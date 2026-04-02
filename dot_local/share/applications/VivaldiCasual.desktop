@@ -1,0 +1,21 @@
+[Desktop Entry]
+Categories=Network;WebBrowser;
+Comment[en_US]=
+Comment=
+Exec=env GTK_THEME=Adwaita:dark /usr/bin/vivaldi --ozone-platform=wayland --class=VivaldiCasual --user-data-dir=/home/samuel/.config/vivaldi-casual %u
+GenericName[en_US]=
+GenericName=
+Icon=a7xpg
+MimeType=
+Name[en_US]=Vivaldi (Casual)
+Name=Vivaldi (Casual)
+NoDisplay=false
+Path=
+PrefersNonDefaultGPU=false
+StartupNotify=true
+StartupWMClass=VivaldiCasual
+Terminal=false
+TerminalOptions=
+Type=Application
+X-KDE-SubstituteUID=false
+X-KDE-Username=
