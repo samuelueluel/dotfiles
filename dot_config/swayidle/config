@@ -1,0 +1,11 @@
+# swayidle configuration
+# Stage 1 (5 min): turn off displays
+# Stage 2 (5 min 30 sec): lock screen
+# Stage 3 (10 min): suspend
+
+timeout 300  'niri msg action power-off-monitors'
+timeout 330  'swaylock'
+timeout 600  'systemctl suspend'
+after-resume 'niri msg action power-on-monitors'
+
+before-sleep 'swaylock'

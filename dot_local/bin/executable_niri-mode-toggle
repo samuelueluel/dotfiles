@@ -1,0 +1,39 @@
+#!/bin/bash
+# Toggles between two Niri display modes:
+#   Default:    real wallpaper + center-focused-column always + dim unfocused to 0.75 + gaps 6 + focus-ring width 1
+#   Focus mode: solid black wallpaper + center-focused-column never + dim unfocused to 0.9 + gaps 2 + focus-ring width 0
+#
+# State is detected by center-focused-column value in config.kdl.
+
+CONFIG="$HOME/.config/niri/config.kdl"
+STATE_FILE="$HOME/.cache/niri-mode-toggle-wallpaper"
+BLACK_WALLPAPER="solid://#000000"
+
+if grep -qP '^    center-focused-column "never"' "$CONFIG"; then
+    # Currently in focus mode → restore defaults
+
+    # 1. Start wallpaper change first so animation begins immediately
+    RESTORE_WALLPAPER=$(cat "$STATE_FILE" 2>/dev/null)
+    if [[ -z "$RESTORE_WALLPAPER" || "$RESTORE_WALLPAPER" == "$BLACK_WALLPAPER" ]]; then
+        RESTORE_WALLPAPER="/home/samuel/Pictures/Wallpapers/pedernal_0x5.jpg"
+    fi
+    qs -c noctalia-shell ipc call wallpaper set "$RESTORE_WALLPAPER" ""
+
+    # 2. Apply niri config changes (runs while wallpaper transition plays)
+    sed -i --follow-symlinks '/^    center-focused-column "never"/s/"never"/"always"/' "$CONFIG"
+    sed -i --follow-symlinks 's/opacity 0\.9$/opacity 0.75/' "$CONFIG"
+    sed -i --follow-symlinks 's/^\(    gaps \)2/\16/' "$CONFIG"
+    sed -i --follow-symlinks 's/width 0 \/\/ 1 current/width 1 \/\/ 1 current/' "$CONFIG"
+else
+    # Currently in default mode → enter focus mode
+
+    # 1. Save current wallpaper and start change to black first
+    qs -c noctalia-shell ipc call wallpaper get "eDP-1" > "$STATE_FILE"
+    qs -c noctalia-shell ipc call wallpaper set "$BLACK_WALLPAPER" ""
+
+    # 2. Apply niri config changes (runs while wallpaper transition plays)
+    sed -i --follow-symlinks '/^    center-focused-column "always"/s/"always"/"never"/' "$CONFIG"
+    sed -i --follow-symlinks 's/opacity 0\.75$/opacity 0.9/' "$CONFIG"
+    sed -i --follow-symlinks 's/^\(    gaps \)6/\12/' "$CONFIG"
+    sed -i --follow-symlinks 's/width 1 \/\/ 1 current/width 0 \/\/ 1 current/' "$CONFIG"
+fi

@@ -328,7 +328,7 @@ spawn-at-startup "swayidle" "-w"
 spawn-at-startup "sh" "-c" "sleep 5 && dropbox start -i"
 spawn-at-startup "sh" "-c" "sleep 5 && easyeffects --gapplication-service"
 spawn-at-startup "copyq" "--start-server"
-spawn-at-startup "/usr/sbin/niriusd"
+spawn-at-startup "/usr/bin/niriusd"
 spawn-at-startup "udiskie" "--no-tray" // auto-mount USB / external drives
 // mpris-proxy removed: airpods-media.service (evdev daemon) handles routing to Quod Libet directly
 
@@ -481,11 +481,11 @@ binds {
 
     Mod+Ctrl+Q hotkey-overlay-title="Close window"  repeat=false { close-window; }
     Mod+P hotkey-overlay-title="Toggle window floating" { toggle-window-floating; } // note this will also make non-floating windows sticky, but buggy
-    Mod+Ctrl+P hotkey-overlay-title="Toggle window follow mode" { spawn "/usr/sbin/nirius" "toggle-follow-mode"; }
+    Mod+Ctrl+P hotkey-overlay-title="Toggle window follow mode" { spawn "/usr/bin/nirius" "toggle-follow-mode"; }
 
-    Mod+O hotkey-overlay-title="Toggle window scratchpad state" { spawn "/usr/sbin/nirius" "scratchpad-toggle"; } // Oh not Zero
-    Mod+1 hotkey-overlay-title="Show all scratchpad windows" { spawn "/usr/sbin/nirius" "scratchpad-show-all"; }
-    Mod+2 hotkey-overlay-title="Cycle scratchpad windows" { spawn "/usr/sbin/nirius" "scratchpad-show"; }
+    Mod+O hotkey-overlay-title="Toggle window scratchpad state" { spawn "/usr/bin/nirius" "scratchpad-toggle"; } // Oh not Zero
+    Mod+1 hotkey-overlay-title="Show all scratchpad windows" { spawn "/usr/bin/nirius" "scratchpad-show-all"; }
+    Mod+2 hotkey-overlay-title="Cycle scratchpad windows" { spawn "/usr/bin/nirius" "scratchpad-show"; }
 
     Mod+G hotkey-overlay-title="Toggle fullscreen" { fullscreen-window; }
     Mod+Ctrl+G hotkey-overlay-title="Expand column to available width" { expand-column-to-available-width; }
