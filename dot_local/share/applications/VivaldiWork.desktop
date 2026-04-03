@@ -2,7 +2,7 @@
 Categories=Network;WebBrowser;
 Comment[en_US]=
 Comment=
-Exec=flatpak run --env=GTK_THEME=Adwaita:dark com.vivaldi.Vivaldi --ozone-platform=wayland --user-data-dir=/home/samuel/.config/vivaldi-work --new-window --class=VivaldiWork
+Exec=vivaldi-stable --ozone-platform-hint=wayland --app-id-window-class=VivaldiWork --class=VivaldiWork --user-data-dir=/var/home/samuel/.config/vivaldi-work --new-window %u
 GenericName[en_US]=
 GenericName=
 Icon=format-text-symbol
