@@ -79,10 +79,12 @@ function update-all() {
     print -P "\n%F{blue}=== System Health Check ===%f"
     print -P "%F{cyan}  \$ systemctl --failed%f"
     systemctl --failed
-    print -P "%F{cyan}  \$ journalctl -p 3 -b%f"
-    journalctl -p 3 -b --no-pager | grep -Pv "(systemd-coredump|^\s{10,}|org\.freedesktop\.FileManager1)"
+    #print -P "%F{cyan}  \$ journalctl -p 3 -b%f"
+    #journalctl -p 3 -b --no-pager | grep -Pv "(systemd-coredump|^\s{10,}|org\.freedesktop\.FileManager1)"
 
     print -P "\n%F{blue}=== Updating Custom Image (rpm-ostree) ===%f"
+    print -P "%F{cyan}  \$ rpm-ostree status%f"
+    sudo rpm-ostree status
     print -P "%F{cyan}  \$ rpm-ostree upgrade%f"
     sudo rpm-ostree upgrade
 
