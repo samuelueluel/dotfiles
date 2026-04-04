@@ -138,5 +138,9 @@ ZSH_HIGHLIGHT_STYLES[arg0]='fg=2'
 # Force 16-color ANSI mode for Claude Code
 alias claude="FORCE_COLOR=1 /home/samuel/.local/bin/claude"
 
+# Night light toggles
+alias night-on="pkill wlsunset; nohup wlsunset -l 39.0 -L -77.0 >/dev/null 2>&1 &"
+alias night-off="pkill wlsunset"
+
 # fzf keybinds
 export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char'"
