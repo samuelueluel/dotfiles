@@ -5,41 +5,11 @@
 #   - All columns on focused workspace set to 50% width (two full columns always visible)
 #   - center-focused-column never + dim unfocused to 0.9 + gaps 2 + focus-ring width 0
 #   - Black wallpaper
-#
-# State is tracked via a cache file.
 
 CONFIG="$HOME/.config/niri/config.kdl"
-SETTINGS="$HOME/.config/noctalia/settings.json"
 STATE_FILE="$HOME/.cache/niri-tile-toggle"
 WALLPAPER_FILE="$HOME/.cache/niri-tile-toggle-wallpaper"
-BAR_OPACITY_FILE="$HOME/.cache/niri-tile-toggle-bar-opacity"
-BLACK_WALLPAPER="solid://#000000"
-
-set_bar_opacity() {
-    python3 -c "
-import json, sys
-path = sys.argv[1]
-opacity = float(sys.argv[2])
-with open(path) as f:
-    d = json.load(f)
-d['bar']['backgroundOpacity'] = opacity
-with open(path, 'w') as f:
-    json.dump(d, f, indent=2)
-" "$SETTINGS" "$1"
-}
-
-set_transition() {
-    python3 -c "
-import json, sys
-path = sys.argv[1]
-transition = sys.argv[2]
-with open(path) as f:
-    d = json.load(f)
-d['wallpaper']['transitionType'] = transition
-with open(path, 'w') as f:
-    json.dump(d, f, indent=2)
-" "$SETTINGS" "$1"
-}
+DEFAULT_WALLPAPER="/var/home/samuel/Pictures/Wallpapers/joonyeop-baek-GK6qXiHm6Iw-unsplash.jpg"
 
 resize_columns() {
     COLUMN_WIDTH="$1" python3 << 'EOF'
@@ -81,77 +51,48 @@ EOF
 }
 
 if [ -f "$STATE_FILE" ]; then
-    # In tile mode → restore scroller mode
+    # EXITING TILE MODE → RESTORE DEFAULTS
+    
+    # 1. Restore wallpaper
+    RESTORE_WALLPAPER=$(cat "$WALLPAPER_FILE" 2>/dev/null)
+    if [[ -z "$RESTORE_WALLPAPER" ]]; then
+        RESTORE_WALLPAPER="$DEFAULT_WALLPAPER"
+    fi
+    pkill swaybg
+    swaybg -i "$RESTORE_WALLPAPER" -m fill &
 
-    # 1. Restore column centering
-    sed -i --follow-symlinks '/^    center-focused-column "never"/s/"never"/"always"/' "$CONFIG"
-
-    # 2. Restore default unfocused opacity
+    # 2. Apply config changes
+    sed -i --follow-symlinks 's/^\(\s*\)center-focused-column "never"/\1center-focused-column "always"/' "$CONFIG"
     sed -i --follow-symlinks 's/opacity 0\.9$/opacity 0.75/' "$CONFIG"
-
-    # 3. Restore layout gaps (2 → 6)
-    sed -i --follow-symlinks 's/^\(    gaps \)2/\16/' "$CONFIG"
-
-    # 4. Restore focus-ring width (0 → 1)
+    sed -i --follow-symlinks 's/^\(\s*gaps \)2/\16/' "$CONFIG"
     sed -i --follow-symlinks 's/width 0 \/\/ 1 current/width 1 \/\/ 1 current/' "$CONFIG"
-
-    # 4b. Restore border width (2 → 3)
     sed -i --follow-symlinks 's/width 2 \/\/ 3 current/width 3 \/\/ 3 current/' "$CONFIG"
 
-    # 5. Restore column widths
+    # 3. Restore column widths
     resize_columns "76.666667%"
 
-    # 6. Restore wallpaper
-    RESTORE_WALLPAPER=$(cat "$WALLPAPER_FILE" 2>/dev/null)
-    if [[ -z "$RESTORE_WALLPAPER" || "$RESTORE_WALLPAPER" == "$BLACK_WALLPAPER" ]]; then
-        RESTORE_WALLPAPER="/home/samuel/Pictures/Wallpapers/pedernal_0x5.jpg"
-    fi
-    ORIG=$(python3 -c "import json; print(json.load(open('$SETTINGS'))['wallpaper']['transitionType'])")
-    set_transition "wipe"
-    sleep 0.3
-    qs -c noctalia-shell ipc call wallpaper set "$RESTORE_WALLPAPER" ""
-    sleep 2
-    set_transition "$ORIG"
-
-    # 7. Restore bar opacity
-    BAR_OPACITY=$(cat "$BAR_OPACITY_FILE" 2>/dev/null)
-    if [[ -n "$BAR_OPACITY" ]]; then
-        set_bar_opacity "$BAR_OPACITY"
-    fi
-    rm -f "$STATE_FILE" "$BAR_OPACITY_FILE"
+    rm -f "$STATE_FILE"
 else
-    # In scroller mode → enter tile mode
+    # ENTERING TILE MODE
+    
+    # 1. Save wallpaper and go black
+    CURRENT_WALLPAPER=$(grep -oP '(?<=spawn-at-startup "swaybg" "-i" ")[^"]+' "$CONFIG")
+    if [[ -z "$CURRENT_WALLPAPER" ]]; then
+        CURRENT_WALLPAPER="$DEFAULT_WALLPAPER"
+    fi
+    echo "$CURRENT_WALLPAPER" > "$WALLPAPER_FILE"
+    pkill swaybg
+    swaybg -c "#000000" &
 
-    # 1. Disable column centering
-    sed -i --follow-symlinks '/^    center-focused-column "always"/s/"always"/"never"/' "$CONFIG"
-
-    # 2. Raise unfocused opacity (less dimming)
+    # 2. Apply config changes
+    sed -i --follow-symlinks 's/^\(\s*\)center-focused-column "always"/\1center-focused-column "never"/' "$CONFIG"
     sed -i --follow-symlinks 's/opacity 0\.75$/opacity 0.9/' "$CONFIG"
-
-    # 3. Reduce layout gaps (6 → 2)
-    sed -i --follow-symlinks 's/^\(    gaps \)6/\12/' "$CONFIG"
-
-    # 4. Remove focus-ring
+    sed -i --follow-symlinks 's/^\(\s*gaps \)6/\12/' "$CONFIG"
     sed -i --follow-symlinks 's/width 1 \/\/ 1 current/width 0 \/\/ 1 current/' "$CONFIG"
-
-    # 4b. Reduce border width (3 → 2)
     sed -i --follow-symlinks 's/width 3 \/\/ 3 current/width 2 \/\/ 3 current/' "$CONFIG"
 
-    # 5. Set column widths to 50%
+    # 3. Set ALL columns on workspace to 50%
     resize_columns "50%"
-
-    # 6. Save current wallpaper and switch to black
-    qs -c noctalia-shell ipc call wallpaper get "eDP-1" > "$WALLPAPER_FILE"
-    ORIG=$(python3 -c "import json; print(json.load(open('$SETTINGS'))['wallpaper']['transitionType'])")
-    set_transition "wipe"
-    sleep 0.3
-    qs -c noctalia-shell ipc call wallpaper set "$BLACK_WALLPAPER" ""
-    sleep 2
-    set_transition "$ORIG"
-
-    # 7. Save bar opacity and set to fully opaque
-    python3 -c "import json; print(json.load(open('$SETTINGS'))['bar']['backgroundOpacity'])" > "$BAR_OPACITY_FILE"
-    set_bar_opacity 1.0
 
     touch "$STATE_FILE"
 fi
