@@ -140,6 +140,7 @@ alias claude="FORCE_COLOR=1 distrobox enter dev-box -- /home/samuel/.local/bin/c
 alias gemini="distrobox enter dev-box -- gemini"
 alias npm="distrobox enter dev-box -- npm"
 alias node="distrobox enter dev-box -- node"
+alias hyprpicker="distrobox enter dev-box -- hyprpicker"
 
 # Night light toggles
 alias night-on="pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 &"
