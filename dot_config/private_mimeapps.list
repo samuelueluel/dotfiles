@@ -1,7 +1,33 @@
 [Default Applications]
 text/markdown=dev.zed.Zed.desktop
 inode/x-empty=dev.zed.Zed.desktop
+text/html=VivaldiLLM.desktop
+x-scheme-handler/http=VivaldiLLM.desktop
+x-scheme-handler/https=VivaldiLLM.desktop
+x-scheme-handler/about=VivaldiLLM.desktop
+x-scheme-handler/unknown=VivaldiLLM.desktop
+application/xhtml+xml=VivaldiLLM.desktop
+application/x-extension-html=VivaldiLLM.desktop
+application/x-extension-htm=VivaldiLLM.desktop
+application/x-extension-shtml=VivaldiLLM.desktop
+application/x-extension-xhtml=VivaldiLLM.desktop
+application/x-extension-xht=VivaldiLLM.desktop
+text/xml=VivaldiLLM.desktop
+application/xml=VivaldiLLM.desktop
 
 [Added Associations]
 text/markdown=dev.zed.Zed.desktop;
 inode/x-empty=dev.zed.Zed.desktop;
+text/html=VivaldiLLM.desktop;
+x-scheme-handler/http=VivaldiLLM.desktop;
+x-scheme-handler/https=VivaldiLLM.desktop;
+x-scheme-handler/about=VivaldiLLM.desktop;
+x-scheme-handler/unknown=VivaldiLLM.desktop;
+application/xhtml+xml=VivaldiLLM.desktop;
+application/x-extension-html=VivaldiLLM.desktop;
+application/x-extension-htm=VivaldiLLM.desktop;
+application/x-extension-shtml=VivaldiLLM.desktop;
+application/x-extension-xhtml=VivaldiLLM.desktop;
+application/x-extension-xht=VivaldiLLM.desktop;
+text/xml=VivaldiLLM.desktop;
+application/xml=VivaldiLLM.desktop;

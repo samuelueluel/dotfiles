@@ -32,25 +32,22 @@ window#waybar {
     margin: 0 3px;
     color: @peach;
     background: transparent;
-    border-radius: 12px;
+    border-radius: 0;
     min-height: 16px;
-    min-width: 10px;
+    min-width: 12px;
     font-size: 8px;
     transition: all 0.4s cubic-bezier(.55,-0.04,.3,1.44);
 }
 
 #workspaces button.active {
     color: @accent;
-    background: linear-gradient(to bottom, transparent 4px, @accent 4px, @accent 12px, transparent 12px);
+    background: linear-gradient(to bottom, transparent 3.5px, @accent 3.5px, @accent 12.5px, transparent 12.5px);
     min-width: 32px;
+    border-radius: 0;
 }
 
 #workspaces button.urgent {
     color: #ff5555;
-}
-
-#workspaces button:hover {
-    color: @fg;
 }
 
 /* ── Taskbar (Icons) ─────────────────────────────────────────────────────── */
