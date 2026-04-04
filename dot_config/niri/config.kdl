@@ -318,7 +318,7 @@ spawn-at-startup "sh" "-c" "wl-paste --watch cliphist store"
 spawn-at-startup "kanshi"
 
 // ── Night light ───────────────────────────────────────────────────────────
-spawn-at-startup "wlsunset" "-l" "39.0" "-L" "-77.0"   // US East Coast — adjust lat/lon as needed
+// spawn-at-startup "wlsunset" "-l" "39.0" "-L" "-77.0"   // US East Coast — adjust lat/lon as needed
 
 
 // ── Idle management ───────────────────────────────────────────────────────
