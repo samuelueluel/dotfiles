@@ -2,60 +2,46 @@ export EDITOR=zeditor
 export SUDO_EDITOR=zeditor
 
 # Lines configured by zsh-newuser-install
-HISTFILE=~/.histfile
-HISTSIZE=1000
-SAVEHIST=1000
+HISTFILE=~/.zsh_history
+HISTSIZE=50000
+SAVEHIST=50000
 setopt extendedglob
 unsetopt beep
 bindkey -e
 bindkey '^X' undo
-# End of lines configured by zsh-newuser-install
-# The following lines were added by compinstall
-zstyle :compinstall filename '/home/samuel/.zshrc'
-
-autoload -Uz compinit
-compinit
-# End of lines added by compinstall
-
-### ----- Personal config (below zsh-newuser-install block) -----
 
 # History (large, shared across sessions, deduped)
-HISTSIZE=50000
-SAVEHIST=50000
-HISTFILE=~/.zsh_history
 setopt APPEND_HISTORY
 setopt SHARE_HISTORY
 setopt HIST_IGNORE_ALL_DUPS
 setopt HIST_REDUCE_BLANKS
 setopt INC_APPEND_HISTORY
 
-# Better globbing tools (assuming you enabled extendedglob earlier)
+# Better globbing tools
 setopt EXTENDED_GLOB
 
-# Quality-of-life: no terminal bell (assuming you disabled beep earlier)
+# Quality-of-life: no terminal bell
 unsetopt BEEP
 
-# Safer glob behavior (keep nomatch on; optional nullglob behavior via (N) when needed)
+# Safer glob behavior
 setopt NOMATCH
 
 # Modern CLI defaults if installed
 command -v eza >/dev/null && alias ls='eza --group-directories-first --icons'
 command -v eza >/dev/null && alias ll='eza -lah --group-directories-first --icons'
 command -v bat >/dev/null && alias cat='bat'
-#command -v rg  >/dev/null && alias grep='rg'
 
 # zoxide: smart cd
 if command -v zoxide >/dev/null; then
   eval "$(zoxide init zsh)"
 fi
 
-# fzf keybindings/completion (path varies by distro)
+# fzf keybindings/completion
 for f in /usr/share/fzf/shell/key-bindings.zsh /usr/share/fzf/shell/completion.zsh; do
   [ -f "$f" ] && source "$f"
 done
 
 # SSH agent: start if not running, add key if not loaded
-# (must be before p10k instant prompt to avoid console output warnings)
 if ! pgrep -u "$USER" ssh-agent > /dev/null; then
   eval "$(ssh-agent -s)" > /dev/null
 fi
@@ -65,8 +51,7 @@ fi
 
 ### ----- Minimal p10k setup (no framework) -----
 
-# Instant prompt (must be near the top, after any input you need)
-# If you don't have ~/.p10k.zsh yet, that's fine.
+# Instant prompt
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
@@ -76,114 +61,47 @@ autoload -Uz compinit
 compinit
 
 # Plugins (order matters: highlighting should be last)
-source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
-source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
-source /usr/share/zsh/plugins/fzf-tab-git/fzf-tab.plugin.zsh
-source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source ~/.local/share/zsh/plugins/powerlevel10k/powerlevel10k.zsh-theme
+source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+source ~/.local/share/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh
+source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # Recommended options
 unsetopt BEEP
 setopt NOMATCH
 setopt EXTENDED_GLOB
-HISTSIZE=50000
-SAVEHIST=50000
-HISTFILE=~/.zsh_history
-setopt APPEND_HISTORY SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS INC_APPEND_HISTORY
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
-# Update function
+# Update function (Fedora Atomic / BlueBuild version)
 function update-all() {
-    print -P "\n%F{blue}=== Checking Arch News (Informant) ===%f"
-    print -P "%F{cyan}  \$ informant check%f  # check for unread Arch Linux news before updating"
-    informant check || { print -P "%F{red}  Read the news above before continuing. Aborting.%f"; return 1; }
-
-    print -P "\n%F{blue}=== Empty Trash? ===%f"
-    read -q "REPLY?  Empty trash now? (y/n) " && trash-empty -f
-    print ""
-
     print -P "\n%F{blue}=== System Health Check ===%f"
-    print -P "%F{cyan}  \$ systemctl --failed%f  # show any failed services"
+    print -P "%F{cyan}  \$ systemctl --failed%f"
     systemctl --failed
-    print -P "%F{cyan}  \$ journalctl -p 3 -b%f  # errors/criticals this boot (excluding core dumps)"
-    journalctl -p 3 -b | grep -Pv "(systemd-coredump|^\s{10,}|org\.freedesktop\.FileManager1)"
+    print -P "%F{cyan}  \$ journalctl -p 3 -b%f"
+    journalctl -p 3 -b --no-pager | grep -Pv "(systemd-coredump|^\s{10,}|org\.freedesktop\.FileManager1)"
 
-    print -P "\n%F{blue}=== Updating Pacman + AUR Packages ===%f"
-    print -P "%F{cyan}  \$ yay -Syu%f"
-    yay -Syu
-
-    print -P "\n%F{blue}=== Checking for Packages Needing Rebuild ===%f"
-    print -P "%F{cyan}  \$ checkrebuild%f  # find AUR packages linked against updated libraries"
-    # Packages known to false-positive (bundle their own libs or are pre-built binaries)
-    local rebuild_exclude=(librewolf-bin qt5-webengine)
-    local rebuild_pkgs
-    rebuild_pkgs=$(checkrebuild 2>/dev/null | awk '{print $2}' | grep -Fxv "$(printf '%s\n' "${rebuild_exclude[@]}")")
-    if [[ -n "$rebuild_pkgs" ]]; then
-        print -P "%F{yellow}  Packages needing rebuild:%f"
-        echo "$rebuild_pkgs"
-        read -q "REPLY?  Rebuild these packages now with yay? (y/n) " && yay -S ${(f)rebuild_pkgs}
-        print ""
-    else
-        print -P "%F{green}  No packages need rebuilding.%f"
-    fi
-
-    print -P "\n%F{blue}=== Backing Up Package Lists ===%f"
-    print -P "%F{cyan}  saving explicit and AUR package lists to system_config_git/pkglists/%f"
-    pacman -Qqen > ~/system_config_git/pkglists/pkglist_explicit.txt
-    pacman -Qqem > ~/system_config_git/pkglists/pkglist_aur.txt
-    print -P "%F{cyan}  \$ paccache -r%f  # keep last 3 versions of installed packages"
-    paccache -r
-    print -P "%F{cyan}  \$ paccache -ruk0%f  # remove all cached versions of uninstalled packages"
-    paccache -ruk0
-
-    print -P "\n%F{blue}=== Removing Orphaned Packages ===%f"
-    print -P "%F{cyan}  \$ yay -Yc%f  # remove packages no longer needed as dependencies"
-    yay -Yc
+    print -P "\n%F{blue}=== Updating Custom Image (rpm-ostree) ===%f"
+    print -P "%F{cyan}  \$ rpm-ostree upgrade%f"
+    sudo rpm-ostree upgrade
 
     print -P "\n%F{blue}=== Updating Flatpaks ===%f"
-    print -P "%F{cyan}  \$ flatpak update -y --noninteractive%f"
-    flatpak update -y --noninteractive
-
-    print -P "\n%F{blue}=== Cleaning up unused Flatpak runtimes ===%f"
-    sleep 2 # Sometimes this is buggy right after flatpak update
-    print -P "%F{cyan}  \$ flatpak uninstall --unused -y --noninteractive%f  # system runtimes no app needs"
-    flatpak uninstall --unused -y --noninteractive
-
-    print -P "\n%F{blue}=== Updating Rust Toolchain + Cargo packages ===%f"
-    print -P "%F{cyan}  \$ rustup update%f  # update Rust compiler and std lib for all installed toolchains"
-    rustup update
-    # Rebuild cargo-install-update if it's broken due to a library update (e.g. libgit2 ABI bump)
-    if ! rustup run stable cargo install-update --version &>/dev/null; then
-        print -P "%F{yellow}  cargo-install-update broken (library mismatch), rebuilding...%f"
-        print -P "%F{cyan}  \$ cargo install cargo-update --force%f"
-        rustup run stable cargo install cargo-update --force
-    fi
-    print -P "%F{cyan}  \$ cargo install-update -a%f  # update all binaries installed via 'cargo install'"
-    rustup run stable cargo install-update -a
+    print -P "%F{cyan}  \$ flatpak update -y%f"
+    flatpak update -y
+    print -P "%F{cyan}  \$ flatpak uninstall --unused -y%f"
+    flatpak uninstall --unused -y
 
     print -P "\n%F{blue}=== Updating npm global packages ===%f"
-    print -P "%F{cyan}  \$ npm update -g%f  # update all globally installed npm packages"
+    print -P "%F{cyan}  \$ npm update -g%f"
     npm update -g
 
-    print -P "\n%F{blue}=== Checking ThinkPad Firmware/BIOS Updates ===%f"
-    print -P "%F{cyan}  \$ fwupdmgr refresh%f  # fetch latest firmware metadata from LVFS"
-    fwupdmgr refresh
-    print -P "%F{cyan}  \$ fwupdmgr get-updates%f  # list available firmware updates"
-    fwupdmgr get-updates
-    print -P "%F{cyan}  \$ fwupdmgr update%f  # apply firmware updates"
-    fwupdmgr update
-    print -P "%F{cyan}  \$ sudo systemctl stop fwupd%f  # stop fwupd daemon until next update"
-    sudo systemctl stop fwupd
+    print -P "\n%F{blue}=== Checking Firmware Updates ===%f"
+    fwupdmgr refresh && fwupdmgr get-updates
 
-    print -P "\n%F{blue}=== Checking for .pacnew Config Files ===%f"
-    print -P "%F{cyan}  \$ eos-pacdiff%f  # show config files that need merging after package updates"
-    eos-pacdiff
-
-    print -P "%F{green}Update sequence complete! (If Niri or your kernel updated, you should reboot soon).%f\n"
+    print -P "\n%F{green}Update sequence complete!%f\n"
 }
 
-# I don't know what this for, but the last one was necessary for zram
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.npm-global/bin:$PATH"
@@ -217,11 +135,8 @@ ZSH_HIGHLIGHT_STYLES[redirection]='fg=4'
 ZSH_HIGHLIGHT_STYLES[comment]='fg=8'
 ZSH_HIGHLIGHT_STYLES[arg0]='fg=2'
 
-# Force 16-color ANSI mode for Claude Code so colors map to controllable ANSI slots
+# Force 16-color ANSI mode for Claude Code
 alias claude="FORCE_COLOR=1 /home/samuel/.local/bin/claude"
 
-# Zoxide (smart cd with frecency)
-eval "$(zoxide init zsh)"
-
-# fzf keybinds (alt+wasd for navigation)
+# fzf keybinds
 export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char'"
