@@ -121,6 +121,7 @@ window#waybar {
 
 #mpris,
 #pulseaudio,
+#power-profiles-daemon,
 #battery,
 #memory,
 #temperature,
@@ -145,8 +146,14 @@ window#waybar {
     color: @gold;
 }
 
+#power-profiles-daemon {
+    font-size: 8px;
+    padding-right: 0px;
+}
+
 #battery {
     color: @fg;
+    padding-left: 0px;
 }
 
 #custom-swaync {
