@@ -517,6 +517,7 @@ binds {
 
     //Mod+I hotkey-overlay-title="Toggle focus mode (wallpaper + centering + opacity)" repeat=false { spawn "niri-mode-toggle"; }
     Mod+I hotkey-overlay-title="Toggle tile-scroll mode (50% columns)" repeat=false { spawn "niri-tile-toggle"; }
+    Mod+Ctrl+B hotkey-overlay-title="Toggle waybar tray" repeat=false { spawn "waybar-tray-toggle"; }
     Mod+Ctrl+I hotkey-overlay-title="Resize right column to complement of focused" repeat=false { spawn "niri-complement-column"; }
 
     Mod+Tab hotkey-overlay-title="Focus previous window" { focus-window-previous; }
