@@ -139,7 +139,7 @@ ZSH_HIGHLIGHT_STYLES[arg0]='fg=2'
 alias claude="FORCE_COLOR=1 /home/samuel/.local/bin/claude"
 
 # Night light toggles
-alias night-on="pkill wlsunset; nohup wlsunset -l 39.0 -L -77.0 >/dev/null 2>&1 &"
+alias night-on="pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 &"
 alias night-off="pkill wlsunset"
 
 # fzf keybinds
