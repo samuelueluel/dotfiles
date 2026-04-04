@@ -92,9 +92,9 @@ function update-all() {
     print -P "%F{cyan}  \$ flatpak uninstall --unused -y%f"
     flatpak uninstall --unused -y
 
-    print -P "\n%F{blue}=== Updating npm global packages ===%f"
-    print -P "%F{cyan}  \$ npm update -g%f"
-    npm update -g
+    print -P "\n%F{blue}=== Updating npm global packages via Distrobox ===%f"
+    print -P "%F{cyan}  \$ distrobox enter dev-box -- npm update -g%f"
+    distrobox enter dev-box -- npm update -g
 
     print -P "\n%F{blue}=== Checking Firmware Updates ===%f"
     fwupdmgr refresh && fwupdmgr get-updates
@@ -135,8 +135,11 @@ ZSH_HIGHLIGHT_STYLES[redirection]='fg=4'
 ZSH_HIGHLIGHT_STYLES[comment]='fg=8'
 ZSH_HIGHLIGHT_STYLES[arg0]='fg=2'
 
-# Force 16-color ANSI mode for Claude Code
-alias claude="FORCE_COLOR=1 /home/samuel/.local/bin/claude"
+# Force 16-color ANSI mode for Claude Code via Distrobox
+alias claude="FORCE_COLOR=1 distrobox enter dev-box -- /home/samuel/.local/bin/claude"
+alias gemini="distrobox enter dev-box -- gemini"
+alias npm="distrobox enter dev-box -- npm"
+alias node="distrobox enter dev-box -- node"
 
 # Night light toggles
 alias night-on="pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 &"
