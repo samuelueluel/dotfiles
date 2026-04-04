@@ -109,7 +109,7 @@
 
   "memory": {
     "interval": 5,
-    "format": "󰍛 {percentage}%",
+    "format": "󰍛  {percentage}%",
     "states": {
       "warning": 70,
       "critical": 90
@@ -119,7 +119,7 @@
 
   "temperature": {
     "critical-threshold": 75,
-    "format": "󰈸 {temperatureC}°C",
+    "format": "󰈸  {temperatureC}°C",
     "tooltip": false
   }
 }
