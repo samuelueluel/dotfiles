@@ -1,6 +1,6 @@
 [opener]
 edit = [
-  { run = 'zeditor "$@"', desc = "Zed", orphan = true },
+  { run = 'zed "$@"', desc = "Zed", orphan = true },
 ]
 view_image = [
   { run = 'swayimg "$@"', desc = "swayimg", orphan = true },
@@ -14,6 +14,7 @@ open = [
 
 [open]
 prepend_rules = [
+  { name = "*.md", use = "edit" },
   { mime = "image/*", use = "view_image" },
   { mime = "application/pdf", use = "view_pdf" },
   { mime = "text/*",        use = "edit" },

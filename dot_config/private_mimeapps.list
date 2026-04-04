@@ -1,0 +1,7 @@
+[Default Applications]
+text/markdown=dev.zed.Zed.desktop
+inode/x-empty=dev.zed.Zed.desktop
+
+[Added Associations]
+text/markdown=dev.zed.Zed.desktop;
+inode/x-empty=dev.zed.Zed.desktop;
