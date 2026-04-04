@@ -10,7 +10,7 @@ Name=Alacritty
 GenericName=Terminal
 Comment=A fast, cross-platform, OpenGL terminal emulator
 StartupNotify=true
-StartupWMClass=Alacritty
+StartupWMClass=alacritty-custom
 Actions=New;
 
 [Desktop Action New]
