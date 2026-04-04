@@ -9,6 +9,8 @@
   "modules-center": ["cffi/niri_window_buttons"],
   "modules-right": [
     "custom/swaync",
+    "temperature",
+    "memory",
     "pulseaudio",
     "battery",
     "clock",
@@ -104,4 +106,20 @@
     "on-click-right": "swaync-client -d -sw",
     "escape": true,
   },
+
+  "memory": {
+    "interval": 5,
+    "format": "󰍛 {percentage}%",
+    "states": {
+      "warning": 70,
+      "critical": 90
+    },
+    "tooltip": true
+  },
+
+  "temperature": {
+    "critical-threshold": 75,
+    "format": "󰈸 {temperatureC}°C",
+    "tooltip": false
+  }
 }

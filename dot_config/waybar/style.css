@@ -122,6 +122,8 @@ window#waybar {
 #mpris,
 #pulseaudio,
 #battery,
+#memory,
+#temperature,
 #custom-swaync {
     padding: 0 3px;
     margin: 0;
