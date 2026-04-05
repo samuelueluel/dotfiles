@@ -76,21 +76,18 @@ setopt EXTENDED_GLOB
 
 # Update function (Fedora Atomic / BlueBuild version)
 function update-all() {
+    print -P "\n%F{yellow}NOTE: rpm-ostree and flatpaks auto-update daily at ~4 AM (systemd timers).%f"
+    print -P "%F{yellow}      This function is mainly useful for on-demand updates, npm globals, and firmware.%f"
     print -P "\n%F{blue}=== System Health Check ===%f"
     print -P "%F{cyan}  \$ systemctl --failed%f"
     systemctl --failed
     #print -P "%F{cyan}  \$ journalctl -p 3 -b%f"
     #journalctl -p 3 -b --no-pager | grep -Pv "(systemd-coredump|^\s{10,}|org\.freedesktop\.FileManager1)"
 
-    print -P "\n%F{blue}=== Updating Custom Image (rpm-ostree) ===%f"
-    print -P "%F{cyan}  \$ rpm-ostree status%f"
-    sudo rpm-ostree status
-    print -P "%F{cyan}  \$ rpm-ostree upgrade%f"
-    sudo rpm-ostree upgrade
+    print -P "\n%F{blue}=== Updating System, Flatpaks, and Containers (ujust update) ===%f"
+    ujust update
 
-    print -P "\n%F{blue}=== Updating Flatpaks ===%f"
-    print -P "%F{cyan}  \$ flatpak update -y%f"
-    flatpak update -y
+    print -P "\n%F{blue}=== Removing Unused Flatpak Runtimes ===%f"
     print -P "%F{cyan}  \$ flatpak uninstall --unused -y%f"
     flatpak uninstall --unused -y
 

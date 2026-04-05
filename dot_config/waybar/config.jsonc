@@ -6,7 +6,7 @@
   "exclusive": true,
 
   "modules-left": ["niri/workspaces"],
-  "modules-center": ["cffi/niri_window_buttons"],
+  "modules-center": ["cffi/niri_window_buttons", "custom/center-spacer"],
   "modules-right": [
     "custom/swaync",
     "temperature",
@@ -42,11 +42,16 @@
       "icon_size": 0,
       "icon_spacing": 0
     },
-    "max_taskbar_width": 400,
+    "max_taskbar_width": 800,
     "button_alignment": "center",
     "only_current_workspace": true,
     "on-click": "activate",
     "on-click-right": "close"
+  },
+
+  "custom/center-spacer": {
+    "format": " ",
+    "tooltip": false
   },
 
   // ── Center ────────────────────────────────────────────────────────────────

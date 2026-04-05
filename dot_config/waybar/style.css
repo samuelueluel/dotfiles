@@ -36,12 +36,18 @@ window#waybar {
     min-height: 16px;
     min-width: 12px;
     font-size: 8px;
-    transition: all 0.4s cubic-bezier(.55,-0.04,.3,1.44);
+    transition: all 0.4s cubic-bezier(0.55, -0.04, 0.3, 1.44);
 }
 
 #workspaces button.active {
     color: @accent;
-    background: linear-gradient(to bottom, transparent 3.5px, @accent 3.5px, @accent 12.5px, transparent 12.5px);
+    background: linear-gradient(
+        to bottom,
+        transparent 3.5px,
+        @accent 3.5px,
+        @accent 12.5px,
+        transparent 12.5px
+    );
     min-width: 32px;
     border-radius: 0;
 }
@@ -55,6 +61,10 @@ window#waybar {
 .niri-window-buttons,
 #cffi-niri_window_buttons {
     padding: 0;
+}
+
+#custom-center-spacer {
+    min-width: 100px;
 }
 
 /* Base style for buttons */
