@@ -14,6 +14,7 @@ See # --- Configuration --- for aesthetic options.
 Must pkill -f niri-minimap for changes to take hold.
 """
 
+import ctypes.util
 import json
 import os
 import signal
@@ -48,7 +49,7 @@ def check_toggle():
                 raise ProcessLookupError
 
             # Decide what signal to send
-            sig = signal.SIGUSR1 # default: toggle
+            sig = signal.SIGUSR1  # default: toggle
             if len(sys.argv) > 1:
                 if sys.argv[1] == "show":
                     sig = signal.SIGUSR2
@@ -76,8 +77,15 @@ def cleanup_pid():
 # --- Toggle check FIRST (so toggle-off is near-instant, no extra work) ---
 # Only run on the first exec (before LD_PRELOAD re-exec), since execvp
 # preserves PID and we'd find our own PID in the file.
-_LAYER_SO = "/usr/lib/libgtk4-layer-shell.so"
-if _LAYER_SO not in os.environ.get("LD_PRELOAD", ""):
+_LAYER_SO = ctypes.util.find_library("gtk4-layer-shell")
+if not _LAYER_SO:
+    # Fallback paths for systems where find_library fails
+    for p in ["/usr/lib64/libgtk4-layer-shell.so.0", "/usr/lib/libgtk4-layer-shell.so"]:
+        if os.path.exists(p):
+            _LAYER_SO = p
+            break
+
+if _LAYER_SO and _LAYER_SO not in os.environ.get("LD_PRELOAD", ""):
     check_toggle()
     os.environ["LD_PRELOAD"] = _LAYER_SO
     os.execvp(sys.executable, [sys.executable] + sys.argv)
@@ -148,31 +156,35 @@ from gi.repository import Gdk, GLib, Gtk, Gtk4LayerShell
 
 # --- Configuration ---
 # Layout
-MINIMAP_WIDTH = 0.95  # default width as a fraction of monitor width (expands if content needs more)
-ICON_SIZE = 50        # px, app icon size, 48
-CELL_PAD = 8          # px, outer margin around each tile (space outside the ring)
-TILE_PAD = 6          # px, inner padding between icon and the ring
-COL_SPACING = 12      # px, horizontal gap between columns
-TILE_SPACING = 4      # px, vertical gap between tiles in a column
-WS_SPACING = 16      # px, vertical gap between workspaces
+MINIMAP_WIDTH = (
+    0.95  # default width as a fraction of monitor width (expands if content needs more)
+)
+ICON_SIZE = 50  # px, app icon size, 48
+CELL_PAD = 8  # px, outer margin around each tile (space outside the ring)
+TILE_PAD = 6  # px, inner padding between icon and the ring
+COL_SPACING = 12  # px, horizontal gap between columns
+TILE_SPACING = 4  # px, vertical gap between tiles in a column
+WS_SPACING = 16  # px, vertical gap between workspaces
 
 # Borders & radii
-BORDER_WIDTH = 6          # px, highlight ring around focused/active tiles
-OUTER_BORDER_WIDTH = 2    # px, border around the whole minimap panel
+BORDER_WIDTH = 6  # px, highlight ring around focused/active tiles
+OUTER_BORDER_WIDTH = 2  # px, border around the whole minimap panel
 OUTER_BORDER_RADIUS = 12  # px, corner rounding of the outer panel
-TILE_BORDER_RADIUS = 6    # px, corner rounding of tiles and columns
-FOCUS_RING_CIRCLE = False  # True = circle focus ring (border-radius 50%), False = rounded square
+TILE_BORDER_RADIUS = 6  # px, corner rounding of tiles and columns
+FOCUS_RING_CIRCLE = (
+    False  # True = circle focus ring (border-radius 50%), False = rounded square
+)
 
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
-FOCUS_RING_COLOR   = ("#00B6C2", 1.00)  # focused window border ring (turquoise)
-FOCUS_FILL_COLOR   = ("#00B6C2", 0.70)  # focused window background fill (turquoise)
-NORMAL_COLOR       = ("#595966", 1.00)  # reserved / unused
-BG_COLOR           = ("#000000", 0.80)  # outer panel background, old #1F1F26
-WS_BG_COLOR        = ("#2E2E38", 0.85)  # workspace background
+FOCUS_RING_COLOR = ("#00B6C2", 1.00)  # focused window border ring (turquoise)
+FOCUS_FILL_COLOR = ("#00B6C2", 0.70)  # focused window background fill (turquoise)
+NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
+BG_COLOR = ("#000000", 0.80)  # outer panel background, old #1F1F26
+WS_BG_COLOR = ("#2E2E38", 0.85)  # workspace background
 OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
-COLUMN_COLOR       = ("#574150", 1.00)  # non-spine column background
-SPINE_COLOR        = ("#A14763", 1.00)  # spine column background
-WS_RING_COLOR      = ("#E7BAC2", 1.00)  # focused-workspace ring
+COLUMN_COLOR = ("#574150", 1.00)  # non-spine column background
+SPINE_COLOR = ("#A14763", 1.00)  # spine column background
+WS_RING_COLOR = ("#00B6C2", 1.00)  # focused-workspace ring
 
 
 def _c(color):
@@ -186,6 +198,7 @@ def _c(color):
 
 
 # --- .desktop icon cache (pre-scanned in background thread above) ---
+
 
 def get_desktop_icon_map():
     _desktop_scan_thread.join()  # blocks only if scan isn't done yet (~9ms)
@@ -247,14 +260,16 @@ def parse_state(workspaces_raw, windows_raw):
         if pos is None:
             continue
         col_idx, tile_idx = pos
-        ws_by_id[ws_id]["columns"][col_idx].append({
-            "id": win["id"],
-            "app_id": win.get("app_id", ""),
-            "title": win.get("title", ""),
-            "is_focused": win["is_focused"],
-            "col_idx": col_idx,
-            "tile_idx": tile_idx,
-        })
+        ws_by_id[ws_id]["columns"][col_idx].append(
+            {
+                "id": win["id"],
+                "app_id": win.get("app_id", ""),
+                "title": win.get("title", ""),
+                "is_focused": win["is_focused"],
+                "col_idx": col_idx,
+                "tile_idx": tile_idx,
+            }
+        )
 
     for ws in ws_by_id.values():
         for col_idx in ws["columns"]:
@@ -285,13 +300,11 @@ class MinimapWindow(Gtk.Window):
         super().__init__(application=app)
         self.icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
 
-        self.tile_widgets = {}   # win_id -> Gtk.Box
+        self.tile_widgets = {}  # win_id -> Gtk.Box
 
         Gtk4LayerShell.init_for_window(self)
         Gtk4LayerShell.set_layer(self, Gtk4LayerShell.Layer.OVERLAY)
-        Gtk4LayerShell.set_keyboard_mode(
-            self, Gtk4LayerShell.KeyboardMode.NONE
-        )
+        Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.NONE)
         Gtk4LayerShell.set_namespace(self, "niri-minimap")
 
         self.set_decorated(False)
@@ -300,7 +313,7 @@ class MinimapWindow(Gtk.Window):
         self.outer.set_halign(Gtk.Align.CENTER)
         self.outer.set_valign(Gtk.Align.CENTER)
         self.outer.add_css_class("minimap-outer")
-        
+
         display = Gdk.Display.get_default()
         monitors = display.get_monitors()
         if monitors and monitors.get_n_items() > 0:
@@ -400,7 +413,7 @@ class MinimapWindow(Gtk.Window):
                         tile["title"][:60] if tile["title"] else tile["app_id"]
                     )
 
-                    in_spine = (start_col + i == spine_index)
+                    in_spine = start_col + i == spine_index
                     if tile["is_focused"]:
                         tile_box.add_css_class("minimap-tile-focused")
                     else:
@@ -506,8 +519,12 @@ class MinimapApp(Gtk.Application):
         self._win = MinimapWindow(self)
         self._win.set_hide_on_close(True)
 
-        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, self._on_toggle_signal)
-        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, self._on_show_signal)
+        GLib.unix_signal_add(
+            GLib.PRIORITY_DEFAULT, signal.SIGUSR1, self._on_toggle_signal
+        )
+        GLib.unix_signal_add(
+            GLib.PRIORITY_DEFAULT, signal.SIGUSR2, self._on_show_signal
+        )
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, self._on_hide_signal)
 
         # Start event stream — initial dump provides both windows and workspaces
@@ -524,8 +541,12 @@ class MinimapApp(Gtk.Application):
 
     def _refresh_state(self):
         try:
-            ws_res = subprocess.run(["niri", "msg", "--json", "workspaces"], capture_output=True, text=True)
-            win_res = subprocess.run(["niri", "msg", "--json", "windows"], capture_output=True, text=True)
+            ws_res = subprocess.run(
+                ["niri", "msg", "--json", "workspaces"], capture_output=True, text=True
+            )
+            win_res = subprocess.run(
+                ["niri", "msg", "--json", "windows"], capture_output=True, text=True
+            )
             self._workspaces = {ws["id"]: ws for ws in json.loads(ws_res.stdout)}
             self._windows = {w["id"]: w for w in json.loads(win_res.stdout)}
             self._sync_ws_focus()
@@ -593,7 +614,9 @@ class MinimapApp(Gtk.Application):
             self._try_initial_build()
 
         elif "WorkspacesChanged" in event:
-            self._workspaces = {ws["id"]: ws for ws in event["WorkspacesChanged"]["workspaces"]}
+            self._workspaces = {
+                ws["id"]: ws for ws in event["WorkspacesChanged"]["workspaces"]
+            }
             self._sync_ws_focus()
             self._got_initial_workspaces = True
             self._try_initial_build()
