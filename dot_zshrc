@@ -131,9 +131,6 @@ ZSH_HIGHLIGHT_STYLES[redirection]='fg=4'
 ZSH_HIGHLIGHT_STYLES[comment]='fg=8'
 ZSH_HIGHLIGHT_STYLES[arg0]='fg=2'
 
-# Force 16-color ANSI mode for Claude Code via Distrobox
-alias claude="FORCE_COLOR=1 distrobox enter dev-box -- /home/samuel/.local/bin/claude"
-alias gemini="distrobox enter dev-box -- gemini"
 alias npm="distrobox enter dev-box -- npm"
 alias node="distrobox enter dev-box -- node"
 alias hyprpicker="distrobox enter dev-box -- hyprpicker"
