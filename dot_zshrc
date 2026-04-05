@@ -101,10 +101,7 @@ function update-all() {
     print -P "\n%F{green}Update sequence complete!%f\n"
 }
 
-export PATH="$HOME/.local/bin:$PATH"
-export PATH="$HOME/.cargo/bin:$PATH"
-export PATH="$HOME/.npm-global/bin:$PATH"
-export PATH="/usr/sbin:$PATH"
+# PATH is set via ~/.config/environment.d/10-path.conf
 
 # Autosuggestions: gray slot for ghost/unobtrusive text
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'

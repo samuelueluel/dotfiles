@@ -2,7 +2,7 @@
 
 # --- CONFIGURATION ---
 # Your exact Vault folder path (No trailing slash)
-VAULT_ROOT="/home/samuel/Dropbox/Sam_Personal_Vault"
+VAULT_ROOT="$HOME/Dropbox/Sam_Personal_Vault"
 # Your Vault Name (As shown in Obsidian) - usually the folder name
 VAULT_NAME="Sam_Personal_Vault"
 # ---------------------

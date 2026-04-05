@@ -1,0 +1,3 @@
+# Sourced by ZSH for every process (login, interactive, and scripts).
+# PATH lives here so it's set before systemctl import-environment runs in niri-session.
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.npm-global/bin:/usr/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin"
