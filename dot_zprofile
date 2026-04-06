@@ -1,0 +1,19 @@
+# this file is installed as ~/.zprofile for newly created users
+
+# prepend ~/.local/bin and ~/bin to $PATH unless it is already there
+if ! [[ "$PATH" =~ "$HOME/bin" ]]
+then
+    PATH="$HOME/bin:$PATH"
+fi
+if ! [[ "$PATH" =~ "$HOME/.local/bin:" ]]
+then
+    PATH="$HOME/.local/bin:$PATH"
+fi
+export PATH
+
+# ── Homebrew Activation ──────────────────────────────────────────────────────
+# This command dynamically sets PATH, MANPATH, INFOPATH, and HOMEBREW_PREFIX.
+# It only runs once per login session.
+if [ -d "/home/linuxbrew/.linuxbrew/bin" ]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi

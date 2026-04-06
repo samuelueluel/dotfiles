@@ -84,6 +84,10 @@ function update-all() {
     #print -P "%F{cyan}  \$ journalctl -p 3 -b%f"
     #journalctl -p 3 -b --no-pager | grep -Pv "(systemd-coredump|^\s{10,}|org\.freedesktop\.FileManager1)"
 
+    print -P "\n%F{blue}=== Empty Trash? ===%f"
+    read -q "REPLY?  Empty trash? (y/n) " && gio trash --empty
+    print ""
+
     print -P "\n%F{blue}=== Updating System, Flatpaks, and Containers (ujust update) ===%f"
     ujust update
 
