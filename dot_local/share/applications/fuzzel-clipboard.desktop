@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Clipboard History
+Comment=Search and select from clipboard history using Fuzzel
+Exec={{ .chezmoi.homeDir }}/.config/niri/executable_fuzzel-clipboard.sh
+Icon=edit-paste
+Terminal=false
+Type=Application
+Categories=System;Utility;
+Keywords=clipboard;copy;paste;history;
