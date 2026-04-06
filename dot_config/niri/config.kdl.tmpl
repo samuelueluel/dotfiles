@@ -313,7 +313,7 @@ spawn-at-startup "swaync"
 spawn-at-startup "swayosd-server"
 
 // ── Clipboard daemon ──────────────────────────────────────────────────────
-spawn-at-startup "sh" "-c" "wl-paste --watch cliphist store"
+// spawn-at-startup "sh" "-c" "wl-paste --watch cliphist store"
 
 // ── Display management ────────────────────────────────────────────────────
 spawn-at-startup "kanshi"
@@ -357,6 +357,8 @@ exclude title="File Launcher"
 exclude title="Folder Launcher"
 exclude title="Keybind Search"
 exclude app-id="org.gnome.SystemMonitor"
+exclude app-id="com.github.hluk.copyq"
+exclude app-id="nemo"
 open-on-workspace "utility" // May need to adjust for work-specific apps
 }
 
@@ -605,7 +607,7 @@ binds {
     // CLIPBOARD
     // -----------------------------------
 
-    Mod+V hotkey-overlay-title="Spawn CopyQ" { spawn "copyq" "toggle"; }
+    //Mod+V hotkey-overlay-title="Spawn CopyQ" { spawn "copyq" "toggle"; } just launch from fuzzel
 
     // -----------------------------------
     // MEDIA CONTROLS
