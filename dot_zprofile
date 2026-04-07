@@ -10,10 +10,3 @@ then
     PATH="$HOME/.local/bin:$PATH"
 fi
 export PATH
-
-# ── Homebrew Activation ──────────────────────────────────────────────────────
-# This command dynamically sets PATH, MANPATH, INFOPATH, and HOMEBREW_PREFIX.
-# It only runs once per login session.
-if [ -d "/home/linuxbrew/.linuxbrew/bin" ]; then
-    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-fi

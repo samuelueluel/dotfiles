@@ -1,9 +1,9 @@
 [mgr]
 prepend_keymap = [
 { on = "<C-f>", run = "plugin fzf", desc = "Fuzzy jump (fzf)" },
-	{ on = "<C-h>", run = "filter", desc = "Filter files" },
+	{ on = "<C-g>", run = "plugin fazif folder_search", desc = "Fuzzy jump to directory (fzf)" },
+	{ on = "<C-h>", run = "search rg", desc = "Search by content (ripgrep)" },
 	{ on = "<C-s>", run = "search fd", desc = "Search by name (fd)" },
-	{ on = "<C-g>", run = "search rg", desc = "Search by content (ripgrep)" },
 	{ on = "<C-n>", run = "create", desc = "Create file/folder" },
 	{ on = "<C-t>", run = "tab_create --current", desc = "New tab" },
 	{ on = "<C-r>", run = "reload", desc = "Reload" },
@@ -29,7 +29,8 @@ prepend_keymap = [
 	{ on = "8", run = "noop" },
 	{ on = "9", run = "noop" },
 	{ on = "f", run = "noop", desc = "Disabled (use Ctrl+F)" },
-	{ on = "<C-j>", run = "plugin zoxide", desc = "Jump via zoxide" },
+	{ on = "<C-j>", run = "filter", desc = "Filter files" },
+	{ on = "<C-k>", run = "plugin zoxide", desc = "Jump via zoxide" },
 	{ on = "z", run = "noop" },
 	{ on = "Z", run = "noop" },
 	{ on = "s", run = "noop" },

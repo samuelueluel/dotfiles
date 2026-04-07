@@ -95,9 +95,17 @@ function update-all() {
     print -P "%F{cyan}  \$ flatpak uninstall --unused -y%f"
     flatpak uninstall --unused -y
 
-    print -P "\n%F{blue}=== Updating npm global packages via Distrobox ===%f"
-    print -P "%F{cyan}  \$ distrobox enter dev-box -- npm update -g%f"
-    distrobox enter dev-box -- npm update -g
+    #print -P "\n%F{blue}=== Updating npm global packages via Distrobox ===%f"
+    #print -P "%F{cyan}  \$ distrobox enter dev-box -- npm update -g%f"
+    #distrobox enter dev-box -- npm update -g
+
+    print -P "\n%F{blue}=== Updating Homebrew and Packages ===%f"
+    if command -v brew >/dev/null; then
+        print -P "%F{cyan}  $ brew update && brew upgrade && brew cleanup%f"
+        brew update && brew upgrade && brew cleanup
+    else
+        print -P "%F{red}  Homebrew not found, skipping.%f"
+    fi
 
     print -P "\n%F{blue}=== Checking Firmware Updates ===%f"
     fwupdmgr refresh && fwupdmgr get-updates
@@ -134,10 +142,6 @@ ZSH_HIGHLIGHT_STYLES[assign]='fg=0'
 ZSH_HIGHLIGHT_STYLES[redirection]='fg=4'
 ZSH_HIGHLIGHT_STYLES[comment]='fg=8'
 ZSH_HIGHLIGHT_STYLES[arg0]='fg=2'
-
-alias npm="distrobox enter dev-box -- npm"
-alias node="distrobox enter dev-box -- node"
-alias hyprpicker="distrobox enter dev-box -- hyprpicker"
 
 # Night light toggles
 alias night-on="pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 &"
