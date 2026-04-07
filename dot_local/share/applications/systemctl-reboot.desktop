@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=systemctl reboot
-Exec=systemctl reboot
-Icon=system-reboot
-Type=Application
-Categories=System;
-Terminal=false
-Comment=Reboot the system

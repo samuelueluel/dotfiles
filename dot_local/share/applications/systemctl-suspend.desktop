@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=systemctl suspend
-Exec=systemctl suspend
-Icon=system-suspend
-Type=Application
-Categories=System;
-Terminal=false
-Comment=Suspend the system

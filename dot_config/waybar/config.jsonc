@@ -58,8 +58,7 @@
 
   "clock": {
     "format": "{:%a %b %e  %I:%M %p}",
-    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
-    "on-click": "swaync-client -t",
+    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
   },
 
   // ── Right ─────────────────────────────────────────────────────────────────
