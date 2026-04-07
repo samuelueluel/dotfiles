@@ -1,6 +1,6 @@
 [mgr]
 prepend_keymap = [
-{ on = "<C-f>", run = "plugin fzf", desc = "Fuzzy jump (fzf)" },
+{ on = "<C-f>", run = "plugin fzf-nav", desc = "Fuzzy jump (fzf)" },
 	{ on = "<C-g>", run = "plugin fazif folder_search", desc = "Fuzzy jump to directory (fzf)" },
 	{ on = "<C-h>", run = "search rg", desc = "Search by content (ripgrep)" },
 	{ on = "<C-s>", run = "search fd", desc = "Search by name (fd)" },
