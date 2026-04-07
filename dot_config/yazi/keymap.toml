@@ -46,7 +46,7 @@ prepend_keymap = [
 	{ on = "<A-s>", run = "arrow 1", desc = "Move cursor down" },
 	{ on = "<A-a>", run = "leave", desc = "Go to parent directory" },
 	{ on = "<A-d>", run = "enter", desc = "Enter directory / open file" },
-	{ on = "<Enter>", run = "open", desc = "Open file" },
+	{ on = "<Enter>", run = "enter", desc = "Enter directory / open file" },
 	{ on = "<A-o>", run = "tasks:show", desc = "Open task manager" },
 	{ on = "w", run = "noop" },
 	{ on = "o", run = "noop" },
