@@ -371,15 +371,9 @@ window-rule {
 window-rule {
     match app-id="VivaldiCasual"
     match app-id="io.github.quodlibet.QuodLibet"
+    match app-id="blueman-manager"
     open-on-workspace "casual"
     default-column-width { proportion 1.0; }
-}
-
-// --- App-Specific Fixes ---
-
-window-rule {
-    match app-id=r#"^org\.wezfurlong\.wezterm$"#
-    default-column-width {}  // Default rule; I guess keep in case I use this program
 }
 
 // --- Custom Floating Launchers ---

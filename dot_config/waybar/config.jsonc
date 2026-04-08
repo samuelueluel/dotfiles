@@ -1,7 +1,7 @@
 {
   "layer": "top",
   "position": "top",
-  "height": 16,
+  "height": 18,
   "spacing": 4,
   "exclusive": true,
 
@@ -34,10 +34,10 @@
   "cffi/niri_window_buttons": {
     "module_path": "/usr/lib/waybar/libniri_window_buttons.so",
     "show_window_titles": false,
-    "icon_size": 14,
+    "icon_size": 16,
     "icon_spacing": 0,
-    "min_button_width": 14,
-    "max_button_width": 14,
+    "min_button_width": 16,
+    "max_button_width": 16,
     "audio_indicator": {
       "icon_size": 0,
       "icon_spacing": 0
@@ -75,7 +75,8 @@
       "car": "󰄄",
       "default": ["󰕿", "󰖀", "󰕾"]
     },
-    "on-click": "pavucontrol",
+    "on-click": "flatpak run com.saivert.pwvucontrol",
+    "on-click-right": "blueman-manager",
     "on-scroll-up": "swayosd-client --output-volume raise",
     "on-scroll-down": "swayosd-client --output-volume lower"
   },

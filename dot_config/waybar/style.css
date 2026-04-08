@@ -10,7 +10,7 @@
 
 * {
     font-family: "IBM Plex Sans", "sans-serif";
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 900;
     min-height: 0;
     margin: 0;
@@ -22,7 +22,7 @@
 window#waybar {
     background-color: @bg;
     color: @fg;
-    min-height: 16px;
+    min-height: 18px;
 }
 
 /* ── Workspaces ──────────────────────────────────────────────────────────── */
@@ -33,9 +33,9 @@ window#waybar {
     color: @peach;
     background: transparent;
     border-radius: 0;
-    min-height: 16px;
-    min-width: 12px;
-    font-size: 8px;
+    min-height: 18px;
+    min-width: 14px;
+    font-size: 9px;
     transition: all 0.4s cubic-bezier(0.55, -0.04, 0.3, 1.44);
 }
 
@@ -43,10 +43,10 @@ window#waybar {
     color: @accent;
     background: linear-gradient(
         to bottom,
-        transparent 3.5px,
-        @accent 3.5px,
-        @accent 12.5px,
-        transparent 12.5px
+        transparent 4px,
+        @accent 4px,
+        @accent 14px,
+        transparent 14px
     );
     min-width: 32px;
     border-radius: 0;
@@ -64,7 +64,7 @@ window#waybar {
 }
 
 #custom-center-spacer {
-    min-width: 100px;
+    min-width: 96px;
 }
 
 /* Base style for buttons */
@@ -75,7 +75,7 @@ window#waybar {
     border-radius: 0;
     background: transparent;
     min-width: 0;
-    min-height: 16px;
+    min-height: 18px;
 }
 
 /* Hide labels and indicators */
@@ -156,7 +156,7 @@ window#waybar {
 }
 
 #power-profiles-daemon {
-    font-size: 8px;
+    font-size: 9px;
     padding-right: 0px;
 }
 
