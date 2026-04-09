@@ -6,7 +6,7 @@
   "exclusive": true,
 
   "modules-left": ["niri/workspaces"],
-  "modules-center": ["cffi/niri_window_buttons", "custom/center-spacer"],
+  "modules-center": ["cffi/niri_window_buttons"],
   "modules-right": [
     "custom/swaync",
     "temperature",
@@ -36,8 +36,8 @@
     "show_window_titles": false,
     "icon_size": 16,
     "icon_spacing": 0,
-    "min_button_width": 16,
-    "max_button_width": 16,
+    "min_button_width": 28,
+    "max_button_width": 28,
     "audio_indicator": {
       "icon_size": 0,
       "icon_spacing": 0
@@ -47,11 +47,6 @@
     "only_current_workspace": true,
     "on-click": "activate",
     "on-click-right": "close"
-  },
-
-  "custom/center-spacer": {
-    "format": " ",
-    "tooltip": false
   },
 
   // ── Center ────────────────────────────────────────────────────────────────

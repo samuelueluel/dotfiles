@@ -63,15 +63,11 @@ window#waybar {
     padding: 0;
 }
 
-#custom-center-spacer {
-    min-width: 96px;
-}
-
 /* Base style for buttons */
 .niri-window-buttons button,
 #cffi-niri_window_buttons button {
-    padding: 0 5px;
-    margin: 0 2px;
+    padding: 0;
+    margin: 0;
     border-radius: 0;
     background: transparent;
     min-width: 0;

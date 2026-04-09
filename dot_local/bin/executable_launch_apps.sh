@@ -7,7 +7,7 @@ vivaldi-stable --ozone-platform-hint=wayland --app-id-window-class=VivaldiCasual
 vivaldi-stable --ozone-platform-hint=wayland --app-id-window-class=VivaldiLLM --class=VivaldiLLM --user-data-dir=/var/home/samuel/.config/vivaldi-llm &
 
 # Launch Quod Libet
-quodlibet &
+flatpak run io.github.quodlibet.QuodLibet &
 
 # Launch Alacritty
 alacritty &
