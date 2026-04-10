@@ -313,7 +313,7 @@ spawn-at-startup "swaync"
 spawn-at-startup "swayosd-server"
 
 // ── Clipboard daemon ──────────────────────────────────────────────────────
-// spawn-at-startup "sh" "-c" "wl-paste --watch cliphist store"
+spawn-at-startup "sh" "-c" "wl-paste --watch cliphist-store"
 
 // ── Display management ────────────────────────────────────────────────────
 spawn-at-startup "kanshi"
@@ -328,7 +328,6 @@ spawn-at-startup "swayidle" "-w"
 // ── Apps ──────────────────────────────────────────────────────────────────
 spawn-at-startup "sh" "-c" "sleep 5 && dropbox start -i"
 spawn-at-startup "sh" "-c" "sleep 5 && flatpak run com.github.wwmm.easyeffects --gapplication-service"
-spawn-at-startup "copyq" "--start-server"
 spawn-at-startup "/usr/bin/niriusd"
 spawn-at-startup "udiskie" "--no-tray" // auto-mount USB / external drives
 // mpris-proxy removed: airpods-media.service (evdev daemon) handles routing to Quod Libet directly
@@ -356,9 +355,12 @@ exclude title="termfilechooser"
 exclude title="File Launcher"
 exclude title="Folder Launcher"
 exclude title="Keybind Search"
+exclude title="Clipboard History"
+exclude title="Alacritty Float"
 exclude app-id="org.gnome.SystemMonitor"
-exclude app-id="com.github.hluk.copyq"
 exclude app-id="nemo"
+exclude app-id="nm-connection-editor"
+exclude app-id="blueman-manager"
 open-on-workspace "utility" // May need to adjust for work-specific apps
 }
 
@@ -371,7 +373,6 @@ window-rule {
 window-rule {
     match app-id="VivaldiCasual"
     match app-id="io.github.quodlibet.QuodLibet"
-    match app-id="blueman-manager"
     open-on-workspace "casual"
     default-column-width { proportion 1.0; }
 }
@@ -393,7 +394,28 @@ window-rule {
 }
 
 window-rule {
+    match title="Yazi Float"
+    open-floating true
+    default-column-width { fixed 1500; }
+    default-window-height { fixed 800; }
+}
+
+window-rule {
     match title="Keybind Search" // Catch the specific window title we set in the bind command
+    open-floating true
+    default-column-width { fixed 1500; }
+    default-window-height { fixed 800; }
+}
+
+window-rule {
+    match title="Clipboard History"
+    open-floating true
+    default-column-width { fixed 1500; }
+    default-window-height { fixed 800; }
+}
+
+window-rule {
+    match title="Alacritty Float"
     open-floating true
     default-column-width { fixed 1500; }
     default-window-height { fixed 800; }
@@ -459,6 +481,7 @@ binds {
     XF86MenuKB hotkey-overlay-title="Toggle minimap" repeat=false { spawn "niri-minimap"; }
     Mod+B hotkey-overlay-title="Toggle Waybar" { spawn-sh "pkill -SIGUSR1 waybar || waybar"; }
     Mod+Space hotkey-overlay-title="App launcher (fuzzel)" repeat=false { spawn "fuzzel"; }
+    // Mod+V hotkey-overlay-title="Clipboard history (cliphist)" repeat=false { spawn-sh "cliphist list | fuzzel --dmenu | cliphist decode | wl-copy"; }
     Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "swaync-client" "-t"; }
 
     // -----------------------------------
@@ -466,8 +489,9 @@ binds {
     // -----------------------------------
 
     Mod+Grave hotkey-overlay-title="Spawn additional Alacritty"  repeat=false { spawn "alacritty"; }
-    Mod+E hotkey-overlay-title="Spawn Yazi file manager" repeat=false { spawn "kitty" "--title" "yazi" "-e" "yazi"; }
-    Mod+Ctrl+E hotkey-overlay-title="Spawn additional Nemo" { spawn "nemo"; }
+    Mod+Ctrl+Grave hotkey-overlay-title="Spawn floating Alacritty" repeat=false { spawn "alacritty" "--title" "Alacritty Float"; }
+    Mod+E hotkey-overlay-title="Spawn floating Yazi (auto-close on open)" repeat=false { spawn-sh "YAZI_FLOAT=1 kitty --title 'Yazi Float' -e yazi"; }
+    Mod+Ctrl+E hotkey-overlay-title="Spawn Yazi file manager" repeat=false { spawn "kitty" "--title" "yazi" "-e" "yazi"; }
     // Mod+Space hotkey-overlay-title="fzf file search (Ctrl+Y to copy)" repeat=false { spawn-sh "alacritty -t 'File Launcher' -e $HOME/.config/niri/open-file.sh"; }
     // Mod+Ctrl+Space hotkey-overlay-title="fzf folder search (Ctrl+Y to copy)" repeat=false { spawn-sh "alacritty -t 'Folder Launcher' -e $HOME/.config/niri/open-folder.sh"; }
     Mod+Slash hotkey-overlay-title="Keybind search" repeat=false { spawn-sh "alacritty -t 'Keybind Search' -e bash -c 'python3 $HOME/.config/niri/niri_parse_keybinds.py | fzf --reverse --border=rounded --info=inline'"; }

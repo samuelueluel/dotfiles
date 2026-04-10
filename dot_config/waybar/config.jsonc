@@ -127,7 +127,8 @@
       "warning": 70,
       "critical": 90
     },
-    "tooltip": true
+    "tooltip": true,
+    "on-click-right": "nm-connection-editor"
   },
 
   "temperature": {

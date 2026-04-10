@@ -1,4 +1,5 @@
 [Default Applications]
+application/pdf=org.kde.okular.desktop
 text/markdown=dev.zed.Zed.desktop
 inode/x-empty=dev.zed.Zed.desktop
 text/html=VivaldiLLM.desktop
