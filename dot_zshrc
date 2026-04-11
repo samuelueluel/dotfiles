@@ -58,7 +58,7 @@ fi
 
 # Completion
 autoload -Uz compinit
-compinit
+compinit -u
 
 # Plugins (order matters: highlighting should be last)
 source ~/.local/share/zsh/plugins/powerlevel10k/powerlevel10k.zsh-theme
@@ -76,8 +76,8 @@ setopt EXTENDED_GLOB
 
 # Update function (Fedora Atomic / BlueBuild version)
 function update-all() {
-    print -P "\n%F{yellow}NOTE: rpm-ostree and flatpaks auto-update daily at ~4 AM (systemd timers).%f"
-    print -P "%F{yellow}      This function is mainly useful for on-demand updates, npm globals, and firmware.%f"
+    print -P "\n%F{yellow}NOTE: rpm-ostree, flatpaks, and homebrew metadata auto-update daily.%f"
+    print -P "%F{yellow}      This function is the only way to update actual homebrew packages, not just metadata .%f"
     print -P "\n%F{blue}=== System Health Check ===%f"
     print -P "%F{cyan}  \$ systemctl --failed%f"
     systemctl --failed
