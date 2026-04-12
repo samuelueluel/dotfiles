@@ -37,6 +37,16 @@ if command -v zoxide >/dev/null; then
   eval "$(zoxide init zsh)"
 fi
 
+# atuin: shell history
+if command -v atuin >/dev/null; then
+  if [[ -f /usr/share/samuel-niri/image-id ]]; then
+    export ATUIN_DATA_DIR="$HOME/.local/share/atuin-samuel"
+  else
+    export ATUIN_DATA_DIR="$HOME/.local/share/atuin-samuel-bluefin"
+  fi
+  eval "$(atuin init zsh)"
+fi
+
 # fzf keybindings/completion
 for f in /usr/share/fzf/shell/key-bindings.zsh /usr/share/fzf/shell/completion.zsh; do
   [ -f "$f" ] && source "$f"
