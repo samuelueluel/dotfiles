@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Launch Vivaldi Casual
-vivaldi-stable --ozone-platform-hint=wayland --app-id-window-class=VivaldiCasual --class=VivaldiCasual --user-data-dir=/var/home/samuel/.config/vivaldi-casual &
+# Launch Zen Personal
+env MOZ_APP_REMOTINGNAME=zen-personal zen-browser -P "personal" --new-instance &
 
-# Launch Vivaldi LLM
-vivaldi-stable --ozone-platform-hint=wayland --app-id-window-class=VivaldiLLM --class=VivaldiLLM --user-data-dir=/var/home/samuel/.config/vivaldi-llm &
+# Launch Zen Utility
+env MOZ_APP_REMOTINGNAME=zen-utility zen-browser -P "utility" --new-instance &
 
 # Launch Quod Libet
 flatpak run io.github.quodlibet.QuodLibet &

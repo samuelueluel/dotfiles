@@ -1,3 +1,4 @@
+umask 002
 export EDITOR=zeditor
 export SUDO_EDITOR=zeditor
 

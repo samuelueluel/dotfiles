@@ -347,9 +347,9 @@ window-rule {
 
 window-rule {
 match {} // Matches everything except exlcuded below
-exclude app-id="VivaldiCasual"
+exclude app-id="zen-personal"
 exclude app-id="io.github.quodlibet.QuodLibet"
-exclude app-id="VivaldiWork"
+exclude app-id="zen-work"
 exclude app-id="kitty"
 exclude title="termfilechooser"
 exclude title="File Launcher"
@@ -361,17 +361,19 @@ exclude app-id="org.gnome.SystemMonitor"
 exclude app-id="nemo"
 exclude app-id="nm-connection-editor"
 exclude app-id="blueman-manager"
+exclude app-id="com.github.wwmm.easyeffects"
+exclude app-id="mpv"
 open-on-workspace "utility" // May need to adjust for work-specific apps
 }
 
 window-rule {
-    match app-id="VivaldiWork"
+    match app-id="zen-work"
     open-on-workspace "work"
     default-column-width { proportion 1.0; }
 }
 
 window-rule {
-    match app-id="VivaldiCasual"
+    match app-id="zen-personal"
     match app-id="io.github.quodlibet.QuodLibet"
     open-on-workspace "casual"
     default-column-width { proportion 1.0; }
@@ -437,9 +439,9 @@ window-rule {
     opacity 1.0
 }
 
-// 3. The Vivaldi "Casual" Exception (Optional)
+// 3. The Zen "Personal" Exception (Optional)
 window-rule {
-    match app-id="VivaldiCasual"
+    match app-id="zen-personal"
     opacity 1.0
 }
 
@@ -637,7 +639,7 @@ binds {
     XF86AudioPrev  { spawn "playerctl" "--player=quodlibet" "previous"; }
 
     Mod+Z hotkey-overlay-title="Play/pause Quod Libet"   { spawn "playerctl" "--player=quodlibet" "play-pause"; }
-    Mod+Ctrl+Z hotkey-overlay-title="Play/pause Vivaldi" { spawn "playerctl" "--player=vivaldi" "play-pause"; }
+    Mod+Ctrl+Z hotkey-overlay-title="Play/pause Zen" { spawn "playerctl" "--player=zen-browser" "play-pause"; }
 
     // -----------------------------------
     // VOLUME AND BRIGHTNESS

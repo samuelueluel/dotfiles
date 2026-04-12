@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Start-up Apps
-Comment=Launch Vivaldi Casual, Vivaldi LLM, Quod Libet, and Alacritty
+Comment=Launch Zen Personal, Zen Utility, Quod Libet, and Alacritty
 Exec=/var/home/samuel/.local/bin/launch_apps.sh
 Icon=utilities-terminal
 Terminal=false
