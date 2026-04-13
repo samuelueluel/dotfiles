@@ -1,0 +1,6 @@
+[Unit]
+Description=Distrobox Automatic Upgrade
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/distrobox upgrade -a
