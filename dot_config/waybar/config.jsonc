@@ -129,6 +129,7 @@
   "temperature": {
     "critical-threshold": 75,
     "format": "󰈸  {temperatureC}°C",
-    "tooltip": false
+    "tooltip": false,
+    "on-click-right": "/usr/bin/flatpak run io.missioncenter.MissionCenter"
   }
 }

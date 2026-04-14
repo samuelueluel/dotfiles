@@ -73,9 +73,9 @@ compinit -u
 
 # Plugins (order matters: highlighting should be last)
 source ~/.local/share/zsh/plugins/powerlevel10k/powerlevel10k.zsh-theme
-source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+[[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 source ~/.local/share/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh
-source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+[[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # Recommended options
 unsetopt BEEP
@@ -87,8 +87,7 @@ setopt EXTENDED_GLOB
 
 # Update function (Fedora Atomic / BlueBuild version)
 function update-all() {
-    print -P "\n%F{yellow}NOTE: rpm-ostree, flatpaks, and homebrew metadata auto-update daily.%f"
-    print -P "%F{yellow}      This function is the only way to update actual homebrew packages, not just metadata .%f"
+    print -P "\n%F{yellow}NOTE: rpm-ostree, flatpaks, and homebrew metadata + packages auto-update daily at ~8pm.%f"
     print -P "\n%F{blue}=== System Health Check ===%f"
     print -P "%F{cyan}  \$ systemctl --failed%f"
     systemctl --failed
@@ -129,7 +128,8 @@ function update-all() {
 # Autosuggestions: gray slot for ghost/unobtrusive text
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'
 
-# Syntax highlighting: map to custom palette
+# Syntax highlighting: map to custom palette (only when plugin is loaded)
+if (( ${+ZSH_HIGHLIGHT_STYLES} )); then
 ZSH_HIGHLIGHT_STYLES[default]='fg=0'
 ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=1'
 ZSH_HIGHLIGHT_STYLES[reserved-word]='fg=4'
@@ -153,6 +153,7 @@ ZSH_HIGHLIGHT_STYLES[assign]='fg=0'
 ZSH_HIGHLIGHT_STYLES[redirection]='fg=4'
 ZSH_HIGHLIGHT_STYLES[comment]='fg=8'
 ZSH_HIGHLIGHT_STYLES[arg0]='fg=2'
+fi
 
 # Night light toggles
 alias night-on="pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 &"
