@@ -123,13 +123,13 @@
       "critical": 90
     },
     "tooltip": true,
-    "on-click-right": "nm-connection-editor"
+    "on-click-right": "alacritty --title nmtui -e nmtui"
   },
 
   "temperature": {
     "critical-threshold": 75,
     "format": "󰈸  {temperatureC}°C",
     "tooltip": false,
-    "on-click-right": "/usr/bin/flatpak run io.missioncenter.MissionCenter"
+    "on-click-right": "alacritty --title htop -e htop"
   }
 }

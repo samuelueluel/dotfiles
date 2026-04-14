@@ -423,6 +423,20 @@ window-rule {
     default-window-height { fixed 800; }
 }
 
+window-rule {
+    match title="nmtui"
+    open-floating true
+    default-column-width { fixed 800; }
+    default-window-height { fixed 550; }
+}
+
+window-rule {
+    match title="htop"
+    open-floating true
+    default-column-width { fixed 1200; }
+    default-window-height { fixed 700; }
+}
+
 // --- Opacity / Dimming ---
 
 // 1. The Global Dimming Rule (Base behavior) --- to make window focus switching a little more obvious
