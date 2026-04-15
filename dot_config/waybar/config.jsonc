@@ -29,7 +29,7 @@
   "cffi/niri_window_buttons": {
     "module_path": "/usr/lib/waybar/libniri_window_buttons.so",
     "show_window_titles": false,
-    "icon_size": 16,
+    "icon_size": 18,
     "icon_spacing": 0,
     "min_button_width": 28,
     "max_button_width": 28,
