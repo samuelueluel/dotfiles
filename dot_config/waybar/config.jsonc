@@ -66,7 +66,7 @@
       "default": ["󰕿", "󰖀", "󰕾"]
     },
     "on-click": "flatpak run com.saivert.pwvucontrol",
-    "on-click-right": "blueman-manager",
+    "on-click-right": "alacritty --title bluetuith -e bluetuith",
     "on-scroll-up": "swayosd-client --output-volume raise",
     "on-scroll-down": "swayosd-client --output-volume lower"
   },
