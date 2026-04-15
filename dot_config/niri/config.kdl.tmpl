@@ -515,8 +515,8 @@ binds {
 
     Mod+Grave hotkey-overlay-title="Spawn additional Alacritty"  repeat=false { spawn "alacritty"; }
     Mod+Ctrl+Grave hotkey-overlay-title="Spawn floating Alacritty" repeat=false { spawn "alacritty" "--title" "Alacritty Float"; }
-    Mod+E hotkey-overlay-title="Spawn floating Yazi (auto-close on open)" repeat=false { spawn-sh "YAZI_FLOAT=1 kitty --title 'Yazi Float' -e yazi"; }
-    Mod+Ctrl+E hotkey-overlay-title="Spawn Yazi file manager" repeat=false { spawn "kitty" "--title" "yazi" "-e" "yazi"; }
+    Mod+E hotkey-overlay-title="Spawn floating Yazi (auto-close on open)" repeat=false { spawn-sh "YAZI_FLOAT=1 kitty --title 'Yazi Float' -e zsh -c 'exec yazi'"; }
+    Mod+Ctrl+E hotkey-overlay-title="Spawn Yazi file manager" repeat=false { spawn "kitty" "--title" "yazi" "-e" "zsh" "-c" "exec yazi"; }
     // Mod+Space hotkey-overlay-title="fzf file search (Ctrl+Y to copy)" repeat=false { spawn-sh "alacritty -t 'File Launcher' -e $HOME/.config/niri/open-file.sh"; }
     // Mod+Ctrl+Space hotkey-overlay-title="fzf folder search (Ctrl+Y to copy)" repeat=false { spawn-sh "alacritty -t 'Folder Launcher' -e $HOME/.config/niri/open-folder.sh"; }
     Mod+Slash hotkey-overlay-title="Keybind search" repeat=false { spawn-sh "alacritty -t 'Keybind Search' -e bash -c 'python3 $HOME/.config/niri/niri_parse_keybinds.py | fzf --reverse --border=rounded --info=inline'"; }
