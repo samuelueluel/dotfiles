@@ -87,7 +87,7 @@ setopt EXTENDED_GLOB
 
 # Update function (Fedora Atomic / BlueBuild version)
 function update-all() {
-    print -P "\n%F{yellow}NOTE: rpm-ostree, flatpaks, and homebrew metadata + packages auto-update daily at ~8pm.%f"
+    print -P "\n%F{yellow}NOTE: rpm-ostree, flatpaks, homebrew metadata + packages, and all distroboxes auto-update daily at ~8pm.%f"
     print -P "\n%F{yellow}NOTE: Some packages built from source in image recipe are PINNED and won't update without manual intervention; others pull latest release without notification.%f"
     print -P "\n%F{blue}=== System Health Check ===%f"
     print -P "%F{cyan}  \$ systemctl --failed%f"
