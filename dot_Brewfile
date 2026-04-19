@@ -18,8 +18,9 @@ brew "glow"        # Markdown renderer for the terminal
 brew "lazygit"     # TUI for git
 brew "ripgrep"     # grep replacement
 brew "television"  # fuzzy finder TUI with live previews
-brew "tldr"        # simplified man pages
+brew "tealdeer"    # simplified man pages (fast Rust tldr client)
 brew "yq"          # jq-style processor for YAML/TOML/XML
 brew "ouch"        # archive tool (zip, tar, gz, zst, etc.)
+brew "pet"         # CLI snippet manager with fzf search
 brew "yt-dlp"      # video downloader
 brew "zoxide"      # smart cd replacement
