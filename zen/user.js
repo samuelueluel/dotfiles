@@ -66,7 +66,7 @@ user_pref("nimbus.rollouts.enabled", false);
 // ── Zen settings ──────────────────────────────────────────────────────────────
 user_pref("zen.glance.enabled", false);
 user_pref("zen.tabs.ctrl-tab.ignore-pending-tabs", true);
-user_pref("zen.theme.content-element-separation", 6);
+user_pref("zen.theme.content-element-separation", 0);
 user_pref("zen.view.compact.enable-at-startup", true);
 user_pref("zen.view.experimental-no-window-controls", true);
 user_pref("zen.view.show-newtab-button-top", false);
