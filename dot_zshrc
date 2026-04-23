@@ -85,46 +85,6 @@ setopt EXTENDED_GLOB
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
-# Update function (Fedora Atomic / BlueBuild version)
-function update-all() {
-    print -P "\n%F{yellow}NOTE: uupd handles image, flatpaks, homebrew, and distroboxes automatically daily at 4am.%f"
-    print -P "\n%F{yellow}NOTE: Some packages built from source in image recipe are PINNED and won't update without manual intervention; others pull latest release without notification.%f"
-    print -P "\n%F{blue}=== System Health Check ===%f"
-    print -P "%F{cyan}  \$ systemctl --failed%f"
-    systemctl --failed
-    #print -P "%F{cyan}  \$ journalctl -p 3 -b%f"
-    #journalctl -p 3 -b --no-pager | grep -Pv "(systemd-coredump|^\s{10,}|org\.freedesktop\.FileManager1)"
-
-    print -P "\n%F{blue}=== Empty Trash? ===%f"
-    read -q "REPLY?  Empty trash? (y/n) " && gio trash --empty
-    print ""
-
-    print -P "\n%F{blue}=== Staging Image Update (bootc upgrade) ===%f"
-    print -P "%F{cyan}  \$ sudo bootc upgrade%f"
-    sudo bootc upgrade
-
-    print -P "\n%F{blue}=== Removing Unused Flatpak Runtimes ===%f"
-    print -P "%F{cyan}  \$ flatpak uninstall --unused -y%f"
-    flatpak uninstall --unused -y
-
-    #print -P "\n%F{blue}=== Updating npm global packages via Distrobox ===%f"
-    #print -P "%F{cyan}  \$ distrobox enter dev-box -- npm update -g%f"
-    #distrobox enter dev-box -- npm update -g
-
-    print -P "\n%F{blue}=== Updating Homebrew and Packages ===%f"
-    if command -v brew >/dev/null; then
-        print -P "%F{cyan}  $ brew update && brew upgrade && brew cleanup%f"
-        brew update && brew upgrade && brew cleanup
-    else
-        print -P "%F{red}  Homebrew not found, skipping.%f"
-    fi
-
-    print -P "\n%F{blue}=== Checking Firmware Updates ===%f"
-    fwupdmgr refresh && fwupdmgr get-updates
-
-    print -P "\n%F{green}Update sequence complete!%f\n"
-}
-
 # PATH is set via ~/.config/environment.d/10-path.conf
 
 # Autosuggestions: gray slot for ghost/unobtrusive text
