@@ -1,0 +1,24 @@
+[Desktop Entry]
+FullScreen=false
+
+[General]
+LockSidebar=true
+ShowSidebar=true
+
+[MainWindow]
+MenuBar=Disabled
+
+[Recent Files]
+File1[$e]=$HOME/system_config_git/gemini-cli/.gemini/GEMINI.md
+File2[$e]=$HOME/system_config_git/gemini-cli/GEMINI.md
+File3[$e]=$HOME/system_config_git/noctalia-qml-patches/README.md
+File4[$e]=$HOME/Dropbox/2021_SummerSupport_Saltmarsh.pdf
+File5[$e]=$HOME/Documents/NixOS_Documentation
+Name1[$e]=GEMINI.md
+Name2[$e]=GEMINI.md
+Name3[$e]=README.md
+Name4[$e]=2021_SummerSupport_Saltmarsh.pdf
+Name5[$e]=NixOS_Documentation
+
+[UiSettings]
+ColorScheme=Noctalia
