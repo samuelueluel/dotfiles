@@ -9,7 +9,7 @@
 CONFIG="$HOME/.config/niri/config.kdl"
 STATE_FILE="$HOME/.cache/niri-tile-toggle"
 WALLPAPER_FILE="$HOME/.cache/niri-tile-toggle-wallpaper"
-DEFAULT_WALLPAPER="/var/home/samuel/Pictures/Wallpapers/joonyeop-baek-GK6qXiHm6Iw-unsplash.jpg"
+DEFAULT_WALLPAPER="$HOME/Pictures/Wallcups/joonyeop-baek-GK6qXiHm6Iw-unsplash.jpg"
 
 resize_columns() {
     COLUMN_WIDTH="$1" python3 << 'EOF'
