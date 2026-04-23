@@ -94,3 +94,15 @@
   Output = ""
   Tag = []
   command = "pets"
+
+[[Snippets]]
+  Description = "Display images on system"
+  Output = ""
+  Tag = []
+  command = "sudo bootc status"
+
+[[Snippets]]
+  Description = "Set \"rollback\" image as default image and the current image as the new \"rollback\", discarding staged images"
+  Output = ""
+  Tag = []
+  command = "sudo bootc rollback"
