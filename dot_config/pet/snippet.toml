@@ -1,0 +1,96 @@
+
+[[Snippets]]
+  Description = "Turns on wlsunset at Santa Fe, NM coordinates"
+  Output = ""
+  Tag = []
+  command = "night-on"
+
+[[Snippets]]
+  Description = "Turns off wlsunset"
+  Output = ""
+  Tag = []
+  command = "night-off"
+
+[[Snippets]]
+  Description = "Reboot laptop"
+  Output = ""
+  Tag = []
+  command = "systemctl reboot"
+
+[[Snippets]]
+  Description = "List chezmoi options"
+  Output = ""
+  Tag = []
+  command = "chezmoi"
+
+[[Snippets]]
+  Description = "Trigger full update and maintenance script"
+  Output = ""
+  Tag = []
+  command = "update-all"
+
+[[Snippets]]
+  Description = "List niri commands"
+  Output = ""
+  Tag = []
+  command = "niri msg"
+
+[[Snippets]]
+  Description = "Launch network/wifi tui"
+  Output = ""
+  Tag = []
+  command = "nmtui"
+
+[[Snippets]]
+  Description = "Launch bluetooth tui"
+  Output = ""
+  Tag = []
+  command = "bluetuith"
+
+[[Snippets]]
+  Description = "Launch resource monitor and task manager tui"
+  Output = ""
+  Tag = []
+  command = "htop"
+
+[[Snippets]]
+  Description = "Tealdeer manpages / descriptions of commands"
+  Output = ""
+  Tag = []
+  command = "tldr"
+
+[[Snippets]]
+  Description = "Turn off laptop"
+  Output = ""
+  Tag = []
+  command = "systemctl poweroff"
+
+[[Snippets]]
+  Description = "Suspend (to RAM) and lock laptop"
+  Output = ""
+  Tag = []
+  command = "systemctl suspend"
+
+[[Snippets]]
+  Description = "Lock laptop"
+  Output = ""
+  Tag = []
+  command = "swaylock"
+
+[[Snippets]]
+  Description = "Kill waydroid from running in the background"
+  Output = ""
+  Tag = []
+  command = "waydroid session stop"
+
+[[Snippets]]
+  Description = "Check if waydroid is running in the background"
+  Output = ""
+  Tag = []
+  command = "waydroid status"
+
+[[Snippets]]
+  Description = "Wrapper for pet search that runs selected command after hitting enter"
+  Output = ""
+  Tag = []
+  command = "pets"
