@@ -305,7 +305,7 @@ gestures {
 // ============================================================
 
 // ── Bar + notifications ───────────────────────────────────────────────────
-spawn-at-startup "sh" "-c" "swaybg -i $HOME/Pictures/Wallpapers/joonyeop-baek-GK6qXiHm6Iw-unsplash.jpg -m fill"
+spawn-at-startup "swaybg" "-i" "/usr/share/samuel-niri/wallpapers/joonyeop-baek-GK6qXiHm6Iw-unsplash.jpg" "-m" "fill"
 spawn-at-startup "waybar"
 spawn-at-startup "swaync"
 
@@ -526,7 +526,7 @@ binds {
     // WINDOW MANAGEMENT
     // -----------------------------------
 
-    Mod+Ctrl+Q hotkey-overlay-title="Close window"  repeat=false { spawn-sh "~/.config/niri/smart-close.sh"; }
+    Mod+Ctrl+Q hotkey-overlay-title="Close window"  repeat=false { spawn "/usr/bin/smart-close.sh"; }
     Mod+P hotkey-overlay-title="Toggle window floating" { toggle-window-floating; } // note this will also make non-floating windows sticky, but buggy
     Mod+Ctrl+P hotkey-overlay-title="Toggle window follow mode" { spawn "/usr/bin/nirius" "toggle-follow-mode"; }
 
