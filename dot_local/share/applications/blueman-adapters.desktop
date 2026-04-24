@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Bluetooth Adapters
+Comment=Set Bluetooth Adapter Properties
+Exec=blueman-adapters
+Icon=blueman
+Terminal=false
+Type=Application
+Categories=Settings;HardwareSettings;GTK;
+StartupNotify=true
+NoDisplay=false

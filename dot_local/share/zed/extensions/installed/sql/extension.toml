@@ -1,0 +1,25 @@
+id = "sql"
+name = "SQL"
+version = "1.1.7"
+schema_version = 1
+description = "SQL language support."
+repository = "https://github.com/zed-extensions/sql"
+authors = ["nervenes", "notpeter", "phileix", "tammyxiong"]
+themes = []
+icon_themes = []
+languages = ["languages/sql"]
+capabilities = []
+
+[lib]
+
+[grammars.sql]
+repository = "https://github.com/DerekStride/tree-sitter-sql"
+rev = "4a99c73f5384f2be10adc55208c84d95a7eb1137"
+
+[language_servers]
+
+[context_servers]
+
+[agent_servers]
+
+[slash_commands]

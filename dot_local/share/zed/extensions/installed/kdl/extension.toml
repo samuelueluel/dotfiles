@@ -1,0 +1,21 @@
+id = "kdl"
+name = "kdl"
+version = "0.0.1"
+schema_version = 1
+description = "Syntax highlighting for KDL files."
+repository = "https://github.com/elkowar/zed-kdl"
+authors = ["ElKowar <dev@elkowar.dev>"]
+themes = []
+languages = ["languages/kdl"]
+
+[lib]
+
+[grammars.kdl]
+repository = "https://github.com/tree-sitter-grammars/tree-sitter-kdl"
+rev = "b37e3d58e5c5cf8d739b315d6114e02d42e66664"
+
+[language_servers]
+
+[slash_commands]
+
+[indexed_docs_providers]
