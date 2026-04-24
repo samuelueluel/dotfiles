@@ -1,3 +1,8 @@
+# Instant prompt — must be first, before anything that produces output
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 umask 002
 export EDITOR=zed
 export SUDO_EDITOR=zed
@@ -58,13 +63,6 @@ if ! pgrep -u "$USER" ssh-agent > /dev/null; then
 fi
 if ! ssh-add -l > /dev/null 2>&1; then
   ssh-add ~/.ssh/id_ed25519 > /dev/null 2>&1
-fi
-
-### ----- Minimal p10k setup (no framework) -----
-
-# Instant prompt
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
 # Completion
