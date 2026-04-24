@@ -65,6 +65,7 @@ user_pref("nimbus.rollouts.enabled", false);
 
 // ── Zen settings ──────────────────────────────────────────────────────────────
 user_pref("zen.glance.enabled", false);
+user_pref("zen.keyboard.shortcuts.version", 17);
 user_pref("zen.tabs.ctrl-tab.ignore-pending-tabs", true);
 user_pref("zen.theme.content-element-separation", 0);
 user_pref("zen.view.compact.enable-at-startup", true);
