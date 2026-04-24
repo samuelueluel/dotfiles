@@ -522,7 +522,7 @@ binds {
     Mod+Ctrl+E hotkey-overlay-title="Spawn Yazi file manager" repeat=false { spawn "kitty" "--title" "yazi" "-e" "zsh" "-c" "exec yazi"; }
     // Mod+Space hotkey-overlay-title="fzf file search (Ctrl+Y to copy)" repeat=false { spawn-sh "alacritty -t 'File Launcher' -e $HOME/.config/niri/open-file.sh"; }
     // Mod+Ctrl+Space hotkey-overlay-title="fzf folder search (Ctrl+Y to copy)" repeat=false { spawn-sh "alacritty -t 'Folder Launcher' -e $HOME/.config/niri/open-folder.sh"; }
-    Mod+Slash hotkey-overlay-title="Keybind search" repeat=false { spawn-sh "alacritty -t 'Keybind Search' -e bash -c 'CONFIG=\"${HOME}/.config/niri/config.kdl\"; [[ -f \"$CONFIG\" ]] || CONFIG=/etc/niri/config.kdl; python3 /usr/bin/niri_parse_keybinds.py -i \"$CONFIG\" | fzf --reverse --border=rounded --info=inline'"; }
+    Mod+Slash hotkey-overlay-title="Keybind search" repeat=false { spawn-sh "alacritty -t 'Keybind Search' -e bash -c 'CONFIG=\"$HOME/.config/niri/config.kdl\"; [[ -f \"$CONFIG\" ]] || CONFIG=/etc/niri/config.kdl; python3 /usr/bin/niri_parse_keybinds.py -i \"$CONFIG\" | fzf --reverse --border=rounded --info=inline'"; }
 
     // -----------------------------------
     // WINDOW MANAGEMENT
