@@ -12,5 +12,6 @@
       }
     ]
   },
+  "effortLevel": "medium",
   "theme": "dark-ansi"
 }

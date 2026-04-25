@@ -22,8 +22,9 @@ if [ "$save" = "1" ]; then
     # save a file
     set -- --chooser-file="$out" "$path"
 elif [ "$directory" = "1" ]; then
-    # upload files from a directory
-    set -- --chooser-file="$out" --cwd-file="$out"".1" "$path"
+    # select a directory — require explicit selection via Enter (no CWD fallback)
+    export YAZI_CHOOSER=1
+    set -- --chooser-file="$out" "$path"
 elif [ "$multiple" = "1" ]; then
     # upload multiple files
     set -- --chooser-file="$out" "$path"
@@ -41,12 +42,3 @@ for arg in "$@"; do
 done
 
 sh -c "$command"
-
-if [ "$directory" = "1" ]; then
-    if [ ! -s "$out" ] && [ -s "$out"".1" ]; then
-        cat "$out"".1" > "$out"
-        rm "$out"".1"
-    else
-        rm "$out"".1"
-    fi
-fi
