@@ -14,8 +14,10 @@ inside-wrong-color=ffa72600
 line-color=00000000
 line-ver-color=00000000
 line-wrong-color=00000000
-text-color=b1b9f9
-text-ver-color=b1b9f9
+# text-color=b1b9f9
+text-color=ffffff
+# text-ver-color=b1b9f9
+text-ver-color=ffffff
 text-wrong-color=ffa726
 separator-color=00000000
 

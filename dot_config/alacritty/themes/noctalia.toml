@@ -2,11 +2,11 @@
 #   Background:  Terracotta  #914059
 #   Regular:     Black       #000000  (ANSI 0, 15)
 #   Special:     Turquoise   #00B6C2  (ANSI 4, 6, 12, 14)
-#   Special:     Peach       #D0A7AF  (ANSI 3, 7, 11)
+#   Special:     Dusty Rose       #D0A7AF  (ANSI 3, 7, 11)
 #   Special:     Green       #17C182  (ANSI 2, 10)
 #   Unobtrusive: Gray        #574150  (ANSI 8)
 #   Bad/Error:   Gold        #FFA726  (ANSI 1, 9)
-#   Accent:      Lilac       #B1B9F9  (ANSI 5, 13)
+#   Accent:      Lavender       #B1B9F9  (ANSI 5, 13)
 
 [colors.primary]
 background = '#914059'
@@ -26,7 +26,7 @@ red     = '#FFA726'  # gold (bad/error)
 green   = '#17C182'  # green
 yellow  = '#D0A7AF'  # peach
 blue    = '#00B6C2'  # turquoise
-magenta = '#B1B9F9'  # lilac (accent)
+magenta = '#FFFFFF'  # white (was: #B1B9F9 lavender)
 cyan    = '#00B6C2'  # turquoise
 white   = '#D0A7AF'  # peach
 
@@ -36,6 +36,6 @@ red     = '#FFA726'  # gold (bad/error)
 green   = '#17C182'  # green
 yellow  = '#D0A7AF'  # peach
 blue    = '#00B6C2'  # turquoise
-magenta = '#B1B9F9'  # lilac (accent)
+magenta = '#FFFFFF'  # white (was: #B1B9F9 lavender)
 cyan    = '#00B6C2'  # turquoise
 white   = '#D0A7AF'  # peach

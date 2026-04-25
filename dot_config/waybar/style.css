@@ -1,7 +1,7 @@
 /* Noctalia color palette */
 @define-color bg       #A14763;
 @define-color bg-dark  #614859;
-@define-color fg       #B1B9F9;
+@define-color fg       /* #B1B9F9 */ #FFFFFF;
 @define-color accent   #00B6C2;
 @define-color peach   #D0A7AF;
 @define-color gold     #FFA726;

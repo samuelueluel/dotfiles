@@ -18,6 +18,7 @@ brew "htop"        # interactive process viewer
 brew "glow"        # Markdown renderer for the terminal
 brew "lazygit"     # TUI for git
 brew "ripgrep"     # grep replacement
+brew "ugrep"       # grep replacement with Unicode and interactive TUI
 brew "television"  # fuzzy finder TUI with live previews
 brew "tealdeer"    # simplified man pages (fast Rust tldr client)
 brew "yq"          # jq-style processor for YAML/TOML/XML
@@ -25,3 +26,5 @@ brew "ouch"        # archive tool (zip, tar, gz, zst, etc.)
 brew "pet"         # CLI snippet manager with fzf search
 brew "yt-dlp"      # video downloader
 brew "zoxide"      # smart cd replacement
+
+cask "font-crimson-pro" # elegant variable serif
