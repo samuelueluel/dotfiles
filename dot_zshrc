@@ -57,13 +57,8 @@ for f in /usr/share/fzf/shell/key-bindings.zsh /usr/share/fzf/shell/completion.z
   [ -f "$f" ] && source "$f"
 done
 
-# SSH agent: start if not running, add key if not loaded
-if ! pgrep -u "$USER" ssh-agent > /dev/null; then
-  eval "$(ssh-agent -s)" > /dev/null
-fi
-if ! ssh-add -l > /dev/null 2>&1; then
-  ssh-add ~/.ssh/id_ed25519 > /dev/null 2>&1
-fi
+# SSH agent via systemd socket (enable with: sjust ssh-setup)
+[[ -S "$XDG_RUNTIME_DIR/ssh-agent.socket" ]] && export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
 
 # Completion
 autoload -Uz compinit
