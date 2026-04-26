@@ -106,8 +106,6 @@ layout {
     gaps 5 // 6 current; 2 for "multi-screen"
 
     background-color "#000000" // Black
-    //background-color "#EE9D00" // gold
-    //background-color "#574150"  // theme gray
 
     //center-focused-column "never"
     center-focused-column "always"
@@ -130,51 +128,15 @@ layout {
 
     focus-ring {
         //off
-
         width 1 // 1 current; 0 for "multi-screen"
-
-        //active-color "#AD4E49"
-        //active-color "#000000"
-        //active-color "#00B6C2"
-        //active-color "#007f87" // dark turqoise
-        //active-color "#05ebfa" // bright turq
-        active-color "#00A4AF"  //theme turqoise
-        //active-color "#EE9D00"  // theme gold
-        //active-color "#2EBF82" // theme green
-        //active-color "#f72dbb" // magenta
-        //active-color "#D0A7AF" // secondary theme
-        //active-color "#f70000" pure red
-        //inactive-color "#858585"
+        active-color "#00A4AF"  //theme turquoise
     }
 
     border {
         // off
-
         width 3 // 3 current; 3 for "multi-screen"
-
-        //active-color "#00B6C2" // lighter turqoise
-        //active-color "#007f87" // dark turqoise
-        //active-color "#05ebfa" // bright turq
-        //active-color "#a8888f"
-        //active-color "#000000"
-        //active-color "#00A4AF" // slighter darker turqoise
-        active-color "#00B6C2" // exact theme turqoise
-        //active-color "#EE9D00"  // theme gold
-        //active-color "#2EBF82" // theme green
-        //inactive-color "#178B69" // green
-        //inactive-color "#2957BC" // darker blue
-        //inactive-color "#712D2B" // redish brown
-        //inactive-color "#AD4E49" // clay brown
-        //inactive-color "#AD5B5B" // terra cotta
-        //inactive-color "#A14763" // terra cotta 2
-        inactive-color "#D0A7AF" // exact theme peach
-        //inactive-color "#b08f95"
-        //inactive-color "#ba979e"
-        //inactive-color "#a8888f"
-        //inactive-color "#000000"
-        //inactive-color "#94787d"
-        //inactive-color "#574150"
-        //inactive-color "#B1B9F9" //blue-white
+        active-color "#00B6C2" // exact theme turquoise
+        inactive-color "#D0A7AF" // exact theme dusty rose
         urgent-color "#EE9D00" // theme gold
     }
 
@@ -197,23 +159,8 @@ layout {
         width 8
         length total-proportion=1.0
 
-        //active-color "#000000"
-        //active-color "#c4a7e7"
-        //active-color "#e0def4"
-        //active-color "#fcd303"
-        //active-color "#D36483"
-        //active-color "#b33b5c"
         active-color "#FFA726" // theme gold
-        //active-color "#d41549"
-        //active-color "#000000"
-        //active-color "#574150" // theme grayish
         inactive-color "#00000090"   // black at ~50% opacity
-        //inactive-color "#00000033" // black at 20% opacity
-        //inactive-color "#57415099" // theme grayish at opacity
-        //inactive-color "#c4a7e7"
-        //inactive-color "#f6c177"
-        //inactive-color "#232136"
-        //active-color "#8CBAC2"
     }
 }
 
@@ -453,7 +400,7 @@ window-rule {
 
 // --- Opacity and Blur ---
 
-// 1a. Opacity of focused window
+// 1a. Opacity of focused window --- exceptions below
 window-rule {
     //match is-active=false
     //exclude is-floating=true
@@ -465,35 +412,27 @@ window-rule {
 window-rule {
     match is-active=false
     //exclude is-floating=true
-    opacity 0.7
+    opacity 0.5
     draw-border-with-background false
 }
 
-// 2. The Picture-in-Picture Exception
+// 2. Exceptions for full opacity
 window-rule {
     match title="(?i)picture in picture|picture-in-picture"
-    opacity 1.0
-}
-
-// 3. The Zen Personal exception
-window-rule {
     match app-id="zen-personal"
-    opacity 1.0
-}
-
-// 4. The mpv exception
-window-rule {
+    match app-id="zen-work"
     match app-id="^mpv$"
+    //match is-floating=true
     opacity 1.0
 }
 
-// 5. Floating windows exception
-//window-rule {
-    //match is-floating=true
-    //opacity 1.0
-//}
+// 3. Exceptions for lower opacity
+window-rule {
+    match app-id="io.github.quodlibet.QuodLibet"
+    opacity 0.7
+}
 
-// 6. Blur  ---  requires transparency for blur to work, set above
+// 4. Blur for regular windows  ---  requires transparency for blur to work, set above
 window-rule {
     match {}
     exclude app-id="zen-personal"
@@ -502,8 +441,9 @@ window-rule {
     }
 }
 
+// 5. Blur for special windows --- some particulars with geometry
 layer-rule {
-    match namespace="^launcher$"
+    match namespace="^launcher$"   // fuzzel
     geometry-corner-radius 10
     background-effect {
         blur true
