@@ -368,6 +368,7 @@ exclude app-id="nm-connection-editor"
 exclude app-id="blueman-manager"
 exclude app-id="com.github.wwmm.easyeffects"
 exclude app-id="mpv"
+exclude app-id="obsidian"
 open-on-workspace "utility" // May need to adjust for work-specific apps
 }
 
@@ -449,13 +450,21 @@ window-rule {
     default-window-height { fixed 600; }
 }
 
-// --- Opacity / Dimming ---
+// --- Opacity and Blur ---
 
-// 1. The Global Dimming Rule (Base behavior) --- to make window focus switching a little more obvious
+// 1a. Opacity of focused window
+window-rule {
+    //match is-active=false
+    //exclude is-floating=true
+    opacity 0.9
+    draw-border-with-background false
+}
+
+// 1a. Opacity of non-focused windows
 window-rule {
     match is-active=false
-    exclude is-floating=true
-    opacity 0.75
+    //exclude is-floating=true
+    opacity 0.7
     draw-border-with-background false
 }
 
@@ -465,7 +474,7 @@ window-rule {
     opacity 1.0
 }
 
-// 3. The Zen "Personal" Exception (Optional)
+// 3. The Zen Personal exception
 window-rule {
     match app-id="zen-personal"
     opacity 1.0
@@ -477,11 +486,44 @@ window-rule {
     opacity 1.0
 }
 
-// 5. All floating windows stay fully opaque
+// 5. Floating windows exception
+//window-rule {
+    //match is-floating=true
+    //opacity 1.0
+//}
+
+// 6. Blur  ---  requires transparency for blur to work, set above
 window-rule {
-    match is-floating=true
-    opacity 1.0
+    match {}
+    exclude app-id="zen-personal"
+    background-effect {
+        blur true
+    }
 }
+
+layer-rule {
+    match namespace="^launcher$"
+    geometry-corner-radius 10
+    background-effect {
+        blur true
+    }
+}
+
+layer-rule {
+    match namespace="^waybar$"
+    background-effect {
+        blur true
+    }
+}
+
+layer-rule {
+    match namespace="^niri-minimap$"
+    geometry-corner-radius 12
+    background-effect {
+        blur true
+    }
+}
+
 
 // ============================================================
 // KEYBINDS

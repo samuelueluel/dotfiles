@@ -20,7 +20,7 @@
 }
 
 window#waybar {
-    background-color: @bg;
+    background-color: rgba(161, 71, 99, 0.9);
     color: @fg;
     min-height: 18px;
 }
