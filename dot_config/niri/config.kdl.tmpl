@@ -401,19 +401,11 @@ window-rule {
 
 // --- Opacity and Blur ---
 
-// 1a. Opacity of focused window --- exceptions below
+// 1. Opacity of focused window --- exceptions below
 window-rule {
     //match is-active=false
     //exclude is-floating=true
     opacity 0.9
-    draw-border-with-background false
-}
-
-// 1a. Opacity of non-focused windows
-window-rule {
-    match is-active=false
-    //exclude is-floating=true
-    opacity 0.5
     draw-border-with-background false
 }
 
@@ -432,17 +424,39 @@ window-rule {
     match app-id="io.github.quodlibet.QuodLibet"
     opacity 0.7
 }
+window-rule { // transparency set in app-specific config to prevent text from dimming
+    match app-id="alacritty-custom"
+    match app-id="kitty"
+    match title="Alacritty Float"
+    match title="Keybind Search"
+    match title="Clipboard History"
+    match title="bluetuith"
+    match title="htop"
+    match title="nmtui"
+    match title="Yazi Float"
+    match app-id="dev.zed.Zed"
+    opacity 1.0
+}
 
 // 4. Blur for regular windows  ---  requires transparency for blur to work, set above
 window-rule {
     match {}
     exclude app-id="zen-personal"
+    exclude app-id="zen-work"
     background-effect {
         blur true
     }
 }
 
-// 5. Blur for special windows --- some particulars with geometry
+// 5. Opacity of non-focused windows --- must go below custom rules above
+window-rule {
+    match is-active=false
+    //exclude is-floating=true
+    opacity 0.5
+    draw-border-with-background false
+}
+
+// 6. Blur for special windows --- some particulars with geometry
 layer-rule {
     match namespace="^launcher$"   // fuzzel
     geometry-corner-radius 10
