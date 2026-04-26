@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+exec env XDG_RUNTIME_DIR="/run/user/$(id -u)/.flatpak/md.obsidian.Obsidian/xdg-run" \
+    /var/lib/flatpak/app/md.obsidian.Obsidian/x86_64/stable/active/files/obsidian-cli "$@"

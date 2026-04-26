@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+OBSIDIAN_JSON="${HOME}/.var/app/md.obsidian.Obsidian/config/obsidian/obsidian.json"
+VAULT_DIR=$(python3 -c "
+import json, sys
+data = json.load(open('${OBSIDIAN_JSON}'))
+vaults = list(data.get('vaults', {}).values())
+open_vault = next((v for v in vaults if v.get('open')), vaults[0])
+print(open_vault['path'])
+" 2>/dev/null)
+
+if [ -z "$VAULT_DIR" ]; then
+    echo "obsidian-fzf-files: could not determine vault path from ${OBSIDIAN_JSON}" >&2
+    exit 1
+fi
+
+VAULT_NAME=$(basename "$VAULT_DIR")
+selected=$(fd -e md --base-directory "$VAULT_DIR" |
+    fzf --preview "bat --paging=never --color=always --style=plain -- \"$VAULT_DIR\"/{}" \
+        --preview-window=right:60%:wrap)
+
+if [ -n "$selected" ]; then
+    # Use CLI (new tab) if Obsidian is running; fall back to xdg-open if not
+    if obsidian files total >/dev/null 2>&1; then
+        obsidian open "path=$selected" newtab
+    else
+        encoded=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$selected")
+        setsid xdg-open "obsidian://open?vault=${VAULT_NAME}&file=${encoded}" >/dev/null 2>&1 &
+        disown
+    fi
+    ya emit-to "$YAZI_ID" quit 2>/dev/null
+fi
