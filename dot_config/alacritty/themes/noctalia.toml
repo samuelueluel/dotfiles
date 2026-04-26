@@ -1,41 +1,41 @@
 # Custom palette
 #   Background:  Terracotta  #914059
-#   Regular:     Black       #000000  (ANSI 0, 15)
+#   Regular:     White       #FFFFFF  (ANSI 0, 15)
 #   Special:     Turquoise   #00B6C2  (ANSI 4, 6, 12, 14)
 #   Special:     Dusty Rose       #D0A7AF  (ANSI 3, 7, 11)
 #   Special:     Green       #17C182  (ANSI 2, 10)
-#   Unobtrusive: Gray        #574150  (ANSI 8)
+#   Unobtrusive: Gray        #8B6878  (ANSI 8)
 #   Bad/Error:   Gold        #FFA726  (ANSI 1, 9)
-#   Accent:      Lavender       #B1B9F9  (ANSI 5, 13)
+#   Accent:      Purple      #cc72fc  (ANSI 5, 13)
 
 [colors.primary]
 background = '#914059'
-foreground = '#000000'
+foreground = '#FFFFFF'
 
 [colors.cursor]
 cursor = '#00B6C2'
-text   = '#000000'
+text   = '#FFFFFF'
 
 [colors.selection]
 background = '#00B6C2'
-text       = '#000000'
+text       = '#FFFFFF'
 
 [colors.normal]
-black   = '#000000'  # regular text
+black   = '#FFFFFF'  # regular text
 red     = '#FFA726'  # gold (bad/error)
 green   = '#17C182'  # green
 yellow  = '#D0A7AF'  # peach
 blue    = '#00B6C2'  # turquoise
-magenta = '#FFFFFF'  # white (was: #B1B9F9 lavender)
+magenta = '#cc72fc'  # purple (was: #FFFFFF white)
 cyan    = '#00B6C2'  # turquoise
 white   = '#D0A7AF'  # peach
 
 [colors.bright]
-black   = '#574150'  # gray (unobtrusive)
+black   = '#8B6878'  # gray (unobtrusive)
 red     = '#FFA726'  # gold (bad/error)
 green   = '#17C182'  # green
 yellow  = '#D0A7AF'  # peach
 blue    = '#00B6C2'  # turquoise
-magenta = '#FFFFFF'  # white (was: #B1B9F9 lavender)
+magenta = '#cc72fc'  # purple (was: #FFFFFF white)
 cyan    = '#00B6C2'  # turquoise
 white   = '#D0A7AF'  # peach

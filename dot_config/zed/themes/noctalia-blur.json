@@ -9,12 +9,12 @@
       "style": {
         "accents": [
           "#00B6C2",
-          "#FFFFFF",
+          "#cc72fc",
           "#17C182"
         ],
         "background.appearance": "transparent",
         "background": "#914059A6",
-        
+
         // Make all major surface layers fully transparent so they don't stack
         "elevated_surface.background": "#00000000",
         "surface.background": "#00000000",
@@ -23,54 +23,56 @@
         "editor.background": "#00000000",
         "editor.gutter.background": "#00000000",
         "terminal.background": "#00000000",
-        
+
         // Bars and Toolbar
-        "status_bar.background": "#00000010", // Very slight tint for separation
+        "status_bar.background": "#914059A0", // Terracotta tint for separation
         "title_bar.background": "#00000010",
         "title_bar.inactive_background": "#00000010",
         "toolbar.background": "#00000000",
         "tab_bar.background": "#00000015",
         "tab.inactive_background": "#00000000",
         "tab.active_background": "#00000025", // Subtle highlight for active tab
-        
-        "border": "#6B334840",
-        "border.variant": "#7A3D5540",
+
+        "border": "#6B334890",
+        "border.variant": "#6B334890",
         "border.focused": "#00B6C280",
-        "border.selected": "#FFFFFF80",
+        "border.selected": "#cc72fc80",
         "border.transparent": "#00000000",
-        
+
         "element.background": "#00000015",
-        "element.hover": "#FFFFFF15",
-        "element.active": "#FFFFFF25",
+        "element.hover": "#cc72fc15",
+        "element.active": "#cc72fc25",
         "element.selected": "#00B6C244",
-        
+
         "ghost_element.background": null,
-        "ghost_element.hover": "#FFFFFF10",
-        "ghost_element.active": "#FFFFFF20",
+        "ghost_element.hover": "#cc72fc10",
+        "ghost_element.active": "#cc72fc20",
         "ghost_element.selected": "#00B6C230",
-        
-        "text": "#000000",
+
+        "text": "#FFFFFF",
         "text.muted": "#969696",
         "text.placeholder": "#96969699",
         "text.accent": "#00B6C2",
-        "icon": "#000000",
+        "icon": "#FFFFFF",
         "icon.accent": "#00B6C2",
-        
+
         "scrollbar.thumb.background": "#00000030",
+        "scrollbar.thumb.border": "#00000000",
         "scrollbar.track.background": "#00000010",
-        
-        "editor.foreground": "#000000",
-        "editor.line_number": "#00000060",
-        "editor.active_line_number": "#000000",
+        "scrollbar.track.border": "#6B334870",
+
+        "editor.foreground": "#FFFFFF",
+        "editor.line_number": "#FFFFFF60",
+        "editor.active_line_number": "#FFFFFF",
         "editor.active_line.background": "#00000015",
-        
-        "terminal.foreground": "#000000",
-        "terminal.ansi.black": "#000000",
+
+        "terminal.foreground": "#FFFFFF",
+        "terminal.ansi.black": "#FFFFFF",
         "terminal.ansi.red": "#FFA726",
         "terminal.ansi.green": "#17C182",
         "terminal.ansi.yellow": "#D0A7AF",
         "terminal.ansi.blue": "#00B6C2",
-        "terminal.ansi.magenta": "#FFFFFF",
+        "terminal.ansi.magenta": "#cc72fc",
         "terminal.ansi.cyan": "#00B6C2",
         "terminal.ansi.white": "#D0A7AF",
 
@@ -80,12 +82,12 @@
           "comment": { "color": "#969696", "font_style": "italic", "font_weight": 700 },
           "constant": { "color": "#FFA726", "font_weight": 700 },
           "function": { "color": "#00B6C2", "font_weight": 700 },
-          "keyword": { "color": "#FFFFFF", "font_weight": 700 },
+          "keyword": { "color": "#cc72fc", "font_weight": 700 },
           "number": { "color": "#FFA726", "font_weight": 700 },
           "operator": { "color": "#00B6C2", "font_weight": 700 },
           "string": { "color": "#17C182", "font_weight": 700 },
           "type": { "color": "#D0A7AF", "font_weight": 700 },
-          "variable": { "color": "#000000", "font_weight": 700 }
+          "variable": { "color": "#FFFFFF", "font_weight": 700 }
         }
       }
     }

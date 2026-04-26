@@ -1,0 +1,8 @@
+{
+  "name": "blur-theme",
+  "base": "dark-ansi",
+  "overrides": {
+    "userMessageBackground": "#8F4C62",
+    "inverseText": "#FFFFFF"
+  }
+}

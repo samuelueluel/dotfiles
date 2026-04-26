@@ -156,7 +156,7 @@
 
   #################################[ os_icon: os identifier ]##################################
   # OS identifier color.
-  typeset -g POWERLEVEL9K_OS_ICON_FOREGROUND=0
+  typeset -g POWERLEVEL9K_OS_ICON_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_OS_ICON_BACKGROUND=1
   # Custom icon.
   # typeset -g POWERLEVEL9K_OS_ICON_CONTENT_EXPANSION='⭐'
@@ -188,7 +188,7 @@
   # Current directory background color.
   typeset -g POWERLEVEL9K_DIR_BACKGROUND='#00B6C2'
   # Default current directory foreground color.
-  typeset -g POWERLEVEL9K_DIR_FOREGROUND=0
+  typeset -g POWERLEVEL9K_DIR_FOREGROUND='#000000'
   # If directory is too long, shorten some of its segments to the shortest possible unique
   # prefix. The shortened directory can be tab-completed to the original.
   typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=truncate_to_unique
@@ -198,7 +198,7 @@
   typeset -g POWERLEVEL9K_DIR_SHORTENED_FOREGROUND=8
   # Color of the anchor directory segments. Anchor segments are never shortened. The first
   # segment is always an anchor.
-  typeset -g POWERLEVEL9K_DIR_ANCHOR_FOREGROUND=0
+  typeset -g POWERLEVEL9K_DIR_ANCHOR_FOREGROUND='#000000'
   # Display anchor directory segments in bold.
   typeset -g POWERLEVEL9K_DIR_ANCHOR_BOLD=true
   # Don't shorten directories that contain any of these files. They are anchors.
@@ -256,10 +256,10 @@
     fi
 
     local       meta='%8F'
-    local      clean='%0F'
-    local   modified='%0F'
-    local  untracked='%0F'
-    local conflicted='%0F'
+    local      clean='%F{#000000}'
+    local   modified='%F{#000000}'
+    local  untracked='%F{#000000}'
+    local conflicted='%F{#000000}'
 
     local res
 
@@ -329,20 +329,20 @@
   typeset -g POWERLEVEL9K_STATUS_OK_PIPE_BACKGROUND=0
   typeset -g POWERLEVEL9K_STATUS_ERROR=false
   typeset -g POWERLEVEL9K_STATUS_ERROR_VISUAL_IDENTIFIER_EXPANSION='✘'
-  typeset -g POWERLEVEL9K_STATUS_ERROR_FOREGROUND=0
+  typeset -g POWERLEVEL9K_STATUS_ERROR_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_STATUS_ERROR_BACKGROUND=8
   typeset -g POWERLEVEL9K_STATUS_ERROR_SIGNAL=true
   typeset -g POWERLEVEL9K_STATUS_VERBOSE_SIGNAME=false
   typeset -g POWERLEVEL9K_STATUS_ERROR_SIGNAL_VISUAL_IDENTIFIER_EXPANSION='✘'
-  typeset -g POWERLEVEL9K_STATUS_ERROR_SIGNAL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_STATUS_ERROR_SIGNAL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_STATUS_ERROR_SIGNAL_BACKGROUND=8
   typeset -g POWERLEVEL9K_STATUS_ERROR_PIPE=true
   typeset -g POWERLEVEL9K_STATUS_ERROR_PIPE_VISUAL_IDENTIFIER_EXPANSION='✘'
-  typeset -g POWERLEVEL9K_STATUS_ERROR_PIPE_FOREGROUND=0
+  typeset -g POWERLEVEL9K_STATUS_ERROR_PIPE_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_STATUS_ERROR_PIPE_BACKGROUND=8
 
   ###################[ command_execution_time: duration of the last command ]###################
-  typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_FOREGROUND=0
+  typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_BACKGROUND='#17C182'
   typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_THRESHOLD=3
   typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_PRECISION=0
@@ -359,47 +359,47 @@
   typeset -g POWERLEVEL9K_DIRENV_BACKGROUND=0
 
   ###############[ asdf: asdf version manager (https://github.com/asdf-vm/asdf) ]###############
-  typeset -g POWERLEVEL9K_ASDF_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_BACKGROUND=7
   typeset -g POWERLEVEL9K_ASDF_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_ASDF_PROMPT_ALWAYS_SHOW=false
   typeset -g POWERLEVEL9K_ASDF_SHOW_SYSTEM=true
   typeset -g POWERLEVEL9K_ASDF_SHOW_ON_UPGLOB=
-  typeset -g POWERLEVEL9K_ASDF_RUBY_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_RUBY_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_RUBY_BACKGROUND=1
-  typeset -g POWERLEVEL9K_ASDF_PYTHON_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_PYTHON_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_PYTHON_BACKGROUND=4
-  typeset -g POWERLEVEL9K_ASDF_GOLANG_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_GOLANG_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_GOLANG_BACKGROUND=4
-  typeset -g POWERLEVEL9K_ASDF_NODEJS_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_NODEJS_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_NODEJS_BACKGROUND=2
-  typeset -g POWERLEVEL9K_ASDF_RUST_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_RUST_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_RUST_BACKGROUND=4
-  typeset -g POWERLEVEL9K_ASDF_DOTNET_CORE_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_DOTNET_CORE_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_DOTNET_CORE_BACKGROUND=5
-  typeset -g POWERLEVEL9K_ASDF_FLUTTER_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_FLUTTER_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_FLUTTER_BACKGROUND=4
-  typeset -g POWERLEVEL9K_ASDF_LUA_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_LUA_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_LUA_BACKGROUND=4
-  typeset -g POWERLEVEL9K_ASDF_JAVA_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_JAVA_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_JAVA_BACKGROUND=4
-  typeset -g POWERLEVEL9K_ASDF_PERL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_PERL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_PERL_BACKGROUND=4
-  typeset -g POWERLEVEL9K_ASDF_ERLANG_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_ERLANG_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_ERLANG_BACKGROUND=1
-  typeset -g POWERLEVEL9K_ASDF_ELIXIR_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_ELIXIR_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_ELIXIR_BACKGROUND=5
-  typeset -g POWERLEVEL9K_ASDF_POSTGRES_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_POSTGRES_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_POSTGRES_BACKGROUND=6
-  typeset -g POWERLEVEL9K_ASDF_PHP_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_PHP_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_PHP_BACKGROUND=5
-  typeset -g POWERLEVEL9K_ASDF_HASKELL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_HASKELL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_HASKELL_BACKGROUND=3
-  typeset -g POWERLEVEL9K_ASDF_JULIA_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ASDF_JULIA_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ASDF_JULIA_BACKGROUND=2
 
   ##########[ nordvpn: nordvpn connection status, linux only (https://nordvpn.com/) ]###########
-  typeset -g POWERLEVEL9K_NORDVPN_FOREGROUND=0
+  typeset -g POWERLEVEL9K_NORDVPN_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_NORDVPN_BACKGROUND=4
   typeset -g POWERLEVEL9K_NORDVPN_{DISCONNECTED,CONNECTING,DISCONNECTING}_CONTENT_EXPANSION=
   typeset -g POWERLEVEL9K_NORDVPN_{DISCONNECTED,CONNECTING,DISCONNECTING}_VISUAL_IDENTIFIER_EXPANSION=
@@ -413,19 +413,19 @@
   typeset -g POWERLEVEL9K_YAZI_BACKGROUND=0
 
   ######################[ nnn: nnn shell (https://github.com/jarun/nnn) ]#######################
-  typeset -g POWERLEVEL9K_NNN_FOREGROUND=0
+  typeset -g POWERLEVEL9K_NNN_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_NNN_BACKGROUND=6
 
   ######################[ lf: lf shell (https://github.com/gokcehan/lf) ]#######################
-  typeset -g POWERLEVEL9K_LF_FOREGROUND=0
+  typeset -g POWERLEVEL9K_LF_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_LF_BACKGROUND=6
 
   ##################[ xplr: xplr shell (https://github.com/sayanarijit/xplr) ]##################
-  typeset -g POWERLEVEL9K_XPLR_FOREGROUND=0
+  typeset -g POWERLEVEL9K_XPLR_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_XPLR_BACKGROUND=6
 
   ###########################[ vim_shell: vim shell indicator (:sh) ]###########################
-  typeset -g POWERLEVEL9K_VIM_SHELL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_VIM_SHELL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_VIM_SHELL_BACKGROUND=2
 
   ######[ midnight_commander: midnight commander shell (https://midnight-commander.org/) ]######
@@ -433,26 +433,26 @@
   typeset -g POWERLEVEL9K_MIDNIGHT_COMMANDER_BACKGROUND=0
 
   #[ nix_shell: nix shell (https://nixos.org/nixos/nix-pills/developing-with-nix-shell.html) ]##
-  typeset -g POWERLEVEL9K_NIX_SHELL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_NIX_SHELL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_NIX_SHELL_BACKGROUND=4
 
   ##################[ chezmoi_shell: chezmoi shell (https://www.chezmoi.io/) ]##################
-  typeset -g POWERLEVEL9K_CHEZMOI_SHELL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_CHEZMOI_SHELL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_CHEZMOI_SHELL_BACKGROUND=4
 
   ##################################[ disk_usage: disk usage ]##################################
   typeset -g POWERLEVEL9K_DISK_USAGE_NORMAL_FOREGROUND=3
   typeset -g POWERLEVEL9K_DISK_USAGE_NORMAL_BACKGROUND=0
-  typeset -g POWERLEVEL9K_DISK_USAGE_WARNING_FOREGROUND=0
+  typeset -g POWERLEVEL9K_DISK_USAGE_WARNING_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_DISK_USAGE_WARNING_BACKGROUND=3
-  typeset -g POWERLEVEL9K_DISK_USAGE_CRITICAL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_DISK_USAGE_CRITICAL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_DISK_USAGE_CRITICAL_BACKGROUND=8
   typeset -g POWERLEVEL9K_DISK_USAGE_WARNING_LEVEL=90
   typeset -g POWERLEVEL9K_DISK_USAGE_CRITICAL_LEVEL=95
   typeset -g POWERLEVEL9K_DISK_USAGE_ONLY_WARNING=false
 
   ###########[ vi_mode: vi mode (you don't need this if you've enabled prompt_char) ]###########
-  typeset -g POWERLEVEL9K_VI_MODE_FOREGROUND=0
+  typeset -g POWERLEVEL9K_VI_MODE_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_VI_COMMAND_MODE_STRING=NORMAL
   typeset -g POWERLEVEL9K_VI_MODE_NORMAL_BACKGROUND=2
   typeset -g POWERLEVEL9K_VI_VISUAL_MODE_STRING=VISUAL
@@ -463,53 +463,53 @@
   typeset -g POWERLEVEL9K_VI_MODE_INSERT_FOREGROUND=8
 
   ######################################[ ram: free RAM ]#######################################
-  typeset -g POWERLEVEL9K_RAM_FOREGROUND=0
+  typeset -g POWERLEVEL9K_RAM_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_RAM_BACKGROUND=3
 
   #####################################[ swap: used swap ]######################################
-  typeset -g POWERLEVEL9K_SWAP_FOREGROUND=0
+  typeset -g POWERLEVEL9K_SWAP_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_SWAP_BACKGROUND=3
 
   ######################################[ load: CPU load ]######################################
   typeset -g POWERLEVEL9K_LOAD_WHICH=5
-  typeset -g POWERLEVEL9K_LOAD_NORMAL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_LOAD_NORMAL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_LOAD_NORMAL_BACKGROUND=2
-  typeset -g POWERLEVEL9K_LOAD_WARNING_FOREGROUND=0
+  typeset -g POWERLEVEL9K_LOAD_WARNING_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_LOAD_WARNING_BACKGROUND=3
-  typeset -g POWERLEVEL9K_LOAD_CRITICAL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_LOAD_CRITICAL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_LOAD_CRITICAL_BACKGROUND=1
 
   ################[ todo: todo items (https://github.com/todotxt/todo.txt-cli) ]################
-  typeset -g POWERLEVEL9K_TODO_FOREGROUND=0
+  typeset -g POWERLEVEL9K_TODO_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_TODO_BACKGROUND=8
   typeset -g POWERLEVEL9K_TODO_HIDE_ZERO_TOTAL=true
   typeset -g POWERLEVEL9K_TODO_HIDE_ZERO_FILTERED=false
 
   ###########[ timewarrior: timewarrior tracking status (https://timewarrior.net/) ]############
-  typeset -g POWERLEVEL9K_TIMEWARRIOR_FOREGROUND=0
+  typeset -g POWERLEVEL9K_TIMEWARRIOR_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_TIMEWARRIOR_BACKGROUND=8
   typeset -g POWERLEVEL9K_TIMEWARRIOR_CONTENT_EXPANSION='${P9K_CONTENT:0:24}${${P9K_CONTENT:24}:+…}'
 
   ##############[ taskwarrior: taskwarrior task count (https://taskwarrior.org/) ]##############
-  typeset -g POWERLEVEL9K_TASKWARRIOR_FOREGROUND=0
+  typeset -g POWERLEVEL9K_TASKWARRIOR_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_TASKWARRIOR_BACKGROUND=6
 
   ######[ per_directory_history: Oh My Zsh per-directory-history local/global indicator ]#######
-  typeset -g POWERLEVEL9K_PER_DIRECTORY_HISTORY_LOCAL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_PER_DIRECTORY_HISTORY_LOCAL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_PER_DIRECTORY_HISTORY_LOCAL_BACKGROUND=5
-  typeset -g POWERLEVEL9K_PER_DIRECTORY_HISTORY_GLOBAL_FOREGROUND=0
+  typeset -g POWERLEVEL9K_PER_DIRECTORY_HISTORY_GLOBAL_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_PER_DIRECTORY_HISTORY_GLOBAL_BACKGROUND=3
 
   ################################[ cpu_arch: CPU architecture ]################################
-  typeset -g POWERLEVEL9K_CPU_ARCH_FOREGROUND=0
+  typeset -g POWERLEVEL9K_CPU_ARCH_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_CPU_ARCH_BACKGROUND=3
 
   ##################################[ context: user@hostname ]##################################
-  typeset -g POWERLEVEL9K_CONTEXT_ROOT_FOREGROUND=0
+  typeset -g POWERLEVEL9K_CONTEXT_ROOT_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_CONTEXT_ROOT_BACKGROUND='#FFA726'
-  typeset -g POWERLEVEL9K_CONTEXT_{REMOTE,REMOTE_SUDO}_FOREGROUND=0
+  typeset -g POWERLEVEL9K_CONTEXT_{REMOTE,REMOTE_SUDO}_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_CONTEXT_{REMOTE,REMOTE_SUDO}_BACKGROUND='#FFA726'
-  typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND=0
+  typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_CONTEXT_BACKGROUND='#FFA726'
 
   typeset -g POWERLEVEL9K_CONTEXT_ROOT_TEMPLATE='%n'
@@ -521,19 +521,19 @@
   # typeset -g POWERLEVEL9K_CONTEXT_{DEFAULT,SUDO}_{CONTENT,VISUAL_IDENTIFIER}_EXPANSION=
 
   ###[ virtualenv: python virtual environment (https://docs.python.org/3/library/venv.html) ]###
-  typeset -g POWERLEVEL9K_VIRTUALENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_VIRTUALENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_VIRTUALENV_BACKGROUND=4
   typeset -g POWERLEVEL9K_VIRTUALENV_SHOW_PYTHON_VERSION=false
   typeset -g POWERLEVEL9K_VIRTUALENV_SHOW_WITH_PYENV=false
   typeset -g POWERLEVEL9K_VIRTUALENV_{LEFT,RIGHT}_DELIMITER=
 
   #####################[ anaconda: conda environment (https://conda.io/) ]######################
-  typeset -g POWERLEVEL9K_ANACONDA_FOREGROUND=0
+  typeset -g POWERLEVEL9K_ANACONDA_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_ANACONDA_BACKGROUND=4
   typeset -g POWERLEVEL9K_ANACONDA_CONTENT_EXPANSION='${${${${CONDA_PROMPT_MODIFIER#\(}% }%\)}:-${CONDA_PREFIX:t}}'
 
   ################[ pyenv: python environment (https://github.com/pyenv/pyenv) ]################
-  typeset -g POWERLEVEL9K_PYENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_PYENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_PYENV_BACKGROUND=4
   typeset -g POWERLEVEL9K_PYENV_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_PYENV_PROMPT_ALWAYS_SHOW=false
@@ -541,7 +541,7 @@
   typeset -g POWERLEVEL9K_PYENV_CONTENT_EXPANSION='${P9K_CONTENT}${${P9K_CONTENT:#$P9K_PYENV_PYTHON_VERSION(|/*)}:+ $P9K_PYENV_PYTHON_VERSION}'
 
   ################[ goenv: go environment (https://github.com/syndbg/goenv) ]################
-  typeset -g POWERLEVEL9K_GOENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_GOENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_GOENV_BACKGROUND=4
   typeset -g POWERLEVEL9K_GOENV_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_GOENV_PROMPT_ALWAYS_SHOW=false
@@ -555,7 +555,7 @@
   typeset -g POWERLEVEL9K_NODENV_SHOW_SYSTEM=true
 
   ##############[ nvm: node.js version from nvm (https://github.com/nvm-sh/nvm) ]###############
-  typeset -g POWERLEVEL9K_NVM_FOREGROUND=0
+  typeset -g POWERLEVEL9K_NVM_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_NVM_BACKGROUND=5
   typeset -g POWERLEVEL9K_NVM_PROMPT_ALWAYS_SHOW=false
   typeset -g POWERLEVEL9K_NVM_SHOW_SYSTEM=true
@@ -572,88 +572,88 @@
   typeset -g POWERLEVEL9K_NODE_VERSION_PROJECT_ONLY=true
 
   #######################[ go_version: go version (https://golang.org) ]########################
-  typeset -g POWERLEVEL9K_GO_VERSION_FOREGROUND=0
+  typeset -g POWERLEVEL9K_GO_VERSION_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_GO_VERSION_BACKGROUND=2
   typeset -g POWERLEVEL9K_GO_VERSION_PROJECT_ONLY=true
 
   #################[ rust_version: rustc version (https://www.rust-lang.org) ]##################
-  typeset -g POWERLEVEL9K_RUST_VERSION_FOREGROUND=0
+  typeset -g POWERLEVEL9K_RUST_VERSION_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_RUST_VERSION_BACKGROUND=4
   typeset -g POWERLEVEL9K_RUST_VERSION_PROJECT_ONLY=true
 
   ###############[ dotnet_version: .NET version (https://dotnet.microsoft.com) ]################
-  typeset -g POWERLEVEL9K_DOTNET_VERSION_FOREGROUND=0
+  typeset -g POWERLEVEL9K_DOTNET_VERSION_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_DOTNET_VERSION_BACKGROUND=4
   typeset -g POWERLEVEL9K_DOTNET_VERSION_PROJECT_ONLY=true
 
   #####################[ php_version: php version (https://www.php.net/) ]######################
-  typeset -g POWERLEVEL9K_PHP_VERSION_FOREGROUND=0
+  typeset -g POWERLEVEL9K_PHP_VERSION_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_PHP_VERSION_BACKGROUND=5
   typeset -g POWERLEVEL9K_PHP_VERSION_PROJECT_ONLY=true
 
   ##########[ laravel_version: laravel php framework version (https://laravel.com/) ]###########
-  typeset -g POWERLEVEL9K_LARAVEL_VERSION_FOREGROUND=0
+  typeset -g POWERLEVEL9K_LARAVEL_VERSION_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_LARAVEL_VERSION_BACKGROUND=4
 
   #############[ rbenv: ruby version from rbenv (https://github.com/rbenv/rbenv) ]##############
-  typeset -g POWERLEVEL9K_RBENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_RBENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_RBENV_BACKGROUND=1
   typeset -g POWERLEVEL9K_RBENV_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_RBENV_PROMPT_ALWAYS_SHOW=false
   typeset -g POWERLEVEL9K_RBENV_SHOW_SYSTEM=true
 
   #######################[ rvm: ruby version from rvm (https://rvm.io) ]########################
-  typeset -g POWERLEVEL9K_RVM_FOREGROUND=0
+  typeset -g POWERLEVEL9K_RVM_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_RVM_BACKGROUND=8
   typeset -g POWERLEVEL9K_RVM_SHOW_GEMSET=false
   typeset -g POWERLEVEL9K_RVM_SHOW_PREFIX=false
 
   ###########[ fvm: flutter version management (https://github.com/leoafarias/fvm) ]############
-  typeset -g POWERLEVEL9K_FVM_FOREGROUND=0
+  typeset -g POWERLEVEL9K_FVM_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_FVM_BACKGROUND=4
 
   ##########[ luaenv: lua version from luaenv (https://github.com/cehoffman/luaenv) ]###########
-  typeset -g POWERLEVEL9K_LUAENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_LUAENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_LUAENV_BACKGROUND=4
   typeset -g POWERLEVEL9K_LUAENV_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_LUAENV_PROMPT_ALWAYS_SHOW=false
   typeset -g POWERLEVEL9K_LUAENV_SHOW_SYSTEM=true
 
   ###############[ jenv: java version from jenv (https://github.com/jenv/jenv) ]################
-  typeset -g POWERLEVEL9K_JENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_JENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_JENV_BACKGROUND=4
   typeset -g POWERLEVEL9K_JENV_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_JENV_PROMPT_ALWAYS_SHOW=false
   typeset -g POWERLEVEL9K_JENV_SHOW_SYSTEM=true
 
   ###########[ plenv: perl version from plenv (https://github.com/tokuhirom/plenv) ]############
-  typeset -g POWERLEVEL9K_PLENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_PLENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_PLENV_BACKGROUND=4
   typeset -g POWERLEVEL9K_PLENV_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_PLENV_PROMPT_ALWAYS_SHOW=false
   typeset -g POWERLEVEL9K_PLENV_SHOW_SYSTEM=true
 
   ###########[ perlbrew: perl version from perlbrew (https://github.com/gugod/App-perlbrew) ]############
-  typeset -g POWERLEVEL9K_PERLBREW_FOREGROUND=0
+  typeset -g POWERLEVEL9K_PERLBREW_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_PERLBREW_PROJECT_ONLY=true
   typeset -g POWERLEVEL9K_PERLBREW_SHOW_PREFIX=false
 
   ############[ phpenv: php version from phpenv (https://github.com/phpenv/phpenv) ]############
-  typeset -g POWERLEVEL9K_PHPENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_PHPENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_PHPENV_BACKGROUND=5
   typeset -g POWERLEVEL9K_PHPENV_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_PHPENV_PROMPT_ALWAYS_SHOW=false
   typeset -g POWERLEVEL9K_PHPENV_SHOW_SYSTEM=true
 
   #######[ scalaenv: scala version from scalaenv (https://github.com/scalaenv/scalaenv) ]#######
-  typeset -g POWERLEVEL9K_SCALAENV_FOREGROUND=0
+  typeset -g POWERLEVEL9K_SCALAENV_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_SCALAENV_BACKGROUND=1
   typeset -g POWERLEVEL9K_SCALAENV_SOURCES=(shell local global)
   typeset -g POWERLEVEL9K_SCALAENV_PROMPT_ALWAYS_SHOW=false
   typeset -g POWERLEVEL9K_SCALAENV_SHOW_SYSTEM=true
 
   ##########[ haskell_stack: haskell version from stack (https://haskellstack.org/) ]###########
-  typeset -g POWERLEVEL9K_HASKELL_STACK_FOREGROUND=0
+  typeset -g POWERLEVEL9K_HASKELL_STACK_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_HASKELL_STACK_BACKGROUND=3
   typeset -g POWERLEVEL9K_HASKELL_STACK_SOURCES=(shell local)
   typeset -g POWERLEVEL9K_HASKELL_STACK_ALWAYS_SHOW=true
@@ -667,7 +667,7 @@
   #############[ kubecontext: current kubernetes context (https://kubernetes.io/) ]#############
   typeset -g POWERLEVEL9K_KUBECONTEXT_SHOW_ON_COMMAND='kubectl|helm|kubens|kubectx|oc|istioctl|kogito|k9s|helmfile|flux|fluxctl|stern|kubeseal|skaffold|kubent|kubecolor|cmctl|sparkctl'
   typeset -g POWERLEVEL9K_KUBECONTEXT_CLASSES=('*' DEFAULT)
-  typeset -g POWERLEVEL9K_KUBECONTEXT_DEFAULT_FOREGROUND=0
+  typeset -g POWERLEVEL9K_KUBECONTEXT_DEFAULT_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_KUBECONTEXT_DEFAULT_BACKGROUND=6
   typeset -g POWERLEVEL9K_KUBECONTEXT_DEFAULT_CONTENT_EXPANSION=
   POWERLEVEL9K_KUBECONTEXT_DEFAULT_CONTENT_EXPANSION+='${P9K_KUBECONTEXT_CLOUD_CLUSTER:-${P9K_KUBECONTEXT_NAME}}'
@@ -676,7 +676,7 @@
   #[ aws: aws profile (https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html) ]#
   typeset -g POWERLEVEL9K_AWS_SHOW_ON_COMMAND='aws|awless|cdk|terraform|tofu|pulumi|terragrunt'
   typeset -g POWERLEVEL9K_AWS_CLASSES=('*' DEFAULT)
-  typeset -g POWERLEVEL9K_AWS_DEFAULT_FOREGROUND=0
+  typeset -g POWERLEVEL9K_AWS_DEFAULT_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_AWS_DEFAULT_BACKGROUND=4
   typeset -g POWERLEVEL9K_AWS_CONTENT_EXPANSION='${P9K_AWS_PROFILE//\%/%%}${P9K_AWS_REGION:+ ${P9K_AWS_REGION//\%/%%}}'
 
@@ -687,12 +687,12 @@
   ##########[ azure: azure account name (https://docs.microsoft.com/en-us/cli/azure) ]##########
   typeset -g POWERLEVEL9K_AZURE_SHOW_ON_COMMAND='az|terraform|tofu|pulumi|terragrunt'
   typeset -g POWERLEVEL9K_AZURE_CLASSES=('*' OTHER)
-  typeset -g POWERLEVEL9K_AZURE_OTHER_FOREGROUND=0
+  typeset -g POWERLEVEL9K_AZURE_OTHER_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_AZURE_OTHER_BACKGROUND=4
 
   ##########[ gcloud: google cloud account and project (https://cloud.google.com/) ]###########
   typeset -g POWERLEVEL9K_GCLOUD_SHOW_ON_COMMAND='gcloud|gcs|gsutil'
-  typeset -g POWERLEVEL9K_GCLOUD_FOREGROUND=0
+  typeset -g POWERLEVEL9K_GCLOUD_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_GCLOUD_BACKGROUND=4
   typeset -g POWERLEVEL9K_GCLOUD_PARTIAL_CONTENT_EXPANSION='${P9K_GCLOUD_PROJECT_ID//\%/%%}'
   typeset -g POWERLEVEL9K_GCLOUD_COMPLETE_CONTENT_EXPANSION='${P9K_GCLOUD_PROJECT_NAME//\%/%%}'
@@ -701,12 +701,12 @@
   #[ google_app_cred: google application credentials (https://cloud.google.com/docs/authentication/production) ]#
   typeset -g POWERLEVEL9K_GOOGLE_APP_CRED_SHOW_ON_COMMAND='terraform|tofu|pulumi|terragrunt'
   typeset -g POWERLEVEL9K_GOOGLE_APP_CRED_CLASSES=('*' DEFAULT)
-  typeset -g POWERLEVEL9K_GOOGLE_APP_CRED_DEFAULT_FOREGROUND=0
+  typeset -g POWERLEVEL9K_GOOGLE_APP_CRED_DEFAULT_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_GOOGLE_APP_CRED_DEFAULT_BACKGROUND=4
   typeset -g POWERLEVEL9K_GOOGLE_APP_CRED_DEFAULT_CONTENT_EXPANSION='${P9K_GOOGLE_APP_CRED_PROJECT_ID//\%/%%}'
 
   ##############[ toolbox: toolbox name (https://github.com/containers/toolbox) ]###############
-  typeset -g POWERLEVEL9K_TOOLBOX_FOREGROUND=0
+  typeset -g POWERLEVEL9K_TOOLBOX_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_TOOLBOX_BACKGROUND=3
   typeset -g POWERLEVEL9K_TOOLBOX_CONTENT_EXPANSION='${P9K_TOOLBOX_NAME:#fedora-toolbox-*}'
 
@@ -715,7 +715,7 @@
   typeset -g POWERLEVEL9K_PUBLIC_IP_BACKGROUND=0
 
   ########################[ vpn_ip: virtual private network indicator ]#########################
-  typeset -g POWERLEVEL9K_VPN_IP_FOREGROUND=0
+  typeset -g POWERLEVEL9K_VPN_IP_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_VPN_IP_BACKGROUND=6
   typeset -g POWERLEVEL9K_VPN_IP_CONTENT_EXPANSION=
   typeset -g POWERLEVEL9K_VPN_IP_INTERFACE='(gpd|wg|(.*tun)|tailscale)[0-9]*|(zt.*)'
@@ -723,7 +723,7 @@
 
   ###########[ ip: ip address and bandwidth usage for a specified network interface ]###########
   typeset -g POWERLEVEL9K_IP_BACKGROUND=4
-  typeset -g POWERLEVEL9K_IP_FOREGROUND=0
+  typeset -g POWERLEVEL9K_IP_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_IP_CONTENT_EXPANSION='${P9K_IP_RX_RATE:+⇣$P9K_IP_RX_RATE }${P9K_IP_TX_RATE:+⇡$P9K_IP_TX_RATE }$P9K_IP_IP'
   typeset -g POWERLEVEL9K_IP_INTERFACE='[ew].*'
 
@@ -741,11 +741,11 @@
   typeset -g POWERLEVEL9K_BATTERY_BACKGROUND=0
 
   #####################################[ wifi: wifi speed ]#####################################
-  typeset -g POWERLEVEL9K_WIFI_FOREGROUND=0
+  typeset -g POWERLEVEL9K_WIFI_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_WIFI_BACKGROUND=4
 
   ####################################[ time: current time ]####################################
-  typeset -g POWERLEVEL9K_TIME_FOREGROUND=0
+  typeset -g POWERLEVEL9K_TIME_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_TIME_BACKGROUND='#D0A7AF'
   typeset -g POWERLEVEL9K_TIME_FORMAT='%D{%H:%M}'
   typeset -g POWERLEVEL9K_TIME_UPDATE_ON_COMMAND=false
@@ -759,7 +759,7 @@
     prompt_example
   }
 
-  typeset -g POWERLEVEL9K_EXAMPLE_FOREGROUND=0
+  typeset -g POWERLEVEL9K_EXAMPLE_FOREGROUND='#000000'
   typeset -g POWERLEVEL9K_EXAMPLE_BACKGROUND=4
 
   typeset -g POWERLEVEL9K_TRANSIENT_PROMPT=off
