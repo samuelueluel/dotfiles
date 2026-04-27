@@ -4,7 +4,7 @@
 #   Special:     Turquoise   #00B6C2  (ANSI 4, 6, 12, 14)
 #   Special:     Dusty Rose       #D0A7AF  (ANSI 3, 7, 11)
 #   Special:     Green       #17C182  (ANSI 2, 10)
-#   Unobtrusive: Gray        #8B6878  (ANSI 8)
+#   Unobtrusive: Gray        #AA8499  (ANSI 8)
 #   Bad/Error:   Gold        #FFA726  (ANSI 1, 9)
 #   Accent:      Purple      #cc72fc  (ANSI 5, 13)
 
@@ -31,7 +31,7 @@ cyan    = '#00B6C2'  # turquoise
 white   = '#D0A7AF'  # peach
 
 [colors.bright]
-black   = '#8B6878'  # gray (unobtrusive)
+black   = '#AA8499'  # gray (unobtrusive)
 red     = '#FFA726'  # gold (bad/error)
 green   = '#17C182'  # green
 yellow  = '#D0A7AF'  # peach

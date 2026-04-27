@@ -21,7 +21,7 @@ style = "Italic"
 [window]
 class = { instance = "Alacritty", general = "alacritty-custom" }
 padding = { x = 10, y = 10 }
-opacity = 0.65
+opacity = 0.7
 decorations = "none"
 
 [[keyboard.bindings]]

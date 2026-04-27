@@ -13,7 +13,7 @@
           "#17C182"
         ],
         "background.appearance": "transparent",
-        "background": "#914059A6",
+        "background": "#914059B3",
 
         // Make all major surface layers fully transparent so they don't stack
         "elevated_surface.background": "#00000000",
@@ -50,8 +50,8 @@
         "ghost_element.selected": "#00B6C230",
 
         "text": "#FFFFFF",
-        "text.muted": "#969696",
-        "text.placeholder": "#96969699",
+        "text.muted": "#ABABAB",
+        "text.placeholder": "#ABABAB99",
         "text.accent": "#00B6C2",
         "icon": "#FFFFFF",
         "icon.accent": "#00B6C2",
@@ -79,7 +79,7 @@
         "syntax": {
           "attribute": { "color": "#17C182", "font_weight": 700 },
           "boolean": { "color": "#FFA726", "font_weight": 700 },
-          "comment": { "color": "#969696", "font_style": "italic", "font_weight": 700 },
+          "comment": { "color": "#ABABAB", "font_style": "italic", "font_weight": 700 },
           "constant": { "color": "#FFA726", "font_weight": 700 },
           "function": { "color": "#00B6C2", "font_weight": 700 },
           "keyword": { "color": "#cc72fc", "font_weight": 700 },
