@@ -2,8 +2,9 @@
 # Toggles between scroller mode and tile-scroll mode.
 #
 # Tile-scroll mode:
-#   - All columns on focused workspace set to 50% width (two full columns always visible)
+#   - All columns on ALL workspaces set to 50% width (two full columns always visible)
 #   - center-focused-column never + gaps 2 + focus-ring width 0
+#   - default-column-width 50% so new windows also open at 50%
 #   - Black wallpaper
 #
 # Exit restores the full config snapshot taken at entry — no hardcoded default values.
@@ -11,39 +12,33 @@
 CONFIG="$HOME/.config/niri/config.kdl"
 BACKUP="$HOME/.cache/niri-config-backup.kdl"
 STATE_FILE="$HOME/.cache/niri-tile-toggle"
-WALLPAPER_FILE="$HOME/.cache/niri-tile-toggle-wallpaper"
-DEFAULT_WALLPAPER="$HOME/Pictures/Wallpapers/joonyeop-baek-GK6qXiHm6Iw-unsplash.jpg"
 
-resize_columns() {
+resize_all_columns() {
     COLUMN_WIDTH="$1" python3 << 'EOF'
 import os, json, subprocess, sys
 
 width = os.environ['COLUMN_WIDTH']
 
 win_res = subprocess.run(['niri', 'msg', '--json', 'windows'], capture_output=True, text=True)
-ws_res  = subprocess.run(['niri', 'msg', '--json', 'workspaces'], capture_output=True, text=True)
 win_data = json.loads(win_res.stdout)
-ws_data  = json.loads(ws_res.stdout)
-
-focused_ws_id = next((ws['id'] for ws in ws_data if ws['is_focused']), None)
-if focused_ws_id is None:
-    sys.exit(0)
 
 focused_win_id = next((w['id'] for w in win_data if w.get('is_focused')), None)
 
-# One representative window per column on the focused workspace
-cols = {}
+# One representative window per column, across all workspaces
+cols_by_ws = {}
 for w in win_data:
-    if w.get('workspace_id') != focused_ws_id:
+    ws_id = w.get('workspace_id')
+    if ws_id is None:
         continue
     pos = w['layout'].get('pos_in_scrolling_layout')
     if pos is None:
         continue
     col_idx = pos[0]
-    if col_idx not in cols:
-        cols[col_idx] = w['id']
+    key = (ws_id, col_idx)
+    if key not in cols_by_ws:
+        cols_by_ws[key] = w['id']
 
-for win_id in sorted(cols.values()):
+for win_id in sorted(cols_by_ws.values()):
     subprocess.run(['niri', 'msg', 'action', 'focus-window', '--id', str(win_id)])
     subprocess.run(['niri', 'msg', 'action', 'set-column-width', width])
 
@@ -57,31 +52,20 @@ if [ -f "$STATE_FILE" ]; then
     # EXITING TILE MODE → restore config snapshot taken at entry
 
     # 1. Restore wallpaper
-    RESTORE_WALLPAPER=$(cat "$WALLPAPER_FILE" 2>/dev/null)
-    if [[ -z "$RESTORE_WALLPAPER" ]]; then
-        RESTORE_WALLPAPER="$DEFAULT_WALLPAPER"
-    fi
-    pkill swaybg
-    swaybg -i "$RESTORE_WALLPAPER" -m fill &
+    swww restore
 
     # 2. Restore config from snapshot (niri auto-reloads on file change)
     cp "$BACKUP" "$CONFIG"
 
-    # 3. Restore column widths
-    resize_columns "76.666667%"
+    # 3. Restore column widths on all workspaces
+    resize_all_columns "76.666667%"
 
-    rm -f "$STATE_FILE" "$BACKUP" "$WALLPAPER_FILE"
+    rm -f "$STATE_FILE" "$BACKUP"
 else
     # ENTERING TILE MODE
 
-    # 1. Save wallpaper and go black
-    CURRENT_WALLPAPER=$(grep -oP '(?<=spawn-at-startup "swaybg" "-i" ")[^"]+' "$CONFIG")
-    if [[ -z "$CURRENT_WALLPAPER" ]]; then
-        CURRENT_WALLPAPER="$DEFAULT_WALLPAPER"
-    fi
-    echo "$CURRENT_WALLPAPER" > "$WALLPAPER_FILE"
-    pkill swaybg
-    swaybg -c "#000000" &
+    # 1. Go black (swww restore will undo this on exit)
+    swww clear
 
     # 2. Snapshot config, then apply tile-mode values
     #    Patterns match any current value so the script never needs updating
@@ -92,9 +76,10 @@ else
     sed -i --follow-symlinks 's/width [0-9]\+ \/\/ 1 current/width 0 \/\/ 1 current/' "$CONFIG"
     sed -i --follow-symlinks 's/width [0-9]\+ \/\/ 3 current/width 2 \/\/ 3 current/' "$CONFIG"
     sed -i --follow-symlinks 's/^\(\s*\)opacity [0-9.]*/\1opacity 1.0/' "$CONFIG"
+    sed -i --follow-symlinks 's/default-column-width { proportion 0\.[0-9]\+; }/default-column-width { proportion 0.5; }/' "$CONFIG"
 
-    # 3. Set ALL columns on workspace to 50%
-    resize_columns "50%"
+    # 3. Set ALL columns on ALL workspaces to 50%
+    resize_all_columns "50%"
 
     touch "$STATE_FILE"
 fi
