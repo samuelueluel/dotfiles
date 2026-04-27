@@ -16,7 +16,7 @@
         "background": "#914059E6",
 
         // Make all major surface layers fully transparent so they don't stack
-        "elevated_surface.background": "#00000000",
+        "elevated_surface.background": "#914059FF",
         "surface.background": "#00000000",
         "panel.background": "#00000000",
         "pane.background": "#00000000",

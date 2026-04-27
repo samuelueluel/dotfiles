@@ -458,7 +458,22 @@ window-rule {
     draw-border-with-background false
 }
 
-// 6. Blur for special windows --- some particulars with geometry
+// 6. Blur for pop-up menus
+window-rule {
+    match app-id="io.github.quodlibet.QuodLibet"
+    match app-id="helium"
+    match app-id="obsidian"
+
+    popups {
+        geometry-corner-radius 15
+
+        background-effect {
+            blur true
+        }
+    }
+}
+
+// 7. Blur for special windows --- some particulars with geometry
 layer-rule {
     match namespace="^launcher$"   // fuzzel
     geometry-corner-radius 10
