@@ -13,7 +13,7 @@
           "#17C182"
         ],
         "background.appearance": "transparent",
-        "background": "#914059B3",
+        "background": "#914059E6",
 
         // Make all major surface layers fully transparent so they don't stack
         "elevated_surface.background": "#00000000",
@@ -25,13 +25,13 @@
         "terminal.background": "#00000000",
 
         // Bars and Toolbar
-        "status_bar.background": "#914059A0", // Terracotta tint for separation
-        "title_bar.background": "#00000010",
-        "title_bar.inactive_background": "#00000010",
+        "status_bar.background": "#914059E6",
+        "title_bar.background": "#914059E6",
+        "title_bar.inactive_background": "#914059E6",
         "toolbar.background": "#00000000",
-        "tab_bar.background": "#00000015",
+        "tab_bar.background": "#00000000",
         "tab.inactive_background": "#00000000",
-        "tab.active_background": "#00000025", // Subtle highlight for active tab
+        "tab.active_background": "#00000000",
 
         "border": "#6B334890",
         "border.variant": "#6B334890",

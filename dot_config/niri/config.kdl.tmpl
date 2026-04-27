@@ -331,7 +331,7 @@ window-rule {
     match app-id="io.github.quodlibet.QuodLibet"
     open-on-workspace "casual"
     default-column-width { proportion 1.0; }
-    open-maximized-to-edges true
+    //open-maximized-to-edges true
 }
 
 // --- Custom Floating Launchers ---
@@ -415,14 +415,15 @@ window-rule {
     match app-id="zen-personal"
     match app-id="zen-work"
     match app-id="^mpv$"
+    //match app-id="io.github.quodlibet.QuodLibet"
     //match is-floating=true
     opacity 1.0
 }
 
 // 3. Exceptions for lower opacity
 window-rule {
-    match app-id="io.github.quodlibet.QuodLibet"
-    opacity 0.7
+    //match app-id="io.github.quodlibet.QuodLibet"
+    //opacity 0.7
 }
 window-rule { // transparency set in app-specific config to prevent text from dimming
     match app-id="alacritty-custom"
@@ -433,8 +434,8 @@ window-rule { // transparency set in app-specific config to prevent text from di
     match title="bluetuith"
     match title="htop"
     match title="nmtui"
-    match title="Yazi Float"
-    match app-id="dev.zed.Zed"
+    match title="Yazi Float" // kitty config
+    match app-id="dev.zed.Zed" // noctalia-blur theme
     //match app-id="obsidian"
     opacity 1.0
 }
