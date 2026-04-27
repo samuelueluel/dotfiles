@@ -25,3 +25,6 @@ which rtk             # Verify correct binary
 
 All other commands are automatically rewritten by the Gemini CLI hook.
 Example: `git status` → `rtk git status` (transparent, 0 tokens overhead)
+
+## Gemini Added Memories
+- Testing global memory persistence location.
