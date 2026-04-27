@@ -255,7 +255,7 @@ gestures {
 
 // ── Bar + notifications ───────────────────────────────────────────────────
 spawn-at-startup "swww-daemon"
-spawn-at-startup "sh" "-c" "sleep 1 && waypaper --restore"
+spawn-at-startup "sh" "-c" "sleep 1 && ~/.local/bin/random-wallpaper.sh"
 spawn-at-startup "waybar"
 spawn-at-startup "swaync"
 
