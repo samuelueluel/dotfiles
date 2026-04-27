@@ -132,4 +132,4 @@ if command -v pet >/dev/null; then
 fi
 
 # Auto-load SSH key on first terminal (added by sjust ssh-setup)
-[[ -S "$SSH_AUTH_SOCK" ]] && { ssh-add -l &>/dev/null || SSH_ASKPASS_REQUIRE=never ssh-add ~/.ssh/id_ed25519; }
+[[ -S "$SSH_AUTH_SOCK" ]] && { ssh-add -l &>/dev/null || SSH_ASKPASS_REQUIRE=never ssh-add ~/.ssh/id_ed25519 &>/dev/null; }
