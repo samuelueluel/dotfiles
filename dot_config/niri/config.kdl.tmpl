@@ -435,6 +435,7 @@ window-rule { // transparency set in app-specific config to prevent text from di
     match title="nmtui"
     match title="Yazi Float"
     match app-id="dev.zed.Zed"
+    //match app-id="obsidian"
     opacity 1.0
 }
 
@@ -535,7 +536,7 @@ binds {
     Mod+2 hotkey-overlay-title="Cycle scratchpad windows" { spawn "/usr/bin/nirius" "scratchpad-show"; }
 
     Mod+G hotkey-overlay-title="Toggle fullscreen" { fullscreen-window; }
-    Mod+Ctrl+G hotkey-overlay-title="Expand column to available width" { expand-column-to-available-width; }
+    Mod+Ctrl+G hotkey-overlay-title="Maximize window to edges" { maximize-window-to-edges; }
     Mod+F hotkey-overlay-title="Cycle column width" { switch-preset-column-width; }      // cycles over chosen presets
     Mod+Ctrl+F hotkey-overlay-title="Cycle window height" { switch-preset-window-height; } // cycles over chosen presets
 

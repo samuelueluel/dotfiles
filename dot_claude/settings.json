@@ -13,5 +13,5 @@
     ]
   },
   "effortLevel": "medium",
-  "theme": "dark-ansi"
+  "theme": "custom:blur-theme"
 }
