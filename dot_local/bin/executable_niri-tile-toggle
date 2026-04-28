@@ -5,19 +5,101 @@
 #   - All columns on ALL workspaces set to 50% width (two full columns always visible)
 #   - center-focused-column never + gaps 2 + focus-ring width 0
 #   - default-column-width 50% so new windows also open at 50%
-#   - Black wallpaper
+#   - All windows set to opacity 1.0
 #
 # Exit restores the full config snapshot taken at entry — no hardcoded default values.
 
 CONFIG="$HOME/.config/niri/config.kdl"
 BACKUP="$HOME/.cache/niri-config-backup.kdl"
 STATE_FILE="$HOME/.cache/niri-tile-toggle"
+COLUMNS_FILE="$HOME/.cache/niri-tile-toggle-columns"
+
+save_column_widths() {
+    python3 << 'EOF'
+import os, json, subprocess, sys
+
+import re
+
+win_res = subprocess.run(['niri', 'msg', '--json', 'windows'], capture_output=True, text=True)
+ws_res  = subprocess.run(['niri', 'msg', '--json', 'workspaces'], capture_output=True, text=True)
+win_data = json.loads(win_res.stdout)
+ws_data  = json.loads(ws_res.stdout)
+
+config_path = os.path.expanduser('~/.config/niri/config.kdl')
+with open(config_path) as f:
+    config_text = f.read()
+m = re.search(r'(?m)^\s+gaps (\d+)', config_text)
+gaps = int(m.group(1)) if m else 4
+# set-column-width X gives window_size = X + (gaps - 1), so save the inverse
+correction = gaps - 1
+
+col_widths = {}
+for w in win_data:
+    ws_id = w.get('workspace_id')
+    if ws_id is None:
+        continue
+    layout = w.get('layout') or {}
+    pos = layout.get('pos_in_scrolling_layout')
+    if pos is None:
+        continue
+    window_size = layout.get('window_size')
+    if window_size is None:
+        continue
+    key = (ws_id, pos[0])
+    if key not in col_widths:
+        col_widths[str(key)] = window_size[0] - correction
+
+print(json.dumps(col_widths))
+EOF
+}
+
+restore_column_widths() {
+    COLUMNS_DATA="$(cat "$COLUMNS_FILE")" python3 << 'EOF'
+import os, json, subprocess, sys, ast
+
+col_widths = json.loads(os.environ['COLUMNS_DATA'])
+
+win_res = subprocess.run(['niri', 'msg', '--json', 'windows'], capture_output=True, text=True)
+ws_res  = subprocess.run(['niri', 'msg', '--json', 'workspaces'], capture_output=True, text=True)
+win_data = json.loads(win_res.stdout)
+ws_data  = json.loads(ws_res.stdout)
+
+focused_win_id = next((w['id'] for w in win_data if w.get('is_focused')), None)
+
+# One representative window per (workspace, column)
+cols_by_ws = {}
+for w in win_data:
+    ws_id = w.get('workspace_id')
+    if ws_id is None:
+        continue
+    layout = w.get('layout') or {}
+    pos = layout.get('pos_in_scrolling_layout')
+    if pos is None:
+        continue
+    key = (ws_id, pos[0])
+    if key not in cols_by_ws:
+        cols_by_ws[key] = w['id']
+
+for key, win_id in sorted(cols_by_ws.items()):
+    width = col_widths.get(str(key))
+    if width is None:
+        continue
+    subprocess.run(['niri', 'msg', 'action', 'focus-window', '--id', str(win_id)])
+    subprocess.run(['niri', 'msg', 'action', 'set-column-width', str(width)])
+
+if focused_win_id:
+    subprocess.run(['niri', 'msg', 'action', 'focus-window', '--id', str(focused_win_id)])
+EOF
+}
 
 resize_all_columns() {
     COLUMN_WIDTH="$1" python3 << 'EOF'
 import os, json, subprocess, sys
 
 width = os.environ['COLUMN_WIDTH']
+
+# Freeze the screen so the user doesn't see the view jumping around
+subprocess.run(['niri', 'msg', 'action', 'do-screen-transition', '-d', '1000'])
 
 win_res = subprocess.run(['niri', 'msg', '--json', 'windows'], capture_output=True, text=True)
 win_data = json.loads(win_res.stdout)
@@ -51,28 +133,36 @@ EOF
 if [ -f "$STATE_FILE" ]; then
     # EXITING TILE MODE → restore config snapshot taken at entry
 
-    # 1. Restore config from snapshot (niri auto-reloads on file change)
+    # 1. Freeze screen before any changes
+    niri msg action do-screen-transition -d 1000
+
+    # 2. Restore config (niri reloads asynchronously)
     cp "$BACKUP" "$CONFIG"
 
-    # 2. Restore column widths on all workspaces
-    resize_all_columns "76.666667%"
+    # 3. Restore column widths
+    restore_column_widths
 
-    rm -f "$STATE_FILE" "$BACKUP"
+    rm -f "$STATE_FILE" "$BACKUP" "$COLUMNS_FILE"
+    cp "$COLUMNS_FILE" "$HOME/.cache/niri-tile-toggle-columns-debug" 2>/dev/null || true
 else
     # ENTERING TILE MODE
 
-    # 1. Snapshot config, then apply tile-mode values
-    #    Patterns match any current value so the script never needs updating
-    #    when you edit the default config.
+    # 1. Save column widths before resizing
+    save_column_widths > "$COLUMNS_FILE"
+    cp "$COLUMNS_FILE" "$HOME/.cache/niri-tile-toggle-columns-debug"
+
+    # 2. Snapshot config, then apply tile-mode values
     cp "$CONFIG" "$BACKUP"
     sed -i --follow-symlinks 's/center-focused-column "[^"]*"/center-focused-column "never"/' "$CONFIG"
     sed -i --follow-symlinks 's/^\(\s*\)gaps [0-9]\+/\1gaps 2/' "$CONFIG"
     sed -i --follow-symlinks 's/width [0-9]\+ \/\/ 1 current/width 0 \/\/ 1 current/' "$CONFIG"
     sed -i --follow-symlinks 's/width [0-9]\+ \/\/ 3 current/width 2 \/\/ 3 current/' "$CONFIG"
-    sed -i --follow-symlinks 's/^\(\s*\)opacity [0-9.]*/\1opacity 1.0/' "$CONFIG"
     sed -i --follow-symlinks 's/default-column-width { proportion 0\.[0-9]\+; }/default-column-width { proportion 0.5; }/' "$CONFIG"
 
-    # 2. Set ALL columns on ALL workspaces to 50%
+    # Set all 0.x opacities to 1.0
+    sed -i --follow-symlinks 's/opacity 0\.[0-9]\+/opacity 1.0/g' "$CONFIG"
+
+    # 3. Set ALL columns on ALL workspaces to 50%
     resize_all_columns "50%"
 
     touch "$STATE_FILE"
