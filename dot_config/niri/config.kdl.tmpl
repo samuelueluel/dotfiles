@@ -303,6 +303,7 @@ exclude app-id="zen-work"
 exclude app-id="kitty"
 exclude title="termfilechooser"
 exclude title="File Launcher"
+exclude title="fsel-launcher"
 exclude title="Folder Launcher"
 exclude title="Keybind Search"
 exclude title="Clipboard History"
@@ -429,6 +430,7 @@ window-rule { // transparency set in app-specific config to prevent text from di
     match app-id="alacritty-custom"
     match app-id="kitty"
     match title="Alacritty Float"
+    match title="fsel-launcher"
     match title="Keybind Search"
     match title="Clipboard History"
     match title="bluetuith"
@@ -523,7 +525,7 @@ binds {
 
     XF86MenuKB hotkey-overlay-title="Toggle minimap" repeat=false { spawn "niri-minimap"; }
     Mod+B hotkey-overlay-title="Toggle Waybar" { spawn-sh "pkill -SIGUSR1 waybar || waybar"; }
-    Mod+Space hotkey-overlay-title="App launcher (fuzzel)" repeat=false { spawn "fuzzel"; }
+    Mod+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--title" "fsel-launcher" "fsel"; }
     // Mod+V hotkey-overlay-title="Clipboard history (cliphist)" repeat=false { spawn-sh "cliphist list | fuzzel --dmenu | cliphist decode | wl-copy"; }
     Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "swaync-client" "-t"; }
 
@@ -705,3 +707,4 @@ binds {
 }
 
 //include "./noctalia.kdl" // Noctalia places this here to enforce Template color scheme onto Niri elements; usually don't want this
+./noctalia.kdl" // Noctalia places this here to enforce Template color scheme onto Niri elements; usually don't want this

@@ -239,10 +239,10 @@
 
   #####################################[ vcs: git status ]######################################
   # was: '#B1B9F9' lavender
-  typeset -g POWERLEVEL9K_VCS_CLEAN_BACKGROUND='#FFFFFF'
-  typeset -g POWERLEVEL9K_VCS_MODIFIED_BACKGROUND='#FFFFFF'
-  typeset -g POWERLEVEL9K_VCS_UNTRACKED_BACKGROUND='#FFFFFF'
-  typeset -g POWERLEVEL9K_VCS_CONFLICTED_BACKGROUND='#FFFFFF'
+  typeset -g POWERLEVEL9K_VCS_CLEAN_BACKGROUND='#000000'
+  typeset -g POWERLEVEL9K_VCS_MODIFIED_BACKGROUND='#000000'
+  typeset -g POWERLEVEL9K_VCS_UNTRACKED_BACKGROUND='#000000'
+  typeset -g POWERLEVEL9K_VCS_CONFLICTED_BACKGROUND='#000000'
   typeset -g POWERLEVEL9K_VCS_LOADING_BACKGROUND=8
   typeset -g POWERLEVEL9K_VCS_BRANCH_ICON=
   typeset -g POWERLEVEL9K_VCS_UNTRACKED_ICON='?'
@@ -255,11 +255,11 @@
       return
     fi
 
-    local       meta='%8F'
-    local      clean='%F{#000000}'
-    local   modified='%F{#000000}'
-    local  untracked='%F{#000000}'
-    local conflicted='%F{#000000}'
+    local       meta='%F{8}'
+    local      clean='%F{#FFFFFF}'
+    local   modified='%F{#FFFFFF}'
+    local  untracked='%F{#FFFFFF}'
+    local conflicted='%F{#FFFFFF}'
 
     local res
 
