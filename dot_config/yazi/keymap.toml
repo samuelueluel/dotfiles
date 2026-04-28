@@ -8,6 +8,7 @@ prepend_keymap = [
 	{ on = "<C-n>", run = "shell 'obsidian-fzf-files' --block", desc = "Fuzzy search Obsidian notes" },
 	{ on = "<C-b>", run = "shell 'obsidian-fzf-search' --block", desc = "Grep Obsidian note content" },
 	{ on = "<C-t>", run = "tab_create --current", desc = "New tab" },
+	{ on = "<C-q>", run = "close", desc = "Close tab" },
 	{ on = "<C-r>", run = "reload", desc = "Reload" },
 	{ on = "<C-e>", run = "rename", desc = "Rename" },
 	{ on = "r", run = "noop", desc = "Disabled (use Ctrl+E)" },
