@@ -103,7 +103,7 @@ input {
 // ============================================================
 
 layout {
-    gaps 5 // 6 current; 2 for "multi-screen"
+    gaps 4 // 6 current; 2 for "multi-screen"
 
     background-color "#000000" // Black
 
@@ -127,14 +127,14 @@ layout {
     }
 
     focus-ring {
-        //off
-        width 1 // 1 current; 0 for "multi-screen"
-        active-color "#00A4AF"  //theme turquoise
+        off
+        //width 2 // 1 current; 0 for "multi-screen"
+        //active-color "#00B6C2"  //theme turquoise
     }
 
     border {
-        // off
-        width 3 // 3 current; 3 for "multi-screen"
+         //off
+        width 1 // 3 current; 3 for "multi-screen"
         active-color "#00B6C2" // exact theme turquoise
         inactive-color "#D0A7AF" // exact theme dusty rose
         urgent-color "#EE9D00" // theme gold
@@ -156,7 +156,7 @@ layout {
         hide-when-single-tab
 
         gap 2
-        width 8
+        width 5
         length total-proportion=1.0
 
         active-color "#FFA726" // theme gold
@@ -707,4 +707,3 @@ binds {
 }
 
 //include "./noctalia.kdl" // Noctalia places this here to enforce Template color scheme onto Niri elements; usually don't want this
-./noctalia.kdl" // Noctalia places this here to enforce Template color scheme onto Niri elements; usually don't want this

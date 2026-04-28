@@ -7,10 +7,36 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
+  "ui_font_weight": 500.0,
+  "preview_tabs": {
+    "enabled": true
+  },
+  "tabs": {
+    "file_icons": false
+  },
+  "tab_bar": {
+    "show_tab_bar_buttons": true,
+    "show_nav_history_buttons": true,
+    "show": false
+  },
+  "title_bar": {
+    "show_branch_status_icon": true,
+    "show_user_picture": true,
+    "show_user_menu": true,
+    "show_onboarding_banner": true,
+    "show_project_items": true,
+    "show_branch_name": false,
+    "show_menus": false,
+    "show_sign_in": true
+  },
+  "status_bar": {
+    "show_active_file": false
+  },
   "outline_panel": {
     "dock": "left"
   },
   "collaboration_panel": {
+    "button": true,
     "dock": "left"
   },
   "agent": {
@@ -26,7 +52,7 @@
     "dock": "left",
     "button": true
   },
-  "ui_font_family": "JetBrainsMono Nerd Font",
+  "ui_font_family": "IBM Plex Sans",
   "buffer_font_family": "JetBrainsMono Nerd Font",
   "session": {
     "trust_all_worktrees": true,
@@ -37,7 +63,7 @@
     "diagnostics": false,
     "metrics": false
   },
-  "ui_font_size": 16,
+  "ui_font_size": 17.0,
   "buffer_font_size": 15,
   "window_decorations": "server",
   "theme": "Noctalia Blur",

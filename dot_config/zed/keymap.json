@@ -22,8 +22,37 @@
     }
   },
   {
+    "context": "Workspace",
     "bindings": {
-      "alt-tab": "pane::AlternateFile"
+      "alt-tab": "tab_switcher::Toggle"
+    }
+  },
+  {
+    "context": "Workspace",
+    "unbind": {
+      "ctrl-tab": "tab_switcher::Toggle"
+    }
+  },
+  {
+    "context": "Workspace",
+    "bindings": {
+      "alt-shift-tab": [
+        "tab_switcher::Toggle",
+        {
+          "select_last": true
+        }
+      ]
+    }
+  },
+  {
+    "context": "Workspace",
+    "unbind": {
+      "ctrl-shift-tab": [
+        "tab_switcher::Toggle",
+        {
+          "select_last": true
+        }
+      ]
     }
   }
 ]

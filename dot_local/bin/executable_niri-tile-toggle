@@ -51,23 +51,17 @@ EOF
 if [ -f "$STATE_FILE" ]; then
     # EXITING TILE MODE → restore config snapshot taken at entry
 
-    # 1. Restore wallpaper
-    swww restore
-
-    # 2. Restore config from snapshot (niri auto-reloads on file change)
+    # 1. Restore config from snapshot (niri auto-reloads on file change)
     cp "$BACKUP" "$CONFIG"
 
-    # 3. Restore column widths on all workspaces
+    # 2. Restore column widths on all workspaces
     resize_all_columns "76.666667%"
 
     rm -f "$STATE_FILE" "$BACKUP"
 else
     # ENTERING TILE MODE
 
-    # 1. Go black (swww restore will undo this on exit)
-    swww clear
-
-    # 2. Snapshot config, then apply tile-mode values
+    # 1. Snapshot config, then apply tile-mode values
     #    Patterns match any current value so the script never needs updating
     #    when you edit the default config.
     cp "$CONFIG" "$BACKUP"
@@ -78,7 +72,7 @@ else
     sed -i --follow-symlinks 's/^\(\s*\)opacity [0-9.]*/\1opacity 1.0/' "$CONFIG"
     sed -i --follow-symlinks 's/default-column-width { proportion 0\.[0-9]\+; }/default-column-width { proportion 0.5; }/' "$CONFIG"
 
-    # 3. Set ALL columns on ALL workspaces to 50%
+    # 2. Set ALL columns on ALL workspaces to 50%
     resize_all_columns "50%"
 
     touch "$STATE_FILE"
