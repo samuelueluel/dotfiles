@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=kitty-launcher
+NoDisplay=true
+TryExec=kitty
+StartupWMClass=kitty-launcher
+Exec=kitty --class kitty-launcher
+Icon=accessories-notes
+Categories=System;

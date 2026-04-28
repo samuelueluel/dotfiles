@@ -1,0 +1,12 @@
+disable_mouse = true
+
+[app_launcher]
+filter_actions = true
+filter_desktop = true
+
+[keybinds]
+up = ["up", { key = "w", modifiers = "alt" }]
+down = ["down", { key = "s", modifiers = "alt" }]
+
+[cclip]
+image_preview = true

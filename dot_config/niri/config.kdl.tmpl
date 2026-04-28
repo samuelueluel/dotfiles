@@ -263,7 +263,7 @@ spawn-at-startup "swaync"
 spawn-at-startup "swayosd-server"
 
 // ── Clipboard daemon ──────────────────────────────────────────────────────
-spawn-at-startup "sh" "-c" "wl-paste --watch cliphist-store"
+spawn-at-startup "cclipd" "-s" "2" "-t" "image/png" "-t" "image/*" "-t" "text/plain;charset=utf-8" "-t" "text/*"
 
 // ── Display management ────────────────────────────────────────────────────
 spawn-at-startup "kanshi"
@@ -366,10 +366,17 @@ window-rule {
 }
 
 window-rule {
+    match title="fsel-launcher"
+    open-floating true
+    default-column-width { fixed 500; }
+    default-window-height { fixed 830; }
+}
+
+window-rule {
     match title="Clipboard History"
     open-floating true
-    default-column-width { fixed 1500; }
-    default-window-height { fixed 700; }
+    default-column-width { fixed 800; }
+    default-window-height { fixed 830; }
 }
 
 window-rule {
@@ -525,8 +532,8 @@ binds {
 
     XF86MenuKB hotkey-overlay-title="Toggle minimap" repeat=false { spawn "niri-minimap"; }
     Mod+B hotkey-overlay-title="Toggle Waybar" { spawn-sh "pkill -SIGUSR1 waybar || waybar"; }
-    Mod+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--title" "fsel-launcher" "fsel"; }
-    // Mod+V hotkey-overlay-title="Clipboard history (cliphist)" repeat=false { spawn-sh "cliphist list | fuzzel --dmenu | cliphist decode | wl-copy"; }
+    Mod+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--config" "/var/home/samuel/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "fsel-launcher" "fsel" "--detach"; }
+    Mod+V hotkey-overlay-title="Clipboard history (cclip)" repeat=false { spawn "kitty" "--config" "/var/home/samuel/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "Clipboard History" "fsel" "--cclip"; }
     Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "swaync-client" "-t"; }
 
     // -----------------------------------
