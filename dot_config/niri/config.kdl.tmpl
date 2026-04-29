@@ -532,8 +532,8 @@ binds {
 
     XF86MenuKB hotkey-overlay-title="Toggle minimap" repeat=false { spawn "niri-minimap"; }
     Mod+B hotkey-overlay-title="Toggle Waybar" { spawn-sh "pkill -SIGUSR1 waybar || waybar"; }
-    Mod+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--config" "/var/home/samuel/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "fsel-launcher" "fsel" "--detach"; }
-    Mod+V hotkey-overlay-title="Clipboard history (cclip)" repeat=false { spawn "kitty" "--config" "/var/home/samuel/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "Clipboard History" "fsel" "--cclip"; }
+    Mod+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "fsel-launcher" "fsel" "--detach"; }
+    Mod+V hotkey-overlay-title="Clipboard history (cclip)" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "Clipboard History" "fsel" "--cclip"; }
     Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "swaync-client" "-t"; }
 
     // -----------------------------------
