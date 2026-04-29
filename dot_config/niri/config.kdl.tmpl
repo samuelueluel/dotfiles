@@ -263,7 +263,7 @@ spawn-at-startup "swaync"
 spawn-at-startup "swayosd-server"
 
 // ── Clipboard daemon ──────────────────────────────────────────────────────
-spawn-at-startup "cclipd" "-s" "2" "-t" "image/png" "-t" "image/*" "-t" "text/plain;charset=utf-8" "-t" "text/*"
+spawn-at-startup "sh" "-c" "rm -f ~/.local/share/cclip/db.sqlite3* && cclipd -s 2 -t image/png -t 'image/*' -t 'text/plain;charset=utf-8' -t 'text/*'"
 
 // ── Display management ────────────────────────────────────────────────────
 spawn-at-startup "kanshi"

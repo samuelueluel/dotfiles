@@ -1,4 +1,14 @@
 disable_mouse = true
+highlight_color = "#00B6C2"
+header_title_color = "#D0A7AF"
+main_text_color = "#FFFFFF"
+apps_text_color = "#FFFFFF"
+input_text_color = "#00B6C2"
+main_border_color = "#D0A7AF"
+apps_border_color = "#D0A7AF"
+input_border_color = "#D0A7AF"
+pin_color = "#FFA726"
+title_panel_height_percent = 0
 
 [app_launcher]
 filter_actions = true
@@ -9,4 +19,13 @@ up = ["up", { key = "w", modifiers = "alt" }]
 down = ["down", { key = "s", modifiers = "alt" }]
 
 [cclip]
+title_panel_height_percent = 40
 image_preview = true
+wrap_long_lines = true
+main_text_color = "#FFFFFF"
+items_text_color = "#FFFFFF"
+input_text_color = "#FFFFFF"
+show_line_numbers = true
+
+[dmenu]
+wrap_long_lines = true
