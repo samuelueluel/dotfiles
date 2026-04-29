@@ -311,6 +311,7 @@ exclude title="Alacritty Float"
 exclude title="bluetuith"
 exclude title="nmtui"
 exclude title="htop"
+exclude title="ikhal"
 exclude app-id="org.gnome.SystemMonitor"
 exclude app-id="nemo"
 exclude app-id="nm-connection-editor"
@@ -401,6 +402,13 @@ window-rule {
 }
 
 window-rule {
+    match title="ikhal"
+    open-floating true
+    default-column-width { fixed 1000; }
+    default-window-height { fixed 700; }
+}
+
+window-rule {
     match title="bluetuith"
     open-floating true
     default-column-width { fixed 1000; }
@@ -442,6 +450,7 @@ window-rule { // transparency set in app-specific config to prevent text from di
     match title="Clipboard History"
     match title="bluetuith"
     match title="htop"
+    match title="ikhal"
     match title="nmtui"
     match title="Yazi Float" // kitty config
     match app-id="dev.zed.Zed" // noctalia-blur theme

@@ -1,0 +1,36 @@
+[calendars]
+
+[[private]]
+path = /var/home/samuel/.local/share/khal/calendars/private
+type = calendar
+
+[locale]
+timeformat = %I:%M %p
+dateformat = %m/%d/%Y
+longdateformat = %m/%d/%Y
+datetimeformat = %m/%d/%Y %I:%M %p
+longdatetimeformat = %m/%d/%Y %I:%M %p
+
+[default]
+default_calendar = private
+
+[view]
+theme = dark
+
+[palette]
+list = white, ""
+list focused = white, dark blue, bold
+edit = white, ""
+edit focus = white, dark blue, bold
+line header = white, "", bold
+bright = white, dark blue, bold
+date header = light gray, ""
+date header focused = white, dark blue
+header = white, ""
+footer = white, ""
+
+[keybindings]
+up = up
+down = down
+left = meta b
+right = meta f
