@@ -22,8 +22,10 @@ import re
 
 win_res = subprocess.run(['niri', 'msg', '--json', 'windows'], capture_output=True, text=True)
 ws_res  = subprocess.run(['niri', 'msg', '--json', 'workspaces'], capture_output=True, text=True)
+out_res = subprocess.run(['niri', 'msg', '--json', 'outputs'], capture_output=True, text=True)
 win_data = json.loads(win_res.stdout)
 ws_data  = json.loads(ws_res.stdout)
+out_data = json.loads(out_res.stdout)
 
 config_path = os.path.expanduser('~/.config/niri/config.kdl')
 with open(config_path) as f:
@@ -32,6 +34,15 @@ m = re.search(r'(?m)^\s+gaps (\d+)', config_text)
 gaps = int(m.group(1)) if m else 4
 # set-column-width X gives window_size = X + (gaps - 1), so save the inverse
 correction = gaps - 1
+
+# workspace_id -> output logical width
+ws_to_output = {ws['id']: ws.get('output') for ws in ws_data}
+output_widths = {}
+for name, out in out_data.items():
+    logical = out.get('logical') or {}
+    w = logical.get('width')
+    if w:
+        output_widths[name] = w
 
 col_widths = {}
 for w in win_data:
@@ -43,10 +54,23 @@ for w in win_data:
     if pos is None:
         continue
     window_size = layout.get('window_size')
+    tile_size   = layout.get('tile_size')
     if window_size is None:
         continue
     key = (ws_id, pos[0])
-    if key not in col_widths:
+    if str(key) in col_widths:
+        continue
+    # If column fills (close to) full working width, save as "100%" so
+    # restore is independent of border/gap pixel math.
+    out_w = output_widths.get(ws_to_output.get(ws_id))
+    is_full = False
+    if out_w and tile_size:
+        # Tile width for a 100% column == out_w - 2*gaps. Allow small slack.
+        if tile_size[0] >= (out_w - 2 * gaps - 2):
+            is_full = True
+    if is_full:
+        col_widths[str(key)] = "100%"
+    else:
         col_widths[str(key)] = window_size[0] - correction
 
 print(json.dumps(col_widths))
@@ -85,6 +109,7 @@ for key, win_id in sorted(cols_by_ws.items()):
     if width is None:
         continue
     subprocess.run(['niri', 'msg', 'action', 'focus-window', '--id', str(win_id)])
+    # "100%" stays as a percentage string; pixel widths get stringified.
     subprocess.run(['niri', 'msg', 'action', 'set-column-width', str(width)])
 
 if focused_win_id:
@@ -138,6 +163,11 @@ if [ -f "$STATE_FILE" ]; then
 
     # 2. Restore config (niri reloads asynchronously)
     cp "$BACKUP" "$CONFIG"
+
+    # Wait for niri to pick up the new gaps/border values before we apply
+    # pixel-based column widths — otherwise the saved correction (computed
+    # with normal gaps) gets applied against still-tile-mode gaps.
+    sleep 0.3
 
     # 3. Restore column widths
     restore_column_widths
