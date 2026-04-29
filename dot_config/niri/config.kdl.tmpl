@@ -405,17 +405,6 @@ window-rule {
     draw-border-with-background false
 }
 
-// 2. Exceptions for full opacity
-window-rule {
-    match title="(?i)picture in picture|picture-in-picture"
-    match app-id="zen-personal"
-    match app-id="zen-work"
-    match app-id="^mpv$"
-    //match app-id="io.github.quodlibet.QuodLibet"
-    //match is-floating=true
-    opacity 1.0
-}
-
 // 3. Exceptions for lower opacity
 window-rule {
     //match app-id="io.github.quodlibet.QuodLibet"
@@ -454,6 +443,17 @@ window-rule {
     //exclude is-floating=true
     opacity 0.5
     draw-border-with-background false
+}
+
+// 2. Exceptions for full opacity
+window-rule {
+    match title="(?i)picture in picture|picture-in-picture"
+    match app-id="zen-personal"
+    match app-id="zen-work"
+    match app-id="^mpv$"
+    //match app-id="io.github.quodlibet.QuodLibet"
+    //match is-floating=true
+    opacity 1.0
 }
 
 // 6. Blur for pop-up menus
