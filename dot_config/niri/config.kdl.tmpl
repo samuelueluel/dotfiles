@@ -61,41 +61,14 @@ input {
 // OUTPUTS (MONITORS)
 // ============================================================
 
-// You can configure outputs by their name, which you can find
-// by running `niri msg outputs` while inside a niri instance.
-// The built-in laptop monitor is usually called "eDP-1".
-// Find more information on the wiki:
-// https://yalter.github.io/niri/Configuration:-Outputs
-// Remember to uncomment the node by removing "/-"!
-/-output "eDP-1" {
-    // Uncomment this line to disable this output.
-    // off
-
-    // Resolution and, optionally, refresh rate of the output.
-    // The format is "<width>x<height>" or "<width>x<height>@<refresh rate>".
-    // If the refresh rate is omitted, niri will pick the highest refresh rate
-    // for the resolution.
-    // If the mode is omitted altogether or is invalid, niri will pick one automatically.
-    // Run `niri msg outputs` while inside a niri instance to list all outputs and their modes.
-    mode "1920x1080@120.030"
-
-    // You can use integer or fractional scale, for example use 1.5 for 150% scale.
+output "HDMI-A-1" {
     scale 2
+    position x=0 y=0
+}
 
-    // Transform allows to rotate the output counter-clockwise, valid values are:
-    // normal, 90, 180, 270, flipped, flipped-90, flipped-180 and flipped-270.
-    transform "normal"
-
-    // Position of the output in the global coordinate space.
-    // This affects directional monitor actions like "focus-monitor-left", and cursor movement.
-    // The cursor can only move between directly adjacent outputs.
-    // Output scale and rotation has to be taken into account for positioning:
-    // outputs are sized in logical, or scaled, pixels.
-    // For example, a 3840×2160 output with scale 2.0 will have a logical size of 1920×1080,
-    // so to put another output directly adjacent to it on the right, set its x to 1920.
-    // If the position is unset or results in an overlap, the output is instead placed
-    // automatically.
-    position x=1280 y=0
+output "eDP-1" {
+    scale 1.25 // Niri default for this screen, 1536x864 logical
+    position x=192 y=1080 // 192 centers the 1536px laptop screen under the 1920px TV screen
 }
 
 // ============================================================
@@ -573,8 +546,10 @@ binds {
     Mod+Ctrl+P hotkey-overlay-title="Toggle window follow mode" { spawn "/usr/bin/nirius" "toggle-follow-mode"; }
 
     Mod+O hotkey-overlay-title="Toggle window scratchpad state" { spawn "/usr/bin/nirius" "scratchpad-toggle"; } // Oh not Zero
-    Mod+1 hotkey-overlay-title="Show all scratchpad windows" { spawn "/usr/bin/nirius" "scratchpad-show-all"; }
-    Mod+2 hotkey-overlay-title="Cycle scratchpad windows" { spawn "/usr/bin/nirius" "scratchpad-show"; }
+    Mod+1 hotkey-overlay-title="Focus monitor 1 (laptop)" { focus-monitor "eDP-1"; }
+    Mod+2 hotkey-overlay-title="Focus monitor 2" { focus-monitor "HDMI-A-1"; }
+    Mod+3 hotkey-overlay-title="Show all scratchpad windows" { spawn "/usr/bin/nirius" "scratchpad-show-all"; }
+    Mod+Ctrl+3 hotkey-overlay-title="Cycle scratchpad windows" { spawn "/usr/bin/nirius" "scratchpad-show"; }
 
     Mod+G hotkey-overlay-title="Toggle fullscreen" { fullscreen-window; }
     Mod+Ctrl+G hotkey-overlay-title="Maximize window to edges" { maximize-window-to-edges; }
@@ -659,7 +634,7 @@ binds {
     Mod+Shift+A     { focus-monitor-left; }
     Mod+Shift+S     { focus-monitor-down; }
     Mod+Shift+W     { focus-monitor-up; }
-    Mod+Shift+R     { focus-monitor-right; }
+    Mod+Shift+D     { focus-monitor-right; }
 
     Mod+Shift+Left  { focus-monitor-left; }
     Mod+Shift+Down  { focus-monitor-down; }
