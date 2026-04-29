@@ -1,0 +1,94 @@
+# Mute: ctrl+z (replaces m)
+[[keybindings]]
+key = { Char = "z" }
+modifiers = "CONTROL"
+action = "ToggleMute"
+
+# Set default: space (replaces d)
+[[keybindings]]
+key = { Char = " " }
+modifiers = "NONE"
+action = "SetDefault"
+
+# Tabs: alt+a/d (replaces H/L and tab/shift-tab)
+[[keybindings]]
+key = { Char = "a" }
+modifiers = "ALT"
+action = "TabLeft"
+
+[[keybindings]]
+key = { Char = "d" }
+modifiers = "ALT"
+action = "TabRight"
+
+# Volume: alt+ctrl+a/d (replaces h/l and arrow keys)
+[[keybindings]]
+key = { Char = "a" }
+modifiers = "ALT | CONTROL"
+action = { SetRelativeVolume = -0.05 }
+
+[[keybindings]]
+key = { Char = "d" }
+modifiers = "ALT | CONTROL"
+action = { SetRelativeVolume = 0.05 }
+
+# Disable replaced defaults
+[[keybindings]]
+key = { Char = "j" }
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = { Char = "k" }
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = { Char = "m" }
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = { Char = "d" }
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = { Char = "l" }
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = { Char = "h" }
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = { Char = "L" }
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = { Char = "H" }
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = "Tab"
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = "BackTab"
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = "Left"
+modifiers = "NONE"
+action = "Nothing"
+
+[[keybindings]]
+key = "Right"
+modifiers = "NONE"
+action = "Nothing"

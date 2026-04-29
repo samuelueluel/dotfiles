@@ -9,6 +9,7 @@
   "modules-center": ["cffi/niri_window_buttons"],
   "modules-right": [
     "custom/swaync",
+    "network",
     "temperature",
     "memory",
     "pulseaudio",
@@ -48,8 +49,9 @@
 
   "clock": {
     "format": "{:%a %b %e  %I:%M %p}",
-    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
-    "on-click-right": "alacritty --title ikhal -e ikhal"
+    "tooltip": false,
+    "on-click": "alacritty --title ikhal -e ikhal",
+    "on-click-right": "sh -c 'if pgrep -x wlsunset > /dev/null; then pkill wlsunset; else pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 & fi'"
   },
 
   // ── Right ─────────────────────────────────────────────────────────────────
@@ -66,7 +68,7 @@
       "car": "󰄄",
       "default": ["󰕿", "󰖀", "󰕾"]
     },
-    "on-click": "flatpak run com.saivert.pwvucontrol",
+    "on-click": "kitty --config ~/.config/kitty/launcher.conf --class kitty-launcher --title wiremix wiremix",
     "on-click-right": "alacritty --title bluetuith -e bluetuith",
     "on-scroll-up": "swayosd-client --output-volume raise",
     "on-scroll-down": "swayosd-client --output-volume lower"
@@ -123,14 +125,24 @@
       "warning": 70,
       "critical": 90
     },
-    "tooltip": true,
-    "on-click-right": "alacritty --title nmtui -e nmtui"
+    "tooltip": true
+  },
+
+  "network": {
+    "format-wifi": "{icon}",
+    "format-ethernet": "󰈀",
+    "format-disconnected": "󰤭",
+    "format-icons": ["󰤯", "󰤟", "󰤢", "󰤥", "󰤨"],
+    "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
+    "tooltip-format-ethernet": "{ifname}\n{ipaddr}",
+    "tooltip-format-disconnected": "Disconnected",
+    "on-click": "alacritty --option \"colors.normal.white='#000000'\" --title nmtui -e nmtui"
   },
 
   "temperature": {
     "critical-threshold": 75,
     "format": "󰈸  {temperatureC}°C",
     "tooltip": false,
-    "on-click-right": "alacritty --title htop -e htop"
+    "on-click": "alacritty --title htop -e htop"
   }
 }

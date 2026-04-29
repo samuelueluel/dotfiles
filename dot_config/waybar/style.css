@@ -137,6 +137,7 @@ window#waybar {
 #battery,
 #memory,
 #temperature,
+#network,
 #custom-swaync {
     padding: 0 3px;
     margin: 0;
@@ -161,6 +162,10 @@ window#waybar {
 #power-profiles-daemon {
     font-size: 9px;
     padding-right: 0px;
+}
+
+#network {
+    padding: 0 6px;
 }
 
 #battery {
