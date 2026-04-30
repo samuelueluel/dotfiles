@@ -4,7 +4,7 @@ linemode = "mtime"
 
 [opener]
 edit = [
-  { run = 'zed "$@"', desc = "Zed", orphan = true },
+  { run = 'zed --new "$@"', desc = "Zed", orphan = true },
 ]
 view_image = [
   { run = 'swayimg "$@"', desc = "swayimg", orphan = true },
