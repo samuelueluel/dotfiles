@@ -1,3 +1,6 @@
+[mgr]
+ratio = [1, 4, 4]
+
 [opener]
 edit = [
   { run = 'zed "$@"', desc = "Zed", orphan = true },
