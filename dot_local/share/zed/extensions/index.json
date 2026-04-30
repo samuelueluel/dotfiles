@@ -55,7 +55,7 @@
         "capabilities": [],
         "debug_adapters": {
           "buildx-dockerfile": {
-            "schema_path": "./debug_adapter_schemas/buildx-dockerfile.json"
+            "schema_path": "debug_adapter_schemas/buildx-dockerfile.json"
           }
         }
       },

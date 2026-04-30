@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-fd -H -t d "$@" | fzf
+fd -H -t d --color=always "$@" | fzf --ansi

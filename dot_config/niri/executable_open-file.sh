@@ -9,7 +9,8 @@ VAULT_NAME="Sam_Personal_Vault"
 
 # 1. Select the file
 #target=$(fd -H -t f . ~ | fzf --keep-right --reverse --border=rounded --info=inline)
-target=$(fd -H -t f . ~ | fzf --keep-right --reverse --border=rounded --info=inline \
+cd "$HOME"
+target=$(fd -H -t f --color=always --strip-cwd-prefix | fzf --ansi --keep-right --reverse --border=rounded --info=inline \
   --bind "ctrl-y:execute-silent(realpath {} | tr -d '\n' | wl-copy)+abort")
 
 # 2. Exit if cancelled

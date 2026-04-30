@@ -1,6 +1,7 @@
 #!/bin/bash
 # 1. Select the folder
-target=$(fd -H -t d . ~ | fzf --keep-right --reverse --border=rounded --info=inline \
+cd "$HOME"
+target=$(fd -H -t d --color=always --strip-cwd-prefix | fzf --ansi --keep-right --reverse --border=rounded --info=inline \
   --bind "ctrl-y:execute-silent(realpath {} | tr -d '\n' | wl-copy)+abort")
 
 # 2. Exit if cancelled
