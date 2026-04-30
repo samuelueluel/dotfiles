@@ -1,5 +1,6 @@
 [mgr]
 ratio = [1, 4, 4]
+linemode = "mtime"
 
 [opener]
 edit = [
