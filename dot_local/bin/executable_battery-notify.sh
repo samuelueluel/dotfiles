@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-THRESHOLD=10
+THRESHOLD=20
 INTERVAL=60 # Seconds
 
 # Prevent multiple notifications for the same event

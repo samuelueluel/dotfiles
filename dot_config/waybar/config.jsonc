@@ -50,7 +50,7 @@
   "clock": {
     "format": "{:%a %b %e  %I:%M %p}",
     "tooltip": false,
-    "on-click": "alacritty --title ikhal -e ikhal",
+    "on-click": "alacritty --title ikhal -e /home/linuxbrew/.linuxbrew/bin/ikhal",
     "on-click-right": "sh -c 'if pgrep -x wlsunset > /dev/null; then pkill wlsunset; else pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 & fi'"
   },
 
