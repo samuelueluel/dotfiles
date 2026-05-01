@@ -15,10 +15,14 @@
     "bindings": {
       "ctrl-space": "command_palette::Toggle",
       "ctrl-r": "editor::ReloadFile",
+      "ctrl-q": "editor::DeleteToPreviousWordStart",
+      "ctrl-w": "editor::Backspace",
       "alt-w": "editor::MoveUp",
       "alt-a": "editor::MoveLeft",
       "alt-s": "editor::MoveDown",
-      "alt-d": "editor::MoveRight"
+      "alt-d": "editor::MoveRight",
+      "alt-q": "editor::MoveToBeginningOfLine",
+      "alt-e": "editor::MoveToEndOfLine"
     }
   },
   {
