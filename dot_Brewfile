@@ -29,4 +29,5 @@ brew "vdirsyncer"  # sync CalDAV/CardDAV calendars/contacts to local storage
 brew "yt-dlp"      # video downloader
 brew "zoxide"      # smart cd replacement
 
+
 cask "font-crimson-pro" # elegant variable serif

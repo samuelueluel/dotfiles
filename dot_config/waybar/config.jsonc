@@ -137,7 +137,7 @@
     "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
     "tooltip-format-ethernet": "{ifname}\n{ipaddr}",
     "tooltip-format-disconnected": "Disconnected",
-    "on-click": "alacritty --option \"colors.normal.white='#000000'\" --title nmtui -e nmtui"
+    "on-click": "kitty --config ~/.config/kitty/kitty.conf --config ~/.config/kitty/tui-nav.conf --title nmtui -- nmtui"
   },
 
   "temperature": {
