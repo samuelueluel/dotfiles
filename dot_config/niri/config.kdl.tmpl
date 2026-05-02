@@ -272,6 +272,7 @@ window-rule {
 match {} // Matches everything except exlcuded below
 exclude app-id="zen-personal"
 exclude app-id="io.github.quodlibet.QuodLibet"
+exclude app-id="rmpc"
 exclude app-id="zen-work"
 exclude app-id="kitty"
 exclude title="termfilechooser"
@@ -304,6 +305,7 @@ window-rule {
 window-rule {
     match app-id="zen-personal"
     match app-id="io.github.quodlibet.QuodLibet"
+    match app-id="rmpc"
     open-on-workspace "casual"
     default-column-width { proportion 1.0; }
     //open-maximized-to-edges true
@@ -459,6 +461,7 @@ window-rule {
 // 6. Blur for pop-up menus
 window-rule {
     match app-id="io.github.quodlibet.QuodLibet"
+    match app-id="rmpc"
     match app-id="helium"
     match app-id="obsidian"
 
@@ -675,12 +678,17 @@ binds {
     // MEDIA CONTROLS
     // -----------------------------------
 
-    XF86AudioPlay  { spawn "playerctl" "--player=quodlibet" "play-pause"; }
-    XF86AudioPause { spawn "playerctl" "--player=quodlibet" "play-pause"; }
-    XF86AudioNext  { spawn "playerctl" "--player=quodlibet" "next"; }
-    XF86AudioPrev  { spawn "playerctl" "--player=quodlibet" "previous"; }
+    // XF86AudioPlay  { spawn "playerctl" "--player=quodlibet" "play-pause"; }
+    // XF86AudioPause { spawn "playerctl" "--player=quodlibet" "play-pause"; }
+    // XF86AudioNext  { spawn "playerctl" "--player=quodlibet" "next"; }
+    // XF86AudioPrev  { spawn "playerctl" "--player=quodlibet" "previous"; }
+    XF86AudioPlay  allow-when-locked=true { spawn "playerctl" "--player=mpd" "play-pause"; }
+    XF86AudioPause allow-when-locked=true { spawn "playerctl" "--player=mpd" "play-pause"; }
+    XF86AudioNext  allow-when-locked=true { spawn "playerctl" "--player=mpd" "next"; }
+    XF86AudioPrev  allow-when-locked=true { spawn "playerctl" "--player=mpd" "previous"; }
 
-    Mod+Z hotkey-overlay-title="Play/pause Quod Libet"   { spawn "playerctl" "--player=quodlibet" "play-pause"; }
+    //Mod+Z hotkey-overlay-title="Play/pause Quod Libet"   { spawn "playerctl" "--player=quodlibet" "play-pause"; }
+    Mod+Z hotkey-overlay-title="Play/pause rmpc (MPD)"   { spawn "rmpc" "togglepause"; }
     Mod+Ctrl+Z hotkey-overlay-title="Play/pause Zen" { spawn "playerctl" "--player=firefox" "play-pause"; }
 
     // -----------------------------------

@@ -12,8 +12,8 @@ helium &
 # Give it a second to start
 sleep 2
 
-# Launch Quod Libet
-flatpak run io.github.quodlibet.QuodLibet &
+# Launch rmpc
+kitty --class rmpc --title rmpc -e rmpc &
 
 # Launch Alacritty
 alacritty &

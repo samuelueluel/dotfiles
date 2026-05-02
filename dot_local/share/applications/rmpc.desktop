@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=rmpc
+GenericName=Music Player
+Comment=MPD client
+Exec=kitty --class rmpc --title rmpc -e rmpc
+Icon=mpd
+Terminal=false
+StartupNotify=true
+Categories=AudioVideo;Audio;Player;

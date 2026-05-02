@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Start-up Apps
-Comment=Launch Zen Personal, Helium, Quod Libet, and Alacritty
+Comment=Launch Zen Personal, Helium, rmpc, and Alacritty
 Exec=bash -c '$HOME/.local/bin/launch_apps.sh'
 Icon=utilities-terminal
 Terminal=false
