@@ -20,15 +20,16 @@
     keep_state_on_song_change: true,
     reflect_changes_to_playlist: false,
     select_current_song_on_change: false,
-    ignore_leading_the: false,
+    ignore_leading_the: true,
     browser_song_sort: [Disc, Track, Artist, Title],
     directories_sort: SortFormat(group_by_type: true, reverse: false),
     auto_open_downloads: true,
     album_art: (
         method: Auto,
-        max_size_px: (width: 1200, height: 1200),
+        order: FileFirst,
+        max_size_px: (width: 2400, height: 2400),
         disabled_protocols: ["http://", "https://"],
-        vertical_align: Top,
+        vertical_align: Center,
         horizontal_align: Center,
     ),
     keybinds: (
@@ -149,34 +150,44 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "30%",
+                        size: "31%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
+                                (size: "0", pane: Pane(Empty())),
                                 (
                                     size: "100%",
-                                    borders: "LEFT | RIGHT | TOP",
+                                    borders: "ALL",
                                     border_symbols: Thick,
                                     pane: Pane(AlbumArt)
                                 ),
+                                (size: "0", pane: Pane(Empty())),
                                 (
-                                    size: "6",
+                                    size: "8",
                                     borders: "ALL",
-                                    border_symbols: Inherited(parent: Thick, top_left: "┣", top_right: "┫",),
+                                    border_symbols: Thick,
                                     pane: Component("song_extra_info")
-                                )
+                                ),
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "4",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Component("queue_controls")
+                                ),
                             ]
                         )
-                    ), 
+                    ),
+                    (size: "1", pane: Pane(Empty())),
                     (
-                        size: "70%",
+                        size: "69%",
+                        borders: "ALL",
+                        border_symbols: Thick,
                         pane: Split(
                             direction: Vertical,
                             panes: [
                                 (
-                                    size: "3",
-                                    borders: "ALL",
-                                    border_symbols: Inherited(parent: Thick, bottom_left: "┣", bottom_right: "┫",),
+                                    size: "1",
                                     pane: Split(
                                         direction: Horizontal,
                                         panes: [
@@ -192,9 +203,29 @@
                                     )
                                 ),
                                 (
+                                    size: "1",
+                                    pane: Split(
+                                        direction: Horizontal,
+                                        panes: [
+                                            (
+                                                size: "1",
+                                                pane: Pane(Empty())
+                                            ),
+                                            (
+                                                size: "100%",
+                                                borders: "TOP",
+                                                border_symbols: Plain,
+                                                pane: Pane(Empty())
+                                            ),
+                                            (
+                                                size: "2",
+                                                pane: Pane(Empty())
+                                            ),
+                                        ]
+                                    )
+                                ),
+                                (
                                     size: "100%",
-                                    borders: "LEFT | RIGHT | BOTTOM",
-                                    border_symbols: Thick,
                                     pane: Split(
                                         direction: Horizontal,
                                         panes: [
@@ -217,12 +248,46 @@
         ),
         (
             name: "Artists",
-            borders: "ALL",
-            border_symbols: Thick,
             pane: Split(
-                size: "100%",
-                direction: Vertical,
-                panes: [(pane: Pane(Artists), size: "100%", borders: "ALL", border_symbols: Thick)],
+                direction: Horizontal,
+                panes: [
+                    (
+                        size: "31%",
+                        pane: Split(
+                            direction: Vertical,
+                            panes: [
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "100%",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Pane(AlbumArt)
+                                ),
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "8",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Component("song_extra_info")
+                                ),
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "4",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Component("queue_controls")
+                                ),
+                            ]
+                        )
+                    ),
+                    (size: "1", pane: Pane(Empty())),
+                    (
+                        size: "69%",
+                        borders: "ALL",
+                        border_symbols: Thick,
+                        pane: Pane(Artists)
+                    ),
+                ],
             )
         ),
         (
@@ -231,13 +296,37 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "35%",
-                        borders: "ALL",
-                        border_symbols: Thick,
-                        pane: Pane(AlbumArt)
+                        size: "31%",
+                        pane: Split(
+                            direction: Vertical,
+                            panes: [
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "100%",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Pane(AlbumArt)
+                                ),
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "8",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Component("song_extra_info")
+                                ),
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "4",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Component("queue_controls")
+                                ),
+                            ]
+                        )
                     ),
+                    (size: "1", pane: Pane(Empty())),
                     (
-                        size: "65%",
+                        size: "69%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Albums)
@@ -251,13 +340,37 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "35%",
-                        borders: "ALL",
-                        border_symbols: Thick,
-                        pane: Pane(AlbumArt)
+                        size: "31%",
+                        pane: Split(
+                            direction: Vertical,
+                            panes: [
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "100%",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Pane(AlbumArt)
+                                ),
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "8",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Component("song_extra_info")
+                                ),
+                                (size: "0", pane: Pane(Empty())),
+                                (
+                                    size: "4",
+                                    borders: "ALL",
+                                    border_symbols: Thick,
+                                    pane: Component("queue_controls")
+                                ),
+                            ]
+                        )
                     ),
+                    (size: "1", pane: Pane(Empty())),
                     (
-                        size: "65%",
+                        size: "69%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Browser(root_tag: "grouping"))
@@ -284,10 +397,6 @@
                 direction: Vertical,
                 panes: [(pane: Pane(Search), size: "100%", borders: "ALL", border_symbols: Thick)],
             )
-        ),
-    ],
-)
-      )
         ),
     ],
 )

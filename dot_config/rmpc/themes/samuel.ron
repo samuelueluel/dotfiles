@@ -55,6 +55,12 @@
     ),
     browser_song_format: [
         (
+            kind: Group([
+                (kind: Property(Track), style: (fg: "#D0A7AF")),
+                (kind: Text(" ")),
+            ])
+        ),
+        (
             kind: Property(Title),
             default: (kind: Property(Filename))
         ),
@@ -80,8 +86,9 @@
             width: "20%",
         ),
         (
-            prop: (kind: Property(Album), style: (fg: "white"),
-                default: (kind: Text("Unknown Album"), style: (fg: "white"))
+            prop: (
+                kind: Group([(kind: Property(Album), style: (fg: "#FFFFFF"))]),
+                default: (kind: Text("Unknown Album"), style: (fg: "#FFFFFF"))
             ),
             label_prop: (kind: Text("Album")),
             width: "30%",
@@ -99,22 +106,7 @@
         direction: Vertical,
         panes: [
             (
-                size: "4",
-                borders: "ALL",
-                border_symbols: Thick,
-                pane: Split(
-                    direction: Horizontal,
-                    panes: [
-                        (size: "35", pane: Component("header_left")),
-                        (size: "100%", pane: Component("header_center")),
-                        (size: "35", pane: Component("header_right")),
-                    ]
-                )
-            ),
-            (
-                size: "3",
-                borders: "ALL",
-                border_symbols: Thick,
+                size: "1",
                 pane: Pane(Tabs),
             ),
             (
@@ -125,8 +117,8 @@
                 size: "3",
                 borders: "ALL",
                 border_symbols: Thick,
-                border_title: [(kind: Text(" ")), (kind: Property(Status(QueueLength()))), (kind: Text(" songs / ")), (kind: Property(Status(QueueTimeTotal()))), (kind: Text(" total time "))],
-                border_title_alignment: Right,
+                border_title: [(kind: Text(" ")), (kind: Property(Status(Elapsed))), (kind: Text(" / ")), (kind: Property(Status(Duration))), (kind: Text(" "))],
+                border_title_alignment: Center,
                 pane: Component("progress_bar"),
             ),
         ],
@@ -236,9 +228,28 @@
         "song_extra_info": Split(
             direction: Vertical,
             panes: [
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#FFA726", modifiers: "Bold"), default: (kind: Text("No Song"), style: (fg: "#FFA726", modifiers: "Bold")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#FFA726"), default: (kind: Text("Unknown"), style: (fg: "#FFA726")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#FFA726"), default: (kind: Text("Unknown Album"), style: (fg: "#FFA726")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Text("Year:  "), style: (fg: "#D0A7AF")), (kind: Property(Song(Other("date"))), default: (kind: Text("-")))], align: Center))),
                 (size: "1", pane: Pane(Property(content: [(kind: Text("Genre: "), style: (fg: "#D0A7AF")), (kind: Property(Song(Other("genre"))), default: (kind: Text("-")))], align: Center))),
-                (size: "100%", pane: Pane(Property(content: [(kind: Text("Group: "), style: (fg: "#D0A7AF")), (kind: Property(Song(Other("grouping"))), default: (kind: Text("-")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Text("Group: "), style: (fg: "#D0A7AF")), (kind: Property(Song(Other("grouping"))), default: (kind: Text("-")))], align: Center, scroll_speed: 1))),
+            ]
+        ),
+
+        "queue_controls": Split(
+            direction: Vertical,
+            panes: [
+                (size: "1", pane: Component("volume")),
+                (size: "1", pane: Pane(Property(content: [
+                    (kind: Property(Status(RepeatV2(on_label: "rep", off_label: "rep", on_style: (fg: "red"), off_style: (fg: "yellow"))))),
+                    (kind: Text("  ")),
+                    (kind: Property(Status(RandomV2(on_label: "rnd", off_label: "rnd", on_style: (fg: "red"), off_style: (fg: "yellow"))))),
+                    (kind: Text("  ")),
+                    (kind: Property(Status(ConsumeV2(on_label: "csm", off_label: "csm", oneshot_label: "csm", on_style: (fg: "red"), off_style: (fg: "yellow"), oneshot_style: (fg: "magenta"))))),
+                    (kind: Text("  ")),
+                    (kind: Property(Status(SingleV2(on_label: "sgl", off_label: "sgl", oneshot_label: "sgl", on_style: (fg: "red"), off_style: (fg: "yellow"), oneshot_style: (fg: "magenta"))))),
+                ], align: Center))),
             ]
         ),
 
@@ -278,11 +289,6 @@
                     size: "1",
                     pane: Pane(Empty())
                 ),
-            ]
-        )
-    },
-)
-        ),
             ]
         )
     },
