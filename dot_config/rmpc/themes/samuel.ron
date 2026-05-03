@@ -124,7 +124,13 @@
                 size: "3",
                 borders: "ALL",
                 border_symbols: Thick,
-                border_title: [(kind: Text(" ")), (kind: Property(Status(Elapsed))), (kind: Text(" / ")), (kind: Property(Status(Duration))), (kind: Text(" "))],
+                border_title: [
+                    (kind: Text(" ")),
+                    (kind: Property(Status(Elapsed)), style: (fg: "#FFA726")),
+                    (kind: Text(" / "), style: (fg: "#FFA726")),
+                    (kind: Property(Status(Duration)), style: (fg: "#FFA726")),
+                    (kind: Text(" "))
+                ],
                 border_title_alignment: Center,
                 pane: Component("progress_bar"),
             ),

@@ -1,108 +1,105 @@
-
+# Power & Session
 [[Snippets]]
-  Description = "Turns on wlsunset at Santa Fe, NM coordinates"
-  Output = ""
-  Tag = []
-  command = "night-on"
-
-[[Snippets]]
-  Description = "Turns off wlsunset"
-  Output = ""
-  Tag = []
-  command = "night-off"
-
-[[Snippets]]
-  Description = "Reboot laptop"
-  Output = ""
-  Tag = []
-  command = "systemctl reboot"
-
-[[Snippets]]
-  Description = "List chezmoi options"
-  Output = ""
-  Tag = []
-  command = "chezmoi"
-
-[[Snippets]]
-  Description = "Trigger full update and maintenance script"
-  Output = ""
-  Tag = []
-  command = "update-all"
-
-[[Snippets]]
-  Description = "List niri commands"
-  Output = ""
-  Tag = []
-  command = "niri msg"
-
-[[Snippets]]
-  Description = "Launch network/wifi tui"
-  Output = ""
-  Tag = []
-  command = "nmtui"
-
-[[Snippets]]
-  Description = "Launch bluetooth tui"
-  Output = ""
-  Tag = []
-  command = "bluetuith"
-
-[[Snippets]]
-  Description = "Launch resource monitor and task manager tui"
-  Output = ""
-  Tag = []
-  command = "htop"
-
-[[Snippets]]
-  Description = "Tealdeer manpages / descriptions of commands"
-  Output = ""
-  Tag = []
-  command = "tldr"
-
-[[Snippets]]
-  Description = "Turn off laptop"
-  Output = ""
-  Tag = []
-  command = "systemctl poweroff"
-
-[[Snippets]]
-  Description = "Suspend (to RAM) and lock laptop"
-  Output = ""
-  Tag = []
-  command = "systemctl suspend"
-
-[[Snippets]]
-  Description = "Lock laptop"
-  Output = ""
-  Tag = []
+  Description = "Lock screen"
   command = "swaylock"
 
 [[Snippets]]
-  Description = "Kill waydroid from running in the background"
-  Output = ""
-  Tag = []
-  command = "waydroid session stop"
+  Description = "Suspend & lock"
+  command = "systemctl suspend"
 
 [[Snippets]]
-  Description = "Check if waydroid is running in the background"
-  Output = ""
-  Tag = []
-  command = "waydroid status"
+  Description = "Reboot"
+  command = "systemctl reboot"
 
 [[Snippets]]
-  Description = "Wrapper for pet search that runs selected command after hitting enter"
-  Output = ""
-  Tag = []
-  command = "pets"
+  Description = "Power off"
+  command = "systemctl poweroff"
+
+# System Management
+[[Snippets]]
+  Description = "Systemd TUI"
+  command = "systemd-manager-tui"
 
 [[Snippets]]
-  Description = "Display images on system"
-  Output = ""
-  Tag = []
+  Description = "Process monitor (htop)"
+  command = "htop"
+
+[[Snippets]]
+  Description = "Network TUI (nmtui)"
+  command = "nmtui"
+
+[[Snippets]]
+  Description = "Bluetooth TUI"
+  command = "bluetuith"
+
+[[Snippets]]
+  Description = "Check image status"
   command = "sudo bootc status"
 
 [[Snippets]]
-  Description = "Set \"rollback\" image as default image and the current image as the new \"rollback\", discarding staged images"
-  Output = ""
-  Tag = []
+  Description = "Rollback system image"
   command = "sudo bootc rollback"
+
+# Maintenance
+[[Snippets]]
+  Description = "Clean unused flatpaks"
+  command = "flatpak uninstall --unused"
+
+[[Snippets]]
+  Description = "RTK token savings"
+  command = "rtk gain"
+
+# Debugging
+[[Snippets]]
+  Description = "Logs: Errors current boot"
+  command = "journalctl -p 3 -xb"
+
+[[Snippets]]
+  Description = "Logs: Greetd (login) follow"
+  command = "journalctl -f -u greetd"
+
+[[Snippets]]
+  Description = "Logs: User units"
+  command = "journalctl --user -n 100"
+
+[[Snippets]]
+  Description = "Niri: Toggle debug view"
+  command = "niri msg action toggle-debug-view"
+
+[[Snippets]]
+  Description = "Boot performance blame"
+  command = "systemd-analyze blame"
+
+# Desktop & Tools
+[[Snippets]]
+  Description = "Niri IPC msg"
+  command = "niri msg"
+
+[[Snippets]]
+  Description = "Chezmoi"
+  command = "chezmoi"
+
+[[Snippets]]
+  Description = "Pet search (pets wrapper)"
+  command = "pets"
+
+[[Snippets]]
+  Description = "Tealdeer (tldr)"
+  command = "tldr"
+
+[[Snippets]]
+  Description = "Sunset (Santa Fe)"
+  command = "night-on"
+
+[[Snippets]]
+  Description = "Sunset off"
+  command = "night-off"
+
+# Waydroid
+[[Snippets]]
+  Description = "Waydroid status"
+  command = "waydroid status"
+
+[[Snippets]]
+  Description = "Stop Waydroid session"
+  command = "waydroid session stop"

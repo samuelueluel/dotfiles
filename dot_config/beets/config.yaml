@@ -1,0 +1,30 @@
+# Beets configuration for strictly manual metadata management
+directory: ~/Music/Music_Linux/mp3 library/Music
+library: ~/.config/beets/library.db
+
+# Global settings
+import:
+    autotag: no      # Disable automatic MusicBrainz matching
+    write: no        # Do not write tags to files by default
+    copy: no         # Do not copy files
+    move: no         # Do not move files
+    resume: ask
+    incremental: yes
+    quiet: no        # Always be verbose
+    timid: yes       # Always ask for confirmation
+    follow_symlinks: yes
+
+# UI settings
+ui:
+    color: yes
+
+# Plugins that are useful for manual work
+plugins:
+    - info           # Usage: beet info <query> (shows current tags)
+    - edit           # Usage: beet edit <query> (edit tags in your $EDITOR)
+    - mbsync         # Usage: beet mbsync <query> (manually pull updates from MusicBrainz)
+
+# Editor settings (beets will use $EDITOR, but you can override here)
+# edit:
+#     itemfields: track title artist album
+#     albumfields: album artist
