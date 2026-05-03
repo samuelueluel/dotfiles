@@ -407,11 +407,18 @@ window-rule {
     draw-border-with-background false
 }
 
+// Obsidian
+window-rule {
+    match app-id="obsidian"
+    opacity 1.0
+}
+
 // 3. Exceptions for lower opacity
 window-rule {
     //match app-id="io.github.quodlibet.QuodLibet"
     //opacity 0.7
 }
+
 window-rule { // transparency set in app-specific config to prevent text from dimming
     match app-id="alacritty-custom"
     match app-id="kitty"

@@ -1,6 +1,6 @@
 /* Noctalia color palette */
-@define-color bg       #A14763;
-@define-color bg-dark  #614859;
+@define-color bg       /* #A14763 */ #7A2E2E;
+@define-color bg-dark  /* #614859 */ #4A2020;
 @define-color fg       /* #B1B9F9 */ #FFFFFF;
 @define-color accent   #00B6C2;
 @define-color peach   #D0A7AF;
@@ -20,7 +20,7 @@
 }
 
 window#waybar {
-    background-color: rgba(161, 71, 99, 0.7);
+    background-color: /* rgba(161, 71, 99, 0.8) */ rgba(122, 46, 46, 0.8);
     color: @fg;
     min-height: 18px;
 }

@@ -133,10 +133,12 @@
             (value: "any",         label: "Any Tag"),
             (value: "artist",      label: "Artist"),
             (value: "album",       label: "Album"),
-            (value: "albumartist", label: "Album Artist"),
             (value: "title",       label: "Title"),
             (value: "filename",    label: "Filename"),
             (value: "genre",       label: "Genre"),
+            (value: "grouping",    label: "Grouping"),
+            (value: "date",        label: "Date"),
+            (value: "modified",    label: "Modified"),
         ],
     ),
     artists: (
@@ -147,7 +149,7 @@
     browser_album_format: NameOnly,
     tabs: [
         (
-            name: "Queue",
+            name: "[Queue]",
             pane: Split(
                 direction: Horizontal,
                 panes: [
@@ -165,17 +167,10 @@
                                 ),
                                 (size: "0", pane: Pane(Empty())),
                                 (
-                                    size: "8",
+                                    size: "11",
                                     borders: "ALL",
                                     border_symbols: Thick,
-                                    pane: Component("song_extra_info")
-                                ),
-                                (size: "0", pane: Pane(Empty())),
-                                (
-                                    size: "4",
-                                    borders: "ALL",
-                                    border_symbols: Thick,
-                                    pane: Component("queue_controls")
+                                    pane: Component("song_info_and_controls")
                                 ),
                             ]
                         )
@@ -249,7 +244,7 @@
             ),
         ),
         (
-            name: "Artists",
+            name: "[Artists]",
             pane: Split(
                 direction: Horizontal,
                 panes: [
@@ -267,17 +262,10 @@
                                 ),
                                 (size: "0", pane: Pane(Empty())),
                                 (
-                                    size: "8",
+                                    size: "11",
                                     borders: "ALL",
                                     border_symbols: Thick,
-                                    pane: Component("song_extra_info")
-                                ),
-                                (size: "0", pane: Pane(Empty())),
-                                (
-                                    size: "4",
-                                    borders: "ALL",
-                                    border_symbols: Thick,
-                                    pane: Component("queue_controls")
+                                    pane: Component("song_info_and_controls")
                                 ),
                             ]
                         )
@@ -293,7 +281,7 @@
             )
         ),
         (
-            name: "Albums",
+            name: "[Albums]",
             pane: Split(
                 direction: Horizontal,
                 panes: [
@@ -311,17 +299,10 @@
                                 ),
                                 (size: "0", pane: Pane(Empty())),
                                 (
-                                    size: "8",
+                                    size: "11",
                                     borders: "ALL",
                                     border_symbols: Thick,
-                                    pane: Component("song_extra_info")
-                                ),
-                                (size: "0", pane: Pane(Empty())),
-                                (
-                                    size: "4",
-                                    borders: "ALL",
-                                    border_symbols: Thick,
-                                    pane: Component("queue_controls")
+                                    pane: Component("song_info_and_controls")
                                 ),
                             ]
                         )
@@ -337,7 +318,7 @@
             )
         ),
         (
-            name: "Grouping",
+            name: "[Groups]",
             pane: Split(
                 direction: Horizontal,
                 panes: [
@@ -355,17 +336,10 @@
                                 ),
                                 (size: "0", pane: Pane(Empty())),
                                 (
-                                    size: "8",
+                                    size: "11",
                                     borders: "ALL",
                                     border_symbols: Thick,
-                                    pane: Component("song_extra_info")
-                                ),
-                                (size: "0", pane: Pane(Empty())),
-                                (
-                                    size: "4",
-                                    borders: "ALL",
-                                    border_symbols: Thick,
-                                    pane: Component("queue_controls")
+                                    pane: Component("song_info_and_controls")
                                 ),
                             ]
                         )
@@ -381,7 +355,7 @@
             )
         ),
         (
-            name: "Playlists",
+            name: "[Lists]",
             borders: "ALL",
             border_symbols: Thick,
             pane: Split(
@@ -391,7 +365,7 @@
             )
         ),
         (
-            name: "Search",
+            name: "[Search]",
             borders: "ALL",
             border_symbols: Thick,
             pane: Split(

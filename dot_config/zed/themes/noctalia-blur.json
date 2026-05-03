@@ -9,14 +9,14 @@
       "style": {
         "accents": [
           "#00B6C2",
-          "#cc72fc",
+          "#B05090",
           "#17C182"
         ],
         "background.appearance": "transparent",
-        "background": "#914059E6",
+        "background": "#7A2E2EE6",
 
         // Make all major surface layers fully transparent so they don't stack
-        "elevated_surface.background": "#914059FF",
+        "elevated_surface.background": "#7A2E2EFF",
         "surface.background": "#00000000",
         "panel.background": "#00000000",
         "pane.background": "#00000000",
@@ -25,28 +25,28 @@
         "terminal.background": "#00000000",
 
         // Bars and Toolbar
-        "status_bar.background": "#914059E6",
-        "title_bar.background": "#914059E6",
-        "title_bar.inactive_background": "#914059E6",
+        "status_bar.background": "#7A2E2EE6",
+        "title_bar.background": "#7A2E2EE6",
+        "title_bar.inactive_background": "#7A2E2EE6",
         "toolbar.background": "#00000000",
         "tab_bar.background": "#00000000",
         "tab.inactive_background": "#00000000",
         "tab.active_background": "#00000000",
 
-        "border": "#6B334890",
-        "border.variant": "#6B334890",
+        "border": "#4A202090",
+        "border.variant": "#4A202090",
         "border.focused": "#00B6C280",
-        "border.selected": "#cc72fc80",
+        "border.selected": "#B0509080",
         "border.transparent": "#00000000",
 
         "element.background": "#00000015",
-        "element.hover": "#cc72fc15",
-        "element.active": "#cc72fc25",
+        "element.hover": "#B0509015",
+        "element.active": "#B0509025",
         "element.selected": "#00B6C244",
 
         "ghost_element.background": null,
-        "ghost_element.hover": "#cc72fc10",
-        "ghost_element.active": "#cc72fc20",
+        "ghost_element.hover": "#B0509010",
+        "ghost_element.active": "#B0509020",
         "ghost_element.selected": "#00B6C230",
 
         "text": "#FFFFFF",
@@ -82,7 +82,7 @@
         "terminal.ansi.green": "#17C182",
         "terminal.ansi.yellow": "#D0A7AF",
         "terminal.ansi.blue": "#00B6C2",
-        "terminal.ansi.magenta": "#cc72fc",
+        "terminal.ansi.magenta": "#B05090",
         "terminal.ansi.cyan": "#00B6C2",
         "terminal.ansi.white": "#D0A7AF",
 
@@ -92,7 +92,7 @@
           "comment": { "color": "#ABABAB", "font_style": "italic", "font_weight": 700 },
           "constant": { "color": "#FFA726", "font_weight": 700 },
           "function": { "color": "#00B6C2", "font_weight": 700 },
-          "keyword": { "color": "#cc72fc", "font_weight": 700 },
+          "keyword": { "color": "#B05090", "font_weight": 700 },
           "number": { "color": "#FFA726", "font_weight": 700 },
           "operator": { "color": "#00B6C2", "font_weight": 700 },
           "string": { "color": "#17C182", "font_weight": 700 },

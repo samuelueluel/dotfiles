@@ -15,6 +15,34 @@
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "permission-sound",
+            "type": "command",
+            "command": "pw-play /usr/share/sounds/freedesktop/stereo/message.oga > /dev/null 2>&1 && echo '{\"decision\": \"allow\"}'"
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "turn-finished-sound",
+            "type": "command",
+            "command": "echo \"Gemini Hook Ran\" >> /tmp/gemini_hook.log && pw-play /usr/share/sounds/freedesktop/stereo/complete.oga > /dev/null 2>&1 && echo '{\"decision\": \"allow\"}'"
+          }
+        ]
+      }
     ]
+
+  },
+  "general": {
+    "enableNotifications": true
   }
 }

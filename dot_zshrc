@@ -133,3 +133,14 @@ fi
 
 # Auto-load SSH key on first terminal (added by sjust ssh-setup)
 [[ -S "$SSH_AUTH_SOCK" ]] && { ssh-add -l &>/dev/null || SSH_ASKPASS_REQUIRE=never ssh-add ~/.ssh/id_ed25519 &>/dev/null; }
+
+# AI Agent Sound Alerts
+function claude() {
+    command claude "$@"
+    canberra-gtk-play -i message-new-email &>/dev/null &
+}
+
+function gemini() {
+    command gemini "$@"
+    canberra-gtk-play -i message-new-email &>/dev/null &
+}
