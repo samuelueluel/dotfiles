@@ -28,6 +28,7 @@ brew "khal"        # CLI calendar with TUI (ikhal)
 brew "vdirsyncer"  # sync CalDAV/CardDAV calendars/contacts to local storage
 brew "yt-dlp"      # video downloader
 brew "zoxide"      # smart cd replacement
+brew "pipx"        # isolated Python CLI tool installer
 
 
 cask "font-crimson-pro" # elegant variable serif

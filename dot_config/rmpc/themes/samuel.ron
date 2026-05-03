@@ -20,7 +20,7 @@
         song: "",
         dir: "",
         playlist: "",
-        marker: "▶",
+        marker: "❯",
         ellipsis: "...",
         song_style: None,
         dir_style: None,
@@ -69,6 +69,12 @@
         (
             prop: (
                 kind: Group([
+                    (kind: Transform(Replace(
+                        content: (kind: Sticker("like")),
+                        replacements: [
+                            (match: "2", replace: (kind: Text("❤ "), style: (fg: "#17C182"))),
+                        ]
+                    )), default: (kind: Text("  "))),
                     (kind: Property(Track), style: (fg: "#D0A7AF")),
                     (kind: Text(" ")),
                     (kind: Property(Title), default: (kind: Property(Filename)))
