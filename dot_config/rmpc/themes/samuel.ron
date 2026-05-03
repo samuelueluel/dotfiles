@@ -73,6 +73,7 @@
                         content: (kind: Sticker("like")),
                         replacements: [
                             (match: "2", replace: (kind: Text("❤ "), style: (fg: "#17C182"))),
+                            (match: "1", replace: (kind: Text("  "))),
                         ]
                     )), default: (kind: Text("  "))),
                     (kind: Property(Track), style: (fg: "#D0A7AF")),

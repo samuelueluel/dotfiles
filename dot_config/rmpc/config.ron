@@ -114,8 +114,8 @@
             "<C-s>s":     Save(kind: Modal(all: false, duplicates_strategy: Ask)),
             "<C-s>a":     Save(kind: Modal(all: true, duplicates_strategy: Ask)),
             "r":          Rate(),
-            "<C-l>":      Rate(kind: Like()),
-            "<C-L>":      Rate(kind: Neutral()),
+            "<C-;>":      Rate(kind: Like()),
+            "<C-'>":      Rate(kind: Neutral()),
         },
         queue: {
             "<C-q>":      Delete,
