@@ -9,7 +9,7 @@
       "style": {
         "accents": [
           "#00B6C2",
-          "#B05090",
+          "#FF6EB4",
           "#17C182"
         ],
         "background.appearance": "transparent",
@@ -36,17 +36,17 @@
         "border": "#4A202090",
         "border.variant": "#4A202090",
         "border.focused": "#00B6C280",
-        "border.selected": "#B0509080",
+        "border.selected": "#FF6EB480",
         "border.transparent": "#00000000",
 
         "element.background": "#00000015",
-        "element.hover": "#B0509015",
-        "element.active": "#B0509025",
+        "element.hover": "#FF6EB415",
+        "element.active": "#FF6EB425",
         "element.selected": "#00B6C244",
 
         "ghost_element.background": null,
-        "ghost_element.hover": "#B0509010",
-        "ghost_element.active": "#B0509020",
+        "ghost_element.hover": "#FF6EB410",
+        "ghost_element.active": "#FF6EB420",
         "ghost_element.selected": "#00B6C230",
 
         "text": "#FFFFFF",
@@ -82,7 +82,7 @@
         "terminal.ansi.green": "#17C182",
         "terminal.ansi.yellow": "#D0A7AF",
         "terminal.ansi.blue": "#00B6C2",
-        "terminal.ansi.magenta": "#B05090",
+        "terminal.ansi.magenta": "#FF6EB4",
         "terminal.ansi.cyan": "#00B6C2",
         "terminal.ansi.white": "#D0A7AF",
 
@@ -92,7 +92,7 @@
           "comment": { "color": "#ABABAB", "font_style": "italic", "font_weight": 700 },
           "constant": { "color": "#FFA726", "font_weight": 700 },
           "function": { "color": "#00B6C2", "font_weight": 700 },
-          "keyword": { "color": "#B05090", "font_weight": 700 },
+          "keyword": { "color": "#FF6EB4", "font_weight": 700 },
           "number": { "color": "#FFA726", "font_weight": 700 },
           "operator": { "color": "#00B6C2", "font_weight": 700 },
           "string": { "color": "#17C182", "font_weight": 700 },

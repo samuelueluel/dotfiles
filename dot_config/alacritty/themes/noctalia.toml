@@ -6,7 +6,7 @@
 #   Special:     Green       #17C182  (ANSI 2, 10)
 #   Unobtrusive: Gray        #AA8499  (ANSI 8)
 #   Bad/Error:   Gold        #FFA726  (ANSI 1, 9)
-#   Accent:      Purple      #B05090  (ANSI 5, 13)
+#   Accent:      Pink        #FF6EB4  (ANSI 5, 13)
 
 [colors.primary]
 # background = '#914059'
@@ -27,7 +27,7 @@ red     = '#FFA726'  # gold (bad/error)
 green   = '#17C182'  # green
 yellow  = '#D0A7AF'  # peach
 blue    = '#00B6C2'  # turquoise
-magenta = '#B05090'  # purple (was: #FFFFFF white)
+magenta = '#FF6EB4'  # cactus blossom pink (was: #B05090 purple)
 cyan    = '#00B6C2'  # turquoise
 white   = '#D0A7AF'  # peach
 
@@ -37,6 +37,6 @@ red     = '#FFA726'  # gold (bad/error)
 green   = '#17C182'  # green
 yellow  = '#D0A7AF'  # peach
 blue    = '#00B6C2'  # turquoise
-magenta = '#B05090'  # purple (was: #FFFFFF white)
+magenta = '#FF6EB4'  # cactus blossom pink (was: #B05090 purple)
 cyan    = '#00B6C2'  # turquoise
 white   = '#D0A7AF'  # peach
