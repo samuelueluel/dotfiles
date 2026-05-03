@@ -18,13 +18,18 @@ import:
 ui:
     color: yes
 
-# Plugins that are useful for manual work
 plugins:
-    - info           # Usage: beet info <query> (shows current tags)
-    - edit           # Usage: beet edit <query> (edit tags in your $EDITOR)
-    - mbsync         # Usage: beet mbsync <query> (manually pull updates from MusicBrainz)
+    - info
+    - edit
+    - mbsync
+    - replaygain
 
-# Editor settings (beets will use $EDITOR, but you can override here)
-# edit:
-#     itemfields: track title artist album
-#     albumfields: album artist
+edit:
+    itemfields: title track disc artist album year genres grouping
+    albumfields: album artist year genres grouping
+
+replaygain:
+    auto: no
+    backend: ffmpeg
+    albumgain: yes
+    targetlevel: 89

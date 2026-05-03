@@ -136,7 +136,11 @@ fi
 
 # AI Agent Sound Alerts
 function claude() {
-    command claude "$@"
+    if command -v headroom >/dev/null; then
+        headroom wrap claude "$@"
+    else
+        command claude "$@"
+    fi
     canberra-gtk-play -i message-new-email &>/dev/null &
 }
 
