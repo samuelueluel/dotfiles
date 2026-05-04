@@ -17,6 +17,7 @@ brew "glances"     # system monitor
 brew "htop"        # interactive process viewer
 brew "glow"        # Markdown renderer for the terminal
 brew "lazygit"     # TUI for git
+brew "chafa"        # terminal image renderer with Sixel/Kitty support
 brew "ripgrep"     # grep replacement
 brew "ugrep"       # grep replacement with Unicode and interactive TUI
 brew "television"  # fuzzy finder TUI with live previews

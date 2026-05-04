@@ -1,0 +1,112 @@
+#!/usr/bin/python3
+"""Extract embedded cover art from audio files to cover.jpg.
+
+This script scans the music library. For any directory containing audio files
+but missing a standalone cover image, it attempts to extract the embedded
+artwork from the first audio file using ffmpeg.
+"""
+import os
+import sys
+import subprocess
+import argparse
+
+MUSIC_DIR = os.environ.get(
+    "MUSIC_DIR",
+    os.path.expanduser("~/Music/Music_Linux/mp3 library/Music"),
+)
+
+AUDIO_EXTS = {".mp3", ".flac", ".ogg", ".opus", ".m4a", ".aac", ".wav", ".wv", ".ape"}
+# Include common names so we don't overwrite or duplicate existing art
+COVER_NAMES = {
+    "cover.jpg", "cover.png", "cover.webp", 
+    "folder.jpg", "folder.png", "folder.webp",
+    "Cover.jpg", "Cover.png", "Cover.webp",
+    "Folder.jpg", "Folder.png",
+    "artwork.jpg", "artwork.png",
+    "front.jpg", "front.png",
+    "album.jpg", "album.png"
+}
+
+def main():
+    parser = argparse.ArgumentParser(description="Extract embedded art to cover.jpg")
+    parser.add_argument("directory", nargs="?", help="Directory to process (default: MUSIC_DIR)")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be extracted without doing it")
+    args = parser.parse_args()
+
+    target_dir = os.path.expanduser(args.directory) if args.directory else MUSIC_DIR
+
+    if not os.path.isdir(target_dir):
+        print(f"Error: directory not found: {target_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.dry_run:
+        print("DRY RUN — no changes will be made.\n")
+
+    extracted = 0
+    skipped_has_cover = 0
+    skipped_no_art = 0
+    errors = 0
+
+    for root, dirs, files in os.walk(target_dir, followlinks=True):
+        audio_files = sorted([f for f in files if os.path.splitext(f)[1].lower() in AUDIO_EXTS])
+        
+        if not audio_files:
+            continue
+
+        # Check if any cover already exists
+        if any(f in COVER_NAMES for f in files):
+            skipped_has_cover += 1
+            continue
+
+        # No cover found, try to extract from the first audio file
+        first_audio = os.path.join(root, audio_files[0])
+        target_cover = os.path.join(root, "cover.jpg")
+        rel_dir = os.path.relpath(root, MUSIC_DIR)
+
+        if args.dry_run:
+            print(f"Would extract: {rel_dir}/cover.jpg (from {audio_files[0]})")
+            extracted += 1
+            continue
+
+        # Use ffmpeg to extract. 
+        # -an: no audio
+        # -vcodec copy: copy the image stream directly without re-encoding
+        # -loglevel quiet: suppress output
+        cmd = [
+            "ffmpeg", 
+            "-i", first_audio, 
+            "-an", 
+            "-vcodec", "copy", 
+            target_cover, 
+            "-y", 
+            "-loglevel", "quiet"
+        ]
+        
+        try:
+            result = subprocess.run(cmd, check=False)
+            
+            # ffmpeg returns 0 if successful. If the file has no embedded art, it usually fails.
+            if result.returncode == 0 and os.path.exists(target_cover):
+                # Ensure the file isn't empty
+                if os.path.getsize(target_cover) > 0:
+                    print(f"Extracted: {rel_dir}/cover.jpg")
+                    extracted += 1
+                else:
+                    os.remove(target_cover)
+                    skipped_no_art += 1
+            else:
+                skipped_no_art += 1
+        except Exception as e:
+            print(f"Error processing {rel_dir}: {e}", file=sys.stderr)
+            errors += 1
+
+    print(f"\nDone. Extracted {extracted} cover(s).")
+    print(f"Skipped {skipped_has_cover} album(s) that already had art.")
+    print(f"Skipped {skipped_no_art} album(s) that had no embedded art.")
+    
+    if errors:
+        print(f"Encountered {errors} error(s).", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
