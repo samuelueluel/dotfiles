@@ -1,5 +1,6 @@
 [mgr]
 prepend_keymap = [
+	{ on = "<C-Space>", run = "cd --interactive", desc = "Change directory interactively" },
 { on = "<C-f>", run = "plugin fzf-nav", desc = "Fuzzy jump (fzf)" },
 	{ on = "<C-g>", run = "plugin fazif folder_search", desc = "Fuzzy jump to directory (fzf)" },
 	{ on = "<C-h>", run = "search rg", desc = "Search by content (ripgrep)" },
@@ -84,4 +85,10 @@ prepend_keymap = [
 	{ on = "v", run = "noop" },
 	{ on = "y", run = "noop" },
 	{ on = "x", run = "noop" },
+]
+
+[input]
+prepend_keymap = [
+	{ on = "<C-v>", run = 'lua -- ya.emit("insert", { ya.clipboard() })', desc = "Paste from system clipboard" },
+	{ on = "<C-S-v>", run = 'lua -- ya.emit("insert", { ya.clipboard() })', desc = "Paste from system clipboard" },
 ]

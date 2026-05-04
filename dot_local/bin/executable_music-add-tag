@@ -1,0 +1,93 @@
+#!/usr/bin/python3
+import os
+import sys
+import argparse
+
+# Following existing pattern for tag_utils import
+sys.path.insert(0, os.path.expanduser('~'))
+# Also ensure .local/bin is in path if it's there
+sys.path.insert(0, os.path.join(os.path.expanduser('~'), '.local', 'bin'))
+
+from tag_utils import EXTENSIONS, check_for_unsafe_files, open_audio, get_values, set_values, save_audio
+
+parser = argparse.ArgumentParser(description='Append specific values to grouping and/or genre tags.')
+parser.add_argument('directory', nargs='?', help='Directory to process (optional, defaults to MUSIC_DIR)')
+parser.add_argument('--grouping', nargs='+', metavar='VALUE', help='Grouping values to add')
+parser.add_argument('--genres', nargs='+', metavar='VALUE', help='Genre values to add')
+parser.add_argument('--dry-run', action='store_true')
+args = parser.parse_args()
+
+if not args.grouping and not args.genres:
+    print("Error: specify at least one of --grouping or --genres", file=sys.stderr)
+    sys.exit(1)
+
+if args.directory:
+    MUSIC_DIR = os.path.expanduser(args.directory)
+    recursive = True # If a dir is passed, we usually want it and its subdirs? 
+    # music-set-tags is NOT recursive, but music-rename-tag IS.
+    # Given "appends", it might be for a whole tree.
+    # I'll stick to recursive=True if it's the library, and maybe let the user decide?
+    # Actually, music-set-tags is album-level (non-recursive).
+    # I'll make it recursive=True to be more like the other modification scripts.
+else:
+    MUSIC_DIR = os.environ.get('MUSIC_DIR', os.path.expanduser('~/Music/Music_Linux/mp3 library/Music'))
+    recursive = True
+
+if not os.path.isdir(MUSIC_DIR):
+    print(f"Error: not a directory: {MUSIC_DIR}", file=sys.stderr)
+    sys.exit(1)
+
+check_for_unsafe_files(MUSIC_DIR, recursive=recursive)
+
+add_grouping = args.grouping or []
+add_genres = args.genres or []
+
+changed = 0
+total = 0
+
+def process_file(filepath):
+    global changed
+    audio = open_audio(filepath)
+    if audio is None:
+        return
+
+    updates = {}
+    for field, to_add in [('grouping', add_grouping), ('genres', add_genres)]:
+        if not to_add:
+            continue
+        original = get_values(audio, field)
+        new_values = list(original)
+        added_any = False
+        for val in to_add:
+            if val not in new_values:
+                new_values.append(val)
+                added_any = True
+        
+        if added_any:
+            updates[field] = (original, new_values)
+
+    if updates:
+        changed += 1
+        print(f"File: {filepath}")
+        for field, (original, new_values) in updates.items():
+            print(f"  {field}: {original!r} -> {new_values!r}")
+            if not args.dry_run:
+                set_values(audio, field, new_values)
+        if not args.dry_run:
+            save_audio(audio)
+
+if recursive:
+    for dirpath, dirnames, filenames in os.walk(MUSIC_DIR, followlinks=True):
+        for filename in sorted(filenames):
+            if filename.lower().endswith(EXTENSIONS):
+                total += 1
+                process_file(os.path.join(dirpath, filename))
+else:
+    for filename in sorted(os.listdir(MUSIC_DIR)):
+        if filename.lower().endswith(EXTENSIONS):
+            total += 1
+            process_file(os.path.join(MUSIC_DIR, filename))
+
+print(f"\nScanned: {total} files | Changed: {changed}")
+if args.dry_run:
+    print("(dry run — no files written)")
