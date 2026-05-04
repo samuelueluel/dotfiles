@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+"""Rename cover art files to cover.jpg/cover.png so MPD's albumart command can find them.
+
+MPD only serves files named cover.jpg, cover.png, or cover.webp. This script
+renames common alternatives (folder.jpg, Cover.jpg, etc.) in each album
+directory that lacks a cover.jpg/cover.png/cover.webp already.
+"""
+import os
+import sys
+import argparse
+
+MUSIC_DIR = os.environ.get(
+    "MUSIC_DIR",
+    os.path.expanduser("~/Music/Music_Linux/mp3 library/Music"),
+)
+
+AUDIO_EXTS = {".mp3", ".flac", ".ogg", ".opus", ".m4a", ".aac", ".wav", ".wv", ".ape"}
+MPD_NAMES = {"cover.jpg", "cover.png", "cover.webp"}
+
+# Candidates in priority order — first match wins when multiple exist
+CANDIDATES = [
+    "folder.jpg",
+    "folder.png",
+    "folder.webp",
+    "Cover.jpg",
+    "Cover.png",
+    "Cover.webp",
+    "Folder.jpg",
+    "Folder.png",
+    "artwork.jpg",
+    "artwork.png",
+    "front.jpg",
+    "front.png",
+    "album.jpg",
+    "album.png",
+]
+
+parser = argparse.ArgumentParser(
+    description="Rename cover art files to cover.jpg/cover.png for MPD albumart compatibility."
+)
+parser.add_argument("directory", nargs="?", help="Directory to process (default: MUSIC_DIR)")
+parser.add_argument("--dry-run", action="store_true", help="Show what would be renamed without doing it")
+args = parser.parse_args()
+
+if args.directory:
+    MUSIC_DIR = os.path.expanduser(args.directory)
+
+if not os.path.isdir(MUSIC_DIR):
+    print(f"Error: directory not found: {MUSIC_DIR}", file=sys.stderr)
+    sys.exit(1)
+
+if args.dry_run:
+    print("DRY RUN — no changes will be made.\n")
+
+renamed = 0
+skipped = 0
+errors = 0
+
+for root, dirs, files in os.walk(MUSIC_DIR, followlinks=True):
+    if not any(os.path.splitext(f)[1].lower() in AUDIO_EXTS for f in files):
+        continue
+
+    file_set = set(files)
+
+    if file_set & MPD_NAMES:
+        continue
+
+    for candidate in CANDIDATES:
+        if candidate not in file_set:
+            continue
+
+        ext = os.path.splitext(candidate)[1].lower()
+        target_name = "cover" + ext
+        src = os.path.join(root, candidate)
+        dst = os.path.join(root, target_name)
+
+        rel = os.path.relpath(root, MUSIC_DIR)
+        print(f"{rel}: {candidate} -> {target_name}")
+
+        if not args.dry_run:
+            try:
+                os.rename(src, dst)
+                renamed += 1
+            except OSError as e:
+                print(f"  ERROR: {e}", file=sys.stderr)
+                errors += 1
+        else:
+            renamed += 1
+        break
+    else:
+        skipped += 1
+
+action = "Would rename" if args.dry_run else "Renamed"
+print(f"\n{action} {renamed} file(s). {skipped} album dir(s) skipped (no matching candidate).")
+if errors:
+    print(f"{errors} error(s).", file=sys.stderr)
+    sys.exit(1)

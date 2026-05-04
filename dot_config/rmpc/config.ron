@@ -46,7 +46,7 @@
             "<C-x>":        ToggleRandom,
             "<C-c>":        ToggleConsume,
             "<C-v>":        ToggleSingle,
-            "<C-p>":        TogglePause,
+            "<C-p>":        ExternalCommand(command: ["/var/home/samuel/.local/bin/rmpc-copy-song-path.sh"]),
             "<A-e>":        NextTrack,
             "<A-q>":        PreviousTrack,
             "<C-A-d>":      SeekForward,

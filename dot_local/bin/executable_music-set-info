@@ -1,0 +1,67 @@
+#!/usr/bin/python3
+import os
+import sys
+import argparse
+sys.path.insert(0, os.path.expanduser('~/.local/bin'))
+from tag_utils import EXTENSIONS, check_for_unsafe_files, open_audio, set_values, save_audio
+
+parser = argparse.ArgumentParser(description='Set title, album, artist, and/or track tags on audio files or directories.')
+parser.add_argument('paths', nargs='+', help='Paths to audio files or directories')
+parser.add_argument('--title', help='Title to set')
+parser.add_argument('--album', help='Album to set')
+parser.add_argument('--artist', help='Artist to set')
+parser.add_argument('--track', help='Track number to set')
+parser.add_argument('--dry-run', action='store_true')
+args = parser.parse_args()
+
+if not any([args.title, args.album, args.artist, args.track]):
+    print("Error: specify at least one of --title, --album, --artist, or --track", file=sys.stderr)
+    sys.exit(1)
+
+targets = []
+for p in args.paths:
+    path = os.path.expanduser(p)
+    if os.path.isdir(path):
+        check_for_unsafe_files(path, recursive=False)
+        files = sorted(f for f in os.listdir(path) if f.lower().endswith(EXTENSIONS))
+        for f in files:
+            targets.append(os.path.join(path, f))
+    elif os.path.isfile(path):
+        if path.lower().endswith(EXTENSIONS):
+            targets.append(path)
+        else:
+            print(f"Skipping (unsupported format): {path}", file=sys.stderr)
+    else:
+        print(f"Error: path does not exist: {path}", file=sys.stderr)
+
+if not targets:
+    print("No supported audio files found.", file=sys.stderr)
+    sys.exit(1)
+
+for filepath in targets:
+    audio = open_audio(filepath)
+    if audio is None:
+        print(f"Skipping (could not open): {filepath}")
+        continue
+
+    print(f"File: {filepath}")
+    changes = [
+        ('title', args.title),
+        ('album', args.album),
+        ('artist', args.artist),
+        ('track', args.track)
+    ]
+    
+    has_changes = False
+    for field, value in changes:
+        if value is not None:
+            print(f"  {field}: {value!r}")
+            if not args.dry_run:
+                set_values(audio, field, [value])
+                has_changes = True
+
+    if has_changes and not args.dry_run:
+        save_audio(audio)
+
+if args.dry_run:
+    print("\n(dry run — no files written)")

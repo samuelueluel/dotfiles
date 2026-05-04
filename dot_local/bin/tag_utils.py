@@ -5,13 +5,27 @@ import sys
 import mutagen
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
-from mutagen.id3 import TIT1, TCON
+from mutagen.id3 import TIT1, TCON, TIT2, TALB, TPE1, TRCK
 
 EXTENSIONS = ('.mp3', '.flac')
 UNSAFE_EXTENSIONS = ('.m4a', '.mp4', '.aac', '.wma', '.ogg', '.opus', '.ape', '.wv')
 
-_ID3    = {'grouping': ('TIT1', TIT1), 'genres': ('TCON', TCON)}
-_VORBIS = {'grouping': 'grouping', 'genres': 'genre'}
+_ID3    = {
+    'grouping': ('TIT1', TIT1),
+    'genres': ('TCON', TCON),
+    'title': ('TIT2', TIT2),
+    'album': ('TALB', TALB),
+    'artist': ('TPE1', TPE1),
+    'track': ('TRCK', TRCK)
+}
+_VORBIS = {
+    'grouping': 'grouping',
+    'genres': 'genre',
+    'title': 'title',
+    'album': 'album',
+    'artist': 'artist',
+    'track': 'tracknumber'
+}
 
 def check_for_unsafe_files(path, recursive=False):
     """Exit with error if any unsupported audio formats are found."""
