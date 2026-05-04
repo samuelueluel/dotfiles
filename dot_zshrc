@@ -135,6 +135,7 @@ fi
 [[ -S "$SSH_AUTH_SOCK" ]] && { ssh-add -l &>/dev/null || SSH_ASKPASS_REQUIRE=never ssh-add ~/.ssh/id_ed25519 &>/dev/null; }
 
 # AI Agent Sound Alerts
+export HEADROOM_REQUIRE_RUST_CORE=false
 function claude() {
     if command -v headroom >/dev/null; then
         headroom wrap claude "$@"

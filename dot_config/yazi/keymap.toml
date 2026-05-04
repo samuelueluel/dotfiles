@@ -80,7 +80,7 @@ prepend_keymap = [
 	{ on = "<C-S-c>", run = "yank", desc = "Yank (copy)" },
 	{ on = "<C-S-p>", run = "copy path", desc = "Copy path to clipboard" },
 	{ on = "<C-S-x>", run = "yank --cut", desc = "Yank (cut)" },
-	{ on = "<C-Escape>", run = "unyank", desc = "Cancel cut/yank" },
+	{ on = "<A-y>", run = "unyank", desc = "Cancel cut/yank" },
 	{ on = "p", run = "noop" },
 	{ on = "v", run = "noop" },
 	{ on = "y", run = "noop" },

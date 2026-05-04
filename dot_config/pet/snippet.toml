@@ -154,3 +154,15 @@
   Output = ""
   Tag = []
   command = "rmpc update"
+
+[[Snippets]]
+  Description = "Restart mpd service"
+  Output = ""
+  Tag = []
+  command = "systemctl --user restart mpd"
+
+[[Snippets]]
+  Description = "Full rescan music library"
+  Output = ""
+  Tag = []
+  command = "rmpc rescan"
