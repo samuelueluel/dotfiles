@@ -14,7 +14,7 @@ SELECTED_LINES=$(echo "$DATA" | fzf -m --reverse --no-sort --border=none --no-sc
     --header="Recently Added Albums (Tab: Select | Enter: Add)" \
     --prompt="Recent Art > " \
     --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {}' \
-    --preview-window 'right:50%:noborder')
+    --preview-window 'right:40%:border-left')
 
 if [ -n "$SELECTED_LINES" ]; then
     STATE=$(echo "status" | nc -N 127.0.0.1 6600 | grep "^state: " | awk '{print $2}')

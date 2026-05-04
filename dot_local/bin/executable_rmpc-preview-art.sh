@@ -55,8 +55,13 @@ if [ -z "$COVER" ]; then
 fi
 
 if [ -n "$COVER" ]; then
+    # Add manual vertical padding to center the image better in the fzf box
+    # 2-3 newlines usually provides a good balance for the typical window height
+    printf "\n\n"
+
     # Use chafa with kitty protocol
-    chafa --probe off --format kitty --animate no --size "${FZF_PREVIEW_COLUMNS}x${FZF_PREVIEW_LINES}" "$COVER"
+    # --align mid,mid centers the image both horizontally and vertically
+    chafa --probe off --format kitty --animate no --align mid,mid --size "${FZF_PREVIEW_COLUMNS}x$((FZF_PREVIEW_LINES - 3))" "$COVER"
     
     # Cleanup if it was a temp file (chafa reads it into memory/terminal buffer immediately)
     [ "$COVER" = "$TEMP_COVER" ] && rm -f "$TEMP_COVER"

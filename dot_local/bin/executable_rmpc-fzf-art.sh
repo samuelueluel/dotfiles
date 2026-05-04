@@ -13,7 +13,7 @@ SELECTED_LINES=$(echo "$PAIRS" | fzf -m --reverse --border=none --no-scrollbar -
     --header="Tab: Select multiple | Enter: Add to Queue" \
     --prompt="Art Search > " \
     --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {}' \
-    --preview-window 'right:50%:noborder')
+    --preview-window 'right:40%:border-left')
 
 if [ -n "$SELECTED_LINES" ]; then
     # Check if we are currently stopped
