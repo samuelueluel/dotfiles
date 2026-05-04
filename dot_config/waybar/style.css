@@ -32,7 +32,7 @@ window#waybar {
     margin: 3px 4px 3px 0;
     color: @black;
     background-color: @peach;
-    border-radius: 3px;
+    border-radius: 5px;
     min-height: 12px;
     min-width: 27px;
     font-size: 20px;

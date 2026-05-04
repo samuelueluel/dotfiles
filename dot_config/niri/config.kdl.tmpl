@@ -721,3 +721,19 @@ binds {
 }
 
 //include "./noctalia.kdl" // Noctalia places this here to enforce Template color scheme onto Niri elements; usually don't want this
+
+// ============================================================
+// WINDOW RULES
+// ============================================================
+
+window-rule {
+    match is-focused=true
+    geometry-corner-radius 0
+    clip-to-geometry true
+}
+
+window-rule {
+    match is-focused=false
+    geometry-corner-radius 15
+    clip-to-geometry true
+}
