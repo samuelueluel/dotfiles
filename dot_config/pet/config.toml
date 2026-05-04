@@ -11,11 +11,11 @@
 [General]
   Backend = "gist"
   Cmd = []
-  Color = true
+  Color = false
   Column = 0
   Editor = "zed"
-  Format = "$description : $command"
-  SelectCmd = "awk -F ' : ' '{print \"\\033[32m\" $1 \"\\033[0m : \\033[36m\" $2 \"\\033[0m\"}' | fzf --ansi --layout=reverse --border --height=90% --pointer=* --cycle --prompt=Snippets: | sed 's/\\x1b\\[[0-9;]*m//g'"
+  Format = "$command # $description"
+  SelectCmd = "fzf --layout=reverse --border --height=90% --pointer=* --cycle --prompt=Snippets:"
   SnippetDirs = []
   SnippetFile = "/var/home/samuel/.config/pet/snippet.toml"
   SortBy = ""
