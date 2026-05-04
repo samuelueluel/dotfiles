@@ -78,9 +78,10 @@
                     )), default: (kind: Text("  "))),
                     (kind: Property(Track), style: (fg: "#D0A7AF")),
                     (kind: Text(" ")),
-                    (kind: Property(Title), style: (fg: "#FFFFFF"), default: (kind: Property(Filename), style: (fg: "#FFFFFF")))
+                    (kind: Property(Title), default: (kind: Property(Filename)))
                 ]),
-                default: (kind: Text("Unknown"), style: (fg: "#FFFFFF"))
+                style: (fg: "#FFFFFF"),
+                default: (kind: Text("Unknown"))
             ),
             label_prop: (kind: Text("Title"), style: (fg: "#D0A7AF")),
             width: "35%",
