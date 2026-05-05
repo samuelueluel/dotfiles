@@ -71,7 +71,7 @@ local function entry(_, job)
 	end
 
 	if not output then
-		return ya.notify { title = "Fazif", content = tostring(err), timeout = 5, level = "error" }
+		return ui.notify { title = "Fazif", content = tostring(err), timeout = 5, level = "error" }
 	end
 
 	local urls = split_urls(cwd, output)

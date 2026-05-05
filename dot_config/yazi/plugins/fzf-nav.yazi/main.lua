@@ -5,7 +5,7 @@ local state = ya.sync(function()
 end)
 
 local function fail(s, ...)
-	ya.notify { title = "Fzf", content = string.format(s, ...), timeout = 5, level = "error" }
+	ui.notify { title = "Fzf", content = string.format(s, ...), timeout = 5, level = "error" }
 end
 
 local function entry(_, _args)
@@ -36,10 +36,10 @@ local function entry(_, _args)
 	local url = Url(cwd:join(target))
 
 	if target:match("^%.") or target:match("/%.") then
-		ya.mgr_emit("hidden", { "show" })
+		ya.emit("hidden", { "show" })
 	end
 
-	ya.mgr_emit("reveal", { url, raw = true })
+	ya.emit("reveal", { url, raw = true })
 end
 
 return { entry = entry }
