@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 # rmpc-fzf-art.sh: Multi-select Artist - Album search with Cover Art preview
 
-# 1. Get pairs
-PAIRS=$(echo "list album group artist" | nc -N 127.0.0.1 6600 | awk -F': ' '
+# 1. Get pairs using 'list' which is the most reliable way to get all albums
+# We use Artist as the grouping tag. This is fast and complete.
+DATA=$(echo "list album group artist" | nc -N 127.0.0.1 6600 | awk -F': ' '
     /^Artist: / { artist=substr($0, index($0,$2)) }
-    /^Album: / { album=substr($0, index($0,$2)); if (artist != "" && album != "") print "\033[38;2;23;193;130m[" artist "]\033[0m " album }
+    /^Album: / { 
+        album=substr($0, index($0,$2))
+        if (album != "") {
+            # Use "Unknown Artist" if artist is empty
+            a = (artist != "" ? artist : "Unknown Artist")
+            print "\033[38;2;23;193;130m[" a "]\033[0m " album
+        }
+    }
 ' | sort -u)
 
 # 2. Multi-select with fzf (-m flag)
-# Use Tab or Shift-Tab to select multiple items
-SELECTED_LINES=$(echo "$PAIRS" | fzf -m --ansi --reverse --border=none --no-scrollbar --no-separator \
+SELECTED_LINES=$(echo "$DATA" | fzf -m --ansi --reverse --border=none --no-scrollbar --no-separator \
     --header="Albums (Tab: Select | Enter: Add)" \
     --prompt="Fuzzy Search > " \
     --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {}' \

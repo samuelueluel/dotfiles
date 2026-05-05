@@ -2,36 +2,54 @@
 # rmpc-fzf-newest-art.sh: Sort albums by file modification time with Cover Art preview
 
 # 1. Fetch all albums with dates by paginating the query to avoid MPD truncation limits
+# We call nc inside the loop to ensure each window is fully received.
 DATA=$(
-    # Run the query in chunks of 5000 to bypass MPD's output size limit
     for i in 0 5000 10000 15000 20000; do
-        end=$((i+5000))
-        echo "find \"(album != '')\" window $i:$end" | nc -N 127.0.0.1 6600
+        echo "find \"(album != '')\" window $i:$((i+5000))" | nc -N 127.0.0.1 6600
     done | awk -F": " '
-    /^file: / { 
-        if (f_artist != "" && f_album != "" && f_time != "") {
-            key = "\033[38;2;23;193;130m[" f_artist "]\033[0m " f_album
-            if (f_time > latest[key]) latest[key] = f_time
-        }
-        f_artist=""; f_album=""; f_time=""
+    function get_val(line) {
+        p = index(line, ": ")
+        if (p == 0) return ""
+        return substr(line, p + 2)
     }
-    /^Artist: / { f_artist=substr($0, index($0,$2)) }
-    /^Album: / { f_album=substr($0, index($0,$2)) }
-    /^Last-Modified: / { f_time=$2 }
-    END {
-        if (f_artist != "" && f_album != "" && f_time != "") {
-            key = "\033[38;2;23;193;130m[" f_artist "]\033[0m " f_album
-            if (f_time > latest[key]) latest[key] = f_time
+    function process_record() {
+        if (f_file != "" && f_album != "") {
+            # Fallback logic: Artist -> AlbumArtist -> Unknown Artist
+            artist = (f_artist != "" ? f_artist : (f_albumartist != "" ? f_albumartist : "Unknown Artist"))
+            key = "\033[38;2;23;193;130m[" artist "]\033[0m " f_album
+            
+            # Use a default time if missing
+            time = (f_time != "" ? f_time : "1970-01-01T00:00:00Z")
+            
+            # Keep the newest modification time for each album
+            if (!(key in latest) || time > latest[key]) {
+                latest[key] = time
+                first_file[key] = f_file
+            }
         }
-        for (k in latest) print latest[k] "\t" k
+    }
+    /^file: / { 
+        process_record()
+        f_file = get_val($0)
+        f_artist=""; f_album=""; f_albumartist=""; f_time=""
+    }
+    /^Artist: / { f_artist = get_val($0) }
+    /^Album: / { f_album = get_val($0) }
+    /^AlbumArtist: / { f_albumartist = get_val($0) }
+    /^Last-Modified: / { f_time = $2 }
+    END {
+        process_record()
+        for (k in latest) print latest[k] "\t" k "\t" first_file[k]
     }' | sort -rn | cut -f2-
 )
 
 # 2. Multi-select fuzzy search
+# We use Tab as delimiter to hide the file path from the list but pass it to preview
 SELECTED_LINES=$(echo "$DATA" | fzf -m --ansi --reverse --no-sort --border=none --no-scrollbar --no-separator \
+    --delimiter '\t' --with-nth 1 \
     --header="Recently Added Albums (Tab: Select | Enter: Add)" \
     --prompt="Fuzzy Search > " \
-    --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {}' \
+    --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {1} {2}' \
     --preview-window 'right:40%:border-left')
 
 if [ -n "$SELECTED_LINES" ]; then
@@ -40,8 +58,8 @@ if [ -n "$SELECTED_LINES" ]; then
     while IFS= read -r SELECTED; do
         [ -z "$SELECTED" ] && continue
         
-        # Strip ANSI codes
-        SELECTED_CLEAN=$(echo "$SELECTED" | sed 's/\x1b\[[0-9;]*m//g')
+        # Strip ANSI codes and the hidden file path
+        SELECTED_CLEAN=$(echo "$SELECTED" | sed 's/\x1b\[[0-9;]*m//g' | cut -f1)
         ARTIST=$(echo "$SELECTED_CLEAN" | sed 's/^\[\([^]]*\)\].*/\1/')
         ALBUM=$(echo "$SELECTED_CLEAN" | sed 's/^\[[^]]*\] //')
 

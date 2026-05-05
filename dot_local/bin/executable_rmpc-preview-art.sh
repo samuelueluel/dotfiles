@@ -5,41 +5,44 @@
 # This ensures that even if we exit early, the previous image is removed.
 # a=d means action=delete, d=A means delete all images
 printf "\033_Ga=d,d=A\033\\"
-
 MUSIC_DIR="${MUSIC_DIR:-$HOME/Music/Music_Linux/mp3 library/Music}"
 INPUT="$1"
+RELATIVE_FILE="$2"
 
 if [ -z "$INPUT" ]; then
     exit 0
 fi
 
-# Split "Artist - Album"
-# Strip ANSI escapes if any
-INPUT_CLEAN=$(echo "$INPUT" | sed 's/\x1b\[[0-9;]*m//g')
+if [ -z "$RELATIVE_FILE" ]; then
+    # Split "Artist - Album"
+    # Strip ANSI escapes if any
+    INPUT_CLEAN=$(echo "$INPUT" | sed 's/\x1b\[[0-9;]*m//g')
 
-if [[ "$INPUT_CLEAN" == \[*\]\ * ]]; then
-    # New format: [Artist] Album
-    ARTIST=$(echo "$INPUT_CLEAN" | sed 's/^\[\([^]]*\)\].*/\1/')
-    ALBUM=$(echo "$INPUT_CLEAN" | sed 's/^\[[^]]*\] //')
-else
-    # Fallback to old format
-    # Using sed to be robust against " - " inside names (greedy match for the last " - ")
-    ARTIST=$(echo "$INPUT_CLEAN" | sed 's/ - .*//')
-    ALBUM=$(echo "$INPUT_CLEAN" | sed 's/.* - //')
+    if [[ "$INPUT_CLEAN" == \[*\]\ * ]]; then
+        # New format: [Artist] Album
+        ARTIST=$(echo "$INPUT_CLEAN" | sed 's/^\[\([^]]*\)\].*/\1/')
+        ALBUM=$(echo "$INPUT_CLEAN" | sed 's/^\[[^]]*\] //')
+    else
+        # Fallback to old format
+        # Using sed to be robust against " - " inside names (greedy match for the last " - ")
+        ARTIST=$(echo "$INPUT_CLEAN" | sed 's/ - .*//')
+        ALBUM=$(echo "$INPUT_CLEAN" | sed 's/.* - //')
+    fi
+
+    # Escape quotes for MPD
+    ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')
+    ESCAPED_ALBUM=$(echo "$ALBUM" | sed 's/"/\\"/g')
+
+    # Get the path of the first file in this album
+    # We use 'window 0:1' to make it extremely fast
+    RELATIVE_FILE=$(echo "find artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\" window 0:1" | nc -N 127.0.0.1 6600 | awk -F': ' '/^file: / {print $2; exit}')
 fi
-
-# Escape quotes for MPD
-ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')
-ESCAPED_ALBUM=$(echo "$ALBUM" | sed 's/"/\\"/g')
-
-# Get the path of the first file in this album
-# We use 'find' to get one file, then 'dirname' to get the folder
-RELATIVE_FILE=$(echo "find artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 | grep "^file: " | head -n 1 | cut -d' ' -f2-)
 
 if [ -z "$RELATIVE_FILE" ]; then
-    echo "No files found for $ARTIST - $ALBUM"
+    echo "No files found for $INPUT"
     exit 0
 fi
+
 
 ALBUM_DIR="$MUSIC_DIR/$(dirname "$RELATIVE_FILE")"
 
