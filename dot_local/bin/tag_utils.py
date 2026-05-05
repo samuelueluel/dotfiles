@@ -63,7 +63,52 @@ def get_values(audio, field):
         return list(audio.tags.get(_VORBIS[field], []))
     return []
 
+def normalize_grouping(values):
+    """Sort grouping tags according to Samuel's priority."""
+    # Priority: [Priority] > R: 5 etc > Unrated > Overrated > Underrated > <500 ratings > FL > Wall
+    
+    # Categories
+    priority = []
+    ratings = []
+    unrated = []
+    overrated = []
+    underrated = []
+    under_500 = []
+    fl = []
+    wall = []
+    others = []
+    
+    for v in set(values):
+        if v == '[Priority]':
+            priority.append(v)
+        elif v.startswith('R:'):
+            ratings.append(v)
+        elif v == 'Unrated':
+            unrated.append(v)
+        elif v == 'Overrated':
+            overrated.append(v)
+        elif v == 'Underrated':
+            underrated.append(v)
+        elif v == '<500 ratings':
+            under_500.append(v)
+        elif v == 'FL':
+            fl.append(v)
+        elif v == 'Wall':
+            wall.append(v)
+        else:
+            others.append(v)
+            
+    # Sort categories internally
+    ratings.sort(reverse=True) # R: 5.0 > R: 4.0
+    others.sort(key=str.lower) # Alphabetical for the rest
+    
+    # Recombine in correct order
+    return priority + ratings + unrated + overrated + underrated + under_500 + fl + wall + others
+
 def set_values(audio, field, values):
+    if field == 'grouping':
+        values = normalize_grouping(values)
+        
     if isinstance(audio, MP3):
         tag_name, tag_class = _ID3[field]
         encoding = audio.tags[tag_name].encoding if tag_name in audio.tags else 3

@@ -1,18 +1,36 @@
 #!/usr/bin/env bash
 # rmpc-fzf-newest-art.sh: Sort albums by file modification time with Cover Art preview
 
-# 1. Get all files with their last modified date, sort newest first
-DATA=$(echo "listallinfo" | nc -N 127.0.0.1 6600 | awk -F': ' '
-    /^Last-Modified:/ { time=$2 }
-    /^Artist:/ { artist=$2 }
-    /^Album:/ { if (time != "" && artist != "" && $2 != "") print time "\t" artist " - " $2 }
-' | sort -rn | cut -f2- | awk '!seen[$0]++')
+# 1. Fetch all albums with dates by paginating the query to avoid MPD truncation limits
+DATA=$(
+    # Run the query in chunks of 5000 to bypass MPD's output size limit
+    for i in 0 5000 10000 15000 20000; do
+        end=$((i+5000))
+        echo "find \"(album != '')\" window $i:$end" | nc -N 127.0.0.1 6600
+    done | awk -F": " '
+    /^file: / { 
+        if (f_artist != "" && f_album != "" && f_time != "") {
+            key = f_artist " - " f_album
+            if (f_time > latest[key]) latest[key] = f_time
+        }
+        f_artist=""; f_album=""; f_time=""
+    }
+    /^Artist: / { f_artist=substr($0, index($0,$2)) }
+    /^Album: / { f_album=substr($0, index($0,$2)) }
+    /^Last-Modified: / { f_time=$2 }
+    END {
+        if (f_artist != "" && f_album != "" && f_time != "") {
+            key = f_artist " - " f_album
+            if (f_time > latest[key]) latest[key] = f_time
+        }
+        for (k in latest) print latest[k] "\t" k
+    }' | sort -rn | cut -f2-
+)
 
 # 2. Multi-select fuzzy search
-# --no-sort is CRITICAL here so fzf preserves our "newest first" order
 SELECTED_LINES=$(echo "$DATA" | fzf -m --reverse --no-sort --border=none --no-scrollbar --no-separator \
     --header="Recently Added Albums (Tab: Select | Enter: Add)" \
-    --prompt="Recent Art > " \
+    --prompt="Fuzzy Search > " \
     --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {}' \
     --preview-window 'right:40%:border-left')
 

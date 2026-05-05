@@ -71,7 +71,7 @@
             "<C-g>":      ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "/var/home/samuel/.local/bin/rmpc-fzf-newest-art.sh"]),
             "<C-A-f>":        ExternalCommand(command: ["alacritty", "-t", "Alacritty Float", "-e", "/var/home/samuel/.local/bin/rmpc-fzf-artist-album.sh"]),
             "<C-f>":      ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "/var/home/samuel/.local/bin/rmpc-fzf-art.sh"]),
-            "<C-h>":        ExternalCommand(command: ["alacritty", "-t", "Alacritty Float", "-e", "/var/home/samuel/.local/bin/rmpc-fzf-artist-album.sh"]),
+            "<C-h>":      ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "/var/home/samuel/.local/bin/rmpc-fzf-priority.sh"]),
             "<C-P>":        ExternalCommand(command: ["/var/home/samuel/.local/bin/rmpc-copy-album-path.sh"]),
             "<A-g>":        ExternalCommand(command: ["/var/home/samuel/.local/bin/rmpc-toggle-config.sh"]),
         },

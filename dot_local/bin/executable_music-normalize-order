@@ -1,0 +1,57 @@
+#!/usr/bin/python3
+import os
+import sys
+import argparse
+
+sys.path.insert(0, os.path.expanduser('~'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~'), '.local', 'bin'))
+
+from tag_utils import EXTENSIONS, check_for_unsafe_files, open_audio, get_values, set_values, save_audio, normalize_grouping
+
+parser = argparse.ArgumentParser(description='Normalize the order of grouping tags across the library.')
+parser.add_argument('directory', nargs='?', help='Directory to process (optional, defaults to MUSIC_DIR)')
+parser.add_argument('--dry-run', action='store_true')
+args = parser.parse_args()
+
+if args.directory:
+    MUSIC_DIR = os.path.expanduser(args.directory)
+else:
+    MUSIC_DIR = os.environ.get('MUSIC_DIR', os.path.expanduser('~/Music/Music_Linux/mp3 library/Music'))
+
+if not os.path.isdir(MUSIC_DIR):
+    print(f"Error: not a directory: {MUSIC_DIR}", file=sys.stderr)
+    sys.exit(1)
+
+check_for_unsafe_files(MUSIC_DIR, recursive=True)
+
+changed = 0
+total = 0
+
+for dirpath, dirnames, filenames in os.walk(MUSIC_DIR, followlinks=True):
+    for filename in sorted(filenames):
+        if filename.lower().endswith(EXTENSIONS):
+            total += 1
+            filepath = os.path.join(dirpath, filename)
+            audio = open_audio(filepath)
+            if audio is None:
+                continue
+            
+            original_grouping = get_values(audio, 'grouping')
+            if not original_grouping:
+                continue
+                
+            normalized_grouping = normalize_grouping(original_grouping)
+            
+            # If the order is already correct (and no duplicates were removed), they will be equal
+            if original_grouping != normalized_grouping:
+                changed += 1
+                print(f"File: {filepath}")
+                print(f"  grouping: {original_grouping!r} -> {normalized_grouping!r}")
+                if not args.dry_run:
+                    # set_values now automatically calls normalize_grouping for 'grouping'
+                    set_values(audio, 'grouping', original_grouping)
+                    save_audio(audio)
+
+print(f"\nScanned: {total} files | Changed: {changed}")
+if args.dry_run:
+    print("(dry run — no files written)")

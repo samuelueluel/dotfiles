@@ -134,6 +134,7 @@
                     (kind: Property(Status(Duration)), style: (fg: "#FFA726")),
                     (kind: Text(" "))
                 ],
+                border_title_position: Bottom,
                 border_title_alignment: Center,
                 pane: Component("progress_bar"),
             ),
@@ -213,7 +214,7 @@
             direction: Vertical,
             panes: [
                 (size: "1", pane: Pane(Empty())),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Track)), style: (fg: "#FFA726", modifiers: "Bold")), (kind: Text(" ")), (kind: Property(Song(Title)), style: (fg: "#FFA726", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#FFA726", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#FFA726"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#FFA726"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
                 (size: "0", pane: Pane(Empty())),
@@ -229,7 +230,7 @@
         "song_extra_info": Split(
             direction: Vertical,
             panes: [
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Track)), style: (fg: "#FFA726", modifiers: "Bold")), (kind: Text(" ")), (kind: Property(Song(Title)), style: (fg: "#FFA726", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#FFA726", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#FFA726"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#FFA726"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("date"))), style: (fg: "#17C182"), default: (kind: Text("-")))], align: Center))),
