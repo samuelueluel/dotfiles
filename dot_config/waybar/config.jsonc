@@ -8,6 +8,7 @@
   "modules-left": ["niri/workspaces"],
   "modules-center": ["cffi/niri_window_buttons"],
   "modules-right": [
+    "custom/recorder",
     "custom/swaync",
     "network",
     "temperature",
@@ -17,6 +18,15 @@
     "battery",
     "clock",
   ],
+
+  "custom/recorder": {
+    "format": "{}",
+    "interval": 1,
+    "exec": "echo '{\"text\": \"●\", \"class\": \"recording\"}'",
+    "exec-if": "pgrep wf-recorder",
+    "return-type": "json",
+    "tooltip": false
+  },
 
   // ── Left ──────────────────────────────────────────────────────────────────
 

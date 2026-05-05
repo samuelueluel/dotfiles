@@ -41,7 +41,7 @@ SELECTED_LINES=$(echo "$PAIRS" | fzf -m --ansi --reverse --border=none --no-scro
     --delimiter '\t' --with-nth 1 \
     --header="Priority Albums (Tab: Select | Enter: Add)" \
     --prompt="Fuzzy Search > " \
-    --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {1} {2}' \
+    --preview '$HOME/.local/bin/rmpc-preview-art.sh {1} {2}' \
     --preview-window 'right:40%:border-left')
 
 if [ -n "$SELECTED_LINES" ]; then

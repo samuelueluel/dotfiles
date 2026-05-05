@@ -8,7 +8,6 @@ DATA=$(echo "list album group artist" | nc -N 127.0.0.1 6600 | awk -F': ' '
     /^Album: / { 
         album=substr($0, index($0,$2))
         if (album != "") {
-            # Use "Unknown Artist" if artist is empty
             a = (artist != "" ? artist : "Unknown Artist")
             print "\033[38;2;23;193;130m[" a "]\033[0m " album
         }
@@ -19,7 +18,7 @@ DATA=$(echo "list album group artist" | nc -N 127.0.0.1 6600 | awk -F': ' '
 SELECTED_LINES=$(echo "$DATA" | fzf -m --ansi --reverse --border=none --no-scrollbar --no-separator \
     --header="Albums (Tab: Select | Enter: Add)" \
     --prompt="Fuzzy Search > " \
-    --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {}' \
+    --preview '$HOME/.local/bin/rmpc-preview-art.sh {}' \
     --preview-window 'right:40%:border-left')
 
 if [ -n "$SELECTED_LINES" ]; then

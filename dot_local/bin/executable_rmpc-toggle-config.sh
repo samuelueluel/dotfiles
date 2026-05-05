@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-CONFIG_DIR="/var/home/samuel/.config/rmpc"
+CONFIG_DIR="$HOME/.config/rmpc"
 STATE_FILE="/tmp/rmpc_config_state"
 
 # Determine current state

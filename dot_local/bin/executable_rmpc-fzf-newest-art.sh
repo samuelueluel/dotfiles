@@ -4,7 +4,7 @@
 # 1. Fetch all albums with dates by paginating the query to avoid MPD truncation limits
 # We call nc inside the loop to ensure each window is fully received.
 DATA=$(
-    for i in 0 5000 10000 15000 20000; do
+    for i in 0 5000 10000 15000 20000 25000; do
         echo "find \"(album != '')\" window $i:$((i+5000))" | nc -N 127.0.0.1 6600
     done | awk -F": " '
     function get_val(line) {
@@ -14,14 +14,9 @@ DATA=$(
     }
     function process_record() {
         if (f_file != "" && f_album != "") {
-            # Fallback logic: Artist -> AlbumArtist -> Unknown Artist
             artist = (f_artist != "" ? f_artist : (f_albumartist != "" ? f_albumartist : "Unknown Artist"))
             key = "\033[38;2;23;193;130m[" artist "]\033[0m " f_album
-            
-            # Use a default time if missing
             time = (f_time != "" ? f_time : "1970-01-01T00:00:00Z")
-            
-            # Keep the newest modification time for each album
             if (!(key in latest) || time > latest[key]) {
                 latest[key] = time
                 first_file[key] = f_file
@@ -49,7 +44,7 @@ SELECTED_LINES=$(echo "$DATA" | fzf -m --ansi --reverse --no-sort --border=none 
     --delimiter '\t' --with-nth 1 \
     --header="Recently Added Albums (Tab: Select | Enter: Add)" \
     --prompt="Fuzzy Search > " \
-    --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {1} {2}' \
+    --preview '$HOME/.local/bin/rmpc-preview-art.sh {1} {2}' \
     --preview-window 'right:40%:border-left')
 
 if [ -n "$SELECTED_LINES" ]; then
