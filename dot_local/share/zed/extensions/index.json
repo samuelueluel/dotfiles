@@ -1,5 +1,41 @@
 {
   "extensions": {
+    "csv": {
+      "manifest": {
+        "id": "csv",
+        "name": "CSV",
+        "version": "0.0.3",
+        "schema_version": 1,
+        "description": "CSV language support.",
+        "repository": "https://github.com/huacnlee/zed-csv",
+        "authors": [
+          "Jason Lee <huacnlee@gmail.com>"
+        ],
+        "lib": {
+          "kind": "Rust",
+          "version": "0.0.4"
+        },
+        "themes": [],
+        "icon_themes": [],
+        "languages": [
+          "languages/csv"
+        ],
+        "grammars": {
+          "csv": {
+            "repository": "https://github.com/arnau/tree-sitter-csv",
+            "rev": "4b25b5d745f9462e54b781e3d7798b8e0a4db703",
+            "path": null
+          }
+        },
+        "language_servers": {},
+        "context_servers": {},
+        "agent_servers": {},
+        "slash_commands": {},
+        "snippets": null,
+        "capabilities": []
+      },
+      "dev": false
+    },
     "dockerfile": {
       "manifest": {
         "id": "dockerfile",
@@ -107,6 +143,52 @@
       },
       "dev": false
     },
+    "just": {
+      "manifest": {
+        "id": "just",
+        "name": "Justfile",
+        "version": "0.2.0",
+        "schema_version": 1,
+        "description": "Justfile language support",
+        "repository": "https://github.com/jackTabsCode/zed-just",
+        "authors": [
+          "Jack Taylor <j@jackt.io>",
+          "Matt Robenolt <m@robenolt.com>"
+        ],
+        "lib": {
+          "kind": "Rust",
+          "version": "0.7.0"
+        },
+        "themes": [],
+        "icon_themes": [],
+        "languages": [
+          "languages/just"
+        ],
+        "grammars": {
+          "just": {
+            "repository": "https://github.com/IndianBoy42/tree-sitter-just",
+            "rev": "bb0c898a80644de438e6efe5d88d30bf092935cd",
+            "path": null
+          }
+        },
+        "language_servers": {
+          "just-lsp": {
+            "language": null,
+            "languages": [
+              "Just"
+            ],
+            "language_ids": {},
+            "code_action_kinds": null
+          }
+        },
+        "context_servers": {},
+        "agent_servers": {},
+        "slash_commands": {},
+        "snippets": null,
+        "capabilities": []
+      },
+      "dev": false
+    },
     "kdl": {
       "manifest": {
         "id": "kdl",
@@ -135,6 +217,58 @@
           }
         },
         "language_servers": {},
+        "context_servers": {},
+        "agent_servers": {},
+        "slash_commands": {},
+        "snippets": null,
+        "capabilities": []
+      },
+      "dev": false
+    },
+    "latex": {
+      "manifest": {
+        "id": "latex",
+        "name": "LaTeX",
+        "version": "0.2.3",
+        "schema_version": 1,
+        "description": "LaTeX language server and syntax highlighting for Zed. See wiki on GitHub for help.",
+        "repository": "https://github.com/rzukic/zed-latex",
+        "authors": [
+          "Ruben Zukic <ruben@zukic.net>",
+          "Oli Callaghan <me@olicallaghan.com>",
+          "Luke Naylor <luke.naylr@gmail.com>",
+          "Jan Solanti <jhs@psonet.com>"
+        ],
+        "lib": {
+          "kind": "Rust",
+          "version": "0.1.0"
+        },
+        "themes": [],
+        "icon_themes": [],
+        "languages": [
+          "languages/bibtex",
+          "languages/latex"
+        ],
+        "grammars": {
+          "bibtex": {
+            "repository": "https://github.com/latex-lsp/tree-sitter-bibtex",
+            "rev": "ccfd77db0ed799b6c22c214fe9d2937f47bc8b34",
+            "path": null
+          },
+          "latex": {
+            "repository": "https://github.com/497e0bdf29873/tree-sitter-latex",
+            "rev": "858af2c24547c8ab9386281ece6ead6936dbc8d1",
+            "path": null
+          }
+        },
+        "language_servers": {
+          "texlab": {
+            "language": "LaTeX",
+            "languages": [],
+            "language_ids": {},
+            "code_action_kinds": null
+          }
+        },
         "context_servers": {},
         "agent_servers": {},
         "slash_commands": {},
@@ -329,6 +463,34 @@
   "themes": {},
   "icon_themes": {},
   "languages": {
+    "BibTeX": {
+      "extension": "latex",
+      "path": "languages/bibtex",
+      "matcher": {
+        "path_suffixes": [
+          "bib",
+          "bibtex",
+          "biblatex"
+        ],
+        "first_line_pattern": null,
+        "modeline_aliases": []
+      },
+      "hidden": false,
+      "grammar": "bibtex"
+    },
+    "CSV": {
+      "extension": "csv",
+      "path": "languages/csv",
+      "matcher": {
+        "path_suffixes": [
+          "csv"
+        ],
+        "first_line_pattern": null,
+        "modeline_aliases": []
+      },
+      "hidden": false,
+      "grammar": "csv"
+    },
     "Dockerfile": {
       "extension": "dockerfile",
       "path": "languages/dockerfile",
@@ -359,6 +521,22 @@
       "hidden": false,
       "grammar": "html"
     },
+    "Just": {
+      "extension": "just",
+      "path": "languages/just",
+      "matcher": {
+        "path_suffixes": [
+          "justfile",
+          "Justfile",
+          "JUSTFILE",
+          "just"
+        ],
+        "first_line_pattern": null,
+        "modeline_aliases": []
+      },
+      "hidden": false,
+      "grammar": "just"
+    },
     "Kdl": {
       "extension": "kdl",
       "path": "languages/kdl",
@@ -371,6 +549,22 @@
       },
       "hidden": false,
       "grammar": "kdl"
+    },
+    "LaTeX": {
+      "extension": "latex",
+      "path": "languages/latex",
+      "matcher": {
+        "path_suffixes": [
+          "tex",
+          "latex",
+          "sty",
+          "cls"
+        ],
+        "first_line_pattern": null,
+        "modeline_aliases": []
+      },
+      "hidden": false,
+      "grammar": "latex"
     },
     "PHP": {
       "extension": "php",
