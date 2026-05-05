@@ -11,7 +11,10 @@ return {
     else
       ya.emit("open", {})
       if os.getenv("YAZI_FLOAT") == "1" then
-        ya.emit("quit", {})
+        ya.async(function()
+          ya.sleep(0.1)
+          ya.emit("quit", {})
+        end)()
       end
     end
   end,
