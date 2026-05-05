@@ -13,7 +13,7 @@
     preview_label_style: (fg: "yellow"),
     preview_metadata_group_style: (fg: "yellow", modifiers: "Bold"),
     highlighted_item_style: (fg: "#FFA726", modifiers: "Bold"),
-    current_item_style: (fg: "black", bg: "blue", modifiers: "Bold"),
+    current_item_style: (fg: "black", bg: "blue"),
     borders_style: (fg: "#D0A7AF"),
     highlight_border_style: (fg: "#D0A7AF"),
     symbols: (
@@ -47,8 +47,8 @@
         thumb_style: (fg: "#D0A7AF"),
     ),
     tab_bar: (
-        active_style: (fg: "black", bg: "blue", modifiers: "Bold"),
-        inactive_style: (),
+        active_style: (fg: "black", bg: "blue"),
+        inactive_style: (fg: "#D0A7AF"),
     ),
     lyrics: (
         timestamp: false
@@ -84,7 +84,7 @@
                 default: (kind: Text("Unknown"))
             ),
             label_prop: (kind: Text("Title"), style: (fg: "#D0A7AF")),
-            width: "35%",
+            width: "40%",
         ),
         (
             prop: (kind: Property(Artist), style: (fg: "#FFFFFF"),
@@ -99,14 +99,14 @@
                 default: (kind: Text("Unknown Album"), style: (fg: "#FFFFFF"))
             ),
             label_prop: (kind: Text("Album"), style: (fg: "#D0A7AF")),
-            width: "30%",
+            width: "35%",
         ),
         (
             prop: (kind: Property(Duration), style: (fg: "#FFFFFF"),
                 default: (kind: Text("-"), style: (fg: "#FFFFFF"))
             ),
-            label_prop: (kind: Text("Length"), style: (fg: "#D0A7AF")),
-            width: "15%",
+            label_prop: (kind: Text("Time"), style: (fg: "#D0A7AF")),
+            width: "5%",
             alignment: Right,
         ),
     ],
@@ -114,7 +114,9 @@
         direction: Vertical,
         panes: [
             (
-                size: "1",
+                size: "3",
+                borders: "ALL",
+                border_symbols: Double,
                 pane: Pane(Tabs),
             ),
             (
@@ -124,7 +126,7 @@
             (
                 size: "3",
                 borders: "ALL",
-                border_symbols: Thick,
+                border_symbols: Double,
                 border_title: [
                     (kind: Text(" ")),
                     (kind: Property(Status(Elapsed)), style: (fg: "#FFA726")),

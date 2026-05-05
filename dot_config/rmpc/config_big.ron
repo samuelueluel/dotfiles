@@ -159,7 +159,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -195,7 +195,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Split(
@@ -267,7 +267,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -303,7 +303,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Artists)
@@ -317,7 +317,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -353,7 +353,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Albums)
@@ -367,7 +367,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -403,7 +403,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Browser(root_tag: "genre"))
@@ -417,7 +417,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -453,7 +453,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Browser(root_tag: "grouping"))
@@ -467,7 +467,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -503,7 +503,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Playlists)
