@@ -14,9 +14,19 @@ if [ -z "$INPUT" ]; then
 fi
 
 # Split "Artist - Album"
-# Using sed to be robust against " - " inside names (greedy match for the last " - ")
-ARTIST=$(echo "$INPUT" | sed 's/ - .*//')
-ALBUM=$(echo "$INPUT" | sed 's/.* - //')
+# Strip ANSI escapes if any
+INPUT_CLEAN=$(echo "$INPUT" | sed 's/\x1b\[[0-9;]*m//g')
+
+if [[ "$INPUT_CLEAN" == \[*\]\ * ]]; then
+    # New format: [Artist] Album
+    ARTIST=$(echo "$INPUT_CLEAN" | sed 's/^\[\([^]]*\)\].*/\1/')
+    ALBUM=$(echo "$INPUT_CLEAN" | sed 's/^\[[^]]*\] //')
+else
+    # Fallback to old format
+    # Using sed to be robust against " - " inside names (greedy match for the last " - ")
+    ARTIST=$(echo "$INPUT_CLEAN" | sed 's/ - .*//')
+    ALBUM=$(echo "$INPUT_CLEAN" | sed 's/.* - //')
+fi
 
 # Escape quotes for MPD
 ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')

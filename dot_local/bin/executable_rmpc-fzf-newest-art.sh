@@ -10,7 +10,7 @@ DATA=$(
     done | awk -F": " '
     /^file: / { 
         if (f_artist != "" && f_album != "" && f_time != "") {
-            key = f_artist " - " f_album
+            key = "\033[38;2;23;193;130m[" f_artist "]\033[0m " f_album
             if (f_time > latest[key]) latest[key] = f_time
         }
         f_artist=""; f_album=""; f_time=""
@@ -20,7 +20,7 @@ DATA=$(
     /^Last-Modified: / { f_time=$2 }
     END {
         if (f_artist != "" && f_album != "" && f_time != "") {
-            key = f_artist " - " f_album
+            key = "\033[38;2;23;193;130m[" f_artist "]\033[0m " f_album
             if (f_time > latest[key]) latest[key] = f_time
         }
         for (k in latest) print latest[k] "\t" k
@@ -28,7 +28,7 @@ DATA=$(
 )
 
 # 2. Multi-select fuzzy search
-SELECTED_LINES=$(echo "$DATA" | fzf -m --reverse --no-sort --border=none --no-scrollbar --no-separator \
+SELECTED_LINES=$(echo "$DATA" | fzf -m --ansi --reverse --no-sort --border=none --no-scrollbar --no-separator \
     --header="Recently Added Albums (Tab: Select | Enter: Add)" \
     --prompt="Fuzzy Search > " \
     --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {}' \
@@ -40,8 +40,10 @@ if [ -n "$SELECTED_LINES" ]; then
     while IFS= read -r SELECTED; do
         [ -z "$SELECTED" ] && continue
         
-        ARTIST=$(echo "$SELECTED" | sed 's/ - .*//')
-        ALBUM=$(echo "$SELECTED" | sed 's/.* - //')
+        # Strip ANSI codes
+        SELECTED_CLEAN=$(echo "$SELECTED" | sed 's/\x1b\[[0-9;]*m//g')
+        ARTIST=$(echo "$SELECTED_CLEAN" | sed 's/^\[\([^]]*\)\].*/\1/')
+        ALBUM=$(echo "$SELECTED_CLEAN" | sed 's/^\[[^]]*\] //')
 
         ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')
         ESCAPED_ALBUM=$(echo "$ALBUM" | sed 's/"/\\"/g')

@@ -4,12 +4,12 @@
 # 1. Get pairs
 PAIRS=$(echo "list album group artist" | nc -N 127.0.0.1 6600 | awk -F': ' '
     /^Artist: / { artist=substr($0, index($0,$2)) }
-    /^Album: / { album=substr($0, index($0,$2)); if (artist != "" && album != "") print artist " - " album }
+    /^Album: / { album=substr($0, index($0,$2)); if (artist != "" && album != "") print "\033[38;2;23;193;130m[" artist "]\033[0m " album }
 ' | sort -u)
 
 # 2. Multi-select with fzf (-m flag)
 # Use Tab or Shift-Tab to select multiple items
-SELECTED_LINES=$(echo "$PAIRS" | fzf -m --reverse --border=none --no-scrollbar --no-separator \
+SELECTED_LINES=$(echo "$PAIRS" | fzf -m --ansi --reverse --border=none --no-scrollbar --no-separator \
     --header="Albums (Tab: Select | Enter: Add)" \
     --prompt="Fuzzy Search > " \
     --preview '/var/home/samuel/.local/bin/rmpc-preview-art.sh {}' \
@@ -23,8 +23,10 @@ if [ -n "$SELECTED_LINES" ]; then
     while IFS= read -r SELECTED; do
         [ -z "$SELECTED" ] && continue
         
-        ARTIST=$(echo "$SELECTED" | sed 's/ - .*//')
-        ALBUM=$(echo "$SELECTED" | sed 's/.* - //')
+        # Strip ANSI codes
+        SELECTED_CLEAN=$(echo "$SELECTED" | sed 's/\x1b\[[0-9;]*m//g')
+        ARTIST=$(echo "$SELECTED_CLEAN" | sed 's/^\[\([^]]*\)\].*/\1/')
+        ALBUM=$(echo "$SELECTED_CLEAN" | sed 's/^\[[^]]*\] //')
 
         ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')
         ESCAPED_ALBUM=$(echo "$ALBUM" | sed 's/"/\\"/g')
