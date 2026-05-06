@@ -87,8 +87,8 @@
             width: "40%",
         ),
         (
-            prop: (kind: Property(Artist), style: (fg: "#FFFFFF"),
-                default: (kind: Text("Unknown"), style: (fg: "#FFFFFF"))
+            prop: (kind: Property(Artist), style: (fg: "#17C182"),
+                default: (kind: Text("Unknown"), style: (fg: "#17C182"))
             ),
             label_prop: (kind: Text("Artist"), style: (fg: "#D0A7AF")),
             width: "20%",
