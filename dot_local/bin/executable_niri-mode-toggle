@@ -7,7 +7,7 @@
 
 CONFIG="$HOME/.config/niri/config.kdl"
 STATE_FILE="$HOME/.cache/niri-mode-toggle-wallpaper"
-DEFAULT_WALLPAPER="/var/home/samuel/Pictures/Wallpapers/joonyeop-baek-GK6qXiHm6Iw-unsplash.jpg"
+DEFAULT_WALLPAPER="$HOME/Pictures/Wallpapers/joonyeop-baek-GK6qXiHm6Iw-unsplash.jpg"
 
 if grep -qP '^\s*center-focused-column "never"' "$CONFIG"; then
     # Currently in focus mode → restore defaults
