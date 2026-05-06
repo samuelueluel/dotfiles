@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+# This script swaps permission/defaults between Helium and Zen-Utility browsers for different system resource scenarios
+set -euo pipefail
+
+ZEN="zen-utility.desktop"
+HELIUM="helium.desktop"
+
+current=$(xdg-settings get default-web-browser)
+
+if [[ "$current" == "$ZEN" ]]; then
+    new="$HELIUM"
+    name="Helium"
+else
+    new="$ZEN"
+    name="Zen Utility"
+fi
+
+xdg-settings set default-web-browser "$new"
+xdg-mime default "$new" x-scheme-handler/http
+xdg-mime default "$new" x-scheme-handler/https
+xdg-mime default "$new" text/html
+
+echo "Default browser → $name"
