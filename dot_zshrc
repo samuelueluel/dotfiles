@@ -143,8 +143,3 @@ function claude() {
         command claude "$@"
     fi
 }
-
-function gemini() {
-    command gemini "$@"
-    canberra-gtk-play -i message-new-email &>/dev/null &
-}

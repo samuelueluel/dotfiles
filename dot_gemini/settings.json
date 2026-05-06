@@ -21,9 +21,10 @@
         "matcher": "*",
         "hooks": [
           {
-            "name": "permission-sound",
+            "name": "prompt-sound",
             "type": "command",
-            "command": "pw-play /usr/share/sounds/freedesktop/stereo/message.oga > /dev/null 2>&1 && echo '{\"decision\": \"allow\"}'"
+            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message-new-instant.oga >/dev/null 2>&1 & echo '{}'",
+            "description": "Plays a sound when a notification or prompt occurs."
           }
         ]
       }
@@ -33,16 +34,19 @@
         "matcher": "*",
         "hooks": [
           {
-            "name": "turn-finished-sound",
+            "name": "turn-completion-sound",
             "type": "command",
-            "command": "echo \"Gemini Hook Ran\" >> /tmp/gemini_hook.log && pw-play /usr/share/sounds/freedesktop/stereo/complete.oga > /dev/null 2>&1 && echo '{\"decision\": \"allow\"}'"
+            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message-new-instant.oga >/dev/null 2>&1 & echo '{}'",
+            "description": "Plays a sound asynchronously after every turn completion."
           }
         ]
       }
     ]
-
   },
   "general": {
     "enableNotifications": true
+  },
+  "ui": {
+    "theme": "Default"
   }
 }
