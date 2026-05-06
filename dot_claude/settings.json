@@ -11,24 +11,14 @@
         ]
       }
     ],
-    "Notification": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pw-play /usr/share/sounds/freedesktop/stereo/message.oga > /dev/null 2>&1"
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"Claude Hook Ran\" >> /tmp/claude_hook.log && pw-play /usr/share/sounds/freedesktop/stereo/complete.oga > /dev/null 2>&1"
+            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/dialog-information.oga",
+            "async": true
           }
         ]
       }
