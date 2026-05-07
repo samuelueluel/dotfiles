@@ -282,7 +282,7 @@ exclude title="fsel-launcher"
 exclude title="Folder Launcher"
 exclude title="Keybind Search"
 exclude title="Clipboard History"
-exclude title="Alacritty Float"
+exclude title="Ghostty Float"
 exclude title="bluetuith"
 exclude title="nmtui"
 exclude title="btm"
@@ -359,7 +359,7 @@ window-rule {
 }
 
 window-rule {
-    match title="Alacritty Float"
+    match title="Ghostty Float"
     open-floating true
     default-column-width { fixed 700; }
     default-window-height { fixed 400; }
@@ -433,7 +433,7 @@ window-rule { // transparency set in app-specific config to prevent text from di
     match app-id="alacritty-custom"
     match app-id="com.mitchellh.ghostty"
     match app-id="kitty"
-    match title="Alacritty Float"
+    match title="Ghostty Float"
     match title="fsel-launcher"
     match title="Keybind Search"
     match title="Clipboard History"
@@ -550,8 +550,8 @@ binds {
     // APPLICATION LAUNCHERS
     // -----------------------------------
 
-    Mod+Grave hotkey-overlay-title="Spawn additional Alacritty"  repeat=false { spawn "alacritty"; }
-    Mod+Ctrl+Grave hotkey-overlay-title="Spawn floating Alacritty" repeat=false { spawn "alacritty" "--title" "Alacritty Float"; }
+    Mod+Grave hotkey-overlay-title="Spawn Ghostty"  repeat=false { spawn "ghostty"; }
+    Mod+Ctrl+Grave hotkey-overlay-title="Spawn floating Ghostty" repeat=false { spawn "ghostty" "--title=Ghostty Float"; }
     Mod+E hotkey-overlay-title="Spawn floating Yazi (auto-close on open)" repeat=false { spawn "env" "YAZI_FLOAT=1" "kitty" "--title" "Yazi Float" "-e" "zsh" "-c" "exec yazi"; }
     Mod+Ctrl+E hotkey-overlay-title="Spawn Yazi file manager" repeat=false { spawn "kitty" "--title" "yazi" "-e" "zsh" "-c" "exec yazi"; }
     // Mod+Space hotkey-overlay-title="fzf file search (Ctrl+Y to copy)" repeat=false { spawn-sh "alacritty -t 'File Launcher' -e $HOME/.config/niri/open-file.sh"; }

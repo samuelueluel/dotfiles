@@ -17,9 +17,8 @@ RESULT=$(niri msg -j windows | jq --argjson ws "$ACTIVE_WS" --arg accent "$ACCEN
         (if $id == "VivaldiLLM" then "󰗚"
          elif $id == "VivaldiCasual" then "󰈹"
          elif $id == "VivaldiWork" then "󰖟"
-         elif $id == "alacritty-custom" then ""
          elif $id == "io.github.quodlibet.QuodLibet" then ""
-         elif ($id | test("alacritty")) then ""
+         elif ($id | test("ghostty")) then ""
          elif ($id | test("vivaldi")) then "󰈹"
          else "" end) as $icon |
         if .is_focused then "<span color=\"" + $accent + "\" size=\"large\">" + $icon + "</span>"

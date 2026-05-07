@@ -1,0 +1,110 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+format = """
+[](color_orange)\
+$os\
+$username\
+[](bg:color_yellow fg:color_orange)\
+$directory\
+[](fg:color_yellow bg:color_aqua)\
+$git_branch\
+$git_status\
+[](fg:color_aqua bg:color_bg3)\
+$container\
+[](fg:color_bg3 bg:color_bg1)\
+$time\
+[ ](fg:color_bg1)\
+$line_break$character"""
+
+palette = 'noctalia'
+
+[palettes.noctalia]
+color_fg0   = '#FFFFFF'
+color_black = '#000000'
+color_bg1   = '#D0A7AF'
+color_bg3   = '#9E9080'
+color_blue  = '#00B6C2'
+color_aqua  = '#914059'
+color_green = '#17C182'
+color_orange = '#FFA726'
+color_purple = '#FF6EB4'
+color_red   = '#FF6EB4'
+color_yellow = '#40BFB0'
+
+[os]
+disabled = false
+style = "bg:color_orange fg:color_black"
+
+[os.symbols]
+Windows = "󰍲"
+Ubuntu = "󰕈"
+SUSE = ""
+Raspbian = "󰐿"
+Mint = "󰣭"
+Macos = "󰀵"
+Manjaro = ""
+Linux = "󰌽"
+Gentoo = "󰣨"
+Fedora = "󰣛"
+Alpine = ""
+Amazon = ""
+Android = ""
+AOSC = ""
+Arch = "󰣇"
+Artix = "󰣇"
+EndeavourOS = ""
+CentOS = ""
+Debian = "󰣚"
+Redhat = "󱄛"
+RedHatEnterprise = "󱄛"
+Pop = ""
+
+[username]
+show_always = true
+style_user = "bg:color_orange fg:color_black"
+style_root = "bg:color_orange fg:color_black"
+format = '[ $user ]($style)'
+
+[directory]
+style = "fg:color_black bg:color_yellow"
+format = "[ $path ]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[directory.substitutions]
+"Documents" = "󰈙 "
+"Downloads" = " "
+"Music" = "󰝚 "
+"Pictures" = " "
+"Developer" = "󰲋 "
+
+[git_branch]
+symbol = ""
+style = "bg:color_aqua"
+format = '[[  $branch ](fg:color_fg0 bg:color_aqua)]($style)'
+
+[git_status]
+style = "bg:color_aqua"
+format = '[[($all_status$ahead_behind )](fg:color_fg0 bg:color_aqua)]($style)'
+
+[container]
+style = "bg:color_bg3"
+format = '[[ $symbol $name ](fg:color_fg0 bg:color_bg3)]($style)'
+
+[time]
+disabled = false
+time_format = "%R"
+style = "bg:color_bg1 fg:color_black"
+format = '[[  $time ](fg:color_black bg:color_bg1)]($style)'
+
+[line_break]
+disabled = false
+
+[character]
+disabled = false
+success_symbol = '[](bold fg:color_green)'
+error_symbol = '[](bold fg:color_red)'
+vimcmd_symbol = '[](bold fg:color_green)'
+vimcmd_replace_one_symbol = '[](bold fg:color_purple)'
+vimcmd_replace_symbol = '[](bold fg:color_purple)'
+vimcmd_visual_symbol = '[](bold fg:color_yellow)'

@@ -15,5 +15,5 @@ sleep 2
 # Launch rmpc
 kitty --class rmpc --title rmpc -e rmpc &
 
-# Launch Alacritty
-alacritty &
+# Launch Ghostty
+ghostty &

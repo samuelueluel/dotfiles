@@ -60,7 +60,7 @@
   "clock": {
     "format": "{:%a %b %e  %I:%M %p}",
     "tooltip": false,
-    "on-click": "alacritty --title ikhal -e /home/linuxbrew/.linuxbrew/bin/ikhal",
+    "on-click": "ghostty --title=ikhal -e /home/linuxbrew/.linuxbrew/bin/ikhal",
     "on-click-right": "sh -c 'if pgrep -x wlsunset > /dev/null; then pkill wlsunset; else pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 & fi'"
   },
 
@@ -79,7 +79,7 @@
       "default": ["󰕿", "󰖀", "󰕾"]
     },
     "on-click": "kitty --config ~/.config/kitty/launcher.conf --class kitty-launcher --title wiremix wiremix",
-    "on-click-right": "alacritty --title bluetuith -e bluetuith",
+    "on-click-right": "ghostty --title=bluetuith -e bluetuith",
     "on-scroll-up": "swayosd-client --output-volume raise",
     "on-scroll-down": "swayosd-client --output-volume lower"
   },
@@ -137,7 +137,7 @@
       "critical": 90
     },
     "tooltip": true,
-    "on-click": "alacritty -e systemd-manager-tui"
+    "on-click": "ghostty -e systemd-manager-tui"
   },
 
   "network": {
@@ -155,6 +155,6 @@
     "critical-threshold": 75,
     "format": "󰈸  {temperatureC}°C",
     "tooltip": false,
-    "on-click": "alacritty --title btm -e btm --basic"
+    "on-click": "ghostty --title=btm -e btm --basic"
   }
 }
