@@ -16,8 +16,9 @@ T_STEP=$(cfg swww_transition_step); T_STEP="${T_STEP:-90}"
 T_DUR=$(cfg swww_transition_duration); T_DUR="${T_DUR:-2}"
 T_FPS=$(cfg swww_transition_fps); T_FPS="${T_FPS:-30}"
 
-# swww-daemon is spawned by Niri, not systemd — wait for it
-for i in $(seq 1 20); do
+# Ensure swww-daemon is running; start it if not
+swww query &>/dev/null || swww-daemon --daemon
+for i in $(seq 1 40); do
     swww query &>/dev/null && break
     sleep 0.5
 done
