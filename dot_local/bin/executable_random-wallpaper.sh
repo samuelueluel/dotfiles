@@ -22,6 +22,8 @@ for i in $(seq 1 40); do
     swww query &>/dev/null && break
     sleep 0.5
 done
+# Give the daemon a moment to finish initializing after the socket is ready
+sleep 1
 
 wallpaper=$(find "$WALLPAPER_DIR" -maxdepth 1 -type f \
     \( -name "*.jpg" -o -name "*.jpeg" -o -name "*.png" \
@@ -30,8 +32,12 @@ wallpaper=$(find "$WALLPAPER_DIR" -maxdepth 1 -type f \
 
 [[ -z "$wallpaper" ]] && { echo "No wallpapers found in $WALLPAPER_DIR" >&2; exit 1; }
 
-swww img "$wallpaper" \
-    --transition-type "$T_TYPE" \
-    --transition-step "$T_STEP" \
-    --transition-duration "$T_DUR" \
-    --transition-fps "$T_FPS"
+# Retry swww img in case the daemon isn't fully ready yet
+for i in $(seq 1 5); do
+    swww img "$wallpaper" \
+        --transition-type "$T_TYPE" \
+        --transition-step "$T_STEP" \
+        --transition-duration "$T_DUR" \
+        --transition-fps "$T_FPS" && break
+    sleep 1
+done
