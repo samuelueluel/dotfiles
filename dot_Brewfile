@@ -14,7 +14,7 @@ brew "fd"          # find replacement
 brew "gh"          # GitHub CLI
 brew "git-delta"   # syntax-highlighted git diff pager
 brew "glances"     # system monitor
-brew "htop"        # interactive process viewer
+brew "bottom"      # htop alternative with graphs; command: btm
 brew "glow"        # Markdown renderer for the terminal
 brew "lazygit"     # TUI for git
 brew "chafa"        # terminal image renderer with Sixel/Kitty support

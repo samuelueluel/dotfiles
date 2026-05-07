@@ -155,6 +155,6 @@
     "critical-threshold": 75,
     "format": "󰈸  {temperatureC}°C",
     "tooltip": false,
-    "on-click": "alacritty --title htop -e htop"
+    "on-click": "alacritty --title btm -e btm --basic"
   }
 }
