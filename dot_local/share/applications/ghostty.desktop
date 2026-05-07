@@ -1,0 +1,19 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ghostty
+GenericName=Terminal
+Comment=A fast, native terminal emulator
+TryExec=ghostty
+Exec=ghostty
+Icon=com.mitchellh.ghostty
+Categories=System;TerminalEmulator;
+Keywords=terminal;tty;pty;
+Terminal=false
+StartupNotify=true
+StartupWMClass=com.mitchellh.ghostty
+Actions=New;
+
+[Desktop Action New]
+Name=New Terminal
+Exec=ghostty
