@@ -47,7 +47,7 @@
   "git_panel": {
     "dock": "left"
   },
-  "buffer_font_weight": 700.0,
+  "buffer_font_weight": 600.0,
   "project_panel": {
     "dock": "left",
     "button": true

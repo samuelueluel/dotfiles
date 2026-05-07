@@ -87,17 +87,17 @@
         "terminal.ansi.white": "#D0A7AF",
 
         "syntax": {
-          "attribute": { "color": "#17C182", "font_weight": 700 },
-          "boolean": { "color": "#FFA726", "font_weight": 700 },
-          "comment": { "color": "#ABABAB", "font_style": "italic", "font_weight": 700 },
-          "constant": { "color": "#FFA726", "font_weight": 700 },
-          "function": { "color": "#00B6C2", "font_weight": 700 },
-          "keyword": { "color": "#FF6EB4", "font_weight": 700 },
-          "number": { "color": "#FFA726", "font_weight": 700 },
-          "operator": { "color": "#00B6C2", "font_weight": 700 },
-          "string": { "color": "#17C182", "font_weight": 700 },
-          "type": { "color": "#D0A7AF", "font_weight": 700 },
-          "variable": { "color": "#FFFFFF", "font_weight": 700 }
+          "attribute": { "color": "#17C182", "font_weight": 600 },
+          "boolean": { "color": "#FFA726", "font_weight": 600 },
+          "comment": { "color": "#ABABAB", "font_style": "italic", "font_weight": 600 },
+          "constant": { "color": "#FFA726", "font_weight": 600 },
+          "function": { "color": "#00B6C2", "font_weight": 600 },
+          "keyword": { "color": "#FF6EB4", "font_weight": 600 },
+          "number": { "color": "#FFA726", "font_weight": 600 },
+          "operator": { "color": "#00B6C2", "font_weight": 600 },
+          "string": { "color": "#17C182", "font_weight": 600 },
+          "type": { "color": "#D0A7AF", "font_weight": 600 },
+          "variable": { "color": "#FFFFFF", "font_weight": 600 }
         }
       }
     }
