@@ -1,5 +1,17 @@
 {
   "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message.oga",
+            "async": true
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -24,6 +36,6 @@
       }
     ]
   },
-  "effortLevel": "medium",
+  "effortLevel": "low",
   "theme": "custom:blur-theme"
 }

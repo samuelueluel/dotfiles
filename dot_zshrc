@@ -61,7 +61,7 @@ compinit -u
 
 # Plugins (order matters: highlighting should be last)
 [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-source ~/.local/share/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh
+source /home/linuxbrew/.linuxbrew/opt/fzf-tab/share/fzf-tab/fzf-tab.zsh
 [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # Recommended options
