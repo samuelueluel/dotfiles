@@ -32,9 +32,14 @@ command -v eza >/dev/null && alias ls='eza --group-directories-first --icons'
 command -v eza >/dev/null && alias ll='eza -lah --group-directories-first --icons'
 command -v bat >/dev/null && alias cat='bat'
 
+# Cache dir for init scripts
+ZSH_CACHE="$HOME/.cache/zsh"
+[[ -d "$ZSH_CACHE" ]] || mkdir -p "$ZSH_CACHE"
+
 # zoxide: smart cd
 if command -v zoxide >/dev/null; then
-  eval "$(zoxide init zsh)"
+  [[ -f "$ZSH_CACHE/zoxide.zsh" ]] || zoxide init zsh > "$ZSH_CACHE/zoxide.zsh"
+  source "$ZSH_CACHE/zoxide.zsh"
 fi
 
 # atuin: shell history
@@ -44,7 +49,8 @@ if command -v atuin >/dev/null; then
   else
     export ATUIN_DATA_DIR="$HOME/.local/share/atuin-samuel-bluefin"
   fi
-  eval "$(atuin init zsh)"
+  [[ -f "$ZSH_CACHE/atuin.zsh" ]] || atuin init zsh > "$ZSH_CACHE/atuin.zsh"
+  source "$ZSH_CACHE/atuin.zsh"
 fi
 
 # fzf keybindings/completion
@@ -55,9 +61,13 @@ done
 # SSH agent via systemd socket (enable with: sjust ssh-setup)
 [[ -S "$XDG_RUNTIME_DIR/ssh-agent.socket" ]] && export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
 
-# Completion
+# Completion (optimized)
 autoload -Uz compinit
-compinit -u
+if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.m-1) ]]; then
+  compinit -C -u
+else
+  compinit -u
+fi
 
 # Plugins (order matters: highlighting should be last)
 [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
@@ -70,7 +80,10 @@ setopt NOMATCH
 setopt EXTENDED_GLOB
 
 # Starship prompt
-command -v starship >/dev/null && eval "$(starship init zsh)"
+if command -v starship >/dev/null; then
+  [[ -f "$ZSH_CACHE/starship.zsh" ]] || starship init zsh > "$ZSH_CACHE/starship.zsh"
+  source "$ZSH_CACHE/starship.zsh"
+fi
 
 # Ghostty shell integration (fallback if auto-injection didn't run)
 if [[ "$TERM_PROGRAM" == "ghostty" ]]; then
