@@ -2,7 +2,7 @@
 Name=Bluetooth Adapters
 Comment=Set Bluetooth Adapter Properties
 Exec=blueman-adapters
-Icon=blueman
+Icon=/usr/share/icons/Papirus/48x48/apps/blueman.svg
 Terminal=false
 Type=Application
 Categories=Settings;HardwareSettings;GTK;

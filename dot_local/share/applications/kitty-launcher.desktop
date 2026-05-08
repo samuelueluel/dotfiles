@@ -6,5 +6,5 @@ NoDisplay=true
 TryExec=kitty
 StartupWMClass=kitty-launcher
 Exec=kitty --class kitty-launcher
-Icon=accessories-notes
+Icon=/usr/share/icons/Papirus/48x48/apps/accessories-notes.svg
 Categories=System;

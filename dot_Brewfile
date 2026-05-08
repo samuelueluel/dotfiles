@@ -15,6 +15,7 @@ brew "gh"          # GitHub CLI
 brew "git-delta"   # syntax-highlighted git diff pager
 brew "glances"     # system monitor
 brew "bottom"      # htop alternative with graphs; command: btm
+brew "cava"        # console-based audio visualizer
 brew "glow"        # Markdown renderer for the terminal
 brew "lazygit"     # TUI for git
 brew "chafa"        # terminal image renderer with Sixel/Kitty support

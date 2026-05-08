@@ -2,7 +2,7 @@
 Name=Start-up Apps
 Comment=Launch Zen Personal, Zen Utility, rmpc, and Ghostty
 Exec=bash -c '$HOME/.local/bin/launch_apps.sh'
-Icon=utilities-terminal
+Icon=/usr/share/icons/Papirus/48x48/apps/utilities-terminal.svg
 Terminal=false
 Type=Application
 Categories=Utility;

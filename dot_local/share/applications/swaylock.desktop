@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=swaylock
 Exec=swaylock
-Icon=system-lock-screen
+Icon=/usr/share/icons/Papirus/32x32/apps/system-lock-screen.svg
 Type=Application
 Categories=System;
 Terminal=false
