@@ -25,7 +25,8 @@
     "exec": "echo '{\"text\": \"●\", \"class\": \"recording\"}'",
     "exec-if": "pgrep wf-recorder",
     "return-type": "json",
-    "tooltip": false
+    "tooltip": false,
+    "cursor": false
   },
 
   // ── Left ──────────────────────────────────────────────────────────────────
@@ -34,7 +35,8 @@
     "all-outputs": false,
     "format": "{index}",
     "on-scroll-up": "niri msg action focus-workspace-up",
-    "on-scroll-down": "niri msg action focus-workspace-down"
+    "on-scroll-down": "niri msg action focus-workspace-down",
+    "cursor": false
   },
 
   "cffi/niri_window_buttons": {
@@ -52,7 +54,8 @@
     "button_alignment": "center",
     "only_current_workspace": true,
     "on-click": "activate",
-    "on-click-right": "close"
+    "on-click-right": "close",
+    "cursor": false
   },
 
   // ── Center ────────────────────────────────────────────────────────────────
@@ -61,7 +64,8 @@
     "format": "{:%a %b %e  %I:%M %p}",
     "tooltip": false,
     "on-click": "ghostty --title=ikhal -e /home/linuxbrew/.linuxbrew/bin/ikhal",
-    "on-click-right": "sh -c 'if pgrep -x wlsunset > /dev/null; then pkill wlsunset; else pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 & fi'"
+    "on-click-right": "sh -c 'if pgrep -x wlsunset > /dev/null; then pkill wlsunset; else pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 & fi'",
+    "cursor": false
   },
 
   // ── Right ─────────────────────────────────────────────────────────────────
@@ -81,7 +85,8 @@
     "on-click": "kitty --config ~/.config/kitty/launcher.conf --class kitty-launcher --title wiremix wiremix",
     "on-click-right": "ghostty --title=bluetuith -e bluetuith",
     "on-scroll-up": "swayosd-client --output-volume raise",
-    "on-scroll-down": "swayosd-client --output-volume lower"
+    "on-scroll-down": "swayosd-client --output-volume lower",
+    "cursor": false
   },
 
   "battery": {
@@ -93,13 +98,15 @@
     "format-charging": "{capacity}%",
     "format-plugged": "{capacity}%",
     "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
-    "on-click": "sh -c 'current=$(powerprofilesctl get); case $current in performance) powerprofilesctl set balanced;; balanced) powerprofilesctl set power-saver;; *) powerprofilesctl set performance;; esac'"
+    "on-click": "sh -c 'current=$(powerprofilesctl get); case $current in performance) powerprofilesctl set balanced;; balanced) powerprofilesctl set power-saver;; *) powerprofilesctl set performance;; esac'",
+    "cursor": false
   },
 
   "power-profiles-daemon": {
     "format": "{icon}",
     "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
     "tooltip": true,
+    "cursor": false,
     "format-icons": {
       "default": "",
       "performance": "",
@@ -127,6 +134,7 @@
     "on-click": "swaync-client -t -sw",
     "on-click-right": "swaync-client -d -sw",
     "escape": true,
+    "cursor": false,
   },
 
   "memory": {
@@ -137,7 +145,8 @@
       "critical": 90
     },
     "tooltip": true,
-    "on-click": "ghostty -e systemd-manager-tui"
+    "on-click": "ghostty -e systemd-manager-tui",
+    "cursor": false
   },
 
   "network": {
@@ -148,13 +157,15 @@
     "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
     "tooltip-format-ethernet": "{ifname}\n{ipaddr}",
     "tooltip-format-disconnected": "Disconnected",
-    "on-click": "kitty --config ~/.config/kitty/kitty.conf --config ~/.config/kitty/tui-nav.conf --title nmtui -- nmtui"
+    "on-click": "kitty --config ~/.config/kitty/kitty.conf --config ~/.config/kitty/tui-nav.conf --title nmtui -- nmtui",
+    "cursor": false
   },
 
   "temperature": {
     "critical-threshold": 75,
     "format": "󰈸  {temperatureC}°C",
     "tooltip": false,
-    "on-click": "ghostty --title=btm -e btm --basic"
+    "on-click": "ghostty --title=btm -e btm --basic",
+    "cursor": false
   }
 }
