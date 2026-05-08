@@ -25,7 +25,7 @@
 
 # The number of bars (0-512). 0 sets it to auto (fill up console).
 # Bars' width and space between bars in number of characters.
-bars = 31
+bars = 0
 bar_width = 1
 ; bar_spacing = 1
 # bar_height is only used for output in "noritake" format
@@ -215,7 +215,7 @@ mono_option = average
 # set label on bars on the x-axis. Can be 'frequency' or 'none'. Default: 'none'
 # 'frequency' displays the lower cut off frequency of the bar above.
 # Only supported on ncurses and noncurses output.
-xaxis = frequency
+; xaxis = frequency
 
 # enable synchronized sync. 1 = on, 0 = off
 # removes flickering in alacritty terminal emulator.
