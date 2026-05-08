@@ -53,6 +53,18 @@
     lyrics: (
         timestamp: false
     ),
+    cava: (
+        bar_color: Gradient({
+            0: "#FFA726",
+            14: "#E8A76A",
+            28: "#D0A7AF",
+            42: "#E78AA1",
+            57: "#FF6EB4",
+            71: "#7FC2BC",
+            85: "#3EBCC0",
+            100: "#00B6C2",
+        }),
+    ),
     browser_song_format: [
         (
             kind: Group([
