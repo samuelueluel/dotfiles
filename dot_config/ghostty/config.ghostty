@@ -57,5 +57,5 @@ keybind = alt+a=text:\x1bb
 keybind = alt+d=text:\x1bf
 keybind = ctrl+q=text:\x1b\x7f
 keybind = ctrl+w=text:\x7f
-keybind = alt+q=text:\x02
-keybind = alt+e=text:\x06
+keybind = alt+q=text:\x01
+keybind = alt+e=text:\x05
