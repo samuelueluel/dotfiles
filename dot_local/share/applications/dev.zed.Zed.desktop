@@ -8,7 +8,7 @@ Comment=A high-performance, multiplayer code editor.
 TryExec=zed
 StartupNotify=true
 Exec=zed --new %U
-Icon=ghostwriter
+Icon=/usr/share/icons/Papirus/48x48/apps/ghostwriter.svg
 Categories=Utility;TextEditor;Development;IDE;
 Keywords=zed;
 # To add Zed to "Open Folder With..." context menu, add `inode/directory` to the MimeType field (semicolon separated)
