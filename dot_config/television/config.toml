@@ -149,6 +149,7 @@ ctrl-alt-down = "select_next_history"
 tab = "toggle_selection_down"
 backtab = "toggle_selection_up"
 enter = "confirm_selection"
+alt-space = "confirm_selection"
 
 # Preview panel control
 # --------------------
