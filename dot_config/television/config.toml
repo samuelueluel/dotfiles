@@ -16,7 +16,7 @@
 # General settings
 # ----------------------------------------------------------------------------
 tick_rate = 50
-default_channel = "files"
+default_channel = "Files"
 # Shell settings
 # --------------
 # Default shell used for executing commands (source, preview, actions).
@@ -63,7 +63,7 @@ position = "top"
 # The input prompt string (defaults to ">" if not specified)
 prompt = ">"
 # header = "{}"
-# padding = {"left": 0, "right": 0, "top": 0, "bottom": 0}
+# padding = { left = 0, right = 0, top = 0, bottom = 0 }
 border_type = "thick" # https://docs.rs/ratatui/latest/ratatui/widgets/block/enum.BorderType.html#variants
 
 [ui.status_bar]
@@ -77,7 +77,7 @@ hidden = false
 
 [ui.results_panel]
 border_type = "thick"
-# padding = {"left": 0, "right": 0, "top": 0, "bottom": 0}
+# padding = { left = 0, right = 0, top = 0, bottom = 0 }
 
 [ui.preview_panel]
 # Preview panel size (percentage of screen width/height)
@@ -86,7 +86,7 @@ size = 50
 #footer = ""
 scrollbar = true
 border_type = "thick"
-# padding = {"left": 0, "right": 0, "top": 0, "bottom": 0}
+# padding = { left = 0, right = 0, top = 0, bottom = 0 }
 hidden = false
 
 [ui.help_panel]

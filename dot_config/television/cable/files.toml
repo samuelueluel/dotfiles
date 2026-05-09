@@ -5,6 +5,9 @@ description = "Browse and open files"
 [source]
 command = "fd -H -t f --strip-cwd-prefix"
 
+[ui]
+orientation = "portrait"
+
 [preview]
 command = "bat --color=always --style=plain '{}'"
 

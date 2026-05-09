@@ -3,8 +3,14 @@ name = "Television Hub"
 description = "Main Television Hub"
 
 [source]
-command = "/var/home/samuel/.local/bin/tv-hub-menu.sh"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-hub-menu.sh"
 display = "{split:\t:0}"
+
+[ui]
+ui_scale = 60
+
+[ui.preview_panel]
+hidden = true
 
 [preview]
 command = "echo 'Action: {}'"
@@ -15,5 +21,5 @@ alt-space = "actions:hub-enter"
 
 [actions.hub-enter]
 description = "Execute selected hub workflow"
-command = "/var/home/samuel/.local/bin/tv-hub-action.sh '{split:\t:1}'"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-hub-action.sh '{split:\t:1}'"
 mode = "execute"

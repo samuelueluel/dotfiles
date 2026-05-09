@@ -1,9 +1,9 @@
 [metadata]
-name = "Ripgrep"
-description = "Search file content with Ripgrep"
+name = "Ideas (Obsidian)"
+description = "Search Obsidian vault content"
 
 [source]
-command = "echo '󰩉 Start Ripgrep Search...'"
+command = "echo '󱞒 Start Obsidian Ideas Search...'"
 
 [preview]
 command = "echo 'This will prompt for a search query in your terminal.'"
@@ -14,5 +14,5 @@ alt-space = "actions:launch"
 
 [actions.launch]
 description = "Start interactive search"
-command = "/var/home/samuel/.local/bin/tv-yazi-content.sh"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-obsidian-content.sh"
 mode = "execute"
