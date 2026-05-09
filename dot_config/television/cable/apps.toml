@@ -2,6 +2,12 @@
 name = "Apps"
 description = "Application Launcher"
 
+[ui]
+ui_scale = 80
+
+[ui.preview_panel]
+hidden = true
+
 [source]
 command = "/var/home/samuel/.local/bin/tv-list-apps.py"
 display = "{split:;:0}"
@@ -11,6 +17,7 @@ command = "echo 'Launch: {}'"
 
 [keybindings]
 enter = "actions:app-launch"
+alt-space = "actions:app-launch"
 
 [actions.app-launch]
 description = "Launch application"

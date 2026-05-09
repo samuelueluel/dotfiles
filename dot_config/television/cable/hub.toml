@@ -11,6 +11,7 @@ command = "echo 'Action: {}'"
 
 [keybindings]
 enter = "actions:hub-enter"
+alt-space = "actions:hub-enter"
 
 [actions.hub-enter]
 description = "Execute selected hub workflow"

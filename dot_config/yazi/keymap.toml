@@ -51,6 +51,7 @@ prepend_keymap = [
 	{ on = "<A-a>", run = "leave", desc = "Go to parent directory" },
 	{ on = "<A-d>", run = "enter", desc = "Enter directory / open file" },
 	{ on = "<Enter>", run = "plugin float-open", desc = "Enter directory / open file (auto-close in float mode)" },
+	{ on = "<A-Space>", run = "plugin float-open", desc = "Enter directory / open file (auto-close in float mode)" },
 	{ on = "<A-o>", run = "tasks:show", desc = "Open task manager" },
 	{ on = "w", run = "noop" },
 	{ on = "o", run = "noop" },

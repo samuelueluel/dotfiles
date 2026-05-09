@@ -10,6 +10,7 @@ command = "echo 'This will prompt for a search query in your terminal.'"
 
 [keybindings]
 enter = "actions:launch"
+alt-space = "actions:launch"
 
 [actions.launch]
 description = "Start interactive search"

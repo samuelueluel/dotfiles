@@ -2,6 +2,9 @@
 name = "Clipboard"
 description = "Clipboard History"
 
+[ui]
+orientation = "portrait"
+
 [source]
 command = "cclip list"
 display = "{split:\t:2}"
@@ -11,6 +14,7 @@ command = "cclip get '{split:\t:0}'"
 
 [keybindings]
 enter = "actions:copy"
+alt-space = "actions:copy"
 
 [actions.copy]
 description = "Copy to clipboard"

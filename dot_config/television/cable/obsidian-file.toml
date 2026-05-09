@@ -11,6 +11,7 @@ command = "bat --color=always --style=plain \"/var/home/samuel/Dropbox/Sam_Perso
 
 [keybindings]
 enter = "actions:obsidian-open"
+alt-space = "actions:obsidian-open"
 
 [actions.obsidian-open]
 description = "Open in Obsidian (New Tab)"

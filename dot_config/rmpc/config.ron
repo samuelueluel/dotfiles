@@ -96,6 +96,7 @@
         navigation: {
             "<Esc>":      Close,
             "<CR>":       Confirm,
+            "<A-Space>":  Confirm,
             "<Up>":       Up,
             "<A-w>":      Up,
             "<Down>":     Down,
@@ -143,6 +144,7 @@
             "<C-q>":      Delete,
             "<C-Q>":      DeleteAll,
             "<CR>":       Play,
+            "<A-Space>":  Play,
             "C":          JumpToCurrent,
             "<A-z>":      JumpToCurrent,
         },

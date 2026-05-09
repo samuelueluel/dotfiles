@@ -270,35 +270,6 @@ window-rule {
 // --- Workspace Assignments ---
 
 window-rule {
-match {} // Matches everything except exlcuded below
-exclude app-id="zen-personal"
-exclude app-id="io.github.quodlibet.QuodLibet"
-exclude app-id="rmpc"
-exclude app-id="zen-work"
-exclude app-id="kitty"
-exclude title="termfilechooser"
-exclude title="File Launcher"
-exclude title="fsel-launcher"
-exclude title="Folder Launcher"
-exclude title="Keybind Search"
-exclude title="Clipboard History"
-exclude title="Ghostty Float"
-exclude title="bluetuith"
-exclude title="nmtui"
-exclude title="btm"
-exclude title="ikhal"
-exclude app-id="org.gnome.SystemMonitor"
-exclude app-id="nemo"
-exclude app-id="nm-connection-editor"
-exclude app-id="blueman-manager"
-exclude app-id="com.github.wwmm.easyeffects"
-exclude app-id="mpv"
-exclude app-id="obsidian"
-exclude app-id="com.mitchellh.ghostty"
-open-on-workspace "utility" // May need to adjust for work-specific apps
-}
-
-window-rule {
     match app-id="zen-work"
     open-on-workspace "work"
     default-column-width { proportion 1.0; }
@@ -306,9 +277,13 @@ window-rule {
 
 window-rule {
     match app-id="zen-personal"
+    open-on-workspace "casual"
+}
+
+window-rule {
+    match app-id="zen-personal"
     match app-id="io.github.quodlibet.QuodLibet"
     match app-id="rmpc"
-    open-on-workspace "casual"
     default-column-width { proportion 1.0; }
     //open-maximized-to-edges true
 }

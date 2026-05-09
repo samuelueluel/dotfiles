@@ -10,6 +10,7 @@ command = "bat --color=always --style=plain '{}'"
 
 [keybindings]
 enter = "actions:open"
+alt-space = "actions:open"
 
 [actions.open]
 description = "Open with default application"
