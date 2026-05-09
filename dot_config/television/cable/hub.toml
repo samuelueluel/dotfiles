@@ -1,0 +1,18 @@
+[metadata]
+name = "Television Hub"
+description = "Main Television Hub"
+
+[source]
+command = "/var/home/samuel/.local/bin/tv-hub-menu.sh"
+display = "{split:\t:0}"
+
+[preview]
+command = "echo 'Action: {}'"
+
+[keybindings]
+enter = "actions:hub-enter"
+
+[actions.hub-enter]
+description = "Execute selected hub workflow"
+command = "/var/home/samuel/.local/bin/tv-hub-action.sh '{split:\t:1}'"
+mode = "execute"

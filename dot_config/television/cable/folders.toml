@@ -1,0 +1,17 @@
+[metadata]
+name = "Directories"
+description = "Browse and open folders in Yazi"
+
+[source]
+command = "fd -H -t d --strip-cwd-prefix"
+
+[preview]
+command = "lsd --tree --depth 2 --color=always '{}'"
+
+[keybindings]
+enter = "actions:open"
+
+[actions.open]
+description = "Open in Yazi"
+command = "niri msg action spawn -- kitty -e yazi '{}'"
+mode = "execute"

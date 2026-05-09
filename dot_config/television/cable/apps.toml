@@ -1,0 +1,18 @@
+[metadata]
+name = "Apps"
+description = "Application Launcher"
+
+[source]
+command = "/var/home/samuel/.local/bin/tv-list-apps.py"
+display = "{split:;:0}"
+
+[preview]
+command = "echo 'Launch: {}'"
+
+[keybindings]
+enter = "actions:app-launch"
+
+[actions.app-launch]
+description = "Launch application"
+command = "niri msg action spawn -- gio launch '{split:;:1}'"
+mode = "execute"

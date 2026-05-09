@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+RG=/home/linuxbrew/.linuxbrew/bin/rg
+VAULT_DIR="/var/home/samuel/Dropbox/Sam_Personal_Vault"
+VAULT_NAME="Sam_Personal_Vault"
+
+echo -n "Search content: "
+read -r query
+[ -z "$query" ] && exit 0
+
+selected=$(
+    $RG -l --glob "*.md" "$query" "$VAULT_DIR" |
+    sed "s|$VAULT_DIR/||" |
+    tv --source-command="cat" \
+       --preview-command="$RG --color=always -C2 '$query' \"$VAULT_DIR\"/{}" \
+       --preview-size=60 \
+       --input-header="Results: $query"
+)
+
+[ -z "$selected" ] && exit 0
+
+if obsidian files total >/dev/null 2>&1; then
+    obsidian open "path=$selected" newtab
+else
+    echo "$selected" > /tmp/tv-obsidian-pending
+    niri msg action spawn -- /var/home/samuel/.local/bin/tv-obsidian-launcher.sh
+fi

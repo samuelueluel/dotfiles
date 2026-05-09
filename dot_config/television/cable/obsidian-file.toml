@@ -1,0 +1,18 @@
+[metadata]
+name = "Notes (Obsidian)"
+description = "Search Obsidian files by name"
+
+[source]
+# Target the vault directly
+command = "fd -e md --base-directory /var/home/samuel/Dropbox/Sam_Personal_Vault"
+
+[preview]
+command = "bat --color=always --style=plain \"/var/home/samuel/Dropbox/Sam_Personal_Vault/{}\""
+
+[keybindings]
+enter = "actions:obsidian-open"
+
+[actions.obsidian-open]
+description = "Open in Obsidian (New Tab)"
+command = "/var/home/samuel/.local/bin/tv-action-obsidian.sh '{split:\t:0}'"
+mode = "execute"

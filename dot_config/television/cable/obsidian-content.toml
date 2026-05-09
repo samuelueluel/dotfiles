@@ -1,0 +1,17 @@
+[metadata]
+name = "Search (Obsidian)"
+description = "Search Obsidian vault content"
+
+[source]
+command = "echo '󱞒 Start Obsidian Content Search...'"
+
+[preview]
+command = "echo 'This will prompt for a search query in your terminal.'"
+
+[keybindings]
+enter = "actions:launch"
+
+[actions.launch]
+description = "Start interactive search"
+command = "/var/home/samuel/.local/bin/tv-obsidian-content.sh"
+mode = "execute"

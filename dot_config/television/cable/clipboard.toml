@@ -1,0 +1,18 @@
+[metadata]
+name = "Clipboard"
+description = "Clipboard History"
+
+[source]
+command = "cclip list"
+display = "{split:\t:2}"
+
+[preview]
+command = "cclip get '{split:\t:0}'"
+
+[keybindings]
+enter = "actions:copy"
+
+[actions.copy]
+description = "Copy to clipboard"
+command = "cclip copy '{split:\t:0}'"
+mode = "execute"

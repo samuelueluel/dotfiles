@@ -351,6 +351,13 @@ window-rule {
 }
 
 window-rule {
+    match title="TV Hub"
+    open-floating true
+    default-column-width { fixed 1500; }
+    default-window-height { fixed 800; }
+}
+
+window-rule {
     match title="Clipboard History"
     open-floating true
     default-column-width { fixed 800; }
@@ -540,7 +547,8 @@ binds {
 
     XF86MenuKB hotkey-overlay-title="Toggle minimap" repeat=false { spawn "niri-minimap"; }
     Mod+B hotkey-overlay-title="Toggle Waybar" { spawn-sh "pkill -SIGUSR1 waybar || waybar"; }
-    Mod+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "fsel-launcher" "fsel" "--detach"; }
+    Mod+Ctrl+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "fsel-launcher" "fsel" "--detach"; }
+    Mod+Space hotkey-overlay-title="Television Hub" repeat=false { spawn "kitty" "--title" "TV Hub" "-e" "sh" "-c" "sleep 0.1 && exec /home/linuxbrew/.linuxbrew/bin/tv 'Television Hub'"; }
     Mod+V hotkey-overlay-title="Clipboard history (cclip)" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "Clipboard History" "fsel" "--cclip"; }
     Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "swaync-client" "-t"; }
     Mod+X hotkey-overlay-title="Clear all notifications" { spawn "swaync-client" "-C"; }

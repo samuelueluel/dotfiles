@@ -1,0 +1,8 @@
+[metadata]
+name = "zzz"
+
+[source]
+command = "true"
+
+[preview]
+command = "true"

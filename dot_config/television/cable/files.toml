@@ -1,0 +1,17 @@
+[metadata]
+name = "Files"
+description = "Browse and open files"
+
+[source]
+command = "fd -H -t f --strip-cwd-prefix"
+
+[preview]
+command = "bat --color=always --style=plain '{}'"
+
+[keybindings]
+enter = "actions:open"
+
+[actions.open]
+description = "Open with default application"
+command = "xdg-open '{}'"
+mode = "execute"

@@ -16,6 +16,7 @@ application/x-extension-xht=helium.desktop
 text/xml=helium.desktop
 application/xml=helium.desktop
 x-scheme-handler/claude-cli=claude-code-url-handler.desktop
+text/x-shellscript=dev.zed.Zed.desktop
 
 [Added Associations]
 text/markdown=dev.zed.Zed.desktop;
