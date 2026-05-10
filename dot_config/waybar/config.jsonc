@@ -145,7 +145,6 @@
       "critical": 90
     },
     "tooltip": true,
-    "on-click": "ghostty -e systemd-manager-tui",
     "cursor": false
   },
 

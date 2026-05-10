@@ -24,12 +24,6 @@
   command = "systemctl poweroff"
 
 [[Snippets]]
-  Description = "Systemd TUI"
-  Output = ""
-  Tag = []
-  command = "systemd-manager-tui"
-
-[[Snippets]]
   Description = "Process monitor (htop)"
   Output = ""
   Tag = []
