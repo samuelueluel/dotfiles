@@ -4,13 +4,13 @@ description = "Search Obsidian files by name"
 
 [source]
 # Target the vault directly
-command = "fd -e md --base-directory {{ .chezmoi.homeDir }}/Dropbox/Sam_Personal_Vault"
+command = "fd -e md --base-directory {{ .obsidian.vault_path }}"
 
 [ui]
 orientation = "portrait"
 
 [preview]
-command = "bat --color=always --style=plain \"{{ .chezmoi.homeDir }}/Dropbox/Sam_Personal_Vault/{}\""
+command = "bat --color=always --style=plain \"{{ .obsidian.vault_path }}/{}\""
 
 [keybindings]
 enter = "actions:obsidian-open"
