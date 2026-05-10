@@ -333,13 +333,6 @@ window-rule {
 }
 
 window-rule {
-    match title="Clipboard History"
-    open-floating true
-    default-column-width { fixed 800; }
-    default-window-height { fixed 780; }
-}
-
-window-rule {
     match title="Ghostty Float"
     open-floating true
     default-column-width { fixed 700; }
@@ -417,7 +410,6 @@ window-rule { // transparency set in app-specific config to prevent text from di
     match title="Ghostty Float"
     match title="fsel-launcher"
     match title="Keybind Search"
-    match title="Clipboard History"
     match title="bluetuith"
     match title="btm"
     match title="ikhal"
@@ -525,7 +517,6 @@ binds {
     Mod+B hotkey-overlay-title="Toggle Waybar" { spawn-sh "pkill -SIGUSR1 waybar || waybar"; }
     Mod+Ctrl+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "fsel-launcher" "fsel" "--detach"; }
     Mod+Space hotkey-overlay-title="Television Hub" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "TV Hub" "-e" "sh" "-c" "sleep 0.1 && exec /home/linuxbrew/.linuxbrew/bin/tv 'Television Hub' --input '^'"; }
-    Mod+V hotkey-overlay-title="Clipboard history (cclip)" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "Clipboard History" "fsel" "--cclip"; }
     Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "swaync-client" "-t"; }
     Mod+X hotkey-overlay-title="Clear all notifications" { spawn "swaync-client" "-C"; }
 
@@ -665,12 +656,6 @@ binds {
     //Mod+Shift+WheelScrollUp        { focus-column-left; }
     //Mod+Ctrl+Shift+WheelScrollDown { move-column-right; }
     //Mod+Ctrl+Shift+WheelScrollUp   { move-column-left; }
-
-    // -----------------------------------
-    // CLIPBOARD
-    // -----------------------------------
-
-    //Mod+V hotkey-overlay-title="Spawn CopyQ" { spawn "copyq" "toggle"; } just launch from fuzzel
 
     // -----------------------------------
     // MEDIA CONTROLS
