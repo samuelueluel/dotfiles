@@ -7,6 +7,9 @@ requirements = ["python3", "niri"]
 command = "python3 /usr/bin/niri_parse_keybinds.py -i $HOME/.config/niri/config.kdl -ak '|' -at '|' -s -c"
 display = "{split:|:0} ── {split:|:1}"
 
+[ui.preview_panel]
+hidden = true
+
 [preview]
 command = "echo '{}' | awk -F '|' '{print $3}'"
 shell = "bash"
