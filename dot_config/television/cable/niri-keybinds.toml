@@ -1,0 +1,26 @@
+[metadata]
+name = "Keybinds (Niri)"
+description = "Search and execute Niri keybinds"
+requirements = ["python3", "niri"]
+
+[source]
+command = "python3 /usr/bin/niri_parse_keybinds.py -i $HOME/.config/niri/config.kdl -ak '|' -at '|' -s -c"
+display = "{split:|:0} ── {split:|:1}"
+
+[preview]
+command = "echo '{}' | awk -F '|' '{print $3}'"
+shell = "bash"
+
+[keybindings]
+enter = "actions:execute"
+ctrl-c = "actions:copy"
+
+[actions.execute]
+description = "Execute niri action"
+command = "niri msg action $(echo '{}' | awk -F '|' '{print $3}' | xargs)"
+mode = "execute"
+
+[actions.copy]
+description = "Copy command to clipboard"
+command = "echo '{}' | awk -F '|' '{print $3}' | xargs | wl-copy"
+mode = "execute"
