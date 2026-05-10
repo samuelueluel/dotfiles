@@ -1,0 +1,30 @@
+[metadata]
+name = "RMPC Albums"
+description = "Browse and add albums to MPD queue"
+
+[source]
+command = '''echo "list album group artist" | nc -N 127.0.0.1 6600 | awk -F': ' '/^Artist: / { artist=substr($0, index($0,$2)) } /^Album: / { album=substr($0, index($0,$2)); if (album != "") { a = (artist != "" ? artist : "Unknown Artist"); print "\033[38;2;23;193;130m[" a "]\033[0m " album } }' | sort -u'''
+ansi = true
+output = "{strip_ansi}"
+
+[ui.preview_panel]
+size = 50
+#header = ""
+#footer = ""
+scrollbar = true
+border_type = "thick"
+padding = { left = 6, right = 0, top = 3, bottom = 0 }
+hidden = false
+
+[preview]
+ansi = true
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-preview-rmpc-art.sh '{strip_ansi}'"
+
+[actions.add]
+description = "Add album to queue"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh '{strip_ansi}'"
+mode = "execute"
+
+[keybindings]
+enter = "actions:add"
+alt-space = "actions:add"

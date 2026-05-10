@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+exec 2>/dev/null
+INPUT_CLEAN=$(echo "$1" | sed 's/\x1b\[[0-9;]*m//g')
+[ -z "$INPUT_CLEAN" ] && exit 0
+
+if [[ "$INPUT_CLEAN" =~ ^\[(.*)\]\ (.*)$ ]]; then
+    ARTIST="${BASH_REMATCH[1]}"
+    ALBUM="${BASH_REMATCH[2]}"
+else
+    ARTIST=$(echo "$INPUT_CLEAN" | sed 's/ - .*//')
+    ALBUM=$(echo "$INPUT_CLEAN" | sed 's/.* - //')
+fi
+
+ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')
+ESCAPED_ALBUM=$(echo "$ALBUM" | sed 's/"/\\"/g')
+RELATIVE_FILE=$(echo "find artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\" window 0:1" | nc -N 127.0.0.1 6600 | awk -F': ' '/^file: / {print $2; exit}')
+[ -z "$RELATIVE_FILE" ] && exit 0
+
+MUSIC_DIR="{{ .chezmoi.homeDir }}/Music/Music_Linux/mp3 library/Music"
+ALBUM_DIR="$MUSIC_DIR/$(dirname "$RELATIVE_FILE")"
+COVER=""
+for name in "cover.jpg" "cover.png" "cover.webp" "folder.jpg" "folder.png"; do
+    [ -f "$ALBUM_DIR/$name" ] && COVER="$ALBUM_DIR/$name" && break
+done
+
+[ -z "$COVER" ] && exit 0
+
+chafa --probe off --format symbols --symbols half --size "60x30" "$COVER" | sed 's/\x1b\[?[0-9]*[hl]//g'
