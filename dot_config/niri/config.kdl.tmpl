@@ -328,8 +328,8 @@ window-rule {
 window-rule {
     match title="TV Hub"
     open-floating true
-    default-column-width { fixed 1500; }
-    default-window-height { fixed 800; }
+    default-column-width { proportion 0.996; }
+    default-window-height { proportion 0.99; }
 }
 
 window-rule {
@@ -413,6 +413,7 @@ window-rule {
 window-rule { // transparency set in app-specific config to prevent text from dimming
     match app-id="com.mitchellh.ghostty"
     match app-id="kitty"
+    match app-id="kitty-launcher"
     match title="Ghostty Float"
     match title="fsel-launcher"
     match title="Keybind Search"
