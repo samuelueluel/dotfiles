@@ -1,0 +1,24 @@
+[metadata]
+name = "Snippets"
+description = "Search and execute CLI snippets"
+
+[source]
+command = "grep -oP '^-\\s+\\K.*' {{ .chezmoi.homeDir }}/.config/television/snippets.md"
+display = "{split: | :0}"
+
+[preview]
+command = "echo '{}' | sed 's/^[^|]*| //'"
+
+[keybindings]
+enter = "actions:execute"
+ctrl-c = "actions:copy"
+
+[actions.execute]
+description = "Execute snippet"
+command = "zsh -c \"$(echo '{}' | sed 's/^[^|]*| //')\""
+mode = "execute"
+
+[actions.copy]
+description = "Copy snippet to clipboard"
+command = "echo '{}' | sed 's/^[^|]*| //' | tr -d '\\n' | wl-copy"
+mode = "fork"

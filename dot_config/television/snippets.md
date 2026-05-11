@@ -1,0 +1,28 @@
+# CLI Snippets
+
+- Lock screen | swaylock
+- Suspend & lock | systemctl suspend
+- Reboot | systemctl reboot
+- Power off | systemctl poweroff
+- Process monitor (btm) | btm
+- Network TUI (wlctl) | wlctl
+- Bluetooth TUI | bluetuith
+- Check image status | sudo bootc status
+- Rollback system image | sudo bootc rollback
+- Clean unused flatpaks | flatpak uninstall --unused
+- RTK token savings | rtk gain
+- Logs: Errors current boot | journalctl -p 3 -xb
+- Logs: Greetd (login) follow | journalctl -f -u greetd
+- Logs: User units | journalctl --user -n 100
+- Niri: Toggle debug view | niri msg action toggle-debug-view
+- Boot performance blame | systemd-analyze blame
+- Niri IPC msg | niri msg
+- Chezmoi | chezmoi
+- Tealdeer (tldr) | tldr
+- Sunset (Santa Fe) | night-on
+- Sunset off | night-off
+- Waydroid status | waydroid status
+- Stop Waydroid session | waydroid session stop
+- Refresh music library | rmpc update
+- Restart mpd service | systemctl --user restart mpd
+- Full rescan music library | rmpc rescan
