@@ -63,7 +63,7 @@
   "clock": {
     "format": "{:%a %b %e  %I:%M %p}",
     "tooltip": false,
-    "on-click": "ghostty --title=ikhal -e /home/linuxbrew/.linuxbrew/bin/ikhal",
+    "on-click": "ghostty --title=calcure -e calcure",
     "on-click-right": "sh -c 'if pgrep -x wlsunset > /dev/null; then pkill wlsunset; else pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 & fi'",
     "cursor": false
   },
@@ -156,7 +156,7 @@
     "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
     "tooltip-format-ethernet": "{ifname}\n{ipaddr}",
     "tooltip-format-disconnected": "Disconnected",
-    "on-click": "kitty --config ~/.config/kitty/kitty.conf --config ~/.config/kitty/tui-nav.conf --title nmtui -- nmtui",
+    "on-click": "ghostty --title=wlctl -e wlctl",
     "cursor": false
   },
 

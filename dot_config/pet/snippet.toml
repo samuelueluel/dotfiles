@@ -30,10 +30,10 @@
   command = "htop"
 
 [[Snippets]]
-  Description = "Network TUI (nmtui)"
+  Description = "Network TUI (wlctl)"
   Output = ""
   Tag = []
-  command = "nmtui"
+  command = "wlctl"
 
 [[Snippets]]
   Description = "Bluetooth TUI"

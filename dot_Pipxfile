@@ -1,0 +1,6 @@
+# ~/.Pipxfile
+# Declarative list of Python-based CLI tools managed via pipx.
+# Install/Sync with: sjust pipx
+
+calcure                        # Modern TUI calendar and task manager
+headroom-ai[proxy,code,mcp]    # LLM context optimizer and proxy
