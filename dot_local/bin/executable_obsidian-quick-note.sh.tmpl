@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# This file is managed by Chezmoi.
+
+VAULT_DIR="{{ .obsidian.vault_path }}"
+INBOX="$VAULT_DIR/00_Inbox"
+
+# Ensure Inbox exists
+mkdir -p "$INBOX"
+
+# Colors
+TURQUOISE="\033[38;2;0;182;194m"
+DUSTY_ROSE="\033[38;2;208;167;175m"
+RESET="\033[0m"
+
+# Helper for centering
+center() {
+    local text="$1"
+    local color="$2"
+    local width
+    width=$(tput cols)
+    local padding=$(( (width - ${#text}) / 2 ))
+    if [ $padding -gt 0 ]; then
+        printf "%${padding}s" ""
+    fi
+    printf "${color}${text}${RESET}\n"
+}
+
+# Helper for drawing a centered line
+line() {
+    local color="$1"
+    local width
+    width=$(tput cols)
+    local line_width=40
+    local padding=$(( (width - line_width) / 2 ))
+    if [ $padding -gt 0 ]; then
+        printf "%${padding}s" ""
+    fi
+    printf "${color}"
+    printf '─%.0s' $(seq 1 $line_width)
+    printf "${RESET}\n"
+}
+
+# Clear terminal and show a clean interface
+clear
+echo ""
+center "=== Obsidian Quick Note ===" "$TURQUOISE"
+echo ""
+center "Hit Enter for new line" "$DUSTY_ROSE"
+center "Ctrl+S to save note" "$DUSTY_ROSE"
+line "$DUSTY_ROSE"
+echo ""
+
+TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")
+FILENAME="${TIMESTAMP} Quick Note.md"
+FILEPATH="$INBOX/$FILENAME"
+
+# Remap EOF to Ctrl+S and disable terminal flow control (which usually steals Ctrl+S)
+stty eof ^s
+stty -ixon
+
+# Capture multi-line input directly to file
+cat > "$FILEPATH"
+
+# Restore terminal settings
+stty sane
+
+# If file is empty, remove it and exit
+if [ ! -s "$FILEPATH" ]; then
+    rm "$FILEPATH"
+    echo "  Aborted (empty note)."
+    sleep 0.2
+    exit 0
+fi
+
+echo ""
+echo "  Saved to: $FILENAME"
+sleep 0.5
