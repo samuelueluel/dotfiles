@@ -22,7 +22,12 @@ command = "{{ .chezmoi.homeDir }}/.local/bin/tv-preview-rmpc-art.sh '{strip_ansi
 
 [actions.add]
 description = "Add album to queue"
-command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh '{strip_ansi}'"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh '{strip_ansi}' add"
+mode = "execute"
+
+[actions.replace]
+description = "Clear queue and play album"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh '{strip_ansi}' replace"
 mode = "execute"
 
 [actions.copy]
@@ -32,5 +37,5 @@ mode = "fork"
 
 [keybindings]
 enter = "actions:add"
-alt-space = "actions:add"
+ctrl-q = "actions:replace"
 ctrl-c = "actions:copy"
