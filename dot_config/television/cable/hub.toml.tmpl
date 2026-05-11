@@ -18,8 +18,58 @@ command = "echo 'Action: {}'"
 [keybindings]
 enter = "actions:hub-enter"
 alt-space = "actions:hub-enter"
+"a" = "actions:launch-apps"
+"p" = "actions:launch-pinned"
+"f" = "actions:launch-files"
+"d" = "actions:launch-dirs"
+"r" = "actions:launch-ripgrep"
+"n" = "actions:launch-notes"
+"i" = "actions:launch-ideas"
+"m" = "actions:launch-music"
+"c" = "actions:launch-clipboard"
+"k" = "actions:launch-keybinds"
 
 [actions.hub-enter]
 description = "Execute selected hub workflow"
 command = "{{ .chezmoi.homeDir }}/.local/bin/tv-hub-action.sh '{split:\t:1}'"
+mode = "execute"
+
+[actions.launch-apps]
+command = "/home/linuxbrew/.linuxbrew/bin/tv \"Apps\""
+mode = "execute"
+
+[actions.launch-pinned]
+command = "/home/linuxbrew/.linuxbrew/bin/tv \"Pinned\""
+mode = "execute"
+
+[actions.launch-files]
+command = "/home/linuxbrew/.linuxbrew/bin/tv \"Files\""
+mode = "execute"
+
+[actions.launch-dirs]
+command = "/home/linuxbrew/.linuxbrew/bin/tv \"Directories\""
+mode = "execute"
+
+[actions.launch-ripgrep]
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-yazi-content.sh"
+mode = "execute"
+
+[actions.launch-notes]
+command = "/home/linuxbrew/.linuxbrew/bin/tv \"Notes (Obsidian)\""
+mode = "execute"
+
+[actions.launch-ideas]
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-obsidian-content.sh"
+mode = "execute"
+
+[actions.launch-music]
+command = "/home/linuxbrew/.linuxbrew/bin/tv \"Music (rmpc)\""
+mode = "execute"
+
+[actions.launch-clipboard]
+command = "/home/linuxbrew/.linuxbrew/bin/tv \"Clipboard\" --no-sort"
+mode = "execute"
+
+[actions.launch-keybinds]
+command = "/home/linuxbrew/.linuxbrew/bin/tv \"Keybinds (niri)\""
 mode = "execute"
