@@ -3,13 +3,15 @@ name = "Files"
 description = "Browse and open files"
 
 [source]
-command = "fd -H -t f --strip-cwd-prefix"
+command = "fd -H -t f . /var/home/samuel/ | awk '{ match($0, /.*\\//); dir = substr($0, 1, RLENGTH); file = substr($0, RLENGTH+1); prefix = \"/var/home/samuel/\"; if (index(dir, prefix) == 1) { rest_dir = substr(dir, length(prefix) + 1); printf \"\\033[38;2;208;167;175m%s\\033[36m%s\\033[0m%s\\n\", prefix, rest_dir, file; } else { printf \"\\033[36m%s\\033[0m%s\\n\", dir, file; } }'"
+ansi = true
+output = "{strip_ansi}"
 
 [ui]
 orientation = "portrait"
 
 [preview]
-command = "bat --color=always --style=plain '{}'"
+command = "bat --color=always --style=plain '{strip_ansi}'"
 
 [keybindings]
 enter = "actions:open"
@@ -17,5 +19,5 @@ alt-space = "actions:open"
 
 [actions.open]
 description = "Open with default application"
-command = "xdg-open '{}'"
+command = "xdg-open '{strip_ansi}'"
 mode = "execute"

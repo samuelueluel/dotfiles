@@ -1,5 +1,5 @@
 [metadata]
-name = "Keybinds (Niri)"
+name = "Keybinds (niri)"
 description = "Search and execute Niri keybinds"
 requirements = ["python3", "niri"]
 

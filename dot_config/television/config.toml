@@ -111,7 +111,7 @@ sort_alphabetically = true
 [ui.theme_overrides]
 background = "#7A2E2E"
 text_fg = "#FFFFFF"
-selection_bg = "#00B6C2"
+selection_bg = "#000000"
 selection_fg = "#FFFFFF"
 match_fg = "#FFA726"
 border_fg = "#D0A7AF"

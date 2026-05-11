@@ -1,5 +1,5 @@
 [metadata]
-name = "zzz"
+name = "Zoxide"
 description = "Browse zoxide directory history"
 requirements = ["zoxide"]
 

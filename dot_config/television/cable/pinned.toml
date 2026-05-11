@@ -1,0 +1,26 @@
+[metadata]
+name = "Pinned"
+description = "Quick access to pinned directories"
+
+[ui]
+ui_scale = 80
+
+[source]
+command = "/usr/bin/grep -oP '^-\\s+\\K.*' /var/home/samuel/.config/television/pinned.md | /usr/bin/awk '{ abs=$0; sub(\"^~/\", \"/var/home/samuel/\", abs); match(abs, /.*\\//); dir = substr(abs, 1, RLENGTH); file = substr(abs, RLENGTH+1); prefix = \"/var/home/samuel/\"; if (index(dir, prefix) == 1) { rest_dir = substr(dir, length(prefix) + 1); printf \"\\033[38;2;208;167;175m%s\\033[36m%s\\033[0m%s\\n\", prefix, rest_dir, file; } else { printf \"\\033[36m%s\\033[0m%s\\n\", dir, file; } }'"
+ansi = true
+output = "{strip_ansi}"
+
+[ui.preview_panel]
+hidden = true
+
+[preview]
+command = "/home/linuxbrew/.linuxbrew/bin/eza --tree --level 2 --color=always '{strip_ansi}'"
+
+[keybindings]
+enter = "actions:open"
+ctrl-c = "copy_entry_to_clipboard"
+
+[actions.open]
+description = "Open in Yazi"
+command = "/usr/bin/niri msg action spawn -- /usr/bin/kitty -e /usr/bin/yazi '{strip_ansi}'"
+mode = "execute"

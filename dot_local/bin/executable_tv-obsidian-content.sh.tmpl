@@ -9,9 +9,28 @@ read -r query
 
 selected=$(
     $RG -l --glob "*.md" "$query" "$VAULT_DIR" |
-    sed "s|$VAULT_DIR/||" |
+    awk -v vault_dir="$VAULT_DIR/" '{
+      path = $0;
+      sub(vault_dir, "", path); # Remove absolute path prefix
+      
+      match(path, /.*\//);
+      if (RLENGTH > 0) {
+        dir = substr(path, 1, RLENGTH);
+        file = substr(path, RLENGTH+1);
+        
+        first_slash = index(dir, "/");
+        parent = substr(dir, 1, first_slash);
+        rest_dir = substr(dir, first_slash + 1);
+        
+        printf "\033[38;2;208;167;175m%s\033[36m%s\033[0m%s\n", parent, rest_dir, file;
+      } else {
+        printf "\033[0m%s\n", path;
+      }
+    }' |
     tv --source-command="cat" \
-       --preview-command="$RG --color=always -C2 '$query' \"$VAULT_DIR/{}\"" \
+       --ansi \
+       --source-output="{strip_ansi}" \
+       --preview-command="$RG --color=always -C2 '$query' \"$VAULT_DIR/{strip_ansi}\"" \
        --preview-size=60 \
        --input-header="Results: $query" \
        --layout=portrait

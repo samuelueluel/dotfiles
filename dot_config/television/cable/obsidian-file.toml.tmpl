@@ -4,13 +4,15 @@ description = "Search Obsidian files by name"
 
 [source]
 # Target the vault directly
-command = "fd -e md --base-directory {{ .obsidian.vault_path }}"
+command = "fd -e md --base-directory {{ .obsidian.vault_path }} | awk '{ match($0, /.*\\//); if (RLENGTH > 0) { dir = substr($0, 1, RLENGTH); file = substr($0, RLENGTH+1); first_slash = index(dir, \"/\"); parent = substr(dir, 1, first_slash); rest_dir = substr(dir, first_slash + 1); printf \"\\033[38;2;208;167;175m%s\\033[36m%s\\033[0m%s\\n\", parent, rest_dir, file; } else { printf \"\\033[0m%s\\n\", $0; } }'"
+ansi = true
+output = "{strip_ansi}"
 
 [ui]
 orientation = "portrait"
 
 [preview]
-command = "bat --color=always --style=plain \"{{ .obsidian.vault_path }}/{}\""
+command = "bat --color=always --style=plain \"{{ .obsidian.vault_path }}/{strip_ansi}\""
 
 [keybindings]
 enter = "actions:obsidian-open"
@@ -18,5 +20,5 @@ alt-space = "actions:obsidian-open"
 
 [actions.obsidian-open]
 description = "Open in Obsidian (New Tab)"
-command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-obsidian.sh '{split:\t:0}'"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-obsidian.sh '{strip_ansi}'"
 mode = "execute"

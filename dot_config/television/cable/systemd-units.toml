@@ -1,5 +1,5 @@
 [metadata]
-name = "zzz"
+name = "Systemd Services"
 description = "List and manage systemd services"
 requirements = ["systemctl"]
 
