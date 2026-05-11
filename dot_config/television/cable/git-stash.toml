@@ -20,6 +20,7 @@ layout = "portrait"
 enter = "actions:apply"
 ctrl-p = "actions:pop"
 ctrl-d = "actions:drop"
+ctrl-c = "actions:copy"
 
 [actions.apply]
 description = "Apply the selected stash"
@@ -35,3 +36,8 @@ mode = "execute"
 description = "Drop the selected stash"
 command = "git stash drop '{strip_ansi|split:\\::0}'"
 mode = "execute"
+
+[actions.copy]
+description = "Copy to clipboard (stripped)"
+command = "echo '{strip_ansi|split:\\::0}' | wl-copy"
+mode = "fork"

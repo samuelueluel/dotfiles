@@ -31,6 +31,9 @@ command = '''gh pr view '{strip_ansi|split:#:1|split:   :0}' --json number,title
 (.body // "")'
 '''
 
+[keybindings]
+ctrl-c = "actions:copy"
+
 [actions.open]
 description = "Open the PR in the browser"
 command = "gh pr view {strip_ansi|split:#:1|split:   :0} --web"
@@ -50,3 +53,8 @@ mode = "execute"
 description = "View the PR diff"
 command = "gh pr diff {strip_ansi|split:#:1|split:   :0} | less"
 mode = "execute"
+
+[actions.copy]
+description = "Copy to clipboard (stripped)"
+command = "echo '{strip_ansi|split:#:1|split:   :0}' | wl-copy"
+mode = "fork"

@@ -30,6 +30,9 @@ command = '''gh issue view '{strip_ansi|split:#:1|split:   :0}' --json number,ti
 (.body // "")'
 '''
 
+[keybindings]
+ctrl-c = "actions:copy"
+
 [actions.open]
 description = "Open the issue in the browser"
 command = "gh issue view {strip_ansi|split:#:1|split: :0} --web"
@@ -44,4 +47,9 @@ mode = "fork"
 description = "Add a comment to the selected issue"
 command = "gh issue comment {strip_ansi|split:#:1|split: :0}"
 mode = "execute"
+
+[actions.copy]
+description = "Copy to clipboard (stripped)"
+command = "echo '{strip_ansi|split:#:1|split: :0}' | wl-copy"
+mode = "fork"
 

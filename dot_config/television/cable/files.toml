@@ -16,8 +16,14 @@ command = "bat --color=always --style=plain '{strip_ansi}'"
 [keybindings]
 enter = "actions:open"
 alt-space = "actions:open"
+ctrl-c = "actions:copy"
 
 [actions.open]
 description = "Open with default application"
 command = "xdg-open '{strip_ansi}'"
 mode = "execute"
+
+[actions.copy]
+description = "Copy to clipboard (stripped)"
+command = "echo '{strip_ansi}' | wl-copy"
+mode = "fork"

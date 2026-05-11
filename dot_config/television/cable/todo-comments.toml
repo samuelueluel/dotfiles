@@ -18,9 +18,15 @@ preview_panel = { header = "{strip_ansi|split:\\::..2}" }
 
 [keybindings]
 enter = "actions:edit"
+ctrl-c = "actions:copy"
 
 [actions.edit]
 description = "Open file in editor at the comment"
 command = "${EDITOR:-vim} '+{strip_ansi|split:\\::1}' '{strip_ansi|split:\\::0}'"
 shell = "bash"
 mode = "execute"
+
+[actions.copy]
+description = "Copy to clipboard (stripped)"
+command = "echo '{strip_ansi|split:\\::..2}' | wl-copy"
+mode = "fork"

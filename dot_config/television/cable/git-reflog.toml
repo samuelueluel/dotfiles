@@ -16,6 +16,7 @@ command = "git show -p --stat --pretty=fuller --color=always '{0|strip_ansi}'"
 [keybindings]
 ctrl-o = "actions:checkout"
 ctrl-r = "actions:reset"
+ctrl-c = "actions:copy"
 
 [actions.checkout]
 description = "Checkout the selected reflog entry"
@@ -26,3 +27,8 @@ mode = "execute"
 description = "Reset --hard to the selected reflog entry"
 command = "git reset --hard '{0|strip_ansi}'"
 mode = "execute"
+
+[actions.copy]
+description = "Copy to clipboard (stripped)"
+command = "echo '{0|strip_ansi}' | wl-copy"
+mode = "fork"

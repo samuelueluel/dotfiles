@@ -1,6 +1,6 @@
 [metadata]
 name = "Clipboard"
-description = "Clipboard History"
+description = "Clipboard manager"
 
 [ui]
 orientation = "portrait"

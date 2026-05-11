@@ -16,8 +16,14 @@ command = "lsd --tree --depth 2 --color=always '{strip_ansi}'"
 [keybindings]
 enter = "actions:open"
 alt-space = "actions:open"
+ctrl-c = "actions:copy"
 
 [actions.open]
 description = "Open in Yazi"
 command = "niri msg action spawn -- kitty -e yazi '{strip_ansi}'"
 mode = "execute"
+
+[actions.copy]
+description = "Copy to clipboard (stripped)"
+command = "echo '{strip_ansi}' | wl-copy"
+mode = "fork"

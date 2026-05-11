@@ -25,6 +25,12 @@ description = "Add album to queue"
 command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh '{strip_ansi}'"
 mode = "execute"
 
+[actions.copy]
+description = "Copy to clipboard (stripped)"
+command = "echo '{strip_ansi}' | wl-copy"
+mode = "fork"
+
 [keybindings]
 enter = "actions:add"
 alt-space = "actions:add"
+ctrl-c = "actions:copy"

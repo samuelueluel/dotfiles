@@ -26,4 +26,5 @@ mode = "execute"
 [actions.copy]
 description = "Copy command to clipboard"
 command = "echo '{}' | awk -F '|' '{print $3}' | xargs | wl-copy"
-mode = "execute"
+mode = "fork"
+
