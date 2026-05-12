@@ -5,7 +5,7 @@ import sys
 import mutagen
 from mutagen.mp3 import MP3
 from mutagen.flac import FLAC
-from mutagen.id3 import TIT1, TCON, TIT2, TALB, TPE1, TRCK
+from mutagen.id3 import TIT1, TCON, TIT2, TALB, TPE1, TRCK, TDRC
 
 EXTENSIONS = ('.mp3', '.flac')
 UNSAFE_EXTENSIONS = ('.m4a', '.mp4', '.aac', '.wma', '.ogg', '.opus', '.ape', '.wv')
@@ -16,7 +16,8 @@ _ID3    = {
     'title': ('TIT2', TIT2),
     'album': ('TALB', TALB),
     'artist': ('TPE1', TPE1),
-    'track': ('TRCK', TRCK)
+    'track': ('TRCK', TRCK),
+    'date': ('TDRC', TDRC)
 }
 _VORBIS = {
     'grouping': 'grouping',
@@ -24,7 +25,8 @@ _VORBIS = {
     'title': 'title',
     'album': 'album',
     'artist': 'artist',
-    'track': 'tracknumber'
+    'track': 'tracknumber',
+    'date': 'date'
 }
 
 def check_for_unsafe_files(path, recursive=False):

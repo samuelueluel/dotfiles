@@ -22,17 +22,17 @@ command = "{{ .chezmoi.homeDir }}/.local/bin/tv-preview-rmpc-art.sh '{strip_ansi
 
 [actions.add]
 description = "Add album to queue"
-command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh '{strip_ansi}' add"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh \"{strip_ansi}\" add"
 mode = "execute"
 
 [actions.replace]
 description = "Clear queue and play album"
-command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh '{strip_ansi}' replace"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-rmpc.sh \"{strip_ansi}\" replace"
 mode = "execute"
 
 [actions.copy]
 description = "Copy to clipboard (stripped)"
-command = "echo '{strip_ansi}' | wl-copy"
+command = "printf '%s' \"{strip_ansi}\" | wl-copy"
 mode = "fork"
 
 [keybindings]

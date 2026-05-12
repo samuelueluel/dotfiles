@@ -21,10 +21,10 @@ ctrl-c = "actions:copy"
 
 [actions.obsidian-open]
 description = "Open in Obsidian (New Tab)"
-command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-obsidian.sh '{strip_ansi}'"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-obsidian.sh \"{strip_ansi}\""
 mode = "execute"
 
 [actions.copy]
 description = "Copy to clipboard (stripped)"
-command = "echo '{strip_ansi}' | wl-copy"
+command = "printf '%s' \"{strip_ansi}\" | wl-copy"
 mode = "fork"

@@ -5,17 +5,18 @@ import argparse
 sys.path.insert(0, os.path.expanduser('~/.local/bin'))
 from tag_utils import EXTENSIONS, check_for_unsafe_files, open_audio, set_values, save_audio
 
-parser = argparse.ArgumentParser(description='Set title, album, artist, and/or track tags on audio files or directories.')
+parser = argparse.ArgumentParser(description='Set title, album, artist, date, and/or track tags on audio files or directories.')
 parser.add_argument('paths', nargs='+', help='Paths to audio files or directories')
 parser.add_argument('--title', help='Title to set')
 parser.add_argument('--album', help='Album to set')
 parser.add_argument('--artist', help='Artist to set')
+parser.add_argument('--date', help='Date (year) to set')
 parser.add_argument('--track', help='Track number to set')
 parser.add_argument('--dry-run', action='store_true')
 args = parser.parse_args()
 
-if not any([args.title, args.album, args.artist, args.track]):
-    print("Error: specify at least one of --title, --album, --artist, or --track", file=sys.stderr)
+if not any([args.title, args.album, args.artist, args.date, args.track]):
+    print("Error: specify at least one of --title, --album, --artist, --date, or --track", file=sys.stderr)
     sys.exit(1)
 
 targets = []
@@ -49,6 +50,7 @@ for filepath in targets:
         ('title', args.title),
         ('album', args.album),
         ('artist', args.artist),
+        ('date', args.date),
         ('track', args.track)
     ]
     

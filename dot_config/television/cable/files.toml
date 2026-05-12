@@ -19,11 +19,12 @@ alt-space = "actions:open"
 ctrl-c = "actions:copy"
 
 [actions.open]
-description = "Open with default application"
-command = "xdg-open '{strip_ansi}'"
+description = "Open with xdg-open"
+command = "xdg-open \"{strip_ansi}\""
 mode = "execute"
 
 [actions.copy]
 description = "Copy to clipboard (stripped)"
-command = "echo '{strip_ansi}' | wl-copy"
+command = "printf '%s' \"{strip_ansi}\" | wl-copy"
 mode = "fork"
+

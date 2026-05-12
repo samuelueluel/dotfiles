@@ -20,10 +20,10 @@ ctrl-c = "actions:copy"
 
 [actions.open]
 description = "Open in Yazi"
-command = "niri msg action spawn -- kitty -e yazi '{strip_ansi}'"
+command = "niri msg action spawn -- kitty -e yazi \"{strip_ansi}\""
 mode = "execute"
 
 [actions.copy]
 description = "Copy to clipboard (stripped)"
-command = "echo '{strip_ansi}' | wl-copy"
+command = "printf '%s' \"{strip_ansi}\" | wl-copy"
 mode = "fork"

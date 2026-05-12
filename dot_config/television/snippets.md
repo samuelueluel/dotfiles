@@ -26,3 +26,12 @@
 - Refresh music library | rmpc update
 - Restart mpd service | systemctl --user restart mpd
 - Full rescan music library | rmpc rescan
+- Music: Set tags (overwrite grouping/genre) | music-set-tags "/path/to/album" --grouping "R: 4.5" "FL" --genres "Art Rock"
+- Music: Add tag (append grouping/genre) | music-add-tag "/path/to/album" --grouping "[Priority]" --genres "Experimental"
+- Music: Set info (song or album dir) | music-set-info "/path/to/target" --title "Title" --artist "Artist" --album "Album" --track "01" --date "YYYY"
+- Music: Rename tag (library-wide) | music-rename-tag --grouping "Old Tag" "New Tag"
+- Music: Delete tag (library-wide) | music-delete-tag --grouping "<500 ratings" --genres "Pop"
+- Music: Normalize grouping order | music-normalize-order
+- Music: Convert M4A to FLAC | music-m4a-to-flac
+- Music: Fix cover art filenames | music-fix-cover-names "/path/to/album"
+- Music: Extract embedded cover art | music-extract-covers "/path/to/album"

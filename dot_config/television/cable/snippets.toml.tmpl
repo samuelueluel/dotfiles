@@ -7,18 +7,19 @@ command = "grep -oP '^-\\s+\\K.*' {{ .chezmoi.homeDir }}/.config/television/snip
 display = "{split: | :0}"
 
 [preview]
-command = "echo '{}' | sed 's/^[^|]*| //'"
+command = "echo '{}' | awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//'"
 
 [keybindings]
 enter = "actions:execute"
 ctrl-c = "actions:copy"
+alt-c = "actions:copy"
 
 [actions.execute]
 description = "Execute snippet"
-command = "zsh -c \"$(echo '{}' | sed 's/^[^|]*| //')\""
+command = "zsh -c \"$(echo '{}' | awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//')\""
 mode = "execute"
 
 [actions.copy]
 description = "Copy snippet to clipboard"
-command = "echo '{}' | sed 's/^[^|]*| //' | tr -d '\\n' | wl-copy"
+command = "echo '{}' | awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -d '\\n' | wl-copy"
 mode = "fork"
