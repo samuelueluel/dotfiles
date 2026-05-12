@@ -1,0 +1,227 @@
+#!/usr/bin/python3
+import os
+import sys
+import subprocess
+import shutil
+import argparse
+import difflib
+from typing import Optional, List, Tuple
+
+# Add ~/.local/bin to sys.path to import tag_utils
+sys.path.insert(0, os.path.expanduser('~/.local/bin'))
+try:
+    from tag_utils import (
+        EXTENSIONS, open_audio, get_values, set_values, save_audio, 
+        check_for_unsafe_files, normalize_grouping
+    )
+except ImportError:
+    print("Error: Could not import tag_utils.py from ~/.local/bin")
+    sys.exit(1)
+
+DOWNLOADS_DIR = os.path.expanduser("~/Downloads")
+MUSIC_DIR = os.environ.get(
+    "MUSIC_DIR",
+    os.path.expanduser("~/Music/Music_Linux/mp3 library/Music"),
+)
+
+def run_command(cmd: List[str], cwd: Optional[str] = None, env: Optional[dict] = None) -> bool:
+    """Run a shell command and return True if successful."""
+    try:
+        result = subprocess.run(cmd, cwd=cwd, env=env)
+        return result.returncode == 0
+    except Exception as e:
+        print(f"Error running command {' '.join(cmd)}: {e}")
+        return False
+
+def get_audio_files(path: str) -> List[str]:
+    """Get all supported audio files in the directory."""
+    return sorted(f for f in os.listdir(path) if f.lower().endswith(EXTENSIONS + ('.m4a', '.wav', '.flac')))
+
+def convert_to_mp3(directory: str):
+    """Convert non-MP3 files in the directory to MP3."""
+    files = get_audio_files(directory)
+    for f in files:
+        if not f.lower().endswith('.mp3'):
+            src = os.path.join(directory, f)
+            dst = os.path.join(directory, os.path.splitext(f)[0] + '.mp3')
+            print(f"Converting: {f} -> MP3")
+            # Using ffmpeg with V0 quality
+            cmd = ["ffmpeg", "-y", "-i", src, "-map_metadata", "0", "-c:a", "libmp3lame", "-q:a", "0", dst]
+            if run_command(cmd):
+                os.remove(src)
+
+def get_metadata(path: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Get Artist, Album, Year from the first audio file found."""
+    files = sorted([f for f in os.listdir(path) if f.lower().endswith(EXTENSIONS)])
+    if not files:
+        return None, None, None
+    
+    first_file = os.path.join(path, files[0])
+    audio = open_audio(first_file)
+    if not audio:
+        return None, None, None
+    
+    artist = (get_values(audio, 'artist') or [None])[0]
+    album = (get_values(audio, 'album') or [None])[0]
+    date = (get_values(audio, 'date') or [None])[0]
+    
+    return artist, album, date
+
+def fuzzy_match_artist(artist_name: str) -> str:
+    """Suggest an existing artist folder if a close match is found."""
+    if not os.path.exists(MUSIC_DIR):
+        return artist_name
+    
+    existing_artists = [d for d in os.listdir(MUSIC_DIR) if os.path.isdir(os.path.join(MUSIC_DIR, d))]
+    matches = difflib.get_close_matches(artist_name, existing_artists, n=1, cutoff=0.8)
+    
+    if matches and matches[0] != artist_name:
+        print(f"\nFuzzy match found: '{matches[0]}' (Existing) vs '{artist_name}' (Typed)")
+        choice = input(f"Use existing artist folder '{matches[0]}'? [Y/n]: ").lower()
+        if choice != 'n':
+            return matches[0]
+    return artist_name
+
+def select_dir_fzf() -> Optional[str]:
+    """Use fzf to select a directory in Downloads."""
+    cmd = f"find {DOWNLOADS_DIR} -mindepth 1 -maxdepth 2 -type d"
+    try:
+        result = subprocess.run(
+            f"{cmd} | fzf --prompt='Select Album Folder > ' --height=40% --reverse",
+            shell=True, capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception as e:
+        print(f"Error running fzf: {e}")
+    return None
+
+def main():
+    parser = argparse.ArgumentParser(description="Onboard a new music album.")
+    parser.add_argument("path", nargs="?", help="Path to the album folder in Downloads")
+    args = parser.parse_args()
+
+    source_path = args.path
+    if not source_path:
+        source_path = select_dir_fzf()
+    
+    if not source_path or not os.path.isdir(source_path):
+        print("No valid directory selected.")
+        sys.exit(1)
+    
+    source_path = os.path.abspath(source_path)
+    print(f"--- Onboarding: {source_path} ---")
+
+    # 1. Format Conversion
+    non_mp3 = [f for f in get_audio_files(source_path) if not f.lower().endswith('.mp3')]
+    if non_mp3:
+        print(f"\nNon-MP3 files found: {', '.join(non_mp3)}")
+        if input("Convert all non-MP3 files to MP3? [Y/n]: ").lower() != 'n':
+            convert_to_mp3(source_path)
+
+    # 2. Metadata (Album Level)
+    artist, album, date = get_metadata(source_path)
+    print(f"\nDetected Metadata:")
+    print(f"  Artist: {artist}")
+    print(f"  Album:  {album}")
+    print(f"  Year:   {date}")
+    
+    use_auto = input("\nAccept auto-detected Album info? [Y/n]: ").lower()
+    if use_auto == 'n':
+        artist = input(f"Artist [{artist}]: ") or artist
+        album = input(f"Album [{album}]: ") or album
+        date = input(f"Year [{date}]: ") or date
+
+    if not artist or not album:
+        print("Error: Artist and Album are required.")
+        sys.exit(1)
+
+    # Fuzzy match artist to avoid duplicates
+    artist = fuzzy_match_artist(artist)
+
+    # 3. Metadata (Track Level)
+    files = sorted([f for f in os.listdir(source_path) if f.lower().endswith(EXTENSIONS)])
+    if input("\nEdit track titles and numbers? [y/N]: ").lower() == 'y':
+        for f in files:
+            filepath = os.path.join(source_path, f)
+            audio = open_audio(filepath)
+            if not audio: continue
+            
+            curr_title = (get_values(audio, 'title') or [None])[0]
+            curr_track = (get_values(audio, 'track') or [None])[0]
+            
+            print(f"\nFile: {f}")
+            new_title = input(f"  Title [{curr_title}]: ") or curr_title
+            new_track = input(f"  Track [{curr_track}]: ") or curr_track
+            
+            set_values(audio, 'title', [new_title])
+            set_values(audio, 'track', [new_track])
+            set_values(audio, 'artist', [artist])
+            set_values(audio, 'album', [album])
+            if date: set_values(audio, 'date', [date])
+            save_audio(audio)
+    else:
+        # Still set Artist/Album/Year if they were manually overridden
+        if use_auto == 'n':
+            for f in files:
+                filepath = os.path.join(source_path, f)
+                audio = open_audio(filepath)
+                if audio:
+                    set_values(audio, 'artist', [artist])
+                    set_values(audio, 'album', [album])
+                    if date: set_values(audio, 'date', [date])
+                    save_audio(audio)
+
+    # 4. Relocation
+    target_dir = os.path.join(MUSIC_DIR, artist, album)
+    if os.path.exists(target_dir):
+        print(f"\nTarget directory already exists: {target_dir}")
+        if input("Merge into existing directory? [y/N]: ").lower() != 'y':
+            print("Aborting.")
+            sys.exit(0)
+    else:
+        os.makedirs(target_dir, exist_ok=True)
+
+    print(f"Moving files to {target_dir}...")
+    for f in os.listdir(source_path):
+        src = os.path.join(source_path, f)
+        dst = os.path.join(target_dir, f)
+        if os.path.isdir(src):
+            if os.path.exists(dst):
+                # Simple recursive merge if needed, but usually album folders are flat
+                for subf in os.listdir(src):
+                    shutil.move(os.path.join(src, subf), os.path.join(dst, subf))
+                os.rmdir(src)
+            else:
+                shutil.move(src, dst)
+        else:
+            shutil.move(src, dst)
+
+    # 5. Cleanup & Cover Art
+    print("\n--- Processing Cover Art ---")
+    run_command(["music-fix-cover-names", target_dir])
+    run_command(["music-extract-covers", target_dir])
+
+    # 6. Custom Tags (Grouping & Genres)
+    print("\n--- Specialized Tagging ---")
+    genres_input = input("Genres (comma separated, e.g. Art Rock, Neo-Soul) [Skip]: ")
+    grouping_input = input("Grouping (comma separated, e.g. [Priority], R: 4.0) [Skip]: ")
+    
+    if genres_input or grouping_input:
+        cmd = ["music-set-tags", target_dir]
+        if genres_input:
+            cmd += ["--genres"] + [g.strip() for g in genres_input.split(',')]
+        if grouping_input:
+            cmd += ["--grouping"] + [g.strip() for g in grouping_input.split(',')]
+        run_command(cmd)
+
+    # 7. System Integration
+    print("\n--- System Integration ---")
+    run_command(["beet", "import", target_dir])
+    run_command(["beet", "replaygain", target_dir])
+    run_command(["mpc", "update"])
+
+    print("\nDone! Onboarding complete.")
+
+if __name__ == "__main__":
+    main()

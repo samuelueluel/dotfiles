@@ -2,7 +2,7 @@
 import os
 import sys
 import argparse
-sys.path.insert(0, os.path.expanduser('~'))
+sys.path.insert(0, os.path.expanduser('~/.local/bin'))
 from tag_utils import EXTENSIONS, check_for_unsafe_files, open_audio, set_values, save_audio
 
 parser = argparse.ArgumentParser(description='Set multi-value grouping and/or genre tags on all audio files in a directory.')

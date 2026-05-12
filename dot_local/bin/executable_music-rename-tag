@@ -2,7 +2,7 @@
 import os
 import sys
 import argparse
-sys.path.insert(0, os.path.expanduser('~'))
+sys.path.insert(0, os.path.expanduser('~/.local/bin'))
 from tag_utils import EXTENSIONS, check_for_unsafe_files, open_audio, get_values, set_values, save_audio
 
 parser = argparse.ArgumentParser(description='Rename a specific value in grouping and/or genre tags across the library.')
