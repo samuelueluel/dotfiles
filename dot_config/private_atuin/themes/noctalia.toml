@@ -1,0 +1,26 @@
+# Noctalia Theme for Atuin
+# Finalized theme with Turquoise for selection/failure and Gold for matches
+
+[theme]
+name = "noctalia"
+parent = "default"
+
+[colors]
+# 1. Matched Text: Gold (Confirmed key: AlertWarn)
+AlertWarn = "#FFA726"
+
+# 2. Generic History Entries: White (Confirmed key: Base)
+Base = "#FFFFFF"
+
+# 3. Timestamps, Borders, & Guidance: Dusty Rose
+Annotation = "#D0A7AF"
+Muted = "#D0A7AF"
+Title = "#D0A7AF"
+Guidance = "#D0A7AF"
+
+# 4. Selection Highlight & Failed Duration: Theme Turquoise
+# (These are linked to the same key in this version of Atuin)
+AlertError = "#00B6C2"
+
+# 5. Pass Indicator: Theme Green
+AlertInfo = "#17C182"

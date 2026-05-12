@@ -1,5 +1,5 @@
 [metadata]
-name = "zzz"
+name = "Processes"
 description = "A channel to find and manage running processes"
 requirements = ["ps", "awk"]
 

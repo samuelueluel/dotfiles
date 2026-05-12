@@ -1,0 +1,12 @@
+[metadata]
+name = "Processes (Names)"
+description = "A channel to find and manage running processes (returns names for pkill)"
+requirements = ["ps", "awk"]
+
+[source]
+command = "ps -e -o pid=,ucomm= | awk '{print $1, $2}'"
+display = "{split: :1}"
+output = "{split: :1}"
+
+[preview]
+command = "ps -p '{split: :0}' -o user,pid,ppid,state,%cpu,%mem,command | fold"

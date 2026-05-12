@@ -1,0 +1,20 @@
+## Atuin Config
+
+# Layout: Full screen, bottom-to-top
+style = "full"
+inline_height = 0
+invert = false
+show_preview = false
+enter_accept = true
+
+[theme]
+name = "noctalia"
+# debug = true
+
+[stats]
+common_subcommands = [
+  "apt", "cargo", "dnf", "docker", "git", "go", "ip", "kubectl", "npm", "podman", "systemctl", "tmux"
+]
+
+[sync]
+records = true

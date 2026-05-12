@@ -127,7 +127,7 @@ preview_title_fg = "#D0A7AF"
 [keybindings]
 # Application control
 # ------------------
-#esc = "quit"
+esc = "quit"
 #ctrl-c = "quit"
 
 # Navigation and selection
@@ -166,7 +166,6 @@ ctrl-s = "cycle_sources"
 
 # UI Features
 # ----------
-esc = "toggle_remote_control"
 ctrl-x = "toggle_action_picker"
 ctrl-o = "toggle_preview"
 ctrl-h = "toggle_help"
@@ -196,28 +195,14 @@ alt-e = "go_to_input_end"
 
 [shell_integration]
 # This specifies the default fallback channel if no other channel is matched.
-fallback_channel = "files"
+fallback_channel = "Files"
 
 [shell_integration.channel_triggers]
-# Add your channel triggers here. Each key is a channel that will be triggered
-# by the corresponding commands.
-# Example: say you want the following commands to trigger the following channels
-# when pressing <CTRL-T>:
-#          `git checkout`  should trigger the `git-branches` channel
-#          `ls`            should trigger the `dirs` channel
-#          `cat` and `cp`  should trigger the `files` channel
-#
-# You would add the following to your configuration file:
-# ```
-# [shell_integration.channel_triggers]
-# "git-branches" = ["git checkout"]
-# "dirs" = ["ls"]
-# "files" = ["cat", "cp"]
-# ```
-"alias" = ["alias", "unalias"]
-"env" = ["export", "unset"]
-"dirs" = ["cd", "ls", "rmdir", "z"]
-"files" = [
+"Directories" = ["cd", "z", "ls", "rmdir"]
+"Processes" = ["kill"]
+"Processes (Names)" = ["pkill"]
+"Files" = [
+  "chezmoi add",
   "cat",
   "less",
   "head",
@@ -239,18 +224,7 @@ fallback_channel = "files"
   "gunzip",
   "xz",
 ]
-"git-diff" = ["git add", "git restore"]
-"git-branch" = [
-  "git checkout",
-  "git branch",
-  "git merge",
-  "git rebase",
-  "git pull",
-  "git push",
-]
-"git-log" = ["git log", "git show"]
-"docker-images" = ["docker run"]
-"git-repos" = ["nvim", "code", "hx", "git clone"]
+"Zoxide" = ["zi"]
 
 
 [shell_integration.keybindings]

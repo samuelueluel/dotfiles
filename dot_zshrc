@@ -36,6 +36,9 @@ command -v bat >/dev/null && alias cat='bat'
 ZSH_CACHE="$HOME/.cache/zsh"
 [[ -d "$ZSH_CACHE" ]] || mkdir -p "$ZSH_CACHE"
 
+# fzf global options (colors, keybinds, UI)
+export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char,alt-space:accept' --gutter=' ' --scrollbar='█' --color='bg:-1,gutter:-1,border:#7A2E2E,separator:#D0A7AF,preview-border:#D0A7AF,hl:#FFA726,hl+:#FFA726,pointer:#FFA726,marker:#FFA726,bg+:#000000,prompt:#FFA726,info:#D0A7AF,header:#D0A7AF,scrollbar:#FFA726'"
+
 # zoxide: smart cd
 if command -v zoxide >/dev/null; then
   [[ -f "$ZSH_CACHE/zoxide.zsh" ]] || zoxide init zsh > "$ZSH_CACHE/zoxide.zsh"
@@ -49,6 +52,7 @@ if command -v atuin >/dev/null; then
   else
     export ATUIN_DATA_DIR="$HOME/.local/share/atuin-samuel-bluefin"
   fi
+  export ATUIN_THEME_DIR="$HOME/.config/atuin/themes"
   [[ -f "$ZSH_CACHE/atuin.zsh" ]] || atuin init zsh > "$ZSH_CACHE/atuin.zsh"
   source "$ZSH_CACHE/atuin.zsh"
 fi
@@ -126,8 +130,24 @@ fi
 alias night-on="pkill wlsunset; nohup wlsunset -l 35.7 -L -105.9 >/dev/null 2>&1 &"
 alias night-off="pkill wlsunset"
 
-# fzf keybinds
-export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char,alt-space:accept' --gutter=' ' --scrollbar='█' --color='bg:-1,gutter:-1,border:#7A2E2E,separator:#D0A7AF,preview-border:#D0A7AF,hl:#FFA726,hl+:#FFA726,pointer:#FFA726,marker:#FFA726,bg+:#000000,prompt:#FFA726,info:#D0A7AF,header:#D0A7AF,scrollbar:#FFA726'"
+# fzf-tab: use the global fzf options
+zstyle ':fzf-tab:*' use-fzf-default-opts yes
+
+# Television: smart shell autocomplete (^T)
+if command -v tv >/dev/null; then
+  if [[ ! -f "$ZSH_CACHE/television.zsh" ]]; then
+    tv init zsh > "$ZSH_CACHE/television.zsh"
+    # Fix: Ensure enter key always confirms (pastes) during shell autocomplete
+    # instead of triggering the channel's default action (like opening a file).
+    sed -i 's/tv "$dir"/tv "$dir" --keybindings='\''enter="confirm_selection"'\''/' "$ZSH_CACHE/television.zsh"
+    sed -i 's/| tv /| tv --keybindings='\''enter="confirm_selection"'\'' /' "$ZSH_CACHE/television.zsh"
+  fi
+  source "$ZSH_CACHE/television.zsh"
+  # Restore Atuin history if it was overwritten
+  if (( $+functions[atuin-search] )); then
+    bindkey '^R' atuin-search
+  fi
+fi
 
 # Snippets (via Television)
 if command -v tv >/dev/null; then
