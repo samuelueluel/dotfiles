@@ -35,7 +35,7 @@ if [ -z "$RELATIVE_FILE" ]; then
 
     # Get the path of the first file in this album
     # We use 'window 0:1' to make it extremely fast
-    RELATIVE_FILE=$(echo "find artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\" window 0:1" | nc -N 127.0.0.1 6600 | awk -F': ' '/^file: / {print $2; exit}')
+    RELATIVE_FILE=$(echo "search artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\" window 0:1" | nc -N 127.0.0.1 6600 | awk -F': ' '/^file: / {print $2; exit}')
 fi
 
 if [ -z "$RELATIVE_FILE" ]; then

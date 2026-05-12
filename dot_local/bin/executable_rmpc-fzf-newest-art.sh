@@ -1,50 +1,24 @@
 #!/usr/bin/env bash
 # rmpc-fzf-newest-art.sh: Sort albums by file modification time with Cover Art preview
 
-# 1. Fetch all albums with dates by paginating the query to avoid MPD truncation limits
-# We call nc inside the loop to ensure each window is fully received.
-DATA=$(
-    for i in 0 5000 10000 15000 20000 25000; do
-        echo "find \"(album != '')\" window $i:$((i+5000))" | nc -N 127.0.0.1 6600
-    done | awk -F": " '
-    function get_val(line) {
-        p = index(line, ": ")
-        if (p == 0) return ""
-        return substr(line, p + 2)
+# 1. Fetch all unique albums from beets items sorted by 'added' date
+# We query items (no -a) to get the true '$artist' field, then deduplicate.
+DATA=$(beet ls -f '$added|$artist|$album' | sort -u | sort -rn | awk -F'|' '
+    {
+        artist = ($2 != "" ? $2 : "Unknown Artist")
+        # Format for display: [Artist] Album
+        # We also pass the Artist and Album as hidden fields for the preview script
+        printf "\033[38;2;23;193;130m[%s]\033[0m %s\t%s\t%s\n", artist, $3, artist, $3
     }
-    function process_record() {
-        if (f_file != "" && f_album != "") {
-            artist = (f_artist != "" ? f_artist : (f_albumartist != "" ? f_albumartist : "Unknown Artist"))
-            key = "\033[38;2;23;193;130m[" artist "]\033[0m " f_album
-            time = (f_time != "" ? f_time : "1970-01-01T00:00:00Z")
-            if (!(key in latest) || time > latest[key]) {
-                latest[key] = time
-                first_file[key] = f_file
-            }
-        }
-    }
-    /^file: / { 
-        process_record()
-        f_file = get_val($0)
-        f_artist=""; f_album=""; f_albumartist=""; f_time=""
-    }
-    /^Artist: / { f_artist = get_val($0) }
-    /^Album: / { f_album = get_val($0) }
-    /^AlbumArtist: / { f_albumartist = get_val($0) }
-    /^Last-Modified: / { f_time = $2 }
-    END {
-        process_record()
-        for (k in latest) print latest[k] "\t" k "\t" first_file[k]
-    }' | sort -rn | cut -f2-
-)
+')
 
 # 2. Multi-select fuzzy search
-# We use Tab as delimiter to hide the file path from the list but pass it to preview
+# We use Tab as delimiter to hide the raw fields from the list but pass them to preview
 SELECTED_LINES=$(echo "$DATA" | fzf -m --ansi --reverse --no-sort --border=none --no-scrollbar --no-separator \
     --delimiter '\t' --with-nth 1 \
-    --header="Recently Added Albums (Tab: Select | Enter: Add)" \
+    --header="Recently Added Albums (Beets) (Tab: Select | Enter: Add)" \
     --prompt="Fuzzy Search > " \
-    --preview '$HOME/.local/bin/rmpc-preview-art.sh {1} {2}' \
+    --preview '$HOME/.local/bin/rmpc-preview-art.sh {1}' \
     --preview-window 'right:40%:border-left')
 
 if [ -n "$SELECTED_LINES" ]; then
@@ -61,7 +35,7 @@ if [ -n "$SELECTED_LINES" ]; then
         ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')
         ESCAPED_ALBUM=$(echo "$ALBUM" | sed 's/"/\\"/g')
 
-        echo "findadd artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 > /dev/null
+        echo "searchadd artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 > /dev/null
     done <<< "$SELECTED_LINES"
 
     if [ "$STATE" == "stop" ]; then

@@ -3,8 +3,9 @@ name = "Snippets"
 description = "Search and execute CLI snippets"
 
 [source]
-command = "grep -oP '^-\\s+\\K.*' {{ .chezmoi.homeDir }}/.config/television/snippets.md"
+command = "grep -oP '^-\\s+\\K.*' {{ .chezmoi.homeDir }}/.config/television/snippets.md | sort"
 display = "{split: | :0}"
+no_sort = true
 
 [preview]
 command = "echo '{}' | awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//'"

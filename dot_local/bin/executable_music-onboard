@@ -137,7 +137,9 @@ def main():
         sys.exit(1)
 
     # Fuzzy match artist to avoid duplicates
-    artist = fuzzy_match_artist(artist)
+    new_artist = fuzzy_match_artist(artist)
+    artist_changed = (new_artist != artist)
+    artist = new_artist
 
     # 3. Metadata (Track Level)
     files = sorted([f for f in os.listdir(source_path) if f.lower().endswith(EXTENSIONS)])
@@ -161,8 +163,8 @@ def main():
             if date: set_values(audio, 'date', [date])
             save_audio(audio)
     else:
-        # Still set Artist/Album/Year if they were manually overridden
-        if use_auto == 'n':
+        # Still set Artist/Album/Year if they were manually overridden OR fuzzy matched
+        if use_auto == 'n' or artist_changed:
             for f in files:
                 filepath = os.path.join(source_path, f)
                 audio = open_audio(filepath)

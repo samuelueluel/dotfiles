@@ -1,31 +1,16 @@
 # CLI Snippets
 
-- Lock screen | swaylock
-- Suspend & lock | systemctl suspend
-- Reboot | systemctl reboot
-- Power off | systemctl poweroff
-- Process monitor (btm) | btm
-- Network TUI (wlctl) | wlctl
-- Bluetooth TUI | bluetuith
-- Check image status | sudo bootc status
-- Rollback system image | sudo bootc rollback
-- Clean unused flatpaks | flatpak uninstall --unused
-- RTK token savings | rtk gain
-- Logs: Errors current boot | journalctl -p 3 -xb
-- Logs: Greetd (login) follow | journalctl -f -u greetd
-- Logs: User units | journalctl --user -n 100
-- Niri: Toggle debug view | niri msg action toggle-debug-view
-- Boot performance blame | systemd-analyze blame
-- Niri IPC msg | niri msg
-- Chezmoi | chezmoi
-- Tealdeer (tldr) | tldr
-- Sunset (Santa Fe) | night-on
-- Sunset off | night-off
-- Waydroid status | waydroid status
-- Stop Waydroid session | waydroid session stop
-- Refresh music library | rmpc update
-- Restart mpd service | systemctl --user restart mpd
-- Full rescan music library | rmpc rescan
+- Music: Onboard new album | music-onboard
+- Music: Update MPD database | mpc update
+- Music: Toggle MPD play/pause | mpc toggle
+- Music: Clear MPD queue | mpc clear
+- Music: Search MPD | mpc search artist "Name"
+- Music: Full rescan music library | rmpc rescan
+- Music: Restart mpd service | systemctl --user restart mpd
+- Music: Update beets DB for artist | beet update "Artist Name"
+- Music: Search added last week | beet ls added:-1w..
+- Music: View library stats | beet stats
+- Music: Find missing replaygain | beet ls replaygain_album:0
 - Music: Set tags (overwrite grouping/genre) | music-set-tags "/path/to/album" --grouping "R: 4.5" "FL" --genres "Art Rock"
 - Music: Add tag (append grouping/genre) | music-add-tag "/path/to/album" --grouping "[Priority]" --genres "Experimental"
 - Music: Set info (song or album dir) | music-set-info "/path/to/target" --title "Title" --artist "Artist" --album "Album" --track "01" --date "YYYY"
@@ -35,3 +20,31 @@
 - Music: Convert M4A to FLAC | music-m4a-to-flac
 - Music: Fix cover art filenames | music-fix-cover-names "/path/to/album"
 - Music: Extract embedded cover art | music-extract-covers "/path/to/album"
+
+- System: Lock screen | swaylock
+- System: Suspend & lock | systemctl suspend
+- System: Reboot | systemctl reboot
+- System: Power off | systemctl poweroff
+- System: Clean unused flatpaks | flatpak uninstall --unused
+- System: RTK token savings | rtk gain
+- System: Sunset (Santa Fe) | night-on
+- System: Sunset off | night-off
+- System: Chezmoi | chezmoi
+- System: Tealdeer (tldr) | tldr
+- System: Waydroid status | waydroid status
+- System: Stop Waydroid session | waydroid session stop
+
+- TUI: Process monitor (btm) | btm
+- TUI: Network (wlctl) | wlctl
+- TUI: Bluetooth | bluetuith
+
+- Niri: Toggle debug view | niri msg action toggle-debug-view
+- Niri: IPC msg | niri msg
+
+- bootc: Check image status | sudo bootc status
+- bootc: Rollback system image | sudo bootc rollback
+
+- Logs: Errors current boot | journalctl -p 3 -xb
+- Logs: Greetd (login) follow | journalctl -f -u greetd
+- Logs: User units | journalctl --user -n 100
+- Logs: Boot performance blame | systemd-analyze blame
