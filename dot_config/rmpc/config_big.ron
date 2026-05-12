@@ -2,26 +2,6 @@
 #![enable(unwrap_newtypes)]
 #![enable(unwrap_variant_newtypes)]
 (
-    cava: (
-        framerate: 60,
-        autosens: true,
-        sensitivity: 100,
-        lower_cutoff_freq: 30,
-        higher_cutoff_freq: 20000,
-        channels: Mono,
-        input: (
-            method: Fifo,
-            source: "/tmp/mpd.fifo",
-            sample_rate: 44100,
-            channels: 2,
-            samble_bits: 16,
-        ),
-        smoothing: (
-            noise_reduction: 25,
-            monstercat: false,
-            waves: false,
-        ),
-    ),
     address: "127.0.0.1:6600",
     password: None,
     theme: "samuel",
@@ -55,7 +35,6 @@
     keybinds: (
         clear: true,
         global: {
-            "<C-Esc>":      Quit,
             "<C-?>":        ShowHelp,
             "<C-:>":        CommandMode,
             "<C-o>I":       ShowCurrentSongInfo,
@@ -88,15 +67,17 @@
             "<C-u>":        Update,
             "<C-U>":        Rescan,
             "<C-R>":        AddRandom,
-            "<C-g>":        ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-newest-art.sh"]),
-            "<C-f>":        ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-art.sh"]),
-            "<C-h>":        ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-priority.sh"]),
+            "<C-A-g>":        ExternalCommand(command: ["alacritty", "-t", "Alacritty Float", "-e", "rmpc-fzf-newest.sh"]),
+            "<C-g>":      ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-newest-art.sh"]),
+            "<C-A-f>":        ExternalCommand(command: ["alacritty", "-t", "Alacritty Float", "-e", "rmpc-fzf-artist-album.sh"]),
+            "<C-f>":      ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-art.sh"]),
+            "<C-h>":        ExternalCommand(command: ["alacritty", "-t", "Alacritty Float", "-e", "rmpc-fzf-artist-album.sh"]),
             "<C-P>":        ExternalCommand(command: ["rmpc-copy-album-path.sh"]),
+            "<A-g>":        ExternalCommand(command: ["rmpc-toggle-config.sh"]),
         },
         navigation: {
             "<Esc>":      Close,
             "<CR>":       Confirm,
-            "<A-Space>":  Confirm,
             "<Up>":       Up,
             "<A-w>":      Up,
             "<Down>":     Down,
@@ -144,7 +125,6 @@
             "<C-q>":      Delete,
             "<C-Q>":      DeleteAll,
             "<CR>":       Play,
-            "<A-Space>":  Play,
             "C":          JumpToCurrent,
             "<A-z>":      JumpToCurrent,
         },
@@ -179,7 +159,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -215,7 +195,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Split(
@@ -282,110 +262,12 @@
             ),
         ),
         (
-            name: "[Queue + Cava]",
-            pane: Split(
-                direction: Horizontal,
-                panes: [
-                    (
-                        size: "28%",
-                        pane: Split(
-                            direction: Vertical,
-                            panes: [
-                                (size: "0", pane: Pane(Empty())),
-                                (
-                                    size: "100%",
-                                    borders: "ALL",
-                                    border_symbols: Thick,
-                                    pane: Pane(AlbumArt)
-                                ),
-                                (size: "0", pane: Pane(Empty())),
-                                (
-                                    size: "11",
-                                    borders: "ALL",
-                                    border_symbols: Thick,
-                                    border_title: [
-                                        (kind: Text(" ")),
-                                        (kind: Property(Status(RepeatV2(on_label: "rep", off_label: "rep", on_style: (fg: "red"), off_style: (fg: "yellow"))))),
-                                        (kind: Text("/"), style: (fg: "yellow")),
-                                        (kind: Property(Status(RandomV2(on_label: "rnd", off_label: "rnd", on_style: (fg: "red"), off_style: (fg: "yellow"))))),
-                                        (kind: Text("/"), style: (fg: "yellow")),
-                                        (kind: Property(Status(ConsumeV2(on_label: "csm", off_label: "csm", oneshot_label: "csm", on_style: (fg: "red"), off_style: (fg: "yellow"), oneshot_style: (fg: "magenta"))))),
-                                        (kind: Text("/"), style: (fg: "yellow")),
-                                        (kind: Property(Status(SingleV2(on_label: "sgl", off_label: "sgl", oneshot_label: "sgl", on_style: (fg: "red"), off_style: (fg: "yellow"), oneshot_style: (fg: "magenta"))))),
-                                        (kind: Text(" "))
-                                    ],
-                                    border_title_position: Bottom,
-                                    border_title_alignment: Center,
-                                    pane: Component("song_info_and_controls")
-                                ),
-                            ]
-                        )
-                    ),
-                    (size: "1", pane: Pane(Empty())),
-                    (
-                        size: "72%",
-                        borders: "ALL",
-                        border_symbols: Thick,
-                        pane: Split(
-                            direction: Vertical,
-                            panes: [
-                                (
-                                    size: "50%",
-                                    pane: Split(
-                                        direction: Vertical,
-                                        panes: [
-                                            (
-                                                size: "1",
-                                                pane: Split(
-                                                    direction: Horizontal,
-                                                    panes: [
-                                                        (size: "1", pane: Pane(Empty())),
-                                                        (size: "100%", pane: Pane(QueueHeader())),
-                                                    ]
-                                                )
-                                            ),
-                                            (
-                                                size: "1",
-                                                pane: Split(
-                                                    direction: Horizontal,
-                                                    panes: [
-                                                        (size: "1", pane: Pane(Empty())),
-                                                        (size: "100%", borders: "TOP", border_symbols: Plain, pane: Pane(Empty())),
-                                                        (size: "2", pane: Pane(Empty())),
-                                                    ]
-                                                )
-                                            ),
-                                            (
-                                                size: "100%",
-                                                pane: Split(
-                                                    direction: Horizontal,
-                                                    panes: [
-                                                        (size: "1", pane: Pane(Empty())),
-                                                        (size: "100%", pane: Pane(Queue)),
-                                                    ]
-                                                )
-                                            ),
-                                        ],
-                                    )
-                                ),
-                                (size: "1", pane: Pane(Empty())),
-                                (
-                                    size: "50%",
-                                    pane: Pane(Cava)
-                                ),
-                            ],
-                        )
-                    ),
-                ],
-            )
-        ),
-        (
             name: "[Artists]",
             pane: Split(
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -421,7 +303,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Artists)
@@ -435,7 +317,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -471,7 +353,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Albums)
@@ -485,7 +367,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -521,7 +403,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Browser(root_tag: "genre"))
@@ -535,7 +417,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -571,7 +453,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Browser(root_tag: "grouping"))
@@ -585,7 +467,7 @@
                 direction: Horizontal,
                 panes: [
                     (
-                        size: "28%",
+                        size: "32%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
@@ -621,7 +503,7 @@
                     ),
                     (size: "1", pane: Pane(Empty())),
                     (
-                        size: "72%",
+                        size: "68%",
                         borders: "ALL",
                         border_symbols: Thick,
                         pane: Pane(Playlists)
@@ -637,11 +519,6 @@
                 size: "100%",
                 direction: Vertical,
                 panes: [(pane: Pane(Search), size: "100%", borders: "ALL", border_symbols: Thick)],
-            )
-        ),
-    ],
-)
- size: "100%", borders: "ALL", border_symbols: Thick)],
             )
         ),
     ],

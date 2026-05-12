@@ -67,21 +67,6 @@ def get_metadata(path: str) -> Tuple[Optional[str], Optional[str], Optional[str]
     
     return artist, album, date
 
-def fuzzy_match_artist(artist_name: str) -> str:
-    """Suggest an existing artist folder if a close match is found."""
-    if not os.path.exists(MUSIC_DIR):
-        return artist_name
-    
-    existing_artists = [d for d in os.listdir(MUSIC_DIR) if os.path.isdir(os.path.join(MUSIC_DIR, d))]
-    matches = difflib.get_close_matches(artist_name, existing_artists, n=1, cutoff=0.8)
-    
-    if matches and matches[0] != artist_name:
-        print(f"\nFuzzy match found: '{matches[0]}' (Existing) vs '{artist_name}' (Typed)")
-        choice = input(f"Use existing artist folder '{matches[0]}'? [Y/n]: ").lower()
-        if choice != 'n':
-            return matches[0]
-    return artist_name
-
 def select_dir_fzf() -> Optional[str]:
     """Use fzf to select a directory in Downloads."""
     cmd = f"find {DOWNLOADS_DIR} -mindepth 1 -maxdepth 2 -type d"
@@ -136,11 +121,6 @@ def main():
         print("Error: Artist and Album are required.")
         sys.exit(1)
 
-    # Fuzzy match artist to avoid duplicates
-    new_artist = fuzzy_match_artist(artist)
-    artist_changed = (new_artist != artist)
-    artist = new_artist
-
     # 3. Metadata (Track Level)
     files = sorted([f for f in os.listdir(source_path) if f.lower().endswith(EXTENSIONS)])
     if input("\nEdit track titles and numbers? [y/N]: ").lower() == 'y':
@@ -163,8 +143,8 @@ def main():
             if date: set_values(audio, 'date', [date])
             save_audio(audio)
     else:
-        # Still set Artist/Album/Year if they were manually overridden OR fuzzy matched
-        if use_auto == 'n' or artist_changed:
+        # Still set Artist/Album/Year if they were manually overridden
+        if use_auto == 'n':
             for f in files:
                 filepath = os.path.join(source_path, f)
                 audio = open_audio(filepath)
@@ -175,7 +155,39 @@ def main():
                     save_audio(audio)
 
     # 4. Relocation
-    target_dir = os.path.join(MUSIC_DIR, artist, album)
+    print("\n--- Relocation ---")
+    # Build dictionary of existing folders across Main and USB libraries
+    existing_folders = {}
+    usb_dir = os.path.join(MUSIC_DIR, "USB_Library")
+    for base_dir in [MUSIC_DIR, usb_dir]:
+        if os.path.exists(base_dir):
+            for d in os.listdir(base_dir):
+                if os.path.isdir(os.path.join(base_dir, d)) and d != "USB_Library":
+                    existing_folders[d] = base_dir
+
+    # Default folder name strips trailing dots that cause issues
+    artist_folder = artist.rstrip('.')
+    target_base = MUSIC_DIR
+    
+    matches = difflib.get_close_matches(artist_folder, existing_folders.keys(), n=1, cutoff=0.7)
+    if matches:
+        match = matches[0]
+        match_base = existing_folders[match]
+        rel_base = "USB_Library" if match_base == usb_dir else "Main Library"
+        print(f"Found existing artist folder: {match} ({rel_base})")
+        if input("Use this existing folder? [Y/n]: ").lower() != 'n':
+            artist_folder = match
+            target_base = match_base
+        else:
+            artist_folder = input(f"Enter new folder name [{artist_folder}]: ") or artist_folder
+            if input("Place in USB_Library? [y/N]: ").lower() == 'y':
+                target_base = usb_dir
+    else:
+        artist_folder = input(f"Artist folder name [{artist_folder}]: ") or artist_folder
+        if input("Place in USB_Library? [y/N]: ").lower() == 'y':
+            target_base = usb_dir
+
+    target_dir = os.path.join(target_base, artist_folder, album)
     if os.path.exists(target_dir):
         print(f"\nTarget directory already exists: {target_dir}")
         if input("Merge into existing directory? [y/N]: ").lower() != 'y':
@@ -202,7 +214,38 @@ def main():
     # 5. Cleanup & Cover Art
     print("\n--- Processing Cover Art ---")
     run_command(["music-fix-cover-names", target_dir])
-    run_command(["music-extract-covers", target_dir])
+    
+    def has_cover():
+        for ext in ['jpg', 'jpeg', 'png', 'webp']:
+            if os.path.exists(os.path.join(target_dir, f"cover.{ext}")) or os.path.exists(os.path.join(target_dir, f"Cover.{ext}")):
+                return True
+        return False
+
+    if not has_cover():
+        images = [f for f in os.listdir(target_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+        if images:
+            images.sort(key=lambda x: os.path.getsize(os.path.join(target_dir, x)), reverse=True)
+            src_img = os.path.join(target_dir, images[0])
+            ext = os.path.splitext(images[0])[1].lower()
+            if ext == '.jpeg': ext = '.jpg'
+            dst_img = os.path.join(target_dir, f"cover{ext}")
+            print(f"Renamed {images[0]} to cover{ext}")
+            shutil.move(src_img, dst_img)
+
+    if not has_cover():
+        run_command(["music-extract-covers", target_dir])
+
+    if not has_cover():
+        print("\n[!] WARNING: No cover art found or extracted.")
+        url = input("Enter Image URL to download cover art (or press Enter to skip): ").strip()
+        if url:
+            cmd = ["curl", "-s", "-L", "-o", os.path.join(target_dir, "cover.jpg"), url]
+            if run_command(cmd):
+                print("Cover downloaded successfully.")
+            else:
+                print("Failed to download cover art.")
+    else:
+        print("Cover art confirmed.")
 
     # 6. Custom Tags (Grouping & Genres)
     print("\n--- Specialized Tagging ---")
