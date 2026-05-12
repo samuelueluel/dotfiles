@@ -3,12 +3,12 @@
 
 # 1. Fetch all unique albums from beets items sorted by 'added' date
 # We query items (no -a) to get the true '$artist' field, then deduplicate.
-DATA=$(beet ls -f '$added|$artist|$album' | sort -u | sort -rn | awk -F'|' '
+DATA=$(sqlite3 "$HOME/.config/beets/library.db" "SELECT artist || '|' || album FROM items GROUP BY artist, album ORDER BY MAX(added) DESC" | awk -F'|' '
     {
-        artist = ($2 != "" ? $2 : "Unknown Artist")
+        artist = ($1 != "" ? $1 : "Unknown Artist")
         # Format for display: [Artist] Album
         # We also pass the Artist and Album as hidden fields for the preview script
-        printf "\033[38;2;23;193;130m[%s]\033[0m %s\t%s\t%s\n", artist, $3, artist, $3
+        printf "\033[38;2;23;193;130m[%s]\033[0m %s\t%s\t%s\n", artist, $2, artist, $2
     }
 ')
 

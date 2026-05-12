@@ -3,7 +3,7 @@ name = "Snippets"
 description = "Search and execute CLI snippets"
 
 [source]
-command = "grep -oP '^-\\s+\\K.*' {{ .chezmoi.homeDir }}/.config/television/snippets.md | sort"
+command = "grep -oP '^-\\s+\\K.*' /var/home/samuel/.config/television/snippets.md | sort"
 display = "{split: | :0}"
 no_sort = true
 
@@ -11,14 +11,8 @@ no_sort = true
 command = "echo '{}' | awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//'"
 
 [keybindings]
-enter = "actions:execute"
+enter = "actions:copy"
 ctrl-c = "actions:copy"
-alt-c = "actions:copy"
-
-[actions.execute]
-description = "Execute snippet"
-command = "zsh -c \"$(echo '{}' | awk -F '|' '{print $2}' | sed 's/^[[:space:]]*//')\""
-mode = "execute"
 
 [actions.copy]
 description = "Copy snippet to clipboard"
