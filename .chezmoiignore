@@ -1,1 +1,6 @@
 zen-extensions
+
+# noctalia-shell replaces these; sources kept in repo but no longer deployed
+.config/swayidle
+.config/swaylock
+.local/share/applications/swaylock.desktop
