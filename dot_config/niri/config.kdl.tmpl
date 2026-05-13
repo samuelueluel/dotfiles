@@ -2,6 +2,14 @@
 // "/-" comments out the following node.
 // Check the wiki for a full description of the configuration:
 // https://yalter.github.io/niri/Configuration:-Introduction
+//
+// Noctalia variant — differences from config.kdl:
+//   - Noctalia spawned instead of waybar/swaync/swayosd/swww
+//   - Volume/brightness binds use wpctl + brightnessctl (noctalia OSD observes via signals)
+//   - Mod+Y/X use noctalia IPC for notifications
+//   - Waybar layer-rule removed
+//   - fsel window rule + opacity entry removed
+//   - noctalia.kdl include uncommented
 
 // ============================================================
 // NAMED WORKSPACES
@@ -227,14 +235,8 @@ gestures {
 // STARTUP
 // ============================================================
 
-// ── Bar + notifications ───────────────────────────────────────────────────
-spawn-at-startup "swww-daemon"
-spawn-at-startup "sh" "-c" "~/.local/bin/random-wallpaper.sh"
-spawn-at-startup "waybar"
-spawn-at-startup "swaync"
-
-// ── OSD (volume/brightness popups) ───────────────────────────────────────
-spawn-at-startup "swayosd-server"
+// ── Shell (Noctalia) ──────────────────────────────────────────────────────
+spawn-at-startup "sh" "-c" "sleep 2 && qs -c noctalia-shell"
 
 // ── Clipboard daemon ──────────────────────────────────────────────────────
 spawn-at-startup "sh" "-c" "rm -f ~/.local/share/cclip/db.sqlite3* && cclipd -s 2 -t image/png -t 'image/*' -t 'text/plain;charset=utf-8' -t 'text/*'"
@@ -243,11 +245,10 @@ spawn-at-startup "sh" "-c" "rm -f ~/.local/share/cclip/db.sqlite3* && cclipd -s 
 spawn-at-startup "kanshi"
 
 // ── Night light ───────────────────────────────────────────────────────────
-// spawn-at-startup "wlsunset" "-l" "39.0" "-L" "-77.0"   // US East Coast — adjust lat/lon as needed
-
+// spawn-at-startup "wlsunset" "-l" "39.0" "-L" "-77.0"   // US East Coast — noctalia NightLight widget controls this
 
 // ── Idle management ───────────────────────────────────────────────────────
-spawn-at-startup "swayidle" "-w"
+// Handled by noctalia-shell (IdleService via ext-idle-notify-v1) — no swayidle.
 
 // ── Apps ──────────────────────────────────────────────────────────────────
 spawn-at-startup "sh" "-c" "sleep 5 && dropbox start -i"
@@ -255,6 +256,10 @@ spawn-at-startup "sh" "-c" "sleep 5 && flatpak run com.github.wwmm.easyeffects -
 spawn-at-startup "/usr/bin/niriusd"
 spawn-at-startup "udiskie" "--no-tray" // auto-mount USB / external drives
 // mpris-proxy removed: airpods-media.service (evdev daemon) handles routing to Quod Libet directly
+
+debug {
+    honor-xdg-activation-with-invalid-serial
+}
 
 // ============================================================
 // WINDOW RULES
@@ -316,13 +321,6 @@ window-rule {
     open-floating true
     default-column-width { fixed 1500; }
     default-window-height { fixed 800; }
-}
-
-window-rule {
-    match title="fsel-launcher"
-    open-floating true
-    default-column-width { fixed 300; }
-    default-window-height { fixed 400; }
 }
 
 window-rule {
@@ -416,7 +414,6 @@ window-rule { // transparency set in app-specific config to prevent text from di
     match app-id="kitty-launcher"
     match title="Ghostty Float"
     match title="Obsidian Quick Note"
-    match title="fsel-launcher"
     match title="Keybind Search"
     match title="bluetuith"
     match title="btm"
@@ -483,13 +480,6 @@ layer-rule {
 }
 
 layer-rule {
-    match namespace="^waybar$"
-    background-effect {
-        blur true
-    }
-}
-
-layer-rule {
     match namespace="^niri-minimap$"
     geometry-corner-radius 12
     background-effect {
@@ -522,11 +512,9 @@ binds {
     // -----------------------------------
 
     XF86MenuKB hotkey-overlay-title="Toggle minimap" repeat=false { spawn "niri-minimap"; }
-    Mod+B hotkey-overlay-title="Toggle Waybar" { spawn-sh "pkill -SIGUSR1 waybar || waybar"; }
-    Mod+Ctrl+Space hotkey-overlay-title="App launcher (fsel)" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "fsel-launcher" "fsel" "--detach"; }
     Mod+Space hotkey-overlay-title="Television Hub" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "TV Hub" "-e" "sh" "-c" "sleep 0.1 && exec /home/linuxbrew/.linuxbrew/bin/tv 'Television Hub'"; }
-    Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "swaync-client" "-t"; }
-    Mod+X hotkey-overlay-title="Clear all notifications" { spawn "swaync-client" "-C"; }
+    Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "qs" "ipc" "call" "notifications" "toggle"; }
+    Mod+X hotkey-overlay-title="Clear all notifications" { spawn "qs" "ipc" "call" "notifications" "clear"; }
 
     // -----------------------------------
     // APPLICATION LAUNCHERS
@@ -582,7 +570,6 @@ binds {
     //Mod+I hotkey-overlay-title="Toggle focus mode (wallpaper + centering + opacity)" repeat=false { spawn "niri-mode-toggle"; }
     // NOTE: niri-tile-toggle script is fragile — it hardcodes gap/border values. Update the script if gaps or borders change in this config.
     Mod+I hotkey-overlay-title="Toggle tile-scroll mode (50% columns)" repeat=false { spawn "niri-tile-toggle"; }
-    Mod+Ctrl+B hotkey-overlay-title="Toggle waybar tray" repeat=false { spawn "waybar-tray-toggle"; }
     Mod+Ctrl+I hotkey-overlay-title="Resize right column to complement of focused" repeat=false { spawn "niri-complement-column"; }
 
     Mod+Tab hotkey-overlay-title="Focus previous window" { focus-window-previous; }
@@ -687,13 +674,13 @@ binds {
     // VOLUME AND BRIGHTNESS
     // -----------------------------------
 
-    XF86AudioRaiseVolume allow-when-locked=true { spawn "swayosd-client" "--output-volume" "raise"; }
-    XF86AudioLowerVolume allow-when-locked=true { spawn "swayosd-client" "--output-volume" "lower"; }
-    XF86AudioMute        allow-when-locked=true { spawn "swayosd-client" "--output-volume" "mute-toggle"; }
-    XF86AudioMicMute     allow-when-locked=true { spawn "swayosd-client" "--input-volume" "mute-toggle"; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%+"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
+    XF86AudioMute        allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
 
-    XF86MonBrightnessUp   allow-when-locked=true { spawn "swayosd-client" "--brightness" "raise"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "swayosd-client" "--brightness" "lower"; }
+    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "set" "5%+"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "set" "5%-"; }
 
     // -----------------------------------
     // SCREENSHOTS
@@ -704,8 +691,6 @@ binds {
     Alt+Print  { screenshot-window; }
 
 }
-
-//include "./noctalia.kdl" // Noctalia places this here to enforce Template color scheme onto Niri elements; usually don't want this
 
 // ============================================================
 // WINDOW RULES
@@ -719,6 +704,6 @@ window-rule {
 
 window-rule {
     match is-focused=false
-    geometry-corner-radius 60
+    geometry-corner-radius 30
     clip-to-geometry true
 }
