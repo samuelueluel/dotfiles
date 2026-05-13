@@ -388,7 +388,7 @@ window-rule {
 
 // --- Opacity and Blur ---
 
-// 1. Opacity of focused window --- exceptions below
+// Opacity of focused window --- exceptions below
 window-rule {
     //match is-active=false
     //exclude is-floating=true
@@ -400,12 +400,6 @@ window-rule {
 window-rule {
     match app-id="obsidian"
     opacity 1.0
-}
-
-// 3. Exceptions for lower opacity
-window-rule {
-    //match app-id="io.github.quodlibet.QuodLibet"
-    //opacity 0.7
 }
 
 window-rule { // transparency set in app-specific config to prevent text from dimming
@@ -698,7 +692,7 @@ binds {
 
 window-rule {
     match is-focused=true
-    geometry-corner-radius 0
+    geometry-corner-radius 5
     clip-to-geometry true
 }
 
