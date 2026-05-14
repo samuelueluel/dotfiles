@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Zen (Work)
+GenericName=Web Browser
+Comment=Work and productivity profile
+Exec=env MOZ_APP_REMOTINGNAME=zen-work zen-browser -P "work" --new-instance
+Icon=applications-office
+Terminal=false
+Type=Application
+Categories=Network;WebBrowser;
+StartupWMClass=zen-work

@@ -6,14 +6,18 @@ description = "Application launcher"
 ui_scale = 80
 
 [ui.preview_panel]
-hidden = true
+size = 50
+border_type = "thick"
+padding = { left = 2, right = 0, top = 1, bottom = 0 }
+word_wrap = false
+hidden = false
 
 [source]
 command = "{{ .chezmoi.homeDir }}/.local/bin/tv-list-apps.py"
 display = "{split:;:0}"
 
 [preview]
-command = "echo 'Launch: {}'"
+command = "{{ .chezmoi.homeDir }}/.local/bin/tv-preview-app.py '{}'"
 
 [keybindings]
 enter = "actions:app-launch"

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Zen (Personal)
+GenericName=Web Browser
+Comment=Personal browsing profile
+Exec=env MOZ_APP_REMOTINGNAME=zen-personal zen-browser -P "personal" --new-instance
+Icon=a7xpg
+Terminal=false
+Type=Application
+Categories=Network;WebBrowser;
+StartupWMClass=zen-personal

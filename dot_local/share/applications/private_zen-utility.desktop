@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Zen (Utility)
+GenericName=Web Browser
+Comment=Secondary/Utility browsing profile
+Exec=env MOZ_APP_REMOTINGNAME=zen-utility zen-browser --profile /var/home/samuel/.config/zen/zen.utility %u
+Icon=braindump
+Terminal=false
+Type=Application
+Categories=Network;WebBrowser;
+StartupWMClass=zen-utility
+MimeType=x-scheme-handler/unknown;x-scheme-handler/about;x-scheme-handler/https;x-scheme-handler/http;text/html;
