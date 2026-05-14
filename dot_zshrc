@@ -47,7 +47,7 @@ fi
 
 # atuin: shell history
 if command -v atuin >/dev/null; then
-  if [[ -f /usr/share/samuel-niri/image-id ]]; then
+  if [[ -f /usr/share/turquoise/image-id || -f /usr/share/samuel-niri/image-id ]]; then
     export ATUIN_DATA_DIR="$HOME/.local/share/atuin-samuel"
   else
     export ATUIN_DATA_DIR="$HOME/.local/share/atuin-samuel-bluefin"
