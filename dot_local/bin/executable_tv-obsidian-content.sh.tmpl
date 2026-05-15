@@ -31,7 +31,9 @@ selected=$(
        --ansi \
        --source-output="{strip_ansi}" \
        --preview-command="$RG --color=always -C2 '$query' \"$VAULT_DIR/{strip_ansi}\"" \
-       --preview-size=60 \
+       --preview-size=70 \
+       --preview-word-wrap \
+       --preview-border=thick \
        --input-header="Results: $query" \
        --layout=portrait
 )

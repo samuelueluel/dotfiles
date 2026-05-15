@@ -11,6 +11,13 @@ output = "{strip_ansi}"
 [ui]
 orientation = "portrait"
 
+[ui.preview_panel]
+size = 70
+scrollbar = true
+word_wrap = true
+border_type = "thick"
+hidden = false
+
 [preview]
 command = "bat --color=always --style=plain \"{{ .obsidian.vault_path }}/{strip_ansi}\""
 

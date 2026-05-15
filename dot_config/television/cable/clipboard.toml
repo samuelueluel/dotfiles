@@ -5,6 +5,13 @@ description = "Clipboard manager"
 [ui]
 orientation = "portrait"
 
+[ui.preview_panel]
+size = 70
+scrollbar = true
+word_wrap = true
+border_type = "thick"
+hidden = false
+
 [source]
 command = "cclip list"
 display = "{split:\t:2}"

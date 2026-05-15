@@ -5,13 +5,16 @@ description = "Browse and open folders in Yazi"
 [ui.preview_panel]
 hidden = true
 
+[ui]
+ui_scale = 70
+
 [source]
-command = "fd -H -t d . /var/home/samuel/ | awk '{ match($0, /.*\\//); dir = substr($0, 1, RLENGTH); file = substr($0, RLENGTH+1); prefix = \"/var/home/samuel/\"; if (index(dir, prefix) == 1) { rest_dir = substr(dir, length(prefix) + 1); printf \"\\033[38;2;208;167;175m%s\\033[36m%s\\033[0m%s\\n\", prefix, rest_dir, file; } else { printf \"\\033[36m%s\\033[0m%s\\n\", dir, file; } }'"
+command = "fd -H -t d . /var/home/samuel/ | awk '{ gsub(\"/var/home/samuel/\", \"~/\"); match($0, /.*\\//); dir = substr($0, 1, RLENGTH); file = substr($0, RLENGTH+1); printf \"\\033[36m%s\\033[0m%s\\n\", dir, file }'"
 ansi = true
 output = "{strip_ansi}"
 
 [preview]
-command = "lsd --tree --depth 2 --color=always '{strip_ansi}'"
+command = "bash -c 'p=$(sed \"s|^~/|/var/home/samuel/|\" <<< \"$1\"); lsd --tree --depth 2 --color=always \"$p\"' -- '{strip_ansi}'"
 
 [keybindings]
 enter = "actions:open"
@@ -20,10 +23,10 @@ ctrl-c = "actions:copy"
 
 [actions.open]
 description = "Open in Yazi"
-command = "niri msg action spawn -- kitty -e yazi \"{strip_ansi}\""
+command = "bash -c 'p=$(sed \"s|^~/|/var/home/samuel/|\" <<< \"$1\"); niri msg action spawn -- kitty -e yazi \"$p\"' -- \"{strip_ansi}\""
 mode = "execute"
 
 [actions.copy]
-description = "Copy to clipboard (stripped)"
-command = "printf '%s' \"{strip_ansi}\" | wl-copy"
+description = "Copy to clipboard (full path)"
+command = "printf '%s' \"{strip_ansi}\" | sed 's|^~/|/var/home/samuel/|' | wl-copy"
 mode = "fork"

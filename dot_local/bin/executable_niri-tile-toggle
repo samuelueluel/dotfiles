@@ -185,8 +185,7 @@ else
     cp "$CONFIG" "$BACKUP"
     sed -i --follow-symlinks 's/center-focused-column "[^"]*"/center-focused-column "never"/' "$CONFIG"
     sed -i --follow-symlinks 's/^\(\s*\)gaps [0-9]\+/\1gaps 2/' "$CONFIG"
-    sed -i --follow-symlinks 's/width [0-9]\+ \/\/ 1 current/width 0 \/\/ 1 current/' "$CONFIG"
-    sed -i --follow-symlinks 's/width [0-9]\+ \/\/ 3 current/width 2 \/\/ 3 current/' "$CONFIG"
+    sed -i --follow-symlinks "s/width [0-9]\\+ \\/\\/ \\*\\*don't remove this comment, it's needed by niri-tile-toggle\\*\\*/width 2 \\/\\/ \\*\\*don't remove this comment, it's needed by niri-tile-toggle\\*\\*/" "$CONFIG"
     sed -i --follow-symlinks 's/default-column-width { proportion 0\.[0-9]\+; }/default-column-width { proportion 0.5; }/' "$CONFIG"
 
     # Set all 0.x opacities to 1.0

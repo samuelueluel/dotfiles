@@ -42,7 +42,7 @@
     "bar": {
         "autoHideDelay": 500,
         "autoShowDelay": 150,
-        "backgroundOpacity": 0.4,
+        "backgroundOpacity": 0.7000000000000001,
         "barType": "simple",
         "capsuleColorKey": "secondary",
         "capsuleOpacity": 0.29,
@@ -260,7 +260,7 @@
             }
         ],
         "diskPath": "/",
-        "position": "center",
+        "position": "close_to_bar_button",
         "shortcuts": {
             "left": [
                 {
@@ -318,6 +318,12 @@
                         "videoSource": "portal"
                     },
                     "id": "plugin:screen-recorder"
+                },
+                {
+                    "defaultSettings": {
+                        "iconColor": "none"
+                    },
+                    "id": "plugin:color-scheme-creator"
                 }
             ]
         }
@@ -374,7 +380,7 @@
         "clockFormat": "h:mm AP ",
         "clockStyle": "custom",
         "compactLockScreen": true,
-        "dimmerOpacity": 0,
+        "dimmerOpacity": 0.64,
         "enableBlurBehind": true,
         "enableLockScreenCountdown": true,
         "enableLockScreenMediaControls": false,
@@ -471,7 +477,7 @@
         "weatherTaliaMascotAlways": false
     },
     "network": {
-        "bluetoothAutoConnect": true,
+        "bluetoothAutoConnect": false,
         "bluetoothDetailsViewMode": "grid",
         "bluetoothHideUnnamedDevices": false,
         "bluetoothRssiPollIntervalMs": 60000,
@@ -645,13 +651,13 @@
         "fontDefaultScale": 1,
         "fontFixed": "JetBrainsMono NF",
         "fontFixedScale": 1,
-        "panelBackgroundOpacity": 0.9,
+        "panelBackgroundOpacity": 0.7000000000000001,
         "panelsAttachedToBar": true,
         "scrollbarAlwaysVisible": true,
-        "settingsPanelMode": "centered",
+        "settingsPanelMode": "attached",
         "settingsPanelSideBarCardStyle": false,
         "tooltipsEnabled": true,
-        "translucentWidgets": true
+        "translucentWidgets": false
     },
     "wallpaper": {
         "automationEnabled": true,
@@ -674,7 +680,7 @@
         "setWallpaperOnAllMonitors": true,
         "showHiddenFiles": false,
         "skipStartupTransition": false,
-        "solidColor": "#1a1a2e",
+        "solidColor": "#000000",
         "sortOrder": "name",
         "transitionDuration": 1500,
         "transitionEdgeSmoothness": 0.05,
@@ -688,13 +694,13 @@
         ],
         "useOriginalImages": false,
         "useSolidColor": false,
-        "useWallhaven": true,
-        "viewMode": "single",
+        "useWallhaven": false,
+        "viewMode": "browse",
         "wallhavenApiKey": "",
         "wallhavenCategories": "101",
         "wallhavenOrder": "desc",
         "wallhavenPurity": "100",
-        "wallhavenQuery": "cliff",
+        "wallhavenQuery": "canyon",
         "wallhavenRatios": "",
         "wallhavenResolutionHeight": "1080",
         "wallhavenResolutionMode": "atleast",

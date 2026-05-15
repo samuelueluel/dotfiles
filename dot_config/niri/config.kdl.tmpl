@@ -110,7 +110,7 @@ layout {
 
     border {
         //off
-        width 1
+        width 1 // **don't remove this comment, it's needed by niri-tile-toggle**
         active-color "#00B6C2"  // theme turquoise
         inactive-color "#D0A7AF" // theme dusty rose
         urgent-color "#EE9D00" // theme gold
@@ -467,6 +467,14 @@ layer-rule {
     }
 }
 
+layer-rule {
+    match namespace="^rofi$"
+    geometry-corner-radius 8
+    background-effect {
+        blur true
+    }
+}
+
 
 // ============================================================
 // KEYBINDS
@@ -493,6 +501,7 @@ binds {
 
     XF86MenuKB hotkey-overlay-title="Toggle minimap" repeat=false { spawn "niri-minimap"; }
     Mod+Space hotkey-overlay-title="Television Hub" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "TV Hub" "-e" "sh" "-c" "sleep 0.1 && exec /home/linuxbrew/.linuxbrew/bin/tv 'Television Hub'"; }
+    Mod+Ctrl+Space hotkey-overlay-title="Launcher (rofi)" repeat=false { spawn "rofi" "-show" "drun"; }
     Mod+B hotkey-overlay-title="Toggle bar visibility" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "bar" "toggle"; }
     // Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "qs" "ipc" "call" "notifications" "toggle"; }
     // Mod+X hotkey-overlay-title="Clear all notifications" { spawn "qs" "ipc" "call" "notifications" "clear"; }
@@ -503,8 +512,8 @@ binds {
 
     Mod+Grave hotkey-overlay-title="Spawn Ghostty"  repeat=false { spawn "ghostty"; }
     Mod+Ctrl+Grave hotkey-overlay-title="Spawn floating Ghostty" repeat=false { spawn "ghostty" "--title=Ghostty Float"; }
-    Mod+E hotkey-overlay-title="Spawn floating Yazi (auto-close on open)" repeat=false { spawn "env" "YAZI_FLOAT=1" "kitty" "--title" "Yazi Float" "-e" "zsh" "-c" "exec yazi"; }
-    Mod+Ctrl+E hotkey-overlay-title="Spawn Yazi file manager" repeat=false { spawn "kitty" "--title" "yazi" "-e" "zsh" "-c" "exec yazi"; }
+    Mod+Ctrl+E hotkey-overlay-title="Spawn floating Yazi (auto-close on open)" repeat=false { spawn "env" "YAZI_FLOAT=1" "kitty" "--title" "Yazi Float" "-e" "zsh" "-c" "exec yazi"; }
+    Mod+E hotkey-overlay-title="Spawn Yazi file manager" repeat=false { spawn "kitty" "--title" "yazi" "-e" "zsh" "-c" "exec yazi"; }
     Mod+N hotkey-overlay-title="Quick Note to Obsidian" repeat=false { spawn "ghostty" "--title=Obsidian Quick Note" "-e" "obsidian-quick-note.sh"; }
 
     // -----------------------------------
@@ -685,6 +694,6 @@ window-rule {
 
 window-rule {
     match is-focused=false
-    geometry-corner-radius 30
+    geometry-corner-radius 35
     clip-to-geometry true
 }

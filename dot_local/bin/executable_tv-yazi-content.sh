@@ -5,29 +5,36 @@ echo -n "Search content: "
 read -r query
 [ -z "$query" ] && exit 0
 
-selected=$(
-    $RG -l "$query" "$PWD" |
-    awk '{
-      match($0, /.*\//);
-      dir = substr($0, 1, RLENGTH);
-      file = substr($0, RLENGTH+1);
-      prefix = "/var/home/samuel/";
-      if (index(dir, prefix) == 1) {
-        rest_dir = substr(dir, length(prefix) + 1);
-        printf "\033[38;2;208;167;175m%s\033[36m%s\033[0m%s\n", prefix, rest_dir, file;
-      } else {
-        printf "\033[36m%s\033[0m%s\n", dir, file;
-      }
-    }' |
-    tv --source-command="cat" \
-       --ansi \
-       --source-output="{strip_ansi}" \
-       --preview-command="$RG --color=always -C2 '$query' \"{strip_ansi}\"" \
-       --preview-size=60 \
-       --input-header="Results: $query" \
-       --layout=portrait
-)
+while true; do
+    output=$(
+        $RG -l "$query" "$PWD" |
+        awk '{
+          gsub("/var/home/samuel/", "~/");
+          match($0, /.*\//);
+          dir = substr($0, 1, RLENGTH);
+          file = substr($0, RLENGTH+1);
+          printf "\033[36m%s\033[0m%s\n", dir, file;
+        }' |
+        tv --source-command="cat" \
+           --ansi \
+           --source-output="{strip_ansi}" \
+           --preview-command="/var/home/samuel/.local/bin/tv-ripgrep-preview.sh '$query' '{strip_ansi}'" \
+           --preview-size=60 \
+           --input-header="Results: $query" \
+           --layout=portrait \
+           --expect='ctrl-c'
+    )
 
-[ -z "$selected" ] && exit 0
+    [ -z "$output" ] && exit 0
 
-niri msg action spawn -- kitty -e yazi "$selected"
+    key=$(head -1 <<< "$output")
+    path=$(tail -1 <<< "$output")
+    path=$(sed 's|^~/|/var/home/samuel/|' <<< "$path")
+
+    if [ "$key" = "ctrl-c" ]; then
+        printf '%s' "$path" | wl-copy
+    else
+        niri msg action spawn -- kitty -e yazi "$path"
+        exit 0
+    fi
+done
