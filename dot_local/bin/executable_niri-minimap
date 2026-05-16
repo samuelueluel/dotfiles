@@ -164,7 +164,7 @@ CELL_PAD = 0  # px, outer margin around each tile (space outside the ring)
 TILE_PAD = 2  # px, inner padding between icon and the ring
 COL_SPACING = 7  # px, horizontal gap between columns
 TILE_SPACING = 4  # px, vertical gap between tiles in a column
-WS_SPACING = 11  # px, vertical gap between workspaces
+WS_SPACING = 7  # px, vertical gap between workspaces
 
 # Borders & radii
 BORDER_WIDTH = 4  # px, highlight ring around focused/active tiles
@@ -318,13 +318,6 @@ class MinimapWindow(Gtk.Window):
         self.outer.set_valign(Gtk.Align.CENTER)
         self.outer.add_css_class("minimap-outer")
 
-        display = Gdk.Display.get_default()
-        monitors = display.get_monitors()
-        if monitors and monitors.get_n_items() > 0:
-            monitor = monitors.get_item(0)
-            geometry = monitor.get_geometry()
-            min_width = int(geometry.width * MINIMAP_WIDTH)
-            self.outer.set_size_request(min_width, -1)
 
         self.frame = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=WS_SPACING)
         self.frame.set_margin_top(11)
@@ -332,7 +325,25 @@ class MinimapWindow(Gtk.Window):
         self.frame.set_margin_start(12)
         self.frame.set_margin_end(12)
         self.outer.append(self.frame)
-        self.set_child(self.outer)
+
+        # Wrap outer in an Overlay so the hover label can float over content
+        self._overlay_wrapper = Gtk.Overlay()
+        self._overlay_wrapper.set_child(self.outer)
+
+        self._hover_label = Gtk.Label()
+        self._hover_label.set_visible(False)
+        self._hover_label.set_halign(Gtk.Align.START)
+        self._hover_label.set_valign(Gtk.Align.START)
+        self._hover_label.add_css_class("minimap-hover-label")
+        self._overlay_wrapper.add_overlay(self._hover_label)
+
+        self.set_child(self._overlay_wrapper)
+
+        # Motion tracker on the wrapper: update label position and hide on leave
+        motion_tracker = Gtk.EventControllerMotion.new()
+        motion_tracker.connect("motion", self._on_outer_motion)
+        motion_tracker.connect("leave", lambda _c: self._hover_label.set_visible(False))
+        self._overlay_wrapper.add_controller(motion_tracker)
 
         # Single click handler: focuses whatever tile the pointer is currently over
         click = Gtk.GestureClick.new()
@@ -386,7 +397,7 @@ class MinimapWindow(Gtk.Window):
         grid.set_halign(Gtk.Align.CENTER)
         grid.set_valign(Gtk.Align.CENTER)
         grid.set_column_spacing(COL_SPACING)
-        grid.set_row_spacing(4)
+        grid.set_row_spacing(0)
         # Homogeneous columns ensure the grid center aligns with the spine
         grid.set_column_homogeneous(True)
 
@@ -418,9 +429,12 @@ class MinimapWindow(Gtk.Window):
                 if n_tiles == 1:
                     tile_icon_size = ICON_SIZE
                 elif n_tiles == 2:
-                    tile_icon_size = max(16, int(ICON_SIZE * 0.72))
+                    # Size n=2 so total column height == single-tile height:
+                    # 2*(icon + 2*stacked_border) + TILE_SPACING = ICON_SIZE + 2*TILE_PAD + 2*BORDER_WIDTH
+                    _single_h = ICON_SIZE + 2 * TILE_PAD + 2 * BORDER_WIDTH
+                    tile_icon_size = max(12, (_single_h - TILE_SPACING) // 2 - 4)
                 else:
-                    tile_icon_size = max(14, int(ICON_SIZE * 0.55))
+                    tile_icon_size = max(12, int(ICON_SIZE * 0.46))
 
                 for tile in tiles:
                     designated = tile["id"] in self._designated_win_ids
@@ -437,6 +451,8 @@ class MinimapWindow(Gtk.Window):
                     tile_box.set_margin_bottom(CELL_PAD)
                     tile_box.set_margin_start(CELL_PAD)
                     tile_box.set_margin_end(CELL_PAD)
+                    if n_tiles > 1:
+                        tile_box.add_css_class("minimap-stacked")
 
                     icon_name = lookup_icon_name(tile["app_id"], self.icon_theme)
                     if os.path.isabs(icon_name):
@@ -447,9 +463,6 @@ class MinimapWindow(Gtk.Window):
                     icon.set_halign(Gtk.Align.CENTER)
                     if n_tiles > 1:
                         icon.set_hexpand(True)
-                    icon.set_tooltip_text(
-                        tile["title"][:60] if tile["title"] else tile["app_id"]
-                    )
 
                     in_spine = start_col + i == spine_index
                     if tile["is_focused"]:
@@ -485,9 +498,10 @@ class MinimapWindow(Gtk.Window):
 
                     motion = Gtk.EventControllerMotion.new()
                     win_id = tile["id"]
+                    title_text = tile["title"] or tile["app_id"]
                     motion.connect(
                         "enter",
-                        lambda _c, _x, _y, wid=win_id: setattr(self, "_hovered_win_id", wid),
+                        lambda _c, _x, _y, wid=win_id, t=title_text: self._on_tile_hover(wid, t),
                     )
                     tile_box.add_controller(motion)
 
@@ -508,6 +522,15 @@ class MinimapWindow(Gtk.Window):
                 grid.attach(spacer, c, grid_row, 1, 1)
 
         self.frame.append(grid)
+
+    def _on_tile_hover(self, win_id, title):
+        self._hovered_win_id = win_id
+        self._hover_label.set_text(title)
+        self._hover_label.set_visible(True)
+
+    def _on_outer_motion(self, ctrl, x, y):
+        self._hover_label.set_margin_start(int(x) + 14)
+        self._hover_label.set_margin_top(int(y) + 14)
 
     def _focus_window(self, win_id):
         threading.Thread(
@@ -852,6 +875,26 @@ window {{
     color: rgba(255, 255, 255, 0.3);
     font-style: italic;
     font-size: 12px;
+}}
+
+.minimap-tile.minimap-stacked,
+.minimap-tile-spine.minimap-stacked,
+.minimap-tile-workspace.minimap-stacked,
+.minimap-tile-focused.minimap-stacked {{
+    padding: 0px;
+    border-width: 2px;
+}}
+
+.minimap-tile-focused.minimap-stacked {{
+    border-width: 3px;
+}}
+
+.minimap-hover-label {{
+    background-color: rgba(0, 0, 0, 0.85);
+    color: rgba(255, 255, 255, 0.90);
+    border-radius: 4px;
+    padding: 3px 7px;
+    font-size: 11px;
 }}
 """
 
