@@ -318,6 +318,13 @@ class MinimapWindow(Gtk.Window):
         self.outer.set_valign(Gtk.Align.CENTER)
         self.outer.add_css_class("minimap-outer")
 
+        display = Gdk.Display.get_default()
+        monitors = display.get_monitors()
+        if monitors and monitors.get_n_items() > 0:
+            monitor = monitors.get_item(0)
+            geometry = monitor.get_geometry()
+            min_width = int(geometry.width * MINIMAP_WIDTH)
+            self.outer.set_size_request(min_width, -1)
 
         self.frame = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=WS_SPACING)
         self.frame.set_margin_top(11)
