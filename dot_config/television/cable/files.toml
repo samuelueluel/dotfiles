@@ -22,7 +22,7 @@ border_type = "thick"
 hidden = false
 
 [preview]
-command = "bash -c 'p=$(sed \"s|^~/|/var/home/samuel/|\" <<< \"$1\"); bat --color=always --style=plain \"$p\"' -- '{strip_ansi}'"
+command = "bash -c 'p=$(sed \"s|^~/|/var/home/samuel/|\" <<< \"$1\"); bat --color=always --style=plain --theme=Noctalia \"$p\"' -- '{strip_ansi}'"
 
 [keybindings]
 enter = "actions:open"
