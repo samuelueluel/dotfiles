@@ -302,9 +302,6 @@ class MinimapWindow(Gtk.Window):
         self.icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
 
         self.tile_widgets = {}  # win_id -> Gtk.Box
-        self._hovered_win_id = None
-        self._designated_win_ids = set()
-        self._request_rebuild = None  # set by app after construction
 
         Gtk4LayerShell.init_for_window(self)
         Gtk4LayerShell.set_layer(self, Gtk4LayerShell.Layer.OVERLAY)
@@ -334,12 +331,6 @@ class MinimapWindow(Gtk.Window):
         self.outer.append(self.frame)
         self.set_child(self.outer)
 
-        # Single click handler: focuses whatever tile the pointer is currently over
-        click = Gtk.GestureClick.new()
-        click.set_button(0)  # 0 = any button (default is 1 = left only)
-        click.connect("pressed", self._on_click)
-        self.outer.add_controller(click)
-
     def rebuild(self, workspaces):
         """Tear down and rebuild all widgets from fresh state."""
         self.tile_widgets.clear()
@@ -352,15 +343,6 @@ class MinimapWindow(Gtk.Window):
 
         if not workspaces:
             return
-
-        # Prune designation set to only live window IDs
-        live_ids = {
-            t["id"]
-            for ws in workspaces
-            for col in ws["columns"].values()
-            for t in col
-        }
-        self._designated_win_ids.intersection_update(live_ids)
 
         # To keep the "spine" (active column) at a fixed screen position,
         # we build a symmetrical grid where the spine is always at the center.
@@ -413,25 +395,9 @@ class MinimapWindow(Gtk.Window):
                 else:
                     col_box.add_css_class("minimap-column")
 
-                # Scale down icons for stacked columns so they don't dominate height
-                n_tiles = len(tiles)
-                if n_tiles == 1:
-                    tile_icon_size = ICON_SIZE
-                elif n_tiles == 2:
-                    tile_icon_size = max(16, int(ICON_SIZE * 0.72))
-                else:
-                    tile_icon_size = max(14, int(ICON_SIZE * 0.55))
-
                 for tile in tiles:
-                    designated = tile["id"] in self._designated_win_ids
-
-                    # Use Overlay as tile container when we need to layer indicators
-                    # on top; plain Box otherwise.
-                    if designated:
-                        tile_box = Gtk.Overlay()
-                    else:
-                        tile_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-                    tile_box.set_halign(Gtk.Align.FILL if n_tiles > 1 else Gtk.Align.CENTER)
+                    tile_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+                    tile_box.set_halign(Gtk.Align.CENTER)
                     tile_box.set_valign(Gtk.Align.CENTER)
                     tile_box.set_margin_top(CELL_PAD)
                     tile_box.set_margin_bottom(CELL_PAD)
@@ -443,10 +409,7 @@ class MinimapWindow(Gtk.Window):
                         icon = Gtk.Image.new_from_file(icon_name)
                     else:
                         icon = Gtk.Image.new_from_icon_name(icon_name)
-                    icon.set_pixel_size(tile_icon_size)
-                    icon.set_halign(Gtk.Align.CENTER)
-                    if n_tiles > 1:
-                        icon.set_hexpand(True)
+                    icon.set_pixel_size(ICON_SIZE)
                     icon.set_tooltip_text(
                         tile["title"][:60] if tile["title"] else tile["app_id"]
                     )
@@ -462,35 +425,7 @@ class MinimapWindow(Gtk.Window):
                         else:
                             tile_box.add_css_class("minimap-tile")
 
-                    if designated:
-                        tile_box.set_child(icon)
-                        tri = Gtk.DrawingArea()
-                        tri_size = max(10, tile_icon_size // 2)
-                        tri.set_size_request(tri_size, tri_size)
-                        tri.set_halign(Gtk.Align.END)
-                        tri.set_valign(Gtk.Align.END)
-                        tri.set_draw_func(
-                            lambda da, cr, w, h: (
-                                cr.move_to(w, 0),
-                                cr.line_to(w, h),
-                                cr.line_to(0, h),
-                                cr.close_path(),
-                                cr.set_source_rgb(0, 0, 0),
-                                cr.fill(),
-                            )
-                        )
-                        tile_box.add_overlay(tri)
-                    else:
-                        tile_box.append(icon)
-
-                    motion = Gtk.EventControllerMotion.new()
-                    win_id = tile["id"]
-                    motion.connect(
-                        "enter",
-                        lambda _c, _x, _y, wid=win_id: setattr(self, "_hovered_win_id", wid),
-                    )
-                    tile_box.add_controller(motion)
-
+                    tile_box.append(icon)
                     col_box.append(tile_box)
                     self.tile_widgets[tile["id"]] = (tile_box, in_spine, ws["id"])
 
@@ -508,44 +443,6 @@ class MinimapWindow(Gtk.Window):
                 grid.attach(spacer, c, grid_row, 1, 1)
 
         self.frame.append(grid)
-
-    def _focus_window(self, win_id):
-        threading.Thread(
-            target=lambda: subprocess.run(
-                ["niri", "msg", "action", "focus-window", "--id", str(win_id)],
-                capture_output=True,
-            ),
-            daemon=True,
-        ).start()
-
-    def _resolve_hovered_win_id(self, x, y):
-        if self._hovered_win_id in self.tile_widgets:
-            return self._hovered_win_id
-        picked = self.outer.pick(x, y, Gtk.PickFlags.DEFAULT)
-        w = picked
-        while w is not None and w is not self.outer:
-            for win_id, (tile_box, _, _) in self.tile_widgets.items():
-                if w is tile_box:
-                    return win_id
-            w = w.get_parent()
-        return None
-
-    def _on_click(self, gesture, n_press, x, y):
-        win_id = self._resolve_hovered_win_id(x, y)
-        if win_id is None:
-            return
-        if gesture.get_current_button() == 3:
-            # Right-click: toggle designation
-            if win_id in self._designated_win_ids:
-                self._designated_win_ids.discard(win_id)
-            else:
-                self._designated_win_ids.add(win_id)
-            if self._request_rebuild:
-                self._request_rebuild()
-        else:
-            # Left-click: focus window and close minimap
-            self._focus_window(win_id)
-            self.set_visible(False)
 
     def update_focus(self, focused_window_id, focused_ws_id):
         """Update CSS classes to reflect the newly focused window/workspace."""
@@ -622,7 +519,6 @@ class MinimapApp(Gtk.Application):
 
         self._win = MinimapWindow(self)
         self._win.set_hide_on_close(True)
-        self._win._request_rebuild = self._full_rebuild
 
         GLib.unix_signal_add(
             GLib.PRIORITY_DEFAULT, signal.SIGUSR1, self._on_toggle_signal
