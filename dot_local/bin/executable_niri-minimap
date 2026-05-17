@@ -152,7 +152,9 @@ import gi
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gtk4LayerShell", "1.0")
-from gi.repository import Gdk, GLib, Gtk, Gtk4LayerShell
+gi.require_version("Pango", "1.0")
+gi.require_version("PangoCairo", "1.0")
+from gi.repository import Gdk, GLib, Gtk, Gtk4LayerShell, Pango, PangoCairo
 
 # --- Configuration ---
 # Layout
@@ -525,27 +527,42 @@ class MinimapWindow(Gtk.Window):
                         tri.set_margin_end(-(dot_size // 2 + 9))
                         tri.set_can_target(False)
                         _r = dot_size / 2
-                        
+
                         def _draw_tag(da, cr, w, h, r=_r, txt=num_tag):
-                            cr.arc(w / 2, h / 2, r, 0, 6.283185)
+                            # Inset the circle so the 1.5px stroke stays inside the
+                            # widget allocation and doesn't get clipped.
+                            radius = r - 1
+                            cr.arc(w / 2, h / 2, radius, 0, 6.283185)
                             cr.set_source_rgb(1.0, 0.655, 0.149)
                             cr.fill_preserve()
                             cr.set_source_rgb(0, 0, 0)
-                            cr.set_line_width(1)
+                            cr.set_line_width(1.5)
                             cr.stroke()
                             if txt:
+                                # JetBrains Mono: monospace digits all share the same
+                                # advance and bearing, so "1" and "2" center identically.
+                                layout = PangoCairo.create_layout(cr)
+                                layout.set_text(txt, -1)
+                                font_px = int(r * 1.3)
+                                desc = Pango.FontDescription.from_string(
+                                    f"JetBrainsMono Nerd Font Bold {font_px}px"
+                                )
+                                layout.set_font_description(desc)
+                                ink, logical = layout.get_pixel_extents()
                                 cr.set_source_rgb(0, 0, 0)
-                                cr.select_font_face("sans-serif", 0, 1) # normal, bold
-                                cr.set_font_size(r * 1.6)
-                                extents = cr.text_extents(txt)
-                                ascent, descent, height, max_x_adv, max_y_adv = cr.font_extents()
-                                
-                                # Use font ascent/descent for stable vertical centering
-                                x = w / 2 - (extents.width / 2 + extents.x_bearing)
-                                y = h / 2 + (ascent - descent) / 2
-                                cr.move_to(x, y)
-                                cr.show_text(txt)
-                                
+                                # x: center via the LOGICAL (advance) box so that
+                                # monospace digits all land on the same x — ink
+                                # centering would push "1" off because its visible
+                                # glyph is narrower than "2"/"3".
+                                # y: center via the INK box so the digit sits
+                                # vertically on its visual midline (not the font's
+                                # full ascender+descender).
+                                cr.move_to(
+                                    w / 2 - logical.x - logical.width / 2,
+                                    h / 2 - ink.y - ink.height / 2,
+                                )
+                                PangoCairo.show_layout(cr, layout)
+
                         tri.set_draw_func(_draw_tag)
                         tile_box.add_overlay(tri)
                     else:
