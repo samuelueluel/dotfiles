@@ -167,7 +167,7 @@ TILE_SPACING = 11  # px, vertical gap between tiles in a column
 WS_SPACING = 15  # px, vertical gap between workspaces
 
 # Borders & radii
-BORDER_WIDTH = 3  # px, highlight ring around focused/active tiles
+BORDER_WIDTH = 7  # px, highlight ring around focused/active tiles
 OUTER_BORDER_WIDTH = 1  # px, border around the whole minimap panel
 OUTER_BORDER_RADIUS = 9  # px, corner rounding of the outer panel
 TILE_BORDER_RADIUS = 5  # px, corner rounding of tiles and columns (focused workspace)
@@ -178,8 +178,8 @@ FOCUS_RING_CIRCLE = (
 )
 
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
-FOCUS_RING_COLOR = ("#D0A7AF", 1.00)  # focused window border ring (theme gold)
-FOCUS_FILL_COLOR = ("#00B6C2", 1.00)  # focused window background fill (turquoise)
+FOCUS_RING_COLOR = ("#00B6C2", 1.00)  # focused window border ring (theme gold)
+FOCUS_FILL_COLOR = ("#D0A7AF", 1.00)  # focused window background fill (turquoise)
 INACTIVE_FILL_COLOR = ("#7A2E2E", 1.00)  # non-focused window fill (terracotta)
 NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
 BG_COLOR = ("#000000", 1.00)  # outer panel background, old #1F1F26
@@ -187,7 +187,7 @@ WS_BG_COLOR = ("#2E2E38", 1.00)  # workspace background
 OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
 COLUMN_COLOR = ("#7A2E2E", 1.00)  # non-spine column background (terracotta)
 SPINE_COLOR = ("#7A2E2E", 1.00)  # spine column background (terracotta)
-WS_RING_COLOR = ("#00B6C2", 1.00)  # focused-workspace ring (turquoise)
+WS_RING_COLOR = ("#D0A7AF", 1.00)  # focused-workspace ring (turquoise)
 SPINE_LINE_COLOR = ("#FFA726", 1.00)  # faint vertical accent through the spine column
 
 # Timing
@@ -1062,10 +1062,10 @@ window {{
 }}
 
 .minimap-tile-workspace {{
-    border: {BORDER_WIDTH}px solid transparent;
+    border: {BORDER_WIDTH}px solid #D0A7AF;
     border-radius: 50%;
     padding: {TILE_PAD}px;
-    background-color: {_c(FOCUS_FILL_COLOR)};
+    background-color: {_c(INACTIVE_FILL_COLOR)};
     box-shadow: 0 0 0 3px rgb(0,0,0);
 }}
 
@@ -1073,7 +1073,7 @@ window {{
     border: {BORDER_WIDTH}px solid {_c(FOCUS_RING_COLOR)};
     border-radius: {"50%" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
     padding: {TILE_PAD}px;
-    background-color: {_c(FOCUS_FILL_COLOR)};
+    background-color: {_c(INACTIVE_FILL_COLOR)};
     box-shadow: 0 0 0 3px rgb(0,0,0), inset 0 0 0 1px rgb(0,0,0);
 }}
 
