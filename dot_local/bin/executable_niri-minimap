@@ -188,6 +188,13 @@ OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
 COLUMN_COLOR = ("#7A2E2E", 1.00)  # non-spine column background (terracotta)
 SPINE_COLOR = ("#7A2E2E", 1.00)  # spine column background (terracotta)
 WS_RING_COLOR = ("#00B6C2", 1.00)  # focused-workspace ring (turquoise)
+SPINE_LINE_COLOR = ("#000000", 1.00)  # faint vertical accent through the spine column
+
+# Timing
+FADE_MS = 50  # fade-in/out duration in ms (quick to stay unobtrusive)
+FADE_STEP_MS = 8  # animation tick interval (~120fps target, GTK caps to vsync)
+HOVER_DELAY_MS = 120  # delay before showing hover label, so fast sweeps don't flash it
+SPINE_LINE_WIDTH = 1  # px, vertical accent line width
 
 
 def _c(color):
@@ -307,6 +314,10 @@ class MinimapWindow(Gtk.Window):
         self._hovered_win_id = None
         self._designated_win_ids = set()
         self._request_rebuild = None  # set by app after construction
+        self._fade_timer_id = None
+        self._hover_pending_id = None
+        self._hover_hide_id = None
+        self._pending_hover_title = ""
 
         Gtk4LayerShell.init_for_window(self)
         Gtk4LayerShell.set_layer(self, Gtk4LayerShell.Layer.OVERLAY)
@@ -329,10 +340,14 @@ class MinimapWindow(Gtk.Window):
             self.outer.set_size_request(min_width, -1)
 
         self.frame = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=WS_SPACING)
-        self.frame.set_margin_top(14)
-        self.frame.set_margin_bottom(14)
-        self.frame.set_margin_start(15)
-        self.frame.set_margin_end(15)
+        # Generous transparent margins around the visible content. These expand
+        # the overlay's bounds so the hover tooltip can spawn anywhere within
+        # them without being clipped — no flipping needed. Equal top/bottom
+        # keeps the visible panel centered on screen.
+        self.frame.set_margin_top(120)
+        self.frame.set_margin_bottom(120)
+        self.frame.set_margin_start(120)
+        self.frame.set_margin_end(120)
         self.outer.append(self.frame)
 
         # Wrap outer in an Overlay so the hover label can float over content
@@ -343,6 +358,7 @@ class MinimapWindow(Gtk.Window):
         self._hover_label.set_visible(False)
         self._hover_label.set_halign(Gtk.Align.START)
         self._hover_label.set_valign(Gtk.Align.START)
+        self._hover_label.set_can_target(False)  # never intercept pointer events
         self._hover_label.add_css_class("minimap-hover-label")
         self._overlay_wrapper.add_overlay(self._hover_label)
 
@@ -351,14 +367,11 @@ class MinimapWindow(Gtk.Window):
         # Motion tracker on the wrapper: update label position and hide on leave
         motion_tracker = Gtk.EventControllerMotion.new()
         motion_tracker.connect("motion", self._on_outer_motion)
-        motion_tracker.connect("leave", lambda _c: self._hover_label.set_visible(False))
+        motion_tracker.connect("leave", lambda _c: self._cancel_hover_label())
         self._overlay_wrapper.add_controller(motion_tracker)
 
-        # Single click handler: focuses whatever tile the pointer is currently over
-        click = Gtk.GestureClick.new()
-        click.set_button(0)  # 0 = any button (default is 1 = left only)
-        click.connect("pressed", self._on_click)
-        self.outer.add_controller(click)
+        # Click handlers are attached per-tile in rebuild(); no outer-level
+        # click handler — clicks in the gaps between tiles must do nothing.
 
     def rebuild(self, workspaces):
         """Tear down and rebuild all widgets from fresh state."""
@@ -460,6 +473,7 @@ class MinimapWindow(Gtk.Window):
                     # on top; plain Box otherwise.
                     if designated:
                         tile_box = Gtk.Overlay()
+                        tile_box.set_overflow(Gtk.Overflow.VISIBLE)
                     else:
                         tile_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
                     tile_box.set_halign(Gtk.Align.FILL if n_tiles > 1 else Gtk.Align.CENTER)
@@ -497,9 +511,10 @@ class MinimapWindow(Gtk.Window):
                         tri = Gtk.DrawingArea()
                         dot_size = max(10, ICON_SIZE // 3)
                         tri.set_size_request(dot_size, dot_size)
-                        tri.set_halign(Gtk.Align.CENTER)
-                        tri.set_valign(Gtk.Align.END)
-                        tri.set_margin_bottom(-(dot_size // 2 + 9))
+                        tri.set_halign(Gtk.Align.END)
+                        tri.set_valign(Gtk.Align.CENTER)
+                        tri.set_margin_end(-(dot_size // 2 + 9))
+                        tri.set_can_target(False)
                         _r = dot_size / 2
                         tri.set_draw_func(
                             lambda da, cr, w, h, r=_r: (
@@ -519,7 +534,19 @@ class MinimapWindow(Gtk.Window):
                         "enter",
                         lambda _c, _x, _y, wid=win_id, t=title_text: self._on_tile_hover(wid, t),
                     )
+                    motion.connect("leave", lambda _c: self._on_tile_unhover())
                     tile_box.add_controller(motion)
+
+                    # Per-tile click handler. Hits only when the pointer is
+                    # truly inside this tile's allocation — gap clicks have
+                    # no handler and harmlessly fall through.
+                    click = Gtk.GestureClick.new()
+                    click.set_button(0)  # 0 = any button
+                    click.connect(
+                        "pressed",
+                        lambda g, _n, _x, _y, wid=win_id: self._on_tile_click(g, wid),
+                    )
+                    tile_box.add_controller(click)
 
                     col_box.append(tile_box)
                     self.tile_widgets[tile["id"]] = (tile_box, in_spine, ws["id"])
@@ -537,16 +564,78 @@ class MinimapWindow(Gtk.Window):
                 spacer.set_size_request(51, 1)
                 grid.attach(spacer, c, grid_row, 1, 1)
 
-        self.frame.append(grid)
+        # Wrap grid in an Overlay so the spine line can paint on TOP of tile
+        # faces, giving a continuous vertical accent from top to bottom.
+        # halign=CENTER aligns the line with the grid's center column, which
+        # is the spine column (by construction: spine_index = m, grid_width =
+        # 2m+1, column_homogeneous=True).
+        grid_overlay = Gtk.Overlay()
+        grid_overlay.set_child(grid)
+        spine_line = Gtk.Box()
+        spine_line.set_size_request(SPINE_LINE_WIDTH, -1)
+        spine_line.set_halign(Gtk.Align.CENTER)
+        spine_line.set_valign(Gtk.Align.FILL)
+        spine_line.add_css_class("minimap-spine-line")
+        spine_line.set_can_target(False)  # don't intercept clicks meant for tiles
+        grid_overlay.add_overlay(spine_line)
+
+        self.frame.append(grid_overlay)
 
     def _on_tile_hover(self, win_id, title):
+        # Cancel any pending hide — we're back on a tile.
+        if self._hover_hide_id is not None:
+            GLib.source_remove(self._hover_hide_id)
+            self._hover_hide_id = None
         self._hovered_win_id = win_id
-        self._hover_label.set_text(title)
+        # If label is already visible, swap text instantly (no extra delay for
+        # tile-to-tile scanning). Otherwise wait HOVER_DELAY_MS before showing
+        # so quick pointer sweeps don't trigger a flicker of labels.
+        if self._hover_label.get_visible():
+            self._hover_label.set_text(title)
+            return
+        if self._hover_pending_id is not None:
+            GLib.source_remove(self._hover_pending_id)
+        self._pending_hover_title = title
+        self._hover_pending_id = GLib.timeout_add(HOVER_DELAY_MS, self._show_hover_label)
+
+    def _on_tile_unhover(self):
+        # Cancel a pending show — pointer left before delay elapsed.
+        if self._hover_pending_id is not None:
+            GLib.source_remove(self._hover_pending_id)
+            self._hover_pending_id = None
+        # Schedule a hide with a brief grace period; if pointer lands on an
+        # adjacent tile within that window, _on_tile_hover cancels it.
+        if self._hover_hide_id is not None:
+            GLib.source_remove(self._hover_hide_id)
+        self._hover_hide_id = GLib.timeout_add(40, self._do_hide_hover_label)
+
+    def _show_hover_label(self):
+        self._hover_pending_id = None
+        self._hover_label.set_text(self._pending_hover_title)
         self._hover_label.set_visible(True)
+        return False
+
+    def _do_hide_hover_label(self):
+        self._hover_hide_id = None
+        self._hover_label.set_visible(False)
+        return False
+
+    def _cancel_hover_label(self):
+        if self._hover_pending_id is not None:
+            GLib.source_remove(self._hover_pending_id)
+            self._hover_pending_id = None
+        if self._hover_hide_id is not None:
+            GLib.source_remove(self._hover_hide_id)
+            self._hover_hide_id = None
+        self._hover_label.set_visible(False)
 
     def _on_outer_motion(self, ctrl, x, y):
-        self._hover_label.set_margin_start(int(x) + 18)
-        self._hover_label.set_margin_top(int(y) + 18)
+        # Always place label below+right of cursor. The frame has generous
+        # transparent margins, so labels near the visible bottom edge of the
+        # panel still spawn inside the overlay's bounds — no teleporting.
+        GAP = 18
+        self._hover_label.set_margin_start(int(x) + GAP)
+        self._hover_label.set_margin_top(int(y) + GAP)
 
     def _focus_window(self, win_id):
         threading.Thread(
@@ -557,22 +646,7 @@ class MinimapWindow(Gtk.Window):
             daemon=True,
         ).start()
 
-    def _resolve_hovered_win_id(self, x, y):
-        if self._hovered_win_id in self.tile_widgets:
-            return self._hovered_win_id
-        picked = self.outer.pick(x, y, Gtk.PickFlags.DEFAULT)
-        w = picked
-        while w is not None and w is not self.outer:
-            for win_id, (tile_box, _, _) in self.tile_widgets.items():
-                if w is tile_box:
-                    return win_id
-            w = w.get_parent()
-        return None
-
-    def _on_click(self, gesture, n_press, x, y):
-        win_id = self._resolve_hovered_win_id(x, y)
-        if win_id is None:
-            return
+    def _on_tile_click(self, gesture, win_id):
         if gesture.get_current_button() == 3:
             # Right-click: toggle designation
             if win_id in self._designated_win_ids:
@@ -584,7 +658,52 @@ class MinimapWindow(Gtk.Window):
         else:
             # Left-click: focus window and close minimap
             self._focus_window(win_id)
-            self.set_visible(False)
+            self.fade_out()
+
+    def fade_in(self):
+        """Present the window if hidden and animate opacity 0->1."""
+        if self._fade_timer_id is not None:
+            GLib.source_remove(self._fade_timer_id)
+            self._fade_timer_id = None
+        if not self.get_visible():
+            self._overlay_wrapper.set_opacity(0.0)
+            self.present()
+        self._animate_opacity(1.0, on_done=None)
+
+    def fade_out(self):
+        """Animate opacity to 0, then hide the window."""
+        if not self.get_visible():
+            return
+        if self._fade_timer_id is not None:
+            GLib.source_remove(self._fade_timer_id)
+            self._fade_timer_id = None
+        self._animate_opacity(0.0, on_done=self._after_fade_out)
+
+    def _after_fade_out(self):
+        self.set_visible(False)
+        self._cancel_hover_label()
+
+    def _animate_opacity(self, target, on_done):
+        start_op = self._overlay_wrapper.get_opacity()
+        start_t = GLib.get_monotonic_time()
+        if abs(target - start_op) < 0.001:
+            if on_done:
+                on_done()
+            return
+
+        def step():
+            elapsed_ms = (GLib.get_monotonic_time() - start_t) / 1000.0
+            t = min(1.0, elapsed_ms / FADE_MS)
+            eased = 1.0 - (1.0 - t) * (1.0 - t)  # ease-out quad
+            self._overlay_wrapper.set_opacity(start_op + (target - start_op) * eased)
+            if t >= 1.0:
+                self._fade_timer_id = None
+                if on_done:
+                    on_done()
+                return False
+            return True
+
+        self._fade_timer_id = GLib.timeout_add(FADE_STEP_MS, step)
 
     def update_focus(self, focused_window_id, focused_ws_id):
         """Update CSS classes to reflect the newly focused window/workspace."""
@@ -676,14 +795,14 @@ class MinimapApp(Gtk.Application):
         self._event_reader = EventStreamReader(callback=self._on_event)
         self._event_reader.start()
 
-        self._win.present()
+        self._win.fade_in()
 
     def _on_toggle_signal(self):
         if self._win:
             if self._win.get_visible():
-                self._win.set_visible(False)
+                self._win.fade_out()
             else:
-                self._win.present()
+                self._win.fade_in()
         return True
 
     def _on_show_signal(self):
@@ -691,13 +810,13 @@ class MinimapApp(Gtk.Application):
         # Used by WASD navigation keys — opens on first keypress and auto-closes after timer.
         if self._win:
             if not self._win.get_visible():
-                self._win.present()
+                self._win.fade_in()
             self._reset_autohide_timer()
         return True
 
     def _on_hide_signal(self):
         if self._win and self._win.get_visible():
-            self._win.set_visible(False)
+            self._win.fade_out()
         return True
 
     def _reset_autohide_timer(self):
@@ -710,7 +829,7 @@ class MinimapApp(Gtk.Application):
     def _autohide_cb(self):
         self._autohide_timer_id = None
         if self._win and self._win.get_visible():
-            self._win.set_visible(False)
+            self._win.fade_out()
         return False
 
     def do_shutdown(self):
@@ -899,17 +1018,17 @@ window {{
 .minimap-tile {{
     border: {BORDER_WIDTH}px solid transparent;
     border-radius: {UNFOCUSED_TILE_RADIUS};
-    padding: {UNFOCUSED_TILE_PAD}px;
+    padding: {TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgb(0,0,0), 3px 6px 14px rgba(0,0,0,0.70);
+    box-shadow: 0 0 0 4px rgb(0,0,0);
 }}
 
 .minimap-tile-spine {{
-    border: {BORDER_WIDTH}px solid {_c(FOCUS_RING_COLOR)};
+    border: {BORDER_WIDTH}px solid transparent;
     border-radius: {UNFOCUSED_TILE_RADIUS};
-    padding: {UNFOCUSED_TILE_PAD}px;
+    padding: {TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: inset 0 0 0 1px rgb(0,0,0), 0 0 0 5px rgb(0,0,0), 3px 6px 14px rgba(0,0,0,0.70);
+    box-shadow: 0 0 0 4px rgb(0,0,0);
 }}
 
 .minimap-tile-workspace {{
@@ -917,7 +1036,7 @@ window {{
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgb(0,0,0), 3px 6px 14px rgba(0,0,0,0.70);
+    box-shadow: 0 0 0 4px rgb(0,0,0);
     transform: scale(1.05);
 }}
 
@@ -926,7 +1045,7 @@ window {{
     border-radius: {"50%" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
-    box-shadow: inset 0 0 0 1px rgb(0,0,0), 0 0 0 5px rgb(0,0,0), 3px 6px 14px rgba(0,0,0,0.70);
+    box-shadow: 0 0 0 4px rgb(0,0,0), inset 0 0 0 1px rgb(0,0,0);
     transform: scale(1.05);
 }}
 
@@ -951,6 +1070,11 @@ window {{
     background-color: transparent;
 }}
 
+
+.minimap-spine-line {{
+    background-color: {_c(SPINE_LINE_COLOR)};
+    border-radius: 1px;
+}}
 
 .minimap-hover-label {{
     background-color: rgb(0, 0, 0);
