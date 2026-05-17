@@ -178,10 +178,10 @@ FOCUS_RING_CIRCLE = (
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
 FOCUS_RING_COLOR = ("#FFA726", 1.00)  # focused window border ring (theme gold)
 FOCUS_FILL_COLOR = ("#00B6C2", 1.00)  # focused window background fill (turquoise)
-INACTIVE_FILL_COLOR = ("#A07885", 1.00)  # non-focused window fill (dusty rose, darkened)
+INACTIVE_FILL_COLOR = ("#6B5059", 1.00)  # non-focused window fill (dusty rose, darkened)
 NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
-BG_COLOR = ("#000000", 0.80)  # outer panel background, old #1F1F26
-WS_BG_COLOR = ("#2E2E38", 0.85)  # workspace background
+BG_COLOR = ("#000000", 1.00)  # outer panel background, old #1F1F26
+WS_BG_COLOR = ("#2E2E38", 1.00)  # workspace background
 OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
 COLUMN_COLOR = ("#7A2E2E", 1.00)  # non-spine column background (terracotta)
 SPINE_COLOR = ("#7A2E2E", 1.00)  # spine column background (terracotta)
@@ -853,7 +853,7 @@ window {{
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: {TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgba(0,0,0,0.8);
+    box-shadow: 0 0 0 5px rgb(0,0,0);
 }}
 
 .minimap-tile-spine {{
@@ -861,7 +861,7 @@ window {{
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: {TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgba(0,0,0,0.8);
+    box-shadow: 0 0 0 5px rgb(0,0,0);
 }}
 
 .minimap-tile-workspace {{
@@ -869,7 +869,7 @@ window {{
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgba(0,0,0,0.8);
+    box-shadow: 0 0 0 5px rgb(0,0,0);
 }}
 
 .minimap-tile-focused {{
@@ -877,7 +877,7 @@ window {{
     border-radius: {"50%" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgba(0,0,0,0.8);
+    box-shadow: 0 0 0 5px rgb(0,0,0);
 }}
 
 .minimap-empty {{
@@ -896,8 +896,8 @@ window {{
 
 
 .minimap-hover-label {{
-    background-color: rgba(0, 0, 0, 0.85);
-    color: rgba(255, 255, 255, 0.90);
+    background-color: rgb(0, 0, 0);
+    color: rgb(255, 255, 255);
     border-radius: 5px;
     padding: 4px 9px;
     font-size: 14px;
