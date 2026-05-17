@@ -180,7 +180,7 @@ FOCUS_RING_CIRCLE = (
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
 FOCUS_RING_COLOR = ("#FFA726", 1.00)  # focused window border ring (theme gold)
 FOCUS_FILL_COLOR = ("#00B6C2", 1.00)  # focused window background fill (turquoise)
-INACTIVE_FILL_COLOR = ("#9B5E72", 1.00)  # non-focused window fill (dusty rose)
+INACTIVE_FILL_COLOR = ("#7A2E2E", 1.00)  # non-focused window fill (terracotta)
 NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
 BG_COLOR = ("#000000", 1.00)  # outer panel background, old #1F1F26
 WS_BG_COLOR = ("#2E2E38", 1.00)  # workspace background
