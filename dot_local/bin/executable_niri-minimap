@@ -159,18 +159,18 @@ from gi.repository import Gdk, GLib, Gtk, Gtk4LayerShell
 MINIMAP_WIDTH = (
     0.55  # default width as a fraction of monitor width (expands if content needs more)
 )
-ICON_SIZE = 34  # px, app icon size, 48
+ICON_SIZE = 43  # px, app icon size, 48
 CELL_PAD = 0  # px, outer margin around each tile (space outside the ring)
-TILE_PAD = 2  # px, inner padding between icon and the ring
-COL_SPACING = 7  # px, horizontal gap between columns
-TILE_SPACING = 4  # px, vertical gap between tiles in a column
-WS_SPACING = 7  # px, vertical gap between workspaces
+TILE_PAD = 3  # px, inner padding between icon and the ring
+COL_SPACING = 16  # px, horizontal gap between columns
+TILE_SPACING = 11  # px, vertical gap between tiles in a column
+WS_SPACING = 15  # px, vertical gap between workspaces
 
 # Borders & radii
-BORDER_WIDTH = 4  # px, highlight ring around focused/active tiles
+BORDER_WIDTH = 5  # px, highlight ring around focused/active tiles
 OUTER_BORDER_WIDTH = 1  # px, border around the whole minimap panel
-OUTER_BORDER_RADIUS = 7  # px, corner rounding of the outer panel
-TILE_BORDER_RADIUS = 4  # px, corner rounding of tiles and columns
+OUTER_BORDER_RADIUS = 9  # px, corner rounding of the outer panel
+TILE_BORDER_RADIUS = 5  # px, corner rounding of tiles and columns
 FOCUS_RING_CIRCLE = (
     False  # True = circle focus ring (border-radius 50%), False = rounded square
 )
@@ -327,10 +327,10 @@ class MinimapWindow(Gtk.Window):
             self.outer.set_size_request(min_width, -1)
 
         self.frame = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=WS_SPACING)
-        self.frame.set_margin_top(11)
-        self.frame.set_margin_bottom(11)
-        self.frame.set_margin_start(12)
-        self.frame.set_margin_end(12)
+        self.frame.set_margin_top(14)
+        self.frame.set_margin_bottom(14)
+        self.frame.set_margin_start(15)
+        self.frame.set_margin_end(15)
         self.outer.append(self.frame)
 
         # Wrap outer in an Overlay so the hover label can float over content
@@ -525,7 +525,7 @@ class MinimapWindow(Gtk.Window):
             for c in [0, grid_width - 1]:
                 spacer = Gtk.Box()
                 # 47 is the calculated width of a tile column (ICON_SIZE+2*CELL_PAD+2*BORDER_WIDTH+2*padding)
-                spacer.set_size_request(41, 1)
+                spacer.set_size_request(51, 1)
                 grid.attach(spacer, c, grid_row, 1, 1)
 
         self.frame.append(grid)
@@ -536,8 +536,8 @@ class MinimapWindow(Gtk.Window):
         self._hover_label.set_visible(True)
 
     def _on_outer_motion(self, ctrl, x, y):
-        self._hover_label.set_margin_start(int(x) + 14)
-        self._hover_label.set_margin_top(int(y) + 14)
+        self._hover_label.set_margin_start(int(x) + 18)
+        self._hover_label.set_margin_top(int(y) + 18)
 
     def _focus_window(self, win_id):
         threading.Thread(
@@ -817,9 +817,7 @@ window {{
 }}
 
 .minimap-outer {{
-    background-color: {_c(BG_COLOR)};
-    border-radius: {OUTER_BORDER_RADIUS}px;
-    border: {OUTER_BORDER_WIDTH}px solid {_c(OUTER_BORDER_COLOR)};
+    background-color: transparent;
 }}
 
 .minimap-workspace {{
@@ -855,6 +853,7 @@ window {{
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: {TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
+    box-shadow: 0 0 0 5px rgba(0,0,0,0.8);
 }}
 
 .minimap-tile-spine {{
@@ -862,6 +861,7 @@ window {{
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: {TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
+    box-shadow: 0 0 0 5px rgba(0,0,0,0.8);
 }}
 
 .minimap-tile-workspace {{
@@ -869,6 +869,7 @@ window {{
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
+    box-shadow: 0 0 0 5px rgba(0,0,0,0.8);
 }}
 
 .minimap-tile-focused {{
@@ -876,6 +877,7 @@ window {{
     border-radius: {"50%" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
+    box-shadow: 0 0 0 5px rgba(0,0,0,0.8);
 }}
 
 .minimap-empty {{
@@ -889,19 +891,16 @@ window {{
 .minimap-tile-workspace.minimap-stacked,
 .minimap-tile-focused.minimap-stacked {{
     padding: 0px;
-    border-width: 2px;
+    border-width: 4px;
 }}
 
-.minimap-tile-focused.minimap-stacked {{
-    border-width: 3px;
-}}
 
 .minimap-hover-label {{
     background-color: rgba(0, 0, 0, 0.85);
     color: rgba(255, 255, 255, 0.90);
-    border-radius: 4px;
-    padding: 3px 7px;
-    font-size: 11px;
+    border-radius: 5px;
+    padding: 4px 9px;
+    font-size: 14px;
 }}
 """
 
