@@ -520,7 +520,10 @@ class MinimapWindow(Gtk.Window):
                             lambda da, cr, w, h, r=_r: (
                                 cr.arc(w / 2, h / 2, r, 0, 6.283185),
                                 cr.set_source_rgb(1.0, 0.655, 0.149),
-                                cr.fill(),
+                                cr.fill_preserve(),
+                                cr.set_source_rgb(0, 0, 0),
+                                cr.set_line_width(1),
+                                cr.stroke(),
                             )
                         )
                         tile_box.add_overlay(tri)
