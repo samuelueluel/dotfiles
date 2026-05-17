@@ -519,7 +519,7 @@ class MinimapWindow(Gtk.Window):
                         tri.set_draw_func(
                             lambda da, cr, w, h, r=_r: (
                                 cr.arc(w / 2, h / 2, r, 0, 6.283185),
-                                cr.set_source_rgb(1, 1, 1),
+                                cr.set_source_rgb(1.0, 0.655, 0.149),
                                 cr.fill(),
                             )
                         )
