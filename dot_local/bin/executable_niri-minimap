@@ -727,7 +727,9 @@ class MinimapApp(Gtk.Application):
     def _reset_autohide_timer(self):
         if self._autohide_timer_id is not None:
             GLib.source_remove(self._autohide_timer_id)
-        self._autohide_timer_id = GLib.timeout_add(550, self._autohide_cb)
+        tile_mode = os.path.exists(os.path.expanduser("~/.cache/niri-tile-toggle"))
+        delay = 350 if tile_mode else 550
+        self._autohide_timer_id = GLib.timeout_add(delay, self._autohide_cb)
 
     def _autohide_cb(self):
         self._autohide_timer_id = None
@@ -875,7 +877,7 @@ window {{
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: {UNFOCUSED_TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgb(0,0,0);
+    box-shadow: 0 0 0 5px rgb(0,0,0), 3px 6px 14px rgba(0,0,0,0.70);
 }}
 
 .minimap-tile-spine {{
@@ -883,7 +885,7 @@ window {{
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: {UNFOCUSED_TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgb(0,0,0);
+    box-shadow: 0 0 0 5px rgb(0,0,0), 3px 6px 14px rgba(0,0,0,0.70);
 }}
 
 .minimap-tile-workspace {{
@@ -891,7 +893,7 @@ window {{
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgb(0,0,0);
+    box-shadow: 0 0 0 5px rgb(0,0,0), 3px 6px 14px rgba(0,0,0,0.70);
 }}
 
 .minimap-tile-focused {{
@@ -899,7 +901,7 @@ window {{
     border-radius: {"50%" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
-    box-shadow: 0 0 0 5px rgb(0,0,0);
+    box-shadow: 0 0 0 5px rgb(0,0,0), 3px 6px 14px rgba(0,0,0,0.70);
 }}
 
 .minimap-empty {{
