@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+import os
+import sys
+import json
+import subprocess
+import signal
+
+TAG_FILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-tags.json")
+PID_FILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-minimap.pid")
+
+def load_tags():
+    try:
+        with open(TAG_FILE) as f:
+            return {k: v for k, v in json.load(f).items()}
+    except Exception:
+        return {}
+
+def save_tags(tags):
+    try:
+        with open(TAG_FILE, "w") as f:
+            json.dump(tags, f)
+    except Exception:
+        pass
+
+def notify_minimap():
+    try:
+        if os.path.exists(PID_FILE):
+            with open(PID_FILE) as f:
+                pid = int(f.read().strip())
+            os.kill(pid, signal.SIGRTMIN)
+    except Exception:
+        pass
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: niri-tag [set|focus] <num>")
+        sys.exit(1)
+
+    action = sys.argv[1]
+    num = sys.argv[2]
+
+    tags = load_tags()
+
+    if action == "set":
+        try:
+            out = subprocess.check_output(["niri", "msg", "-j", "focused-window"])
+            win_id = json.loads(out)["id"]
+            
+            if tags.get(num) == win_id:
+                # Toggle off if already set
+                del tags[num]
+            else:
+                # Remove old tags for this window (one tag per window)
+                for k, v in list(tags.items()):
+                    if v == win_id:
+                        del tags[k]
+                tags[num] = win_id
+                
+            save_tags(tags)
+            
+            # Briefly flash the minimap to show the new tag
+            subprocess.run(["niri-minimap", "show"])
+        except Exception as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+
+    elif action == "focus":
+        win_id = tags.get(num)
+        if win_id is not None:
+            # Focus the window
+            subprocess.run(["niri", "msg", "action", "focus-window", "--id", str(win_id)])
+            
+            # Auto-hide the minimap once focused to get out of the way
+            subprocess.run(["niri-minimap", "hide"])
+
+if __name__ == "__main__":
+    main()

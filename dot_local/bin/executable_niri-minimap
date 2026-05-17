@@ -376,6 +376,13 @@ class MinimapWindow(Gtk.Window):
     def rebuild(self, workspaces):
         """Tear down and rebuild all widgets from fresh state."""
         self.tile_widgets.clear()
+        
+        try:
+            tag_file = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-tags.json")
+            with open(tag_file) as f:
+                numbered_tags_map = {v: str(k) for k, v in json.load(f).items()}
+        except Exception:
+            numbered_tags_map = {}
 
         while True:
             child = self.frame.get_first_child()
@@ -468,10 +475,12 @@ class MinimapWindow(Gtk.Window):
 
                 for tile in tiles:
                     designated = tile["id"] in self._designated_win_ids
+                    num_tag = numbered_tags_map.get(tile["id"])
+                    has_overlay = designated or num_tag is not None
 
                     # Use Overlay as tile container when we need to layer indicators
                     # on top; plain Box otherwise.
-                    if designated:
+                    if has_overlay:
                         tile_box = Gtk.Overlay()
                         tile_box.set_overflow(Gtk.Overflow.VISIBLE)
                     else:
@@ -506,26 +515,38 @@ class MinimapWindow(Gtk.Window):
                         else:
                             tile_box.add_css_class("minimap-tile")
 
-                    if designated:
+                    if has_overlay:
                         tile_box.set_child(icon)
                         tri = Gtk.DrawingArea()
-                        dot_size = max(10, ICON_SIZE // 3)
+                        dot_size = max(16, ICON_SIZE // 2) if num_tag else max(10, ICON_SIZE // 3)
                         tri.set_size_request(dot_size, dot_size)
                         tri.set_halign(Gtk.Align.END)
                         tri.set_valign(Gtk.Align.CENTER)
                         tri.set_margin_end(-(dot_size // 2 + 9))
                         tri.set_can_target(False)
                         _r = dot_size / 2
-                        tri.set_draw_func(
-                            lambda da, cr, w, h, r=_r: (
-                                cr.arc(w / 2, h / 2, r, 0, 6.283185),
-                                cr.set_source_rgb(1.0, 0.655, 0.149),
-                                cr.fill_preserve(),
-                                cr.set_source_rgb(0, 0, 0),
-                                cr.set_line_width(1),
-                                cr.stroke(),
-                            )
-                        )
+                        
+                        def _draw_tag(da, cr, w, h, r=_r, txt=num_tag):
+                            cr.arc(w / 2, h / 2, r, 0, 6.283185)
+                            cr.set_source_rgb(1.0, 0.655, 0.149)
+                            cr.fill_preserve()
+                            cr.set_source_rgb(0, 0, 0)
+                            cr.set_line_width(1)
+                            cr.stroke()
+                            if txt:
+                                cr.set_source_rgb(0, 0, 0)
+                                cr.select_font_face("sans-serif", 0, 1) # normal, bold
+                                cr.set_font_size(r * 1.6)
+                                extents = cr.text_extents(txt)
+                                ascent, descent, height, max_x_adv, max_y_adv = cr.font_extents()
+                                
+                                # Use font ascent/descent for stable vertical centering
+                                x = w / 2 - (extents.width / 2 + extents.x_bearing)
+                                y = h / 2 + (ascent - descent) / 2
+                                cr.move_to(x, y)
+                                cr.show_text(txt)
+                                
+                        tri.set_draw_func(_draw_tag)
                         tile_box.add_overlay(tri)
                     else:
                         tile_box.append(icon)
@@ -802,6 +823,10 @@ class MinimapApp(Gtk.Application):
         self._event_reader.start()
 
         self._win.fade_in()
+
+    def _on_tags_changed_signal(self):
+        self._full_rebuild()
+        return True
 
     def _on_toggle_signal(self):
         if self._win:
