@@ -817,6 +817,17 @@ class MinimapApp(Gtk.Application):
             GLib.PRIORITY_DEFAULT, signal.SIGUSR2, self._on_show_signal
         )
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, self._on_hide_signal)
+        # GLib.unix_signal_add doesn't support real-time signals; Python's default
+        # action for SIGRTMIN is to terminate, so install a Python-level handler
+        # that hands the work back to the GLib main loop. The idle callback must
+        # return False or it will be re-run every idle tick, starving input events.
+        def _sigrtmin_idle():
+            self._full_rebuild()
+            return False
+        signal.signal(
+            signal.SIGRTMIN,
+            lambda *_: GLib.idle_add(_sigrtmin_idle),
+        )
 
         # Start event stream — initial dump provides both windows and workspaces
         self._event_reader = EventStreamReader(callback=self._on_event)

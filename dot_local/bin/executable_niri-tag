@@ -1,77 +1,119 @@
 #!/usr/bin/env python3
-import os
-import sys
+"""
+niri-tag: set/focus numbered tags on Niri windows.
+
+Tags live at $XDG_RUNTIME_DIR/niri-tags.json as {"<num>": <win_id>}.
+A window can hold at most one numbered tag; setting a tag that's already on
+the focused window toggles it off.
+
+Signals the running niri-minimap directly (SIGRTMIN to rebuild, SIGUSR2 to
+show, SIGHUP to hide) — no subprocess spawn, no Python re-exec.
+"""
 import json
-import subprocess
+import os
 import signal
+import subprocess
+import sys
 
 TAG_FILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-tags.json")
 PID_FILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-minimap.pid")
 
+
 def load_tags():
     try:
         with open(TAG_FILE) as f:
-            return {k: v for k, v in json.load(f).items()}
-    except Exception:
+            return json.load(f)
+    except (OSError, ValueError):
         return {}
 
+
 def save_tags(tags):
+    tmp = TAG_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(tags, f)
+    os.replace(tmp, TAG_FILE)
+
+
+def minimap_pid():
     try:
-        with open(TAG_FILE, "w") as f:
-            json.dump(tags, f)
-    except Exception:
+        with open(PID_FILE) as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def signal_minimap(sig):
+    pid = minimap_pid()
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, sig)
+        return True
+    except OSError:
+        return False
+
+
+def notify(msg, urgency="low"):
+    """Best-effort desktop notification; silent if notify-send isn't available."""
+    try:
+        subprocess.Popen(
+            ["notify-send", "-u", urgency, "-t", "1500", "-a", "niri-tag", msg],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
         pass
 
-def notify_minimap():
+
+def focused_window_id():
+    out = subprocess.check_output(["niri", "msg", "-j", "focused-window"])
+    return json.loads(out)["id"]
+
+
+def cmd_set(num):
+    tags = load_tags()
     try:
-        if os.path.exists(PID_FILE):
-            with open(PID_FILE) as f:
-                pid = int(f.read().strip())
-            os.kill(pid, signal.SIGRTMIN)
-    except Exception:
-        pass
+        win_id = focused_window_id()
+    except (subprocess.CalledProcessError, ValueError, KeyError):
+        notify("No focused window", "normal")
+        return 1
+
+    if tags.get(num) == win_id:
+        del tags[num]
+    else:
+        # Enforce one tag per window: drop any prior tag on this window.
+        for k, v in list(tags.items()):
+            if v == win_id:
+                del tags[k]
+        tags[num] = win_id
+
+    save_tags(tags)
+    # Rebuild first so the new tag is rendered, then briefly show the minimap.
+    signal_minimap(signal.SIGRTMIN)
+    signal_minimap(signal.SIGUSR2)
+    return 0
+
+
+def cmd_focus(num):
+    tags = load_tags()
+    win_id = tags.get(num)
+    if win_id is None:
+        notify(f"No tag {num} set", "normal")
+        # Briefly show the minimap so the user can see what is tagged.
+        signal_minimap(signal.SIGUSR2)
+        return 1
+    subprocess.run(["niri", "msg", "action", "focus-window", "--id", str(win_id)])
+    signal_minimap(signal.SIGHUP)
+    return 0
+
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: niri-tag [set|focus] <num>")
-        sys.exit(1)
+    if len(sys.argv) < 3 or sys.argv[1] not in ("set", "focus"):
+        print("Usage: niri-tag [set|focus] <num>", file=sys.stderr)
+        sys.exit(2)
+    action, num = sys.argv[1], sys.argv[2]
+    sys.exit(cmd_set(num) if action == "set" else cmd_focus(num))
 
-    action = sys.argv[1]
-    num = sys.argv[2]
-
-    tags = load_tags()
-
-    if action == "set":
-        try:
-            out = subprocess.check_output(["niri", "msg", "-j", "focused-window"])
-            win_id = json.loads(out)["id"]
-            
-            if tags.get(num) == win_id:
-                # Toggle off if already set
-                del tags[num]
-            else:
-                # Remove old tags for this window (one tag per window)
-                for k, v in list(tags.items()):
-                    if v == win_id:
-                        del tags[k]
-                tags[num] = win_id
-                
-            save_tags(tags)
-            
-            # Briefly flash the minimap to show the new tag
-            subprocess.run(["niri-minimap", "show"])
-        except Exception as e:
-            print(f"Error: {e}")
-            sys.exit(1)
-
-    elif action == "focus":
-        win_id = tags.get(num)
-        if win_id is not None:
-            # Focus the window
-            subprocess.run(["niri", "msg", "action", "focus-window", "--id", str(win_id)])
-            
-            # Auto-hide the minimap once focused to get out of the way
-            subprocess.run(["niri-minimap", "hide"])
 
 if __name__ == "__main__":
     main()
