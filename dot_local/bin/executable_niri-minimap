@@ -174,7 +174,7 @@ TILE_BORDER_RADIUS = 5  # px, corner rounding of tiles and columns (focused work
 UNFOCUSED_TILE_RADIUS = "50%"  # border-radius for tiles/columns in non-focused workspaces (50% = circle, ~35% = squircle)
 UNFOCUSED_TILE_PAD = TILE_PAD + 4  # extra padding for circular tiles so the icon clears the circle boundary
 FOCUS_RING_CIRCLE = (
-    True  # True = circle focus ring (border-radius 50%), False = rounded square
+    False  # True = circle focus ring (border-radius 50%), False = rounded square
 )
 
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
@@ -1022,7 +1022,7 @@ window {{
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: {TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 4px rgb(0,0,0);
+    box-shadow: 0 0 0 3px rgb(0,0,0);
 }}
 
 .minimap-tile-spine {{
@@ -1030,7 +1030,7 @@ window {{
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: {TILE_PAD}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 4px rgb(0,0,0);
+    box-shadow: 0 0 0 3px rgb(0,0,0);
 }}
 
 .minimap-tile-workspace {{
@@ -1038,7 +1038,7 @@ window {{
     border-radius: 50%;
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
-    box-shadow: 0 0 0 4px rgb(0,0,0);
+    box-shadow: 0 0 0 3px rgb(0,0,0);
 }}
 
 .minimap-tile-focused {{
@@ -1046,7 +1046,7 @@ window {{
     border-radius: {"50%" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
     padding: {TILE_PAD}px;
     background-color: {_c(FOCUS_FILL_COLOR)};
-    box-shadow: 0 0 0 4px rgb(0,0,0), inset 0 0 0 1px rgb(0,0,0);
+    box-shadow: 0 0 0 3px rgb(0,0,0), inset 0 0 0 1px rgb(0,0,0);
 }}
 
 .minimap-empty {{
