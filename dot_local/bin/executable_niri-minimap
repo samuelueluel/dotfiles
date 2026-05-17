@@ -188,7 +188,7 @@ OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
 COLUMN_COLOR = ("#7A2E2E", 1.00)  # non-spine column background (terracotta)
 SPINE_COLOR = ("#7A2E2E", 1.00)  # spine column background (terracotta)
 WS_RING_COLOR = ("#00B6C2", 1.00)  # focused-workspace ring (turquoise)
-SPINE_LINE_COLOR = ("#D0A7AF", 1.00)  # faint vertical accent through the spine column
+SPINE_LINE_COLOR = ("#FFA726", 1.00)  # faint vertical accent through the spine column
 
 # Timing
 FADE_MS = 50  # fade-in/out duration in ms (quick to stay unobtrusive)
