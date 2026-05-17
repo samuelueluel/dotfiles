@@ -846,25 +846,25 @@ window {{
 }}
 
 .minimap-column {{
-    background-color: {_c(COLUMN_COLOR)};
+    background-color: transparent;
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: 0px;
 }}
 
 .minimap-spine-column {{
-    background-color: {_c(SPINE_COLOR)};
+    background-color: transparent;
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: 0px;
 }}
 
 .minimap-column-unfocused {{
-    background-color: {_c(COLUMN_COLOR)};
+    background-color: transparent;
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: 0px;
 }}
 
 .minimap-spine-column-unfocused {{
-    background-color: {_c(SPINE_COLOR)};
+    background-color: transparent;
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: 0px;
 }}
