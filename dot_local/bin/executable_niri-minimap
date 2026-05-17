@@ -188,13 +188,13 @@ OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
 COLUMN_COLOR = ("#7A2E2E", 1.00)  # non-spine column background (terracotta)
 SPINE_COLOR = ("#7A2E2E", 1.00)  # spine column background (terracotta)
 WS_RING_COLOR = ("#00B6C2", 1.00)  # focused-workspace ring (turquoise)
-SPINE_LINE_COLOR = ("#000000", 1.00)  # faint vertical accent through the spine column
+SPINE_LINE_COLOR = ("#000000", 0.50)  # faint vertical accent through the spine column
 
 # Timing
 FADE_MS = 50  # fade-in/out duration in ms (quick to stay unobtrusive)
 FADE_STEP_MS = 8  # animation tick interval (~120fps target, GTK caps to vsync)
 HOVER_DELAY_MS = 120  # delay before showing hover label, so fast sweeps don't flash it
-SPINE_LINE_WIDTH = 1  # px, vertical accent line width
+SPINE_LINE_WIDTH = 2  # px, vertical accent line width
 
 
 def _c(color):
@@ -571,10 +571,13 @@ class MinimapWindow(Gtk.Window):
         # 2m+1, column_homogeneous=True).
         grid_overlay = Gtk.Overlay()
         grid_overlay.set_child(grid)
+        grid_overlay.set_overflow(Gtk.Overflow.VISIBLE)
         spine_line = Gtk.Box()
         spine_line.set_size_request(SPINE_LINE_WIDTH, -1)
         spine_line.set_halign(Gtk.Align.CENTER)
         spine_line.set_valign(Gtk.Align.FILL)
+        spine_line.set_margin_top(-WS_SPACING)
+        spine_line.set_margin_bottom(-WS_SPACING)
         spine_line.add_css_class("minimap-spine-line")
         spine_line.set_can_target(False)  # don't intercept clicks meant for tiles
         grid_overlay.add_overlay(spine_line)
