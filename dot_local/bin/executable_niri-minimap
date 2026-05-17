@@ -499,13 +499,15 @@ class MinimapWindow(Gtk.Window):
                         tri.set_size_request(tri_size, tri_size)
                         tri.set_halign(Gtk.Align.END)
                         tri.set_valign(Gtk.Align.END)
+                        tri.set_margin_end(-4)
+                        tri.set_margin_bottom(-4)
                         tri.set_draw_func(
                             lambda da, cr, w, h: (
                                 cr.move_to(w, 0),
                                 cr.line_to(w, h),
                                 cr.line_to(0, h),
                                 cr.close_path(),
-                                cr.set_source_rgb(0, 0, 0),
+                                cr.set_source_rgb(1, 1, 1),
                                 cr.fill(),
                             )
                         )

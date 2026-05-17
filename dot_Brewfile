@@ -13,14 +13,12 @@ brew "fastfetch"   # system info fetcher
 brew "fd"          # find replacement
 brew "gh"          # GitHub CLI
 brew "git-delta"   # syntax-highlighted git diff pager
-brew "glances"     # system monitor
 brew "bottom"      # htop alternative with graphs; command: btm
 brew "cava"        # console-based audio visualizer
 brew "glow"        # Markdown renderer for the terminal
 brew "lazygit"     # TUI for git
-brew "chafa"        # terminal image renderer with Sixel/Kitty support
+brew "chafa"       # terminal image renderer with Sixel/Kitty support
 brew "ripgrep"     # grep replacement
-brew "ugrep"       # grep replacement with Unicode and interactive TUI
 brew "television"  # fuzzy finder TUI with live previews
 brew "tealdeer"    # simplified man pages (fast Rust tldr client)
 brew "yq"          # jq-style processor for YAML/TOML/XML
