@@ -647,6 +647,7 @@ class MinimapApp(Gtk.Application):
         self._got_initial_windows = False
         self._got_initial_workspaces = False
         self._autohide_timer_id = None
+        self._rebuild_pending = False
 
     def do_activate(self):
         self.hold()  # Keep app running even if the window is hidden
@@ -676,35 +677,12 @@ class MinimapApp(Gtk.Application):
         self._event_reader.start()
 
         self._win.present()
-        GLib.timeout_add(250, self._poll_state)
-
-    def _poll_state(self):
-        if self._win and self._win.get_visible():
-            self._refresh_state()
-        return True
-
-    def _refresh_state(self):
-        try:
-            ws_res = subprocess.run(
-                ["niri", "msg", "--json", "workspaces"], capture_output=True, text=True
-            )
-            win_res = subprocess.run(
-                ["niri", "msg", "--json", "windows"], capture_output=True, text=True
-            )
-            self._workspaces = {ws["id"]: ws for ws in json.loads(ws_res.stdout)}
-            self._windows = {w["id"]: w for w in json.loads(win_res.stdout)}
-            self._sync_ws_focus()
-            self._sync_focus_from_windows()
-            self._full_rebuild()
-        except Exception as e:
-            print(f"Error refreshing state: {e}", file=sys.stderr)
 
     def _on_toggle_signal(self):
         if self._win:
             if self._win.get_visible():
                 self._win.set_visible(False)
             else:
-                self._refresh_state()
                 self._win.present()
         return True
 
@@ -713,7 +691,6 @@ class MinimapApp(Gtk.Application):
         # Used by WASD navigation keys — opens on first keypress and auto-closes after timer.
         if self._win:
             if not self._win.get_visible():
-                self._refresh_state()
                 self._win.present()
             self._reset_autohide_timer()
         return True
@@ -743,11 +720,22 @@ class MinimapApp(Gtk.Application):
         Gtk.Application.do_shutdown(self)
 
     def _full_rebuild(self):
+        # Coalesce bursts of events into one rebuild per idle cycle.
+        # Without this, fast Mod+Ctrl+WASD presses queue multiple full
+        # rebuilds and the main thread can't keep up, causing visible skips.
+        if self._rebuild_pending:
+            return
+        self._rebuild_pending = True
+        GLib.idle_add(self._do_rebuild, priority=GLib.PRIORITY_HIGH_IDLE)
+
+    def _do_rebuild(self):
+        self._rebuild_pending = False
         ws_list = parse_state(
             list(self._workspaces.values()),
             list(self._windows.values()),
         )
         self._win.rebuild(ws_list)
+        return False
 
     def _try_initial_build(self):
         """Build UI once we have both initial dumps."""
@@ -771,15 +759,25 @@ class MinimapApp(Gtk.Application):
 
         elif "WindowFocusChanged" in event:
             new_id = event["WindowFocusChanged"].get("id")
+            # Update is_focused on every window record — niri only tells us the
+            # new focused id, not which window lost focus. Without this, the
+            # old focused window stays is_focused=True and gets the gold ring
+            # alongside its workspace's spine ring.
+            for w in self._windows.values():
+                w["is_focused"] = w["id"] == new_id
             self._focused_window_id = new_id
             if new_id and new_id in self._windows:
                 self._focused_ws_id = self._windows[new_id].get("workspace_id")
-            self._win.update_focus(self._focused_window_id, self._focused_ws_id)
+            self._full_rebuild()
 
         elif "WindowOpenedOrChanged" in event:
             win = event["WindowOpenedOrChanged"]["window"]
             self._windows[win["id"]] = win
             if win.get("is_focused"):
+                # Same as WindowFocusChanged: unmark stale focus on other windows
+                for w in self._windows.values():
+                    if w["id"] != win["id"]:
+                        w["is_focused"] = False
                 self._focused_window_id = win["id"]
                 self._focused_ws_id = win.get("workspace_id")
             self._full_rebuild()
@@ -794,9 +792,23 @@ class MinimapApp(Gtk.Application):
         elif "WorkspaceActivated" in event:
             ws_id = event["WorkspaceActivated"]["id"]
             focused = event["WorkspaceActivated"].get("focused", False)
+            # Update is_focused/is_active flags on workspace records — parse_state()
+            # reads these directly to decide focused-workspace styling (squares vs
+            # circles). Without this, switching workspaces leaves the old workspace
+            # styled as focused until the next full state refresh.
+            target = self._workspaces.get(ws_id)
+            if target is not None:
+                same_output = target.get("output")
+                for ws in self._workspaces.values():
+                    if ws.get("output") == same_output:
+                        ws["is_active"] = ws["id"] == ws_id
+                if focused:
+                    for ws in self._workspaces.values():
+                        ws["is_focused"] = ws["id"] == ws_id
             if focused:
                 self._focused_ws_id = ws_id
-            self._win.update_focus(self._focused_window_id, self._focused_ws_id)
+            # Focused workspace changed — needs a rebuild, not just update_focus
+            self._full_rebuild()
 
         elif "WorkspaceActiveWindowChanged" in event:
             ws_id = event["WorkspaceActiveWindowChanged"]["workspace_id"]
@@ -804,6 +816,19 @@ class MinimapApp(Gtk.Application):
             if ws_id in self._workspaces:
                 self._workspaces[ws_id]["active_window_id"] = awid
             # Active column may have changed — rebuild to update alignment
+            self._full_rebuild()
+
+        elif "WindowLayoutsChanged" in event:
+            # Fires when column/tile positions change (e.g. Mod+Ctrl+WASD moves,
+            # consume/expel, new column inserts). Update each window's layout
+            # in-place so pos_in_scrolling_layout reflects current state.
+            for change in event["WindowLayoutsChanged"].get("changes", []):
+                # changes is a list of [window_id, layout] pairs
+                if not isinstance(change, (list, tuple)) or len(change) != 2:
+                    continue
+                wid, layout = change
+                if wid in self._windows:
+                    self._windows[wid]["layout"] = layout
             self._full_rebuild()
 
     def _sync_focus_from_windows(self):
