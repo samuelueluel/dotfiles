@@ -25,6 +25,7 @@ from collections import defaultdict
 
 # --- Toggle: kill existing instance if running ---
 PID_FILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-minimap.pid")
+TAG_FILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-tags.json")
 
 
 def _is_minimap_pid(pid):
@@ -72,6 +73,21 @@ def cleanup_pid():
         os.remove(PID_FILE)
     except FileNotFoundError:
         pass
+
+
+def _load_tags():
+    try:
+        with open(TAG_FILE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_tags(tags):
+    tmp = TAG_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(tags, f)
+    os.replace(tmp, TAG_FILE)
 
 
 # --- Toggle check FIRST (so toggle-off is near-instant, no extra work) ---
@@ -380,9 +396,7 @@ class MinimapWindow(Gtk.Window):
         self.tile_widgets.clear()
         
         try:
-            tag_file = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-tags.json")
-            with open(tag_file) as f:
-                numbered_tags_map = {v: str(k) for k, v in json.load(f).items()}
+            numbered_tags_map = {v: str(k) for k, v in _load_tags().items()}
         except Exception:
             numbered_tags_map = {}
 
@@ -690,13 +704,54 @@ class MinimapWindow(Gtk.Window):
             daemon=True,
         ).start()
 
-    def _on_tile_click(self, gesture, win_id):
-        if gesture.get_current_button() == 3:
-            # Right-click: toggle designation
-            if win_id in self._designated_win_ids:
-                self._designated_win_ids.discard(win_id)
+    def _cycle_tag(self, win_id):
+        tags = _load_tags()
+        is_dot = win_id in self._designated_win_ids
+        current_num = next((k for k, v in tags.items() if v == win_id), None)
+        # Numbers not yet taken by another window
+        taken_by_others = {k for k, v in tags.items() if v != win_id}
+        available = [n for n in ("1", "2", "3") if n not in taken_by_others]
+
+        if is_dot:
+            # dot → first available number, or none if all taken
+            self._designated_win_ids.discard(win_id)
+            if available:
+                if current_num:
+                    del tags[current_num]
+                tags[available[0]] = win_id
+                _save_tags(tags)
+        elif current_num is not None:
+            # tag N → next available after N, or none
+            if current_num in available:
+                idx = available.index(current_num)
+                next_num = available[idx + 1] if idx + 1 < len(available) else None
             else:
-                self._designated_win_ids.add(win_id)
+                next_num = None
+            del tags[current_num]
+            if next_num:
+                tags[next_num] = win_id
+            _save_tags(tags)
+        else:
+            # none → dot
+            self._designated_win_ids.add(win_id)
+
+    def _clear_all_tags(self, win_id):
+        self._designated_win_ids.discard(win_id)
+        tags = _load_tags()
+        new_tags = {k: v for k, v in tags.items() if v != win_id}
+        if len(new_tags) != len(tags):
+            _save_tags(new_tags)
+
+    def _on_tile_click(self, gesture, win_id):
+        button = gesture.get_current_button()
+        if button == 3:
+            # Right-click: cycle none → dot → untaken numbers → none
+            self._cycle_tag(win_id)
+            if self._request_rebuild:
+                self._request_rebuild()
+        elif button == 2:
+            # Middle-click: clear all tags from this window
+            self._clear_all_tags(win_id)
             if self._request_rebuild:
                 self._request_rebuild()
         else:
