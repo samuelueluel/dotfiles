@@ -230,7 +230,8 @@ gestures {
 // ============================================================
 
 // ── Shell (Noctalia) ──────────────────────────────────────────────────────
-spawn-at-startup "sh" "-c" "sleep 2 && qs -c noctalia-shell" // I think this fails without sh and sleep 2
+// See end of file
+// spawn-at-startup "sh" "-c" "sleep 2 && qs -c noctalia-shell" // I think this fails without sh and sleep 2 (v4)
 
 // ── Clipboard daemon ──────────────────────────────────────────────────────
 spawn-at-startup "sh" "-c" "rm -f ~/.local/share/cclip/db.sqlite3* && cclipd -s 2 -t image/png -t 'image/*' -t 'text/plain;charset=utf-8' -t 'text/*'"
@@ -330,6 +331,13 @@ window-rule {
     open-floating true
     default-column-width { fixed 600; }
     default-window-height { fixed 500; }
+}
+
+window-rule {
+    match title="rmpc Float"
+    open-floating true
+    default-column-width { fixed 1310; }
+    default-window-height { fixed 695; }
 }
 
 window-rule {
@@ -702,3 +710,9 @@ window-rule {
     geometry-corner-radius 35
     clip-to-geometry true
 }
+
+// ============================================================
+// NOCTALIA
+// ============================================================
+
+spawn-at-startup "noctalia" // this was supposed to be at the end of the file
