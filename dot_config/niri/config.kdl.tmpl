@@ -509,10 +509,11 @@ binds {
 
     XF86MenuKB hotkey-overlay-title="Toggle minimap" repeat=false { spawn "niri-minimap"; }
     Mod+Space hotkey-overlay-title="Television Hub" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "TV Hub" "-e" "sh" "-c" "sleep 0.1 && exec /home/linuxbrew/.linuxbrew/bin/tv 'Television Hub'"; }
-    Mod+Ctrl+Space hotkey-overlay-title="Launcher (rofi)" repeat=false { spawn "rofi" "-show" "drun"; }
+    //Mod+Ctrl+Space hotkey-overlay-title="Launcher (rofi)" repeat=false { spawn "rofi" "-show" "drun"; }
     Mod+B hotkey-overlay-title="Toggle bar visibility" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "bar" "toggle"; }
     // Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "qs" "ipc" "call" "notifications" "toggle"; }
     // Mod+X hotkey-overlay-title="Clear all notifications" { spawn "qs" "ipc" "call" "notifications" "clear"; }
+    Mod+Ctrl+Space repeat=false { toggle-overview; }
 
     // -----------------------------------
     // APPLICATION LAUNCHERS

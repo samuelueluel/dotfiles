@@ -1,8 +1,10 @@
+tap "ublue-os/tap"
+
 # CLI tools managed via Homebrew
 # Install with: brew bundle --global
 
 cask "claude-code@latest"
-brew "gemini-cli"
+cask "antigravity-cli-linux"
 
 brew "atuin"       # shell history with SQLite backend and Ctrl+R search
 brew "bat"         # cat with syntax highlighting
