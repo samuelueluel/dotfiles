@@ -9,7 +9,7 @@ dusty_rose  = "#D0A7AF"  # secondary / muted
 green       = "#7DC4A0"  # success / positive
 gold        = "#FFA726"  # warning / error / distinct accent
 pink        = "#FF6EB4"  # bright accent
-gray        = "#9E9080"  # unobtrusive / dim
+gray        = "#605E63"  # unobtrusive / dim
 
 [terminal]
 background           = "#7A2E2E"
@@ -30,7 +30,7 @@ ansi_6  = "#1AAAD4"  # cyan    → turquoise
 ansi_7  = "#D0A7AF"  # white   → dusty rose
 
 # ANSI 8–15 (bright)
-ansi_8  = "#9E9080"  # bright black   → gray
+ansi_8  = "#605E63"  # bright black   → gray
 ansi_9  = "#FFA726"  # bright red     → gold
 ansi_10 = "#7DC4A0"  # bright green   → green
 ansi_11 = "#D0A7AF"  # bright yellow  → dusty rose

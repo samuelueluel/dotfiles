@@ -2,7 +2,7 @@
 background = "#7A2E2E"
 border_fg = "#D0A7AF"
 text_fg = "#FFFFFF"
-dimmed_text_fg = "#9E9080"
+dimmed_text_fg = "#605E63"
 
 # Input
 input_text_fg = "#FFA726"
