@@ -177,7 +177,7 @@ FOCUS_RING_CIRCLE = (
 
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
 FOCUS_RING_COLOR = ("#FFA726", 1.00)  # focused window border ring (theme gold)
-FOCUS_FILL_COLOR = ("#00B6C2", 1.00)  # focused window background fill (turquoise)
+FOCUS_FILL_COLOR = ("#1AAAD4", 1.00)  # focused window background fill (turquoise)
 INACTIVE_FILL_COLOR = ("#A07885", 1.00)  # non-focused window fill (dusty rose, darkened)
 NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
 BG_COLOR = ("#000000", 0.80)  # outer panel background, old #1F1F26
@@ -185,7 +185,7 @@ WS_BG_COLOR = ("#2E2E38", 0.85)  # workspace background
 OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
 COLUMN_COLOR = ("#7A2E2E", 1.00)  # non-spine column background (terracotta)
 SPINE_COLOR = ("#7A2E2E", 1.00)  # spine column background (terracotta)
-WS_RING_COLOR = ("#00B6C2", 1.00)  # focused-workspace ring (turquoise)
+WS_RING_COLOR = ("#1AAAD4", 1.00)  # focused-workspace ring (turquoise)
 
 
 def _c(color):

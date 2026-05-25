@@ -1,6 +1,6 @@
 umask 002
-export EDITOR=zed
-export SUDO_EDITOR=zed
+export EDITOR=code
+export SUDO_EDITOR=code
 
 # Lines configured by zsh-newuser-install
 HISTFILE=~/.zsh_history
@@ -8,8 +8,22 @@ HISTSIZE=50000
 SAVEHIST=50000
 setopt extendedglob
 unsetopt beep
-bindkey -e
-bindkey '^X' undo
+
+# Vi mode
+bindkey -v
+KEYTIMEOUT=1
+
+# Cursor: beam in insert, block in normal
+function zle-keymap-select {
+  if [[ ${KEYMAP} == vicmd ]]; then
+    echo -ne '\e[2 q\e]12;#FFA726\a'  # block + gold (normal/nav)
+  else
+    echo -ne '\e[2 q\e]12;#1AAAD4\a'  # block + teal (insert/type)
+  fi
+}
+zle -N zle-keymap-select
+function zle-line-init { echo -ne '\e[2 q\e]12;#1AAAD4\a' }
+zle -N zle-line-init
 
 # History (large, shared across sessions, deduped)
 setopt APPEND_HISTORY
@@ -75,6 +89,7 @@ fi
 
 # Plugins (order matters: highlighting should be last)
 [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+bindkey '^F' autosuggest-accept
 source /home/linuxbrew/.linuxbrew/opt/fzf-tab/share/fzf-tab/fzf-tab.zsh
 [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 

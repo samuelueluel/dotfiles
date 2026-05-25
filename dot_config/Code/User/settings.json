@@ -1,0 +1,13 @@
+{
+    "extensions.experimental.affinity": {
+        "asvetliakov.vscode-neovim": 1
+    },
+    "vscode-neovim.neovimExecutablePaths.linux": "/usr/bin/nvim",
+    "security.workspace.trust.untrustedFiles": "open",
+    "workbench.colorTheme": "Noctalia",
+    "editor.bracketPairColorization.enabled": false,
+    "editor.fontFamily": "'JetBrainsMono Nerd Font', monospace",
+    "editor.fontSize": 18,
+    "editor.fontLigatures": true,
+    "editor.fontWeight": "600"
+}

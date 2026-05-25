@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Noctalia accent color
-ACCENT_COLOR="#00B6C2"
+ACCENT_COLOR="#1AAAD4"
 
 # Get current focused workspace ID
 ACTIVE_WS=$(niri msg -j workspaces | jq '.[] | select(.is_focused == true) | .id')

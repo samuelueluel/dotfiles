@@ -3,11 +3,11 @@
   "wip": {
     "name": "",
     "dark": {
-      "mPrimary": "#00b6c2",
+      "mPrimary": "#1aaad4",
       "mOnPrimary": "#000000",
       "mSecondary": "#d0a7af",
       "mOnSecondary": "#000000",
-      "mTertiary": "#17c182",
+      "mTertiary": "#7dc4a0",
       "mOnTertiary": "#000000",
       "mError": "#ffa726",
       "mOnError": "#000000",
@@ -17,7 +17,7 @@
       "mOnSurfaceVariant": "#d0a7af",
       "mOutline": "#778899",
       "mShadow": "#000000",
-      "mHover": "#17c182",
+      "mHover": "#7dc4a0",
       "mOnHover": "#000000",
       "terminal": {
         "normal": {
@@ -25,9 +25,9 @@
           "red": "#FFA726",
           "green": "#00CC33",
           "yellow": "#CCBB00",
-          "blue": "#00B6C2",
+          "blue": "#1AAAD4",
           "magenta": "#D0A7AF",
-          "cyan": "#17C182",
+          "cyan": "#7DC4A0",
           "white": "#D0A7AF"
         },
         "bright": {
@@ -43,8 +43,8 @@
         "foreground": "#D0A7AF",
         "background": "#7A2E2E",
         "selectionFg": "#000000",
-        "selectionBg": "#00B6C2",
-        "cursor": "#00B6C2",
+        "selectionBg": "#1AAAD4",
+        "cursor": "#1AAAD4",
         "cursorText": "#000000"
       }
     },

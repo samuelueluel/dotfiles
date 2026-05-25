@@ -20,7 +20,7 @@ Guidance = "#D0A7AF"
 
 # 4. Selection Highlight & Failed Duration: Theme Turquoise
 # (These are linked to the same key in this version of Atuin)
-AlertError = "#00B6C2"
+AlertError = "#1AAAD4"
 
 # 5. Pass Indicator: Theme Green
-AlertInfo = "#17C182"
+AlertInfo = "#7DC4A0"

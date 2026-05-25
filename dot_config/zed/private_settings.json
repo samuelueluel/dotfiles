@@ -68,4 +68,6 @@
   "buffer_font_size": 15,
   "window_decorations": "server",
   "theme": "Noctalia Blur",
+  "vim_mode": true,
+  "relative_line_numbers": true,
 }

@@ -4,9 +4,9 @@
 [palette]
 terracotta  = "#7A2E2E"  # background
 white       = "#FFFFFF"  # foreground / primary text
-turquoise   = "#00B6C2"  # accent, cursor, selection
+turquoise   = "#1AAAD4"  # accent, cursor, selection
 dusty_rose  = "#D0A7AF"  # secondary / muted
-green       = "#17C182"  # success / positive
+green       = "#7DC4A0"  # success / positive
 gold        = "#FFA726"  # warning / error / distinct accent
 pink        = "#FF6EB4"  # bright accent
 gray        = "#9E9080"  # unobtrusive / dim
@@ -14,27 +14,27 @@ gray        = "#9E9080"  # unobtrusive / dim
 [terminal]
 background           = "#7A2E2E"
 foreground           = "#FFFFFF"
-cursor               = "#00B6C2"
+cursor               = "#1AAAD4"
 cursor_text          = "#FFFFFF"
-selection_background = "#00B6C2"
+selection_background = "#1AAAD4"
 selection_foreground = "#FFFFFF"
 
 # ANSI 0–7 (normal)
 ansi_0  = "#FFFFFF"  # black   → white (regular text)
 ansi_1  = "#FFA726"  # red     → gold
-ansi_2  = "#17C182"  # green   → green
+ansi_2  = "#7DC4A0"  # green   → green
 ansi_3  = "#D0A7AF"  # yellow  → dusty rose
-ansi_4  = "#00B6C2"  # blue    → turquoise
+ansi_4  = "#1AAAD4"  # blue    → turquoise
 ansi_5  = "#FF6EB4"  # magenta → pink
-ansi_6  = "#00B6C2"  # cyan    → turquoise
+ansi_6  = "#1AAAD4"  # cyan    → turquoise
 ansi_7  = "#D0A7AF"  # white   → dusty rose
 
 # ANSI 8–15 (bright)
 ansi_8  = "#9E9080"  # bright black   → gray
 ansi_9  = "#FFA726"  # bright red     → gold
-ansi_10 = "#17C182"  # bright green   → green
+ansi_10 = "#7DC4A0"  # bright green   → green
 ansi_11 = "#D0A7AF"  # bright yellow  → dusty rose
-ansi_12 = "#00B6C2"  # bright blue    → turquoise
+ansi_12 = "#1AAAD4"  # bright blue    → turquoise
 ansi_13 = "#FF6EB4"  # bright magenta → pink
-ansi_14 = "#00B6C2"  # bright cyan    → turquoise
+ansi_14 = "#1AAAD4"  # bright cyan    → turquoise
 ansi_15 = "#D0A7AF"  # bright white   → dusty rose

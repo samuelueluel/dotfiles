@@ -277,7 +277,7 @@ horizontal_gradient_color_4 = '#E78AA1'
 horizontal_gradient_color_5 = '#FF6EB4'
 horizontal_gradient_color_6 = '#7FC2BC'
 horizontal_gradient_color_7 = '#3EBCC0'
-horizontal_gradient_color_8 = '#00B6C2'
+horizontal_gradient_color_8 = '#1AAAD4'
 
 
 # If both vertical and horizontal gradient is enabled, vertical will be blended in this direction.

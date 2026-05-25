@@ -15,7 +15,7 @@
         <key>foreground</key>
         <string>#FFFFFF</string>
         <key>caret</key>
-        <string>#00B6C2</string>
+        <string>#1AAAD4</string>
         <key>selection</key>
         <string>#000000</string>
         <key>selectionForeground</key>
@@ -39,7 +39,7 @@
       <key>name</key><string>String</string>
       <key>scope</key><string>string, string.quoted, string.template</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#17C182</string></dict>
+      <dict><key>foreground</key><string>#7DC4A0</string></dict>
     </dict>
 
     <dict>
@@ -67,14 +67,14 @@
       <key>name</key><string>Keyword</string>
       <key>scope</key><string>keyword, keyword.control, keyword.operator.word</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#00B6C2</string></dict>
+      <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
     <dict>
       <key>name</key><string>Storage</string>
       <key>scope</key><string>storage, storage.type, storage.modifier</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#00B6C2</string></dict>
+      <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
     <dict>
@@ -102,7 +102,7 @@
       <key>name</key><string>Self / This</string>
       <key>scope</key><string>variable.language</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#00B6C2</string></dict>
+      <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
     <dict>
@@ -123,7 +123,7 @@
       <key>name</key><string>Tag</string>
       <key>scope</key><string>entity.name.tag, meta.tag</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#00B6C2</string></dict>
+      <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
     <dict>
@@ -148,7 +148,7 @@
       <key>scope</key><string>markup.heading, entity.name.section</string>
       <key>settings</key>
       <dict>
-        <key>foreground</key><string>#00B6C2</string>
+        <key>foreground</key><string>#1AAAD4</string>
         <key>fontStyle</key><string>bold</string>
       </dict>
     </dict>
@@ -178,7 +178,7 @@
       <key>scope</key><string>markup.underline.link, string.other.link</string>
       <key>settings</key>
       <dict>
-        <key>foreground</key><string>#17C182</string>
+        <key>foreground</key><string>#7DC4A0</string>
         <key>fontStyle</key><string>underline</string>
       </dict>
     </dict>
@@ -187,14 +187,14 @@
       <key>name</key><string>Markup Inline Code</string>
       <key>scope</key><string>markup.inline.raw, markup.raw</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#17C182</string></dict>
+      <dict><key>foreground</key><string>#7DC4A0</string></dict>
     </dict>
 
     <dict>
       <key>name</key><string>Config Key</string>
       <key>scope</key><string>meta.mapping.key, support.type.property-name</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#00B6C2</string></dict>
+      <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
     <dict>

@@ -23,13 +23,13 @@ color_fg0   = '#FFFFFF'
 color_black = '#000000'
 color_bg1   = '#D0A7AF'
 color_bg3   = '#9E9080'
-color_blue  = '#00B6C2'
+color_blue  = '#1AAAD4'
 color_aqua  = '#914059'
-color_green = '#17C182'
+color_green = '#7DC4A0'
 color_orange = '#FFA726'
 color_purple = '#FF6EB4'
 color_red   = '#FF6EB4'
-color_yellow = '#40BFB0'
+color_yellow = '#1AAAD4'
 
 [os]
 disabled = false

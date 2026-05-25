@@ -105,13 +105,13 @@ layout {
     focus-ring {
         off
         //width 2
-        //active-color "#00B6C2"  //theme turquoise
+        //active-color "#1AAAD4"  //theme turquoise
     }
 
     border {
         //off
         width 2 // **don't remove this comment, it's needed by niri-tile-toggle**
-        active-color "#00B6C2"  // theme turquoise
+        active-color "#1AAAD4"  // theme turquoise
         inactive-color "#D0A7AF" // theme dusty rose
         urgent-color "#EE9D00" // theme gold
     }
@@ -244,6 +244,7 @@ spawn-at-startup "sh" "-c" "sleep 5 && dropbox start -i"
 spawn-at-startup "sh" "-c" "sleep 5 && flatpak run com.github.wwmm.easyeffects --gapplication-service"
 spawn-at-startup "/usr/bin/niriusd"
 spawn-at-startup "udiskie" "--no-tray" // auto-mount USB / external drives
+spawn-at-startup "wayvibes" "/var/home/samuel/wayvibes/soundpacks/nk-cream/" "-v" "5" "--device-name" "keyd virtual keyboard"
 // mpris-proxy removed: airpods-media.service (evdev daemon) handles routing to Quod Libet directly
 
 debug {
@@ -718,3 +719,11 @@ window-rule {
 // ============================================================
 
 spawn-at-startup "noctalia" // this was supposed to be at the end of the file
+
+
+window-rule {
+    match app-id="zen-utility"
+    match app-id="rmpc"
+    match app-id="Stremio"
+    opacity 1.0
+}
