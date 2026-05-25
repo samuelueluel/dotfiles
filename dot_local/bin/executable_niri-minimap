@@ -969,9 +969,22 @@ class MinimapApp(Gtk.Application):
         self._win.rebuild(ws_list)
         return False
 
+    def _prune_stale_tags(self):
+        if not self._got_initial_windows:
+            return
+        try:
+            tags = _load_tags()
+            active_ids = set(self._windows.keys())
+            new_tags = {k: v for k, v in tags.items() if v in active_ids}
+            if len(new_tags) != len(tags):
+                _save_tags(new_tags)
+        except Exception:
+            pass
+
     def _try_initial_build(self):
         """Build UI once we have both initial dumps."""
         if self._got_initial_windows and self._got_initial_workspaces:
+            self._prune_stale_tags()
             self._full_rebuild()
 
     def _on_event(self, event):
@@ -979,6 +992,7 @@ class MinimapApp(Gtk.Application):
             self._windows = {w["id"]: w for w in event["WindowsChanged"]["windows"]}
             self._sync_focus_from_windows()
             self._got_initial_windows = True
+            self._prune_stale_tags()
             self._try_initial_build()
 
         elif "WorkspacesChanged" in event:
@@ -1019,6 +1033,7 @@ class MinimapApp(Gtk.Application):
             self._windows.pop(wid, None)
             if self._focused_window_id == wid:
                 self._focused_window_id = None
+            self._prune_stale_tags()
             self._full_rebuild()
 
         elif "WorkspaceActivated" in event:

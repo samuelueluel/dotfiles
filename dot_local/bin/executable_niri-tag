@@ -22,9 +22,20 @@ PID_FILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-minimap
 def load_tags():
     try:
         with open(TAG_FILE) as f:
-            return json.load(f)
+            tags = json.load(f)
     except (OSError, ValueError):
-        return {}
+        tags = {}
+
+    try:
+        out = subprocess.check_output(["niri", "msg", "-j", "windows"])
+        active_ids = {w["id"] for w in json.loads(out)}
+        pruned_tags = {k: v for k, v in tags.items() if v in active_ids}
+        if len(pruned_tags) != len(tags):
+            save_tags(pruned_tags)
+            signal_minimap(signal.SIGRTMIN)
+        return pruned_tags
+    except Exception:
+        return tags
 
 
 def save_tags(tags):
@@ -98,7 +109,6 @@ def cmd_focus(num):
     tags = load_tags()
     win_id = tags.get(num)
     if win_id is None:
-        notify(f"No tag {num} set", "normal")
         # Briefly show the minimap so the user can see what is tagged.
         signal_minimap(signal.SIGUSR2)
         return 1
