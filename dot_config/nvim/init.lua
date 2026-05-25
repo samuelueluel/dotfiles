@@ -66,6 +66,26 @@ map("v", ">", ">gv")
 map("n", "<Esc>", "<cmd>nohlsearch<cr>")
 
 -- ============================================================
+-- VS Code mode indicator (nvim-ui-plus)
+-- ============================================================
+if vim.g.vscode then
+  local vscode = require("vscode")
+  local mode_map = {
+    n = "normal", i = "insert", v = "visual", V = "visual",
+    ["\22"] = "visual", c = "cmdline", R = "replace",
+  }
+  vim.api.nvim_create_autocmd("ModeChanged", {
+    pattern = "*",
+    callback = function()
+      local m = vim.api.nvim_get_mode().mode
+      vscode.action("nvim-ui-plus.setMode", {
+        args = { mode = mode_map[m] or m }
+      })
+    end,
+  })
+end
+
+-- ============================================================
 -- Plugins
 -- ============================================================
 require("lazy").setup({

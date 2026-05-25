@@ -1,29 +1,29 @@
 # Noctalia color scheme
 background = #7A2E2E
-foreground = #FFFFFF
+foreground = #F2F0EC
 cursor-color = #1AAAD4
-cursor-text = #FFFFFF
+cursor-text = #F2F0EC
 cursor-style = block
 shell-integration-features = no-cursor
 selection-background = #1AAAD4
-selection-foreground = #FFFFFF
+selection-foreground = #F2F0EC
 
 # ANSI palette (normal)
-palette = 0=#FFFFFF
+palette = 0=#F2F0EC
 palette = 1=#FFA726
 palette = 2=#7DC4A0
 palette = 3=#D0A7AF
 palette = 4=#1AAAD4
-palette = 5=#FF6EB4
+palette = 5=#E06840
 palette = 6=#1AAAD4
 palette = 7=#D0A7AF
 # ANSI palette (bright)
-palette = 8=#605E63
+palette = 8=#716E75
 palette = 9=#FFA726
 palette = 10=#7DC4A0
 palette = 11=#D0A7AF
 palette = 12=#1AAAD4
-palette = 13=#FF6EB4
+palette = 13=#E06840
 palette = 14=#1AAAD4
 palette = 15=#D0A7AF
 

@@ -30,8 +30,8 @@ alt-space = "actions:open"
 ctrl-c = "actions:copy"
 
 [actions.open]
-description = "Open with xdg-open"
-command = "bash -c 'for f in \"$@\"; do p=$(sed \"s|^~/|/var/home/samuel/|\" <<< \"$f\"); xdg-open \"$p\"; done' -- {split:\\n:..|map:{strip_ansi|append:'|prepend:'}|join: }"
+description = "Open with VSCode"
+command = "bash -c 'for f in \"$@\"; do p=$(sed \"s|^~/|/var/home/samuel/|\" <<< \"$f\"); code --reuse-window \"$p\"; done' -- {split:\\n:..|map:{strip_ansi|append:'|prepend:'}|join: }"
 mode = "execute"
 separator = "\n"
 

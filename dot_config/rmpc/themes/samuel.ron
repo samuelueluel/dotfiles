@@ -59,7 +59,7 @@
             25: "#E8A76A",
             50: "#D0A7AF",
             75: "#E78AA1",
-            100: "#FF6EB4",
+            100: "#E06840",
         }),
     ),
     browser_song_format: [
@@ -89,7 +89,7 @@
                     (kind: Text(" ")),
                     (kind: Property(Title), default: (kind: Property(Filename)))
                 ]),
-                style: (fg: "#FFFFFF"),
+                style: (fg: "#F2F0EC"),
                 default: (kind: Text("Unknown"))
             ),
             label_prop: (kind: Text("Title"), style: (fg: "#D0A7AF")),
@@ -104,15 +104,15 @@
         ),
         (
             prop: (
-                kind: Property(Album), style: (fg: "#FFFFFF"),
-                default: (kind: Text("Unknown Album"), style: (fg: "#FFFFFF"))
+                kind: Property(Album), style: (fg: "#F2F0EC"),
+                default: (kind: Text("Unknown Album"), style: (fg: "#F2F0EC"))
             ),
             label_prop: (kind: Text("Album"), style: (fg: "#D0A7AF")),
             width: "35%",
         ),
         (
-            prop: (kind: Property(Duration), style: (fg: "#FFFFFF"),
-                default: (kind: Text("-"), style: (fg: "#FFFFFF"))
+            prop: (kind: Property(Duration), style: (fg: "#F2F0EC"),
+                default: (kind: Text("-"), style: (fg: "#F2F0EC"))
             ),
             label_prop: (kind: Text("Time"), style: (fg: "#D0A7AF")),
             width: "5%",

@@ -10,7 +10,7 @@ parent = "default"
 AlertWarn = "#FFA726"
 
 # 2. Generic History Entries: White (Confirmed key: Base)
-Base = "#FFFFFF"
+Base = "#F2F0EC"
 
 # 3. Timestamps, Borders, & Guidance: Dusty Rose
 Annotation = "#D0A7AF"

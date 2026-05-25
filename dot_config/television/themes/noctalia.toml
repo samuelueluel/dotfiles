@@ -1,18 +1,18 @@
 # General
 background = "#7A2E2E"
 border_fg = "#D0A7AF"
-text_fg = "#FFFFFF"
-dimmed_text_fg = "#605E63"
+text_fg = "#F2F0EC"
+dimmed_text_fg = "#716E75"
 
 # Input
 input_text_fg = "#FFA726"
 result_count_fg = "#FFA726"
 
 # Results
-result_name_fg = "#FFFFFF"
+result_name_fg = "#F2F0EC"
 result_line_number_fg = "#D0A7AF"
-result_value_fg = "#FFFFFF"
-selection_fg = "#FFFFFF"
+result_value_fg = "#F2F0EC"
+selection_fg = "#F2F0EC"
 selection_bg = "#000000"
 match_fg = "#FFA726"
 
@@ -23,5 +23,5 @@ preview_title_fg = "#D0A7AF"
 channel_mode_fg = "#7A2E2E"
 channel_mode_bg = "#1AAAD4"
 remote_control_mode_fg = "#7A2E2E"
-remote_control_mode_bg = "#FF6EB4"
+remote_control_mode_bg = "#E06840"
 send_to_channel_mode_fg = "#FFA726"

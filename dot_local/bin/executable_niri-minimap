@@ -198,13 +198,13 @@ FOCUS_RING_CIRCLE = (
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
 FOCUS_RING_COLOR = ("#1AAAD4", 1.00)  # focused window border ring (theme gold)
 FOCUS_FILL_COLOR = ("#D0A7AF", 1.00)  # focused window background fill (turquoise)
-INACTIVE_FILL_COLOR = ("#7A2E2E", 1.00)  # non-focused window fill (terracotta)
+INACTIVE_FILL_COLOR = ("#7A2E2E", 1.00)  # non-focused window fill (chimayo red)
 NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
 BG_COLOR = ("#000000", 1.00)  # outer panel background, old #1F1F26
 WS_BG_COLOR = ("#2E2E38", 1.00)  # workspace background
 OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
-COLUMN_COLOR = ("#7A2E2E", 1.00)  # non-spine column background (terracotta)
-SPINE_COLOR = ("#7A2E2E", 1.00)  # spine column background (terracotta)
+COLUMN_COLOR = ("#7A2E2E", 1.00)  # non-spine column background (chimayo red)
+SPINE_COLOR = ("#7A2E2E", 1.00)  # spine column background (chimayo red)
 WS_RING_COLOR = ("#D0A7AF", 1.00)  # focused-workspace ring (turquoise)
 SPINE_LINE_COLOR = ("#FFA726", 1.00)  # faint vertical accent through the spine column
 

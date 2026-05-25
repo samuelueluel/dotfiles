@@ -13,13 +13,13 @@
         <key>background</key>
         <string>#7A2E2E</string>
         <key>foreground</key>
-        <string>#FFFFFF</string>
+        <string>#F2F0EC</string>
         <key>caret</key>
         <string>#1AAAD4</string>
         <key>selection</key>
         <string>#000000</string>
         <key>selectionForeground</key>
-        <string>#FFFFFF</string>
+        <string>#F2F0EC</string>
         <key>lineHighlight</key>
         <string>#8B3F3F</string>
       </dict>
@@ -30,7 +30,7 @@
       <key>scope</key><string>comment, punctuation.definition.comment</string>
       <key>settings</key>
       <dict>
-        <key>foreground</key><string>#605E63</string>
+        <key>foreground</key><string>#716E75</string>
         <key>fontStyle</key><string>italic</string>
       </dict>
     </dict>
@@ -81,7 +81,7 @@
       <key>name</key><string>Type / Class</string>
       <key>scope</key><string>entity.name.type, entity.name.class, entity.other.inherited-class, support.type, support.class</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#FF6EB4</string></dict>
+      <dict><key>foreground</key><string>#E06840</string></dict>
     </dict>
 
     <dict>
@@ -95,7 +95,7 @@
       <key>name</key><string>Variable</string>
       <key>scope</key><string>variable, variable.other, variable.parameter</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#FFFFFF</string></dict>
+      <dict><key>foreground</key><string>#F2F0EC</string></dict>
     </dict>
 
     <dict>
@@ -138,7 +138,7 @@
       <key>scope</key><string>invalid</string>
       <key>settings</key>
       <dict>
-        <key>foreground</key><string>#FF6EB4</string>
+        <key>foreground</key><string>#E06840</string>
         <key>fontStyle</key><string>bold</string>
       </dict>
     </dict>
@@ -202,7 +202,7 @@
       <key>scope</key><string>entity.name.section.toml, entity.name.section.ini</string>
       <key>settings</key>
       <dict>
-        <key>foreground</key><string>#FF6EB4</string>
+        <key>foreground</key><string>#E06840</string>
         <key>fontStyle</key><string>bold</string>
       </dict>
     </dict>
