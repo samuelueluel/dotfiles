@@ -178,21 +178,21 @@ MINIMAP_WIDTH = (
     0.55  # default width as a fraction of monitor width (expands if content needs more)
 )
 ICON_SIZE = 43  # px, app icon size, 48
-CELL_PAD = 0  # px, outer margin around each tile (space outside the ring)
+CELL_PAD = 6  # px, outer margin around each tile (space outside the ring)
 TILE_PAD = 3  # px, inner padding between icon and the ring
-COL_SPACING = 16  # px, horizontal gap between columns
-TILE_SPACING = 11  # px, vertical gap between tiles in a column
-WS_SPACING = 15  # px, vertical gap between workspaces
+COL_SPACING = 4  # px, horizontal gap between columns (adjusted for CELL_PAD)
+TILE_SPACING = 0  # px, vertical gap between tiles in a column (adjusted for CELL_PAD)
+WS_SPACING = 3  # px, vertical gap between workspaces (adjusted for CELL_PAD)
 
 # Borders & radii
 BORDER_WIDTH = 7  # px, highlight ring around focused/active tiles
 OUTER_BORDER_WIDTH = 1  # px, border around the whole minimap panel
 OUTER_BORDER_RADIUS = 9  # px, corner rounding of the outer panel
 TILE_BORDER_RADIUS = 5  # px, corner rounding of tiles and columns (focused workspace)
-UNFOCUSED_TILE_RADIUS = "50%"  # border-radius for tiles/columns in non-focused workspaces (50% = circle, ~35% = squircle)
+UNFOCUSED_TILE_RADIUS = "24px"  # border-radius for tiles/columns in non-focused workspaces (24px = squircle/near-circle, prevents shadow bug)
 UNFOCUSED_TILE_PAD = TILE_PAD + 4  # extra padding for circular tiles so the icon clears the circle boundary
 FOCUS_RING_CIRCLE = (
-    False  # True = circle focus ring (border-radius 50%), False = rounded square
+    False  # True = circle focus ring (border-radius 24px), False = rounded square
 )
 
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
@@ -445,6 +445,7 @@ class MinimapWindow(Gtk.Window):
         grid.set_row_spacing(0)
         # Homogeneous columns ensure the grid center aligns with the spine
         grid.set_column_homogeneous(True)
+        grid.set_overflow(Gtk.Overflow.VISIBLE)
 
         grid_row = 0
         for ws_i, ws in enumerate(workspaces):
@@ -464,6 +465,7 @@ class MinimapWindow(Gtk.Window):
                     spacing=TILE_SPACING,
                 )
                 col_box.set_valign(Gtk.Align.CENTER)
+                col_box.set_overflow(Gtk.Overflow.VISIBLE)
                 if ws["is_focused"]:
                     if start_col + i == spine_index:
                         col_box.add_css_class("minimap-spine-column")
@@ -501,6 +503,7 @@ class MinimapWindow(Gtk.Window):
                         tile_box.set_overflow(Gtk.Overflow.VISIBLE)
                     else:
                         tile_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+                        tile_box.set_overflow(Gtk.Overflow.VISIBLE)
                     tile_box.set_halign(Gtk.Align.FILL if n_tiles > 1 else Gtk.Align.CENTER)
                     tile_box.set_valign(Gtk.Align.CENTER)
                     tile_box.set_margin_top(CELL_PAD)
@@ -1115,64 +1118,64 @@ window {{
     color: rgba(255, 255, 255, 0.6);
 }}
 
-.minimap-ws-focused {{
-    color: {_c(FOCUS_RING_COLOR)};
-}}
-
 .minimap-column {{
     background-color: transparent;
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: 0px;
+    overflow: visible;
 }}
 
 .minimap-spine-column {{
     background-color: transparent;
     border-radius: {TILE_BORDER_RADIUS}px;
     padding: 0px;
+    overflow: visible;
 }}
 
 .minimap-column-unfocused {{
     background-color: transparent;
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: 0px;
+    overflow: visible;
 }}
 
 .minimap-spine-column-unfocused {{
     background-color: transparent;
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: 0px;
+    overflow: visible;
 }}
 
 .minimap-tile {{
-    border: {BORDER_WIDTH}px solid transparent;
+    border: none;
     border-radius: {UNFOCUSED_TILE_RADIUS};
-    padding: {TILE_PAD}px;
+    padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 4px rgb(0,0,0);
+    box-shadow: 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
 }}
 
 .minimap-tile-spine {{
-    border: {BORDER_WIDTH}px solid transparent;
+    border: none;
     border-radius: {UNFOCUSED_TILE_RADIUS};
-    padding: {TILE_PAD}px;
+    padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 4px rgb(0,0,0);
+    box-shadow: 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
 }}
 
 .minimap-tile-workspace {{
-    border: {BORDER_WIDTH}px solid #D0A7AF;
-    border-radius: 50%;
-    padding: {TILE_PAD}px;
+    border: none;
+    border-radius: {UNFOCUSED_TILE_RADIUS};
+    padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 4px rgb(0,0,0);
+    box-shadow: inset 0 0 0 {BORDER_WIDTH}px #D0A7AF, 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
 }}
 
 .minimap-tile-focused {{
-    border: {BORDER_WIDTH}px solid {_c(FOCUS_RING_COLOR)};
-    border-radius: {"50%" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
-    padding: {TILE_PAD}px;
+    border: none;
+    border-radius: {"24px" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
+    padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 4px rgb(0,0,0);
+    box-shadow: inset 0 0 0 {BORDER_WIDTH}px {_c(FOCUS_RING_COLOR)}, 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
 }}
 
 .minimap-empty {{
@@ -1182,11 +1185,25 @@ window {{
 }}
 
 .minimap-tile.minimap-stacked,
-.minimap-tile-spine.minimap-stacked,
-.minimap-tile-workspace.minimap-stacked,
+.minimap-tile-spine.minimap-stacked {{
+    border: none;
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 0 0 2px rgb(0, 0, 0), 0 3px 6px rgba(0, 0, 0, 0.95), 0 6px 12px rgba(0, 0, 0, 0.95);
+}}
+
+.minimap-tile-workspace.minimap-stacked {{
+    border: none;
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: inset 0 0 0 4px #D0A7AF, 0 0 0 2px rgb(0, 0, 0), 0 3px 6px rgba(0, 0, 0, 0.95), 0 6px 12px rgba(0, 0, 0, 0.95);
+}}
+
 .minimap-tile-focused.minimap-stacked {{
-    padding: 0px;
-    border-width: 4px;
+    border: none;
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: inset 0 0 0 4px {_c(FOCUS_RING_COLOR)}, 0 0 0 2px rgb(0, 0, 0), 0 3px 6px rgba(0, 0, 0, 0.95), 0 6px 12px rgba(0, 0, 0, 0.95);
 }}
 
 .minimap-column.minimap-col-stacked,
@@ -1194,6 +1211,7 @@ window {{
 .minimap-column-unfocused.minimap-col-stacked,
 .minimap-spine-column-unfocused.minimap-col-stacked {{
     background-color: transparent;
+    overflow: visible;
 }}
 
 
