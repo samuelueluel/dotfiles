@@ -869,6 +869,7 @@ class MinimapApp(Gtk.Application):
         self._got_initial_workspaces = False
         self._autohide_timer_id = None
         self._rebuild_pending = False
+        self._is_first_show = True
 
     def do_activate(self):
         self.hold()  # Keep app running even if the window is hidden
@@ -904,11 +905,30 @@ class MinimapApp(Gtk.Application):
             lambda *_: GLib.idle_add(_sigrtmin_idle),
         )
 
+        # Query the current state directly to avoid early startup event-stream race conditions
+        try:
+            windows_raw = json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"]))
+            self._windows = {w["id"]: w for w in windows_raw}
+            self._sync_focus_from_windows()
+            self._got_initial_windows = True
+        except Exception as e:
+            print(f"Error getting initial windows: {e}", file=sys.stderr)
+
+        try:
+            workspaces_raw = json.loads(subprocess.check_output(["niri", "msg", "--json", "workspaces"]))
+            self._workspaces = {ws["id"]: ws for ws in workspaces_raw}
+            self._sync_ws_focus()
+            self._got_initial_workspaces = True
+        except Exception as e:
+            print(f"Error getting initial workspaces: {e}", file=sys.stderr)
+
+        if self._got_initial_windows and self._got_initial_workspaces:
+            self._prune_stale_tags()
+            self._full_rebuild()
+
         # Start event stream — initial dump provides both windows and workspaces
         self._event_reader = EventStreamReader(callback=self._on_event)
         self._event_reader.start()
-
-        self._win.fade_in()
 
     def _on_tags_changed_signal(self):
         self._full_rebuild()
@@ -970,6 +990,9 @@ class MinimapApp(Gtk.Application):
             list(self._windows.values()),
         )
         self._win.rebuild(ws_list)
+        if self._is_first_show:
+            self._is_first_show = False
+            self._win.fade_in()
         return False
 
     def _prune_stale_tags(self):
@@ -992,6 +1015,8 @@ class MinimapApp(Gtk.Application):
 
     def _on_event(self, event):
         if "WindowsChanged" in event:
+            if self._got_initial_windows:
+                return
             self._windows = {w["id"]: w for w in event["WindowsChanged"]["windows"]}
             self._sync_focus_from_windows()
             self._got_initial_windows = True
@@ -999,6 +1024,8 @@ class MinimapApp(Gtk.Application):
             self._try_initial_build()
 
         elif "WorkspacesChanged" in event:
+            if self._got_initial_workspaces:
+                return
             self._workspaces = {
                 ws["id"]: ws for ws in event["WorkspacesChanged"]["workspaces"]
             }
@@ -1017,6 +1044,14 @@ class MinimapApp(Gtk.Application):
             self._focused_window_id = new_id
             if new_id and new_id in self._windows:
                 self._focused_ws_id = self._windows[new_id].get("workspace_id")
+            elif new_id:
+                # Fallback: if focused window is unknown, refetch windows list
+                try:
+                    windows_raw = json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"]))
+                    self._windows = {w["id"]: w for w in windows_raw}
+                    self._sync_focus_from_windows()
+                except Exception:
+                    pass
             self._full_rebuild()
 
         elif "WindowOpenedOrChanged" in event:
@@ -1072,6 +1107,7 @@ class MinimapApp(Gtk.Application):
             # Fires when column/tile positions change (e.g. Mod+Ctrl+WASD moves,
             # consume/expel, new column inserts). Update each window's layout
             # in-place so pos_in_scrolling_layout reflects current state.
+            needs_fetch = False
             for change in event["WindowLayoutsChanged"].get("changes", []):
                 # changes is a list of [window_id, layout] pairs
                 if not isinstance(change, (list, tuple)) or len(change) != 2:
@@ -1079,6 +1115,15 @@ class MinimapApp(Gtk.Application):
                 wid, layout = change
                 if wid in self._windows:
                     self._windows[wid]["layout"] = layout
+                else:
+                    needs_fetch = True
+            if needs_fetch:
+                try:
+                    windows_raw = json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"]))
+                    self._windows = {w["id"]: w for w in windows_raw}
+                    self._sync_focus_from_windows()
+                except Exception:
+                    pass
             self._full_rebuild()
 
     def _sync_focus_from_windows(self):
