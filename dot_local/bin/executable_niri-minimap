@@ -212,7 +212,7 @@ SPINE_LINE_COLOR = ("#FFA726", 1.00)  # faint vertical accent through the spine 
 FADE_MS = 50  # fade-in/out duration in ms (quick to stay unobtrusive)
 FADE_STEP_MS = 8  # animation tick interval (~120fps target, GTK caps to vsync)
 HOVER_DELAY_MS = 120  # delay before showing hover label, so fast sweeps don't flash it
-SPINE_LINE_WIDTH = 2  # px, vertical accent line width
+SPINE_LINE_WIDTH = 3  # px, vertical accent line width
 
 
 def _c(color):
@@ -634,8 +634,8 @@ class MinimapWindow(Gtk.Window):
         spine_line.set_size_request(SPINE_LINE_WIDTH, -1)
         spine_line.set_halign(Gtk.Align.CENTER)
         spine_line.set_valign(Gtk.Align.FILL)
-        spine_line.set_margin_top(-WS_SPACING)
-        spine_line.set_margin_bottom(-WS_SPACING)
+        spine_line.set_margin_top(-60)
+        spine_line.set_margin_bottom(-60)
         spine_line.add_css_class("minimap-spine-line")
         spine_line.set_can_target(False)  # don't intercept clicks meant for tiles
         grid_overlay.add_overlay(spine_line)
@@ -1216,7 +1216,7 @@ window {{
 
 
 .minimap-spine-line {{
-    background-color: {_c(SPINE_LINE_COLOR)};
+    background: linear-gradient(to bottom, rgba(255, 167, 38, 0.0) 0%, {_c(SPINE_LINE_COLOR)} 15%, {_c(SPINE_LINE_COLOR)} 85%, rgba(255, 167, 38, 0.0) 100%);
     border-radius: 1px;
 }}
 
