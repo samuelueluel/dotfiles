@@ -8,6 +8,7 @@ cask "antigravity-cli-linux"
 
 brew "atuin"       # shell history with SQLite backend and Ctrl+R search
 brew "bat"         # cat with syntax highlighting
+brew "block-goose-cli" # Goose CLI developer agent
 brew "dust"        # du replacement with visual tree
 brew "duf"         # df replacement with visual output
 brew "eza"         # ls replacement with colors/icons/git info

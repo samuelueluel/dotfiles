@@ -1,6 +1,28 @@
 [
   {
+    "key": "ctrl+space",
+    "command": "workbench.action.showCommands"
+  },
+  {
     "key": "ctrl+q",
     "command": "workbench.action.closeActiveEditor"
+  },
+  {
+    "key": "ctrl+shift+q",
+    "command": "workbench.action.reopenClosedEditor"
+  },
+  {
+    "key": "alt+tab",
+    "command": "workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup"
+  },
+  {
+    "key": "alt+a",
+    "command": "workbench.action.previousEditor",
+    "when": "!inputFocus || neovim.mode == 'normal'"
+  },
+  {
+    "key": "alt+d",
+    "command": "workbench.action.nextEditor",
+    "when": "!inputFocus || neovim.mode == 'normal'"
   }
 ]

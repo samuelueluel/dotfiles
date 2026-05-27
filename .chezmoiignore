@@ -4,3 +4,5 @@ zen-extensions
 .config/swayidle
 .config/swaylock
 .local/share/applications/swaylock.desktop
+
+**/__pycache__
