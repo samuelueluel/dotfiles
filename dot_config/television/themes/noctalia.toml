@@ -21,7 +21,7 @@ preview_title_fg = "#D0A7AF"
 
 # Modes
 channel_mode_fg = "#7A2E2E"
-channel_mode_bg = "#1AAAD4"
+channel_mode_bg = "#FFA726"
 remote_control_mode_fg = "#7A2E2E"
 remote_control_mode_bg = "#E06840"
 send_to_channel_mode_fg = "#FFA726"

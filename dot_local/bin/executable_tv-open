@@ -1,0 +1,10 @@
+#!/bin/bash
+# Used by television files channel to open files with appropriate apps
+for f in "$@"; do
+    p=$(sed "s|^~/|/var/home/samuel/|" <<< "$f")
+    if [[ "$p" == *.pdf ]]; then
+        systemd-run --user --no-block flatpak run org.kde.okular "$p"
+    else
+        code --reuse-window "$p"
+    fi
+done
