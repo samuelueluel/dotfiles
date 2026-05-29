@@ -21,6 +21,7 @@ brew "cava"        # console-based audio visualizer
 brew "glow"        # Markdown renderer for the terminal
 brew "lazygit"     # TUI for git
 brew "chafa"       # terminal image renderer with Sixel/Kitty support
+brew "ramalama"    # run AI models in containers
 brew "ripgrep"     # grep replacement
 brew "television"  # fuzzy finder TUI with live previews
 brew "tealdeer"    # simplified man pages (fast Rust tldr client)
