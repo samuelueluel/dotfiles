@@ -1,0 +1,27 @@
+# Open WebUI — local AI chat frontend (LaTeX/markdown) pointed at the ramalama
+# iGPU server on :8080. Managed by systemd (Quadlet); reachable on the LAN at
+# http://<host>:3000. Auth is on (first visit creates the admin account).
+[Unit]
+Description=Open WebUI (local AI chat frontend → ramalama :8080)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=open-webui
+Image=ghcr.io/open-webui/open-webui:main
+Network=host
+Environment=PORT=3000
+Environment=OPENAI_API_BASE_URL=http://localhost:8080/v1
+Environment=OPENAI_API_KEY=dummy
+Environment=ENABLE_OLLAMA_API=False
+Environment=WEBUI_AUTH=True
+Environment=WEBUI_NAME=ZBook Local AI
+Volume=open-webui:/app/backend/data
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

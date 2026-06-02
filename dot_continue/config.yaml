@@ -1,0 +1,43 @@
+name: Local Assistant
+version: 1.0.0
+schema: v1
+
+# Chat/edit on the iGPU brain (Ramalama :8080); autocomplete on a small iGPU FIM coder
+# (Ramalama :8081); embeddings on the silent NPU (Lemonade :13305).
+# See Strix Halo LLM Guide § 2.J / § 8.E.2.
+#
+# Why autocomplete is NOT on the NPU: FastFlowLM's NPU catalog has no coder/FIM model
+# (verified — fastflowlm.com/models), and an instruct model returns prose, not code.
+# Real ghost-text needs a FIM coder, which only runs as a GGUF on the iGPU. Embeddings
+# DO stay on the NPU (embed-gemma is a strong silent embedder — § 8.C).
+#
+# NOTE: the chat model id MUST be the exact id from :8080/v1/models
+# (unsloth/Qwen3.6-35B-A3B-MTP-GGUF), NOT the friendly "qwen3.6-35b-a3b" — see § 2.K.
+# Whatever serve-brain/serve-dense has loaded must match this id, or chat returns no model.
+
+models:
+  - name: Qwen3.6-35B-A3B (Chat)
+    provider: openai
+    model: unsloth/Qwen3.6-35B-A3B-MTP-GGUF
+    apiBase: http://localhost:8080/v1
+    apiKey: dummy
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: Qwen2.5-Coder-1.5B (Autocomplete)
+    provider: openai
+    model: Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF   # exact served id from :8081/v1/models
+    apiBase: http://localhost:8081/v1              # iGPU coder (serve-coder), NOT the NPU
+    apiKey: dummy
+    roles:
+      - autocomplete
+
+  - name: NPU Embeddings
+    provider: openai
+    model: embed-gemma-300m-FLM     # silent NPU embedder; nomic-embed is higher quality but iGPU (§ 8.C)
+    apiBase: http://localhost:13305/api/v1
+    apiKey: dummy
+    roles:
+      - embed

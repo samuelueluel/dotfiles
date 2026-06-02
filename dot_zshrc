@@ -201,11 +201,12 @@ RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
 MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75"
 CTX=131072  # context window for the server (applies to ALL clients: WebUI, Goose, etc.)
 
-# Stop any running model AND wait for :8080 to actually release before re-serving.
-# Without this, ramalama serve races the old socket, finds 8080 "busy", and
+# Stop the BRAIN container (only) AND wait for :8080 to release before re-serving.
+# Stops just 'llm' (not --all) so the :8081 coder for autocomplete survives a brain swap.
+# Without the wait, ramalama serve races the old socket, finds 8080 "busy", and
 # silently auto-assigns a random port — breaking every client (WebUI/Goose/aider).
 _llm_reset() {
-  ramalama stop --all 2>/dev/null
+  ramalama stop llm 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8080 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
 }
@@ -223,6 +224,19 @@ serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on al
 alias serve-brain='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 alias serve-brain-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 alias serve-dense='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+
+# Small FIM coder for VS Code autocomplete (Continue → :8081). Runs on the iGPU ALONGSIDE
+# the brain, on its own name/port so a brain swap doesn't evict it. No MTP (not an MTP build);
+# small ctx since autocomplete prompts are short. The NPU has no coder model, so real code
+# completion has to live on the iGPU — §2.J / §8.E.2. Served id: Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF
+CODER_MODEL=hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M
+serve-coder() {
+  ramalama stop coder 2>/dev/null
+  local i=0
+  while ss -tln 2>/dev/null | grep -q ':8081 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
+  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 "$CODER_MODEL" \
+    && echo "▶ serving coder (FIM autocomplete) at http://localhost:8081/v1"
+}
 
 goose-with() {
   _llm_reset
