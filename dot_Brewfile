@@ -34,6 +34,8 @@ brew "starship"    # cross-shell prompt
 brew "zoxide"      # smart cd replacement
 brew "fzf-tab"     # replace zsh completion menu with fzf
 brew "pipx"        # isolated Python CLI tool installer
+brew "gcc"         # C compiler — needed to build Python packages with native extensions (e.g. headroom-ai)
+brew "python@3.13" # pinned Python for packages incompatible with 3.14 (e.g. headroom-ai pyo3 cap)
 
 
 cask "font-crimson-pro" # elegant variable serif
