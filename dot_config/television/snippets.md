@@ -48,3 +48,13 @@
 - Logs: Greetd (login) follow | journalctl -f -u greetd
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
+
+- AI: Serve fast MoE model (background) | serve-brain
+- AI: Serve MoE model, MTP off (quality A/B) | serve-brain-nospec
+- AI: Serve dense high-quality model (background) | serve-dense
+- AI: Stop all running models | ramalama stop --all
+- AI: Launch Goose + fast MoE model | goose-brain
+- AI: Launch Goose + dense high-quality model | goose-dense
+- AI: Goose sandbox (read ~, write current dir) | goose-safe-1
+- AI: Goose sandbox (strict read/write current dir) | goose-safe-2
+- AI: Goose sandbox (write single file) | goose-safe-3 ""

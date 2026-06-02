@@ -199,18 +199,25 @@ function claude() {
 # Local LLM (Ramalama / Goose / Aider) — §2.B, §2.D, §2.F
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
 MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75"
+CTX=131072  # context window for the server (applies to ALL clients: WebUI, Goose, etc.)
 
 serve-llm() {
   ramalama stop --all 2>/dev/null
-  ramalama serve -d -n llm --image "$RAMA_IMG" --runtime-args "$MTP_OPTS" "$1" \
-    && echo "▶ serving $1 (MTP) at http://localhost:8080/v1"
+  ramalama serve -d -n llm --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" "$1" \
+    && echo "▶ serving $1 (MTP, ctx $CTX) at http://localhost:8080/v1"
+}
+serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on alias
+  ramalama stop --all 2>/dev/null
+  ramalama serve -d -n llm --image "$RAMA_IMG" --ctx-size "$CTX" "$1" \
+    && echo "▶ serving $1 (no MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 alias serve-brain='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-brain-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 alias serve-dense='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
 
 goose-with() {
   ramalama stop --all 2>/dev/null
-  ramalama serve -d -n llm --image "$RAMA_IMG" --runtime-args "$MTP_OPTS" "$1" || return 1
+  ramalama serve -d -n llm --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" "$1" || return 1
   until curl -sf http://localhost:8080/v1/models >/dev/null 2>&1; do sleep 0.5; done
   goose session --openai-host http://localhost:8080/v1 --openai-model "$2"
 }
