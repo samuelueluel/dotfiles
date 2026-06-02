@@ -202,15 +202,15 @@ MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75"
 
 serve-llm() {
   ramalama stop --all 2>/dev/null
-  ramalama serve -d -n llm --image "$RAMA_IMG" --opts "$MTP_OPTS" "$1" \
+  ramalama serve -d -n llm --image "$RAMA_IMG" --runtime-args "$MTP_OPTS" "$1" \
     && echo "▶ serving $1 (MTP) at http://localhost:8080/v1"
 }
 alias serve-brain='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-brain-fast='ramalama stop --all 2>/dev/null; ramalama serve -d -n llm --image "$RAMA_IMG" qwen3.6-35b-a3b'
+alias serve-brain-fast='ramalama stop --all 2>/dev/null; ramalama serve -d -n llm --image "$RAMA_IMG" hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 
 goose-with() {
   ramalama stop --all 2>/dev/null
-  ramalama serve -d -n llm --image "$RAMA_IMG" --opts "$MTP_OPTS" "$1" || return 1
+  ramalama serve -d -n llm --image "$RAMA_IMG" --runtime-args "$MTP_OPTS" "$1" || return 1
   until curl -sf http://localhost:8080/v1/models >/dev/null 2>&1; do sleep 0.5; done
   goose session --openai-host http://localhost:8080/v1 --openai-model "$2"
 }

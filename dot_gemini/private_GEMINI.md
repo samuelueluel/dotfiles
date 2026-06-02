@@ -23,8 +23,7 @@ which rtk             # Verify correct binary
 
 ## Hook-Based Usage
 
-All other commands are automatically rewritten by the Gemini CLI hook.
+All other commands are automatically rewritten by the Claude Code hook.
 Example: `git status` → `rtk git status` (transparent, 0 tokens overhead)
 
-## Gemini Added Memories
-- Testing global memory persistence location.
+Refer to CLAUDE.md for full command reference.

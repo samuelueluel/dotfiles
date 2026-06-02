@@ -36,6 +36,6 @@
       }
     ]
   },
-  "effortLevel": "low",
+  "effortLevel": "medium",
   "theme": "custom:blur-theme"
 }
