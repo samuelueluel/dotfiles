@@ -203,12 +203,12 @@ CTX=131072  # context window for the server (applies to ALL clients: WebUI, Goos
 
 serve-llm() {
   ramalama stop --all 2>/dev/null
-  ramalama serve -d -n llm --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" "$1" \
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" "$1" \
     && echo "▶ serving $1 (MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on alias
   ramalama stop --all 2>/dev/null
-  ramalama serve -d -n llm --image "$RAMA_IMG" --ctx-size "$CTX" "$1" \
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" "$1" \
     && echo "▶ serving $1 (no MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 alias serve-brain='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
@@ -217,12 +217,13 @@ alias serve-dense='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
 
 goose-with() {
   ramalama stop --all 2>/dev/null
-  ramalama serve -d -n llm --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" "$1" || return 1
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" "$1" || return 1
   until curl -sf http://localhost:8080/v1/models >/dev/null 2>&1; do sleep 0.5; done
-  goose session --openai-host http://localhost:8080/v1 --openai-model "$2"
+  local model_name=$(curl -sf http://localhost:8080/v1/models | python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+  goose session --openai-host http://localhost:8080/v1 --openai-model "$model_name"
 }
-alias goose-brain='goose-with hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL qwen3.6-35b-a3b'
-alias goose-dense='goose-with hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL qwen3.6-27b'
+alias goose-brain='goose-with hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias goose-dense='goose-with hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
 
 alias aider-brain='podman run -it --rm --network=host --userns=keep-id \
   -v "$PWD":/app:z -w /app \
