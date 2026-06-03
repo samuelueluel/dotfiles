@@ -224,6 +224,7 @@ serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on al
 alias serve-brain='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 alias serve-brain-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 alias serve-dense='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias stop-brain='ramalama stop llm'
 
 # Small FIM coder for VS Code autocomplete (Continue → :8081). Runs on the iGPU ALONGSIDE
 # the brain, on its own name/port so a brain swap doesn't evict it. No MTP (not an MTP build);
@@ -236,6 +237,36 @@ serve-coder() {
   while ss -tln 2>/dev/null | grep -q ':8081 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
   ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 "$CODER_MODEL" \
     && echo "▶ serving coder (FIM autocomplete) at http://localhost:8081/v1"
+}
+alias stop-coder='ramalama stop coder'
+
+# Serve an embedder model on the iGPU alongside the brain and coder
+EMBED_MODEL="hf://Qwen/Qwen3-Embedding-8B-GGUF:Q4_K_M"
+serve-embedder() {
+  ramalama stop embedder 2>/dev/null
+  local i=0
+  while ss -tln 2>/dev/null | grep -q ':8082 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
+  ramalama serve -d -n embedder -p 8082 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--embedding" "$EMBED_MODEL" \
+    && echo "▶ serving embedder at http://localhost:8082/v1"
+}
+alias stop-embedder="ramalama stop embedder"
+
+# Show which model is actually loaded on each port (id from /v1/models = source of truth).
+# Tags the chat port MoE/dense: an "A<N>B" suffix (active params) = MoE, plain count = dense.
+model-check() {
+  local p name id tag
+  for entry in "8080:brain/dense" "8081:coder" "8082:embedder"; do
+    p="${entry%%:*}"; name="${entry##*:}"
+    id=$(curl -sf "http://localhost:$p/v1/models" 2>/dev/null \
+           | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    if [[ -z "$id" ]]; then
+      printf '  :%s  %-13s —\n' "$p" "$name"
+    else
+      tag=""
+      [[ "$p" == 8080 ]] && { [[ "$id" == *A[0-9]*B* ]] && tag=" (MoE)" || tag=" (dense)"; }
+      printf '  :%s  %-13s %s%s\n' "$p" "$name" "$id" "$tag"
+    fi
+  done
 }
 
 goose-with() {

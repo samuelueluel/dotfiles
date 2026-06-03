@@ -52,7 +52,13 @@
 - AI: Serve fast MoE model (background) | serve-brain
 - AI: Serve MoE model, MTP off (quality A/B) | serve-brain-nospec
 - AI: Serve dense high-quality model (background) | serve-dense
+- AI: Serve autocomplete coder (background) | serve-coder
+- AI: Serve vector embedder (background) | serve-embedder
+- AI: Stop brain/dense model | stop-brain
+- AI: Stop autocomplete coder | stop-coder
+- AI: Stop vector embedder | stop-embedder
 - AI: Stop all running models | ramalama stop --all
+- AI: Check which models are loaded | model-check
 - AI: Launch Goose + fast MoE model | goose-brain
 - AI: Launch Goose + dense high-quality model | goose-dense
 - AI: Goose sandbox (read ~, write current dir) | goose-safe-1
