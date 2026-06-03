@@ -110,17 +110,17 @@ sort_alphabetically = true
 # as hex values (e.g., "#ff0000", "#1e1e2e").
 #
 #[ui.theme_overrides]
-#background = "#7A2E2E"
+#background = "#693638"
 #text_fg = "#FFFFFF"
 #selection_bg = "#000000"
 #selection_fg = "#FFFFFF"
-#match_fg = "#FFA726"
-#border_fg = "#D0A7AF"
+#match_fg = "#D4B820"
+#border_fg = "#B06F75"
 #result_name_fg = "#FFFFFF"
 #result_value_fg = "#FFFFFF"
-#result_line_number_fg = "#D0A7AF"
-#result_count_fg = "#FFA726"
-#preview_title_fg = "#D0A7AF"
+#result_line_number_fg = "#B06F75"
+#result_count_fg = "#D4B820"
+#preview_title_fg = "#B06F75"
 
 # Keybindings and Events
 # ----------------------------------------------------------------------------

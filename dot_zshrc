@@ -16,7 +16,7 @@ KEYTIMEOUT=1
 # Cursor: beam in insert, block in normal
 function zle-keymap-select {
   if [[ ${KEYMAP} == vicmd ]]; then
-    echo -ne '\e[2 q\e]12;#FFA726\a'  # block + gold (normal/nav)
+    echo -ne '\e[2 q\e]12;#D4B820\a'  # block + gold (normal/nav)
   else
     echo -ne '\e[2 q\e]12;#1AAAD4\a'  # block + teal (insert/type)
   fi
@@ -51,7 +51,7 @@ ZSH_CACHE="$HOME/.cache/zsh"
 [[ -d "$ZSH_CACHE" ]] || mkdir -p "$ZSH_CACHE"
 
 # fzf global options (colors, keybinds, UI)
-export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char,alt-space:accept' --gutter=' ' --scrollbar='█' --color='bg:-1,gutter:-1,border:#7A2E2E,separator:#D0A7AF,preview-border:#D0A7AF,hl:#FFA726,hl+:#FFA726,pointer:#FFA726,marker:#FFA726,bg+:#000000,prompt:#FFA726,info:#D0A7AF,header:#D0A7AF,scrollbar:#FFA726'"
+export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char,alt-space:accept' --gutter=' ' --scrollbar='█' --color='bg:-1,gutter:-1,border:#693638,separator:#B06F75,preview-border:#B06F75,hl:#D4B820,hl+:#D4B820,pointer:#D4B820,marker:#D4B820,bg+:#000000,prompt:#D4B820,info:#B06F75,header:#B06F75,scrollbar:#D4B820'"
 
 # zoxide: smart cd
 if command -v zoxide >/dev/null; then

@@ -1,5 +1,5 @@
 # Noctalia color scheme
-background = #7A2E2E
+background = #693638
 foreground = #F2F0EC
 cursor-color = #1AAAD4
 cursor-text = #F2F0EC
@@ -10,22 +10,22 @@ selection-foreground = #F2F0EC
 
 # ANSI palette (normal)
 palette = 0=#F2F0EC
-palette = 1=#FFA726
-palette = 2=#7DC4A0
-palette = 3=#D0A7AF
+palette = 1=#D4B820
+palette = 2=#6E8C78
+palette = 3=#B06F75
 palette = 4=#1AAAD4
 palette = 5=#E06840
 palette = 6=#1AAAD4
-palette = 7=#D0A7AF
+palette = 7=#B06F75
 # ANSI palette (bright)
 palette = 8=#716E75
-palette = 9=#FFA726
-palette = 10=#7DC4A0
-palette = 11=#D0A7AF
+palette = 9=#D4B820
+palette = 10=#6E8C78
+palette = 11=#B06F75
 palette = 12=#1AAAD4
 palette = 13=#E06840
 palette = 14=#1AAAD4
-palette = 15=#D0A7AF
+palette = 15=#B06F75
 
 # Font
 font-codepoint-map = U+2764=Adwaita Mono

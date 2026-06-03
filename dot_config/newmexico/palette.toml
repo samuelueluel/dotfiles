@@ -2,17 +2,18 @@
 # Source of truth for all theme ports
 
 [palette]
-chimayo_red  = "#7A2E2E"  # background
+red_rock     = "#693638"  # background
 gypsum       = "#F2F0EC"  # foreground / primary text
 turquoise    = "#1AAAD4"  # accent, cursor, selection
-adobe_shadow = "#D0A7AF"  # secondary / muted
-sage         = "#7DC4A0"  # success / positive
-zia          = "#FFA726"  # warning / error / distinct accent
+sandia       = "#B06F75"  # secondary / muted
+juniper      = "#6E8C78"  # success / positive
+chamisa      = "#D4B820"  # warning / error / distinct accent
 globe_mallow = "#E06840"  # bright accent
 gray         = "#716E75"  # unobtrusive / dim
+basalt       = "#1A1614"  # deep UI dark / volcanic black
 
 [terminal]
-background           = "#7A2E2E"
+background           = "#693638"
 foreground           = "#F2F0EC"
 cursor               = "#1AAAD4"
 cursor_text          = "#F2F0EC"
@@ -21,20 +22,20 @@ selection_foreground = "#F2F0EC"
 
 # ANSI 0–7 (normal)
 ansi_0  = "#F2F0EC"  # black   → gypsum (regular text)
-ansi_1  = "#FFA726"  # red     → zia
-ansi_2  = "#7DC4A0"  # green   → sage
-ansi_3  = "#D0A7AF"  # yellow  → adobe shadow
+ansi_1  = "#D4B820"  # red     → chamisa
+ansi_2  = "#6E8C78"  # green   → juniper
+ansi_3  = "#B06F75"  # yellow  → sandia
 ansi_4  = "#1AAAD4"  # blue    → turquoise
 ansi_5  = "#E06840"  # magenta → globe mallow
 ansi_6  = "#1AAAD4"  # cyan    → turquoise
-ansi_7  = "#D0A7AF"  # white   → adobe shadow
+ansi_7  = "#B06F75"  # white   → sandia
 
 # ANSI 8–15 (bright)
 ansi_8  = "#716E75"  # bright black   → gray
-ansi_9  = "#FFA726"  # bright red     → zia
-ansi_10 = "#7DC4A0"  # bright green   → sage
-ansi_11 = "#D0A7AF"  # bright yellow  → adobe shadow
+ansi_9  = "#D4B820"  # bright red     → chamisa
+ansi_10 = "#6E8C78"  # bright green   → juniper
+ansi_11 = "#B06F75"  # bright yellow  → sandia
 ansi_12 = "#1AAAD4"  # bright blue    → turquoise
 ansi_13 = "#E06840"  # bright magenta → globe mallow
 ansi_14 = "#1AAAD4"  # bright cyan    → turquoise
-ansi_15 = "#D0A7AF"  # bright white   → adobe shadow
+ansi_15 = "#B06F75"  # bright white   → sandia

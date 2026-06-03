@@ -181,8 +181,8 @@ FOCUS_FILL_COLOR = ("#1AAAD4", 0.70)  # focused window background fill (turquois
 NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
 BG_COLOR = ("#000000", 0.80)  # outer panel background, old #1F1F26
 WS_BG_COLOR = ("#2E2E38", 0.85)  # workspace background
-OUTER_BORDER_COLOR = ("#574150", 1.00)  # outer panel border
-COLUMN_COLOR = ("#574150", 1.00)  # non-spine column background
+OUTER_BORDER_COLOR = ("#504858", 1.00)  # outer panel border
+COLUMN_COLOR = ("#504858", 1.00)  # non-spine column background
 SPINE_COLOR = ("#A14763", 1.00)  # spine column background
 WS_RING_COLOR = ("#1AAAD4", 1.00)  # focused-workspace ring
 
