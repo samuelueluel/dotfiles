@@ -15,7 +15,7 @@ if not args.grouping and not args.genres:
     print("Error: specify at least one of --grouping or --genres", file=sys.stderr)
     sys.exit(1)
 
-MUSIC_DIR = os.environ.get('MUSIC_DIR', os.path.expanduser('~/Music/Music_Linux/mp3 library/Music'))
+MUSIC_DIR = os.environ.get('MUSIC_DIR', os.path.expanduser('~/Music/mp3-library'))
 
 check_for_unsafe_files(MUSIC_DIR, recursive=True)
 

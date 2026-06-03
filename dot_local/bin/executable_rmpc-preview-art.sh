@@ -5,7 +5,7 @@
 # This ensures that even if we exit early, the previous image is removed.
 # a=d means action=delete, d=A means delete all images
 printf "\033_Ga=d,d=A\033\\"
-MUSIC_DIR="${MUSIC_DIR:-$HOME/Music/Music_Linux/mp3 library/Music}"
+MUSIC_DIR="${MUSIC_DIR:-$HOME/Music/mp3-library}"
 INPUT="$1"
 RELATIVE_FILE="$2"
 

@@ -15,7 +15,7 @@ args = parser.parse_args()
 if args.directory:
     MUSIC_DIR = os.path.expanduser(args.directory)
 else:
-    MUSIC_DIR = os.environ.get('MUSIC_DIR', os.path.expanduser('~/Music/Music_Linux/mp3 library/Music'))
+    MUSIC_DIR = os.environ.get('MUSIC_DIR', os.path.expanduser('~/Music/mp3-library'))
 
 if not os.path.isdir(MUSIC_DIR):
     print(f"Error: not a directory: {MUSIC_DIR}", file=sys.stderr)

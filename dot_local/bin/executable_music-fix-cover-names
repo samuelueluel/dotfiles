@@ -11,7 +11,7 @@ import argparse
 
 MUSIC_DIR = os.environ.get(
     "MUSIC_DIR",
-    os.path.expanduser("~/Music/Music_Linux/mp3 library/Music"),
+    os.path.expanduser("~/Music/mp3-library"),
 )
 
 AUDIO_EXTS = {".mp3", ".flac", ".ogg", ".opus", ".m4a", ".aac", ".wav", ".wv", ".ape"}

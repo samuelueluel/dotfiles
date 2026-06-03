@@ -5,7 +5,7 @@ from mutagen.id3 import ID3, TIT1, TCON
 from mutagen.id3._util import ID3NoHeaderError
 from mutagen.flac import FLAC, FLACNoHeaderError
 
-MUSIC_DIR = os.environ.get('MUSIC_DIR', os.path.expanduser('~/Music/Music_Linux/mp3 library/Music'))
+MUSIC_DIR = os.environ.get('MUSIC_DIR', os.path.expanduser('~/Music/mp3-library'))
 DRY_RUN = '--dry-run' in sys.argv
 
 def split_values(text_list):

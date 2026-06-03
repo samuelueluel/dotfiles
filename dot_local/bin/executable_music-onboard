@@ -21,7 +21,7 @@ except ImportError:
 DOWNLOADS_DIR = os.path.expanduser("~/Downloads")
 MUSIC_DIR = os.environ.get(
     "MUSIC_DIR",
-    os.path.expanduser("~/Music/Music_Linux/mp3 library/Music"),
+    os.path.expanduser("~/Music/mp3-library"),
 )
 
 def run_command(cmd: List[str], cwd: Optional[str] = None, env: Optional[dict] = None) -> bool:

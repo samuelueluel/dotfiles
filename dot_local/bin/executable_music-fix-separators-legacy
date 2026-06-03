@@ -2,7 +2,7 @@
 # Fix tag separators: replace ' / ' with '; ' in grouping (TIT1) and genre (TCON)
 # Usage: ./fix_separators.sh [--dry-run]
 
-MUSIC_DIR="${MUSIC_DIR:-$HOME/Music/Music_Linux/mp3 library/Music}"
+MUSIC_DIR="${MUSIC_DIR:-$HOME/Music/mp3-library}"
 DRY_RUN=0
 [[ "$1" == "--dry-run" ]] && DRY_RUN=1
 

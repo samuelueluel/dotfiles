@@ -1,5 +1,5 @@
 # Beets configuration for strictly manual metadata management
-directory: ~/Music/Music_Linux/mp3 library/Music
+directory: ~/Music/mp3-library
 library: ~/.config/beets/library.db
 
 # Global settings
