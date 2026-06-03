@@ -52,6 +52,7 @@
 - AI: Serve fast MoE model (background) | serve-brain
 - AI: Serve MoE model, MTP off (quality A/B) | serve-brain-nospec
 - AI: Serve dense high-quality model (background) | serve-dense
+- AI: Serve Gemma 4 (Hard Math Rescue) | serve-gemma
 - AI: Serve autocomplete coder (background) | serve-coder
 - AI: Serve vector embedder (background) | serve-embedder
 - AI: Stop brain/dense model | stop-brain

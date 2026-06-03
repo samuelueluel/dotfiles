@@ -26,6 +26,16 @@ models:
       - edit
       - apply
 
+  - name: Gemma 4 31B (Hard Math)
+    provider: openai
+    model: unsloth/gemma-4-31b-it-GGUF
+    apiBase: http://localhost:8080/v1
+    apiKey: dummy
+    roles:
+      - chat
+      - edit
+      - apply
+
   - name: Qwen2.5-Coder-1.5B (Autocomplete)
     provider: openai
     model: Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF   # exact served id from :8081/v1/models

@@ -224,6 +224,7 @@ serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on al
 alias serve-brain='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 alias serve-brain-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 alias serve-dense='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-gemma='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
 alias stop-brain='ramalama stop llm'
 
 # Small FIM coder for VS Code autocomplete (Continue → :8081). Runs on the iGPU ALONGSIDE

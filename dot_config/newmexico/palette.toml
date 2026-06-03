@@ -5,10 +5,11 @@
 red_rock     = "#693638"  # background
 gypsum       = "#F2F0EC"  # foreground / primary text
 turquoise    = "#1AAAD4"  # accent, cursor, selection
-sandia       = "#B06F75"  # secondary / muted
+sandia       = "#B06F75"  # UI chrome — borders, dim labels, elements not meant to be read closely
 juniper      = "#6E8C78"  # success / positive
-chamisa      = "#D4B820"  # warning / error / distinct accent
-globe_mallow = "#E06840"  # bright accent
+chamisa      = "#D4B820"  # warning / error / distinct accent — jarring by design, use sparingly
+globe_mallow = "#E06840"  # bright accent — highlights, active UI elements
+sandstone    = "#D4956A"  # secondary readable text — canyon wall tan
 gray         = "#716E75"  # unobtrusive / dim
 basalt       = "#1A1614"  # deep UI dark / volcanic black
 

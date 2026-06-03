@@ -5,14 +5,14 @@
     "mOnHover": "#000000",
     "mOnPrimary": "#000000",
     "mOnSecondary": "#000000",
-    "mOnSurface": "#b06f75",
-    "mOnSurfaceVariant": "#b06f75",
+    "mOnSurface": "#F2F0EC",
+    "mOnSurfaceVariant": "#D4956A",
     "mOnTertiary": "#000000",
     "mOutline": "#778899",
     "mPrimary": "#1aaad4",
     "mSecondary": "#b06f75",
     "mShadow": "#000000",
     "mSurface": "#693638",
-    "mSurfaceVariant": "#604f5b",
+    "mSurfaceVariant": "#504858",
     "mTertiary": "#6e8c78"
 }
