@@ -14,5 +14,11 @@
     "editor.fontWeight": "600",
     "workbench.colorTheme": "Noctalia",
     "workbench.activityBar.location": "hidden",
-    "window.menuBarVisibility": "toggle"
+    "window.menuBarVisibility": "toggle",
+    "workbench.colorCustomizations": {
+        "editorGhostText.foreground": "#4f535d",
+        "editorGhostText.background": "#8893a82e",
+        "editorGhostText.border": "#8893a866"
+    },
+    "continue.telemetryEnabled": false
 }
