@@ -291,11 +291,30 @@ alias aider-code='podman run -it --rm --network=host --userns=keep-id \
   paulgauthier/aider \
   --model openai/qwen3.6-35b-a3b'
 
+# Creates a temp dir with goose config for the containerised binary (v1.30.x).
+# Returns the dir path; caller mounts it at /home/goose/.config/goose (writable, not :ro).
+# v1.30.x uses flat GOOSE_PROVIDER/GOOSE_MODEL keys, not the providers: nesting of v1.36.x.
+_goose_tmp_config() {
+  local model_name="$1"
+  local cfgdir
+  cfgdir=$(mktemp -d)
+  cat > "$cfgdir/config.yaml" <<YAML
+GOOSE_TELEMETRY_ENABLED: true
+GOOSE_PROVIDER: openai
+GOOSE_MODEL: $model_name
+OPENAI_BASE_URL: http://localhost:8080/v1
+OPENAI_HOST: http://localhost:8080
+OPENAI_BASE_PATH: v1/chat/completions
+OPENAI_API_KEY: dummy
+YAML
+  echo "$cfgdir"
+}
+
 goose-safe-1() {
   local target_dir="${1:-$PWD}"
   local model_name="${2}"
   local abs_dir="$(realpath "$target_dir")"
-  
+
   if [[ "$abs_dir" == "$HOME" ]]; then
     echo "Error: Cannot run goose-safe-1 with write access to your entire home directory."
     return 1
@@ -319,6 +338,7 @@ goose-safe-1() {
     return 1
   fi
 
+  local cfg; cfg=$(_goose_tmp_config "$model_name")
   # --security-opt label=disable prevents SELinux from recursively relabeling the entire $HOME.
   # The more specific mount (-v $abs_dir) overrides the read-only $HOME mount.
   # --network=host gives it full internet access to search online generally.
@@ -328,17 +348,18 @@ goose-safe-1() {
     --security-opt label=disable \
     -v "$HOME":"$HOME":ro \
     -v "$abs_dir":"$abs_dir" \
+    -v "$cfg":/home/goose/.config/goose:z \
     -w "$abs_dir" \
-    -e GOOSE_PATH_ROOT="$abs_dir" \
     ghcr.io/block/goose:latest \
-    goose session --openai-host http://localhost:8080/v1 --openai-model "$model_name" "${@:3}"
+    session "${@:3}"
+  rm -rf "$cfg"
 }
 
 goose-safe-2() {
   local target_dir="${1:-$PWD}"
   local model_name="${2}"
   local abs_dir="$(realpath "$target_dir")"
-  
+
   if [[ "$abs_dir" == "$HOME" ]]; then
     echo "Error: Cannot run goose-safe-2 with write access to your entire home directory."
     return 1
@@ -362,6 +383,7 @@ goose-safe-2() {
     return 1
   fi
 
+  local cfg; cfg=$(_goose_tmp_config "$model_name")
   # Omitting the $HOME mount completely isolates the container filesystem.
   # --network=host still gives it full internet access to search online generally.
   podman run -it --rm \
@@ -369,16 +391,17 @@ goose-safe-2() {
     --userns=keep-id \
     --security-opt label=disable \
     -v "$abs_dir":"$abs_dir" \
+    -v "$cfg":/home/goose/.config/goose:z \
     -w "$abs_dir" \
-    -e GOOSE_PATH_ROOT="$abs_dir" \
     ghcr.io/block/goose:latest \
-    goose session --openai-host http://localhost:8080/v1 --openai-model "$model_name" "${@:3}"
+    session "${@:3}"
+  rm -rf "$cfg"
 }
 
 goose-safe-3() {
   local target_file="${1}"
   local model_name="${2}"
-  
+
   if [[ -z "$target_file" || ! -f "$target_file" ]]; then
     echo "Error: goose-safe-3 requires a specific existing FILE as an argument."
     echo "Usage: goose-safe-3 /path/to/file.ext [model_name]"
@@ -392,7 +415,7 @@ goose-safe-3() {
       return 1
     fi
   fi
-  
+
   local abs_file="$(realpath "$target_file")"
   local abs_dir="$(dirname "$abs_file")"
 
@@ -407,6 +430,7 @@ goose-safe-3() {
     return 1
   fi
 
+  local cfg; cfg=$(_goose_tmp_config "$model_name")
   # --tmpfs /tmp creates a writable, temporary in-memory scratchpad.
   # -v "$abs_file":"$abs_file" mounts just the specific file as writable over the RO home mount.
   podman run -it --rm \
@@ -415,9 +439,10 @@ goose-safe-3() {
     --security-opt label=disable \
     -v "$HOME":"$HOME":ro \
     -v "$abs_file":"$abs_file" \
+    -v "$cfg":/home/goose/.config/goose:z \
     --tmpfs /tmp \
     -w "$abs_dir" \
-    -e GOOSE_PATH_ROOT="$abs_dir" \
     ghcr.io/block/goose:latest \
-    goose session --openai-host http://localhost:8080/v1 --openai-model "$model_name" "${@:3}"
+    session "${@:3}"
+  rm -rf "$cfg"
 }
