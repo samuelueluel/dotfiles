@@ -13,10 +13,10 @@ AlertWarn = "#D4B820"
 Base = "#F0B6B6"
 
 # 3. Timestamps, Borders, & Guidance: Dusty Rose
-Annotation = "#D6AA7E"
-Muted = "#D6AA7E"
-Title = "#D6AA7E"
-Guidance = "#D6AA7E"
+Annotation = "#c99e76"
+Muted = "#c99e76"
+Title = "#c99e76"
+Guidance = "#c99e76"
 
 # 4. Selection Highlight & Failed Duration: Theme Turquoise
 # (These are linked to the same key in this version of Atuin)

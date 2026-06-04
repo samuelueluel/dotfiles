@@ -16,7 +16,7 @@ palette = 3=#ED2658
 palette = 4=#1AAAD4
 palette = 5=#ED6D42
 palette = 6=#1AAAD4
-palette = 7=#D6AA7E
+palette = 7=#c99e76
 # ANSI palette (bright)
 palette = 8=#716E75
 palette = 9=#D4B820
@@ -25,7 +25,7 @@ palette = 11=#ED2658
 palette = 12=#1AAAD4
 palette = 13=#ED6D42
 palette = 14=#1AAAD4
-palette = 15=#D6AA7E
+palette = 15=#c99e76
 
 # Font
 font-codepoint-map = U+2764=Adwaita Mono

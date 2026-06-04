@@ -109,14 +109,14 @@
       <key>name</key><string>Operator</string>
       <key>scope</key><string>keyword.operator</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#D6AA7E</string></dict>
+      <dict><key>foreground</key><string>#c99e76</string></dict>
     </dict>
 
     <dict>
       <key>name</key><string>Punctuation</string>
       <key>scope</key><string>punctuation</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#D6AA7E</string></dict>
+      <dict><key>foreground</key><string>#c99e76</string></dict>
     </dict>
 
     <dict>
@@ -168,7 +168,7 @@
       <key>scope</key><string>markup.italic</string>
       <key>settings</key>
       <dict>
-        <key>foreground</key><string>#D6AA7E</string>
+        <key>foreground</key><string>#c99e76</string>
         <key>fontStyle</key><string>italic</string>
       </dict>
     </dict>

@@ -1,6 +1,6 @@
 # General
 background = "#693638"
-border_fg = "#D6AA7E"
+border_fg = "#c99e76"
 text_fg = "#F0B6B6"
 dimmed_text_fg = "#716E75"
 
@@ -10,14 +10,14 @@ result_count_fg = "#D4B820"
 
 # Results
 result_name_fg = "#F0B6B6"
-result_line_number_fg = "#D6AA7E"
+result_line_number_fg = "#c99e76"
 result_value_fg = "#F0B6B6"
 selection_fg = "#F0B6B6"
 selection_bg = "#000000"
 match_fg = "#D4B820"
 
 # Preview
-preview_title_fg = "#D6AA7E"
+preview_title_fg = "#c99e76"
 
 # Modes
 channel_mode_fg = "#693638"

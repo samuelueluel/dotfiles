@@ -9,7 +9,7 @@ lichen        = "#A1C4B4"  # success / positive
 chamisa       = "#D4B820"  # warning / error / distinct accent — jarring by design, use sparingly
 prickly_pear  = "#ED2658"  # dark magenta accent
 globe_mallow  = "#ED6D42"  # bright accent — highlights, active UI elements
-sandstone     = "#D6AA7E"  # secondary readable text — canyon wall tan
+sandstone     = "#c99e76"  # secondary readable text — canyon wall tan
 gray          = "#716E75"  # unobtrusive / dim
 basalt        = "#1A1614"  # deep UI dark / volcanic black
 
@@ -29,7 +29,7 @@ ansi_3  = "#ED2658"  # yellow  → prickly_pear
 ansi_4  = "#1AAAD4"  # blue    → turquoise
 ansi_5  = "#ED6D42"  # magenta → globe_mallow
 ansi_6  = "#1AAAD4"  # cyan    → turquoise
-ansi_7  = "#D6AA7E"  # white   → sandstone
+ansi_7  = "#c99e76"  # white   → sandstone
 
 # ANSI 8–15 (bright)
 ansi_8  = "#716E75"  # bright black   → gray
@@ -39,4 +39,4 @@ ansi_11 = "#ED2658"  # bright yellow  → prickly_pear
 ansi_12 = "#1AAAD4"  # bright blue    → turquoise
 ansi_13 = "#ED6D42"  # bright magenta → globe_mallow
 ansi_14 = "#1AAAD4"  # bright cyan    → turquoise
-ansi_15 = "#D6AA7E"  # bright white   → sandstone
+ansi_15 = "#c99e76"  # bright white   → sandstone
