@@ -201,8 +201,8 @@ RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
 MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75"
 CTX=131072  # context window for the server (applies to ALL clients: WebUI, Goose, etc.)
 
-# Stop the BRAIN container (only) AND wait for :8080 to release before re-serving.
-# Stops just 'llm' (not --all) so the :8081 coder for autocomplete survives a brain swap.
+# Stop the MAIN-model container (only) AND wait for :8080 to release before re-serving.
+# Stops just 'llm' (not --all) so the :8081 autocomplete model survives a main-model swap.
 # Without the wait, ramalama serve races the old socket, finds 8080 "busy", and
 # silently auto-assigns a random port — breaking every client (WebUI/Goose/aider).
 _llm_reset() {
@@ -221,27 +221,31 @@ serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on al
   ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" "$1" \
     && echo "▶ serving $1 (no MTP, ctx $CTX) at http://localhost:8080/v1"
 }
-alias serve-brain='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-brain-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-dense='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-gemma='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
-alias stop-brain='ramalama stop llm'
+# Three "main models" — they swap through the one :8080 slot (container 'llm'), one at a time:
+#   serve-code  → fast MoE, everyday agentic driver (Goose/Aider/terminal)
+#   serve-think → dense reasoning, high-stakes paper critique/synthesis
+#   serve-edit  → Gemma 4 31B, copyediting + hard statistical/math coding (NOT agentic loops)
+alias serve-code='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-code-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-think='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-edit='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
+alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
-# Small FIM coder for VS Code autocomplete (Continue → :8081). Runs on the iGPU ALONGSIDE
-# the brain, on its own name/port so a brain swap doesn't evict it. No MTP (not an MTP build);
-# small ctx since autocomplete prompts are short. The NPU has no coder model, so real code
-# completion has to live on the iGPU — §2.J / §8.E.2. Served id: Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF
-CODER_MODEL=hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M
-serve-coder() {
+# Small FIM autocomplete model for VS Code (Continue → :8081). Runs on the iGPU ALONGSIDE
+# the main model, on its own name/port so a main-model swap doesn't evict it. No MTP (not an
+# MTP build); small ctx since autocomplete prompts are short. The NPU has no coder model, so
+# real code completion has to live on the iGPU — §2.J / §8.E.2. Served id: Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF
+AUTOCOMPLETE_MODEL=hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M
+serve-autocomplete() {
   ramalama stop coder 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8081 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 "$CODER_MODEL" \
-    && echo "▶ serving coder (FIM autocomplete) at http://localhost:8081/v1"
+  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 "$AUTOCOMPLETE_MODEL" \
+    && echo "▶ serving autocomplete (FIM) at http://localhost:8081/v1"
 }
-alias stop-coder='ramalama stop coder'
+alias stop-autocomplete='ramalama stop coder'
 
-# Serve an embedder model on the iGPU alongside the brain and coder
+# Serve an embedder model on the iGPU alongside the main model and autocomplete
 EMBED_MODEL="hf://Qwen/Qwen3-Embedding-8B-GGUF:Q4_K_M"
 serve-embedder() {
   ramalama stop embedder 2>/dev/null
@@ -256,7 +260,7 @@ alias stop-embedder="ramalama stop embedder"
 # Tags the chat port MoE/dense: an "A<N>B" suffix (active params) = MoE, plain count = dense.
 model-check() {
   local p name id tag
-  for entry in "8080:brain/dense" "8081:coder" "8082:embedder"; do
+  for entry in "8080:main" "8081:autocomplete" "8082:embedder"; do
     p="${entry%%:*}"; name="${entry##*:}"
     id=$(curl -sf "http://localhost:$p/v1/models" 2>/dev/null \
            | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
@@ -277,10 +281,10 @@ goose-with() {
   local model_name=$(curl -sf http://localhost:8080/v1/models | python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
   goose session --openai-host http://localhost:8080/v1 --openai-model "$model_name"
 }
-alias goose-brain='goose-with hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias goose-dense='goose-with hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias goose-code='goose-with hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias goose-think='goose-with hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
 
-alias aider-brain='podman run -it --rm --network=host --userns=keep-id \
+alias aider-code='podman run -it --rm --network=host --userns=keep-id \
   -v "$PWD":/app:z -w /app \
   -e OPENAI_API_BASE=http://localhost:8080/v1 \
   -e OPENAI_API_KEY=dummy \

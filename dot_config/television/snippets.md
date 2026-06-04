@@ -49,19 +49,19 @@
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
 
-- AI: Serve fast MoE model (background) | serve-brain
-- AI: Serve MoE model, MTP off (quality A/B) | serve-brain-nospec
-- AI: Serve dense high-quality model (background) | serve-dense
-- AI: Serve Gemma 4 (Hard Math Rescue) | serve-gemma
-- AI: Serve autocomplete coder (background) | serve-coder
+- AI: Serve fast MoE model — agentic coding (background) | serve-code
+- AI: Serve MoE model, MTP off (quality A/B) | serve-code-nospec
+- AI: Serve dense reasoning model (background) | serve-think
+- AI: Serve Gemma 4 31B — copyedit + hard stats (background) | serve-edit
+- AI: Serve autocomplete model (background) | serve-autocomplete
 - AI: Serve vector embedder (background) | serve-embedder
-- AI: Stop brain/dense model | stop-brain
-- AI: Stop autocomplete coder | stop-coder
+- AI: Stop main model (:8080) | stop-main
+- AI: Stop autocomplete model | stop-autocomplete
 - AI: Stop vector embedder | stop-embedder
 - AI: Stop all running models | ramalama stop --all
 - AI: Check which models are loaded | model-check
-- AI: Launch Goose + fast MoE model | goose-brain
-- AI: Launch Goose + dense high-quality model | goose-dense
+- AI: Launch Goose + fast MoE model (code) | goose-code
+- AI: Launch Goose + dense reasoning model (think) | goose-think
 - AI: Goose sandbox (read ~, write current dir) | goose-safe-1
 - AI: Goose sandbox (strict read/write current dir) | goose-safe-2
 - AI: Goose sandbox (write single file) | goose-safe-3 ""

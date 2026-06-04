@@ -207,6 +207,7 @@ COLUMN_COLOR = ("#693638", 1.00)  # non-spine column background (chimayo red)
 SPINE_COLOR = ("#693638", 1.00)  # spine column background (chimayo red)
 WS_RING_COLOR = ("#B06F75", 1.00)  # focused-workspace ring (turquoise)
 SPINE_LINE_COLOR = ("#D4B820", 1.00)  # faint vertical accent through the spine column
+TAG_DOT_COLOR = ("#D4B820", 1.00)  # color of dots / dots with numbers on window tiles (chamisa)
 
 # Timing
 FADE_MS = 50  # fade-in/out duration in ms (quick to stay unobtrusive)
@@ -550,7 +551,12 @@ class MinimapWindow(Gtk.Window):
                             # widget allocation and doesn't get clipped.
                             radius = r - 1
                             cr.arc(w / 2, h / 2, radius, 0, 6.283185)
-                            cr.set_source_rgb(1.0, 0.655, 0.149)
+                            hex_str, _ = TAG_DOT_COLOR
+                            h_str = hex_str.lstrip("#")
+                            r_c = int(h_str[0:2], 16) / 255.0
+                            g_c = int(h_str[2:4], 16) / 255.0
+                            b_c = int(h_str[4:6], 16) / 255.0
+                            cr.set_source_rgb(r_c, g_c, b_c)
                             cr.fill_preserve()
                             cr.set_source_rgb(0, 0, 0)
                             cr.set_line_width(1.5)
@@ -1261,7 +1267,7 @@ window {{
 
 
 .minimap-spine-line {{
-    background: linear-gradient(to bottom, rgba(255, 167, 38, 0.0) 0%, {_c(SPINE_LINE_COLOR)} 15%, {_c(SPINE_LINE_COLOR)} 85%, rgba(255, 167, 38, 0.0) 100%);
+    background: linear-gradient(to bottom, {_c((SPINE_LINE_COLOR[0], 0.0))} 0%, {_c(SPINE_LINE_COLOR)} 15%, {_c(SPINE_LINE_COLOR)} 85%, {_c((SPINE_LINE_COLOR[0], 0.0))} 100%);
     border-radius: 1px;
 }}
 

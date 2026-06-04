@@ -1,0 +1,17 @@
+[Unit]
+Description=SearXNG (local web search for Open WebUI)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=searxng
+Image=docker.io/searxng/searxng:latest
+PublishPort=8888:8080
+Volume=%h/.config/searxng:/etc/searxng:Z
+AutoUpdate=registry
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
