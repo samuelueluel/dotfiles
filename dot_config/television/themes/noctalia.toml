@@ -1,27 +1,27 @@
 # General
-background = "#693638"
-border_fg = "#c99e76"
-text_fg = "#F0B6B6"
+background = "#6E3840"
+border_fg = "#DA9E8A"
+text_fg = "#E2D8D0"
 dimmed_text_fg = "#716E75"
 
 # Input
-input_text_fg = "#D4B820"
-result_count_fg = "#D4B820"
+input_text_fg = "#ED6D42"
+result_count_fg = "#ED6D42"
 
 # Results
-result_name_fg = "#F0B6B6"
-result_line_number_fg = "#c99e76"
-result_value_fg = "#F0B6B6"
-selection_fg = "#F0B6B6"
+result_name_fg = "#E2D8D0"
+result_line_number_fg = "#DA9E8A"
+result_value_fg = "#E2D8D0"
+selection_fg = "#E2D8D0"
 selection_bg = "#000000"
-match_fg = "#D4B820"
+match_fg = "#ED6D42"
 
 # Preview
-preview_title_fg = "#c99e76"
+preview_title_fg = "#DA9E8A"
 
 # Modes
-channel_mode_fg = "#693638"
-channel_mode_bg = "#D4B820"
-remote_control_mode_fg = "#693638"
+channel_mode_fg = "#6E3840"
+channel_mode_bg = "#ED6D42"
+remote_control_mode_fg = "#6E3840"
 remote_control_mode_bg = "#ED6D42"
 send_to_channel_mode_fg = "#ED6D42"

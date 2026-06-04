@@ -36,6 +36,17 @@
       }
     ]
   },
+  "enabledPlugins": {
+    "mcp-stata@mcp-stata-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "mcp-stata-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "tmonk/mcp-stata"
+      }
+    }
+  },
   "effortLevel": "medium",
   "theme": "custom:blur-theme"
 }

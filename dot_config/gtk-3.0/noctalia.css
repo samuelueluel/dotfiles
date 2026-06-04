@@ -8,41 +8,41 @@
 @define-color accent_bg_color #00b6c2;
 @define-color accent_fg_color #000000;
 
-@define-color destructive_bg_color #D4B820;
+@define-color destructive_bg_color #ED6D42;
 @define-color destructive_fg_color #000000;
 
-@define-color error_bg_color #D4B820;
+@define-color error_bg_color #ED6D42;
 @define-color error_fg_color #000000;
 
-@define-color window_bg_color #693638;
-@define-color window_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color window_bg_color #6E3840;
+@define-color window_fg_color /* #b1b9f9 */ #E2D8D0;
 
-@define-color view_bg_color #693638;
-@define-color view_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color view_bg_color #6E3840;
+@define-color view_fg_color /* #b1b9f9 */ #E2D8D0;
 
-@define-color headerbar_bg_color #693638;
-@define-color headerbar_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color headerbar_bg_color #6E3840;
+@define-color headerbar_fg_color /* #b1b9f9 */ #E2D8D0;
 @define-color headerbar_backdrop_color @window_bg_color;
 
 @define-color popover_bg_color #4A2020;
-@define-color popover_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color popover_fg_color /* #b1b9f9 */ #E2D8D0;
 
 @define-color card_bg_color #4A2020;
-@define-color card_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color card_fg_color /* #b1b9f9 */ #E2D8D0;
 
-@define-color dialog_bg_color #693638;
-@define-color dialog_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color dialog_bg_color #6E3840;
+@define-color dialog_fg_color /* #b1b9f9 */ #E2D8D0;
 
 @define-color overview_bg_color #4A2020;
-@define-color overview_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color overview_fg_color /* #b1b9f9 */ #E2D8D0;
 
 @define-color sidebar_bg_color #4A2020;
-@define-color sidebar_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color sidebar_fg_color /* #b1b9f9 */ #E2D8D0;
 @define-color sidebar_backdrop_color @window_bg_color;
 @define-color sidebar_border_color @window_bg_color;
 
-@define-color secondary_sidebar_bg_color #693638;
-@define-color secondary_sidebar_fg_color /* #b1b9f9 */ #f0b6b6;
+@define-color secondary_sidebar_bg_color #6E3840;
+@define-color secondary_sidebar_fg_color /* #b1b9f9 */ #E2D8D0;
 
 /* Backdrop/unfocused states */
 @define-color theme_unfocused_fg_color @window_fg_color;

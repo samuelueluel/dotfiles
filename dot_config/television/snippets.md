@@ -60,8 +60,6 @@
 - AI: Stop vector embedder | stop-embedder
 - AI: Stop all running models | ramalama stop --all
 - AI: Check which models are loaded | model-check
-- AI: Launch Goose + fast MoE model (code) | goose-code
-- AI: Launch Goose + dense reasoning model (think) | goose-think
-- AI: Goose sandbox (read ~, write current dir) | goose-safe-1
-- AI: Goose sandbox (strict read/write current dir) | goose-safe-2
-- AI: Goose sandbox (write single file) | goose-safe-3 ""
+- AI: OpenCode sandbox (read ~, write current dir) | opencode-safe-1
+- AI: OpenCode sandbox (strict read/write current dir) | opencode-safe-2
+- AI: OpenCode sandbox (write single file) | opencode-safe-3 ""

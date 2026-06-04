@@ -7,20 +7,20 @@ parent = "default"
 
 [colors]
 # 1. Matched Text: Gold (Confirmed key: AlertWarn)
-AlertWarn = "#D4B820"
+AlertWarn = "#ED6D42"
 
 # 2. Generic History Entries: White (Confirmed key: Base)
-Base = "#F0B6B6"
+Base = "#E2D8D0"
 
 # 3. Timestamps, Borders, & Guidance: Dusty Rose
-Annotation = "#c99e76"
-Muted = "#c99e76"
-Title = "#c99e76"
-Guidance = "#c99e76"
+Annotation = "#DA9E8A"
+Muted = "#DA9E8A"
+Title = "#DA9E8A"
+Guidance = "#DA9E8A"
 
 # 4. Selection Highlight & Failed Duration: Theme Turquoise
 # (These are linked to the same key in this version of Atuin)
 AlertError = "#1AAAD4"
 
 # 5. Pass Indicator: Theme Green
-AlertInfo = "#A1C4B4"
+AlertInfo = "#96E050"

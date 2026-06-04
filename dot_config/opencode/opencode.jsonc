@@ -1,0 +1,34 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ramalama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:8080/v1",
+        "apiKey": "dummy"
+      },
+      "models": {
+        "unsloth/Qwen3.6-35B-A3B-MTP-GGUF": {}
+      }
+    }
+  },
+  "model": "ramalama/unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+  "mcp": {
+    "searxng": {
+      "enabled": true,
+      "type": "local",
+      "command": ["/var/home/samuel/.config/goose/searxng-venv/bin/python3"],
+      "args": [
+        "/var/home/samuel/.config/goose/searxng_mcp.py"
+      ]
+    },
+    "stata": {
+      "enabled": true,
+      "type": "local",
+      "command": ["uvx"],
+      "args": [
+        "mcp-stata"
+      ]
+    }
+  }
+}

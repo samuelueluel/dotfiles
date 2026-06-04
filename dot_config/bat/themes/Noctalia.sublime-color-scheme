@@ -1,11 +1,11 @@
 {
   "name": "Noctalia",
   "variables": {
-    "bg":     "#693638",
-    "fg":     "#F0B6B6",
+    "bg":     "#6E3840",
+    "fg":     "#E2D8D0",
     "cyan":   "#1AAAD4",
-    "yellow": "#D4B820",
-    "green":  "#A1C4B4",
+    "yellow": "#ED6D42",
+    "green":  "#96E050",
     "rose":   "#D6AA7E",
     "orange": "#ED6D42",
     "grey":   "#716E75"

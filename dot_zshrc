@@ -16,7 +16,7 @@ KEYTIMEOUT=1
 # Cursor: beam in insert, block in normal
 function zle-keymap-select {
   if [[ ${KEYMAP} == vicmd ]]; then
-    echo -ne '\e[2 q\e]12;#D4B820\a'  # block + gold (normal/nav)
+    echo -ne '\e[2 q\e]12;#ED6D42\a'  # block + gold (normal/nav)
   else
     echo -ne '\e[2 q\e]12;#1AAAD4\a'  # block + teal (insert/type)
   fi
@@ -51,7 +51,7 @@ ZSH_CACHE="$HOME/.cache/zsh"
 [[ -d "$ZSH_CACHE" ]] || mkdir -p "$ZSH_CACHE"
 
 # fzf global options (colors, keybinds, UI)
-export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char,alt-space:accept' --gutter=' ' --scrollbar='█' --color='bg:-1,gutter:-1,border:#693638,separator:#B06F75,preview-border:#B06F75,hl:#D4B820,hl+:#D4B820,pointer:#D4B820,marker:#D4B820,bg+:#000000,prompt:#D4B820,info:#B06F75,header:#B06F75,scrollbar:#D4B820'"
+export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char,alt-space:accept' --gutter=' ' --scrollbar='█' --color='bg:-1,gutter:-1,border:#6E3840,separator:#B06F75,preview-border:#B06F75,hl:#ED6D42,hl+:#ED6D42,pointer:#ED6D42,marker:#ED6D42,bg+:#000000,prompt:#ED6D42,info:#B06F75,header:#B06F75,scrollbar:#ED6D42'"
 
 # zoxide: smart cd
 if command -v zoxide >/dev/null; then
@@ -196,16 +196,16 @@ function claude() {
     fi
 }
 
-# Local LLM (Ramalama / Goose / Aider) — §2.B, §2.D, §2.F
+# Local LLM (Ramalama / OpenCode / Aider) — §2.B, §2.D, §2.F
 export OPENAI_API_KEY=sk-6869f13e80764e0ab07cb09a9ef5ea98
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
 MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75"
-CTX=131072  # context window for the server (applies to ALL clients: WebUI, Goose, etc.)
+CTX=131072  # context window for the server (applies to ALL clients: WebUI, OpenCode, etc.)
 
 # Stop the MAIN-model container (only) AND wait for :8080 to release before re-serving.
 # Stops just 'llm' (not --all) so the :8081 autocomplete model survives a main-model swap.
 # Without the wait, ramalama serve races the old socket, finds 8080 "busy", and
-# silently auto-assigns a random port — breaking every client (WebUI/Goose/aider).
+# silently auto-assigns a random port — breaking every client (WebUI/OpenCode/aider).
 _llm_reset() {
   ramalama stop llm 2>/dev/null
   local i=0
@@ -223,7 +223,7 @@ serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on al
     && echo "▶ serving $1 (no MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 # Three "main models" — they swap through the one :8080 slot (container 'llm'), one at a time:
-#   serve-code  → fast MoE, everyday agentic driver (Goose/Aider/terminal)
+#   serve-code  → fast MoE, everyday agentic driver (OpenCode/Aider/terminal)
 #   serve-think → dense reasoning, high-stakes paper critique/synthesis
 #   serve-edit  → Gemma 4 31B, copyediting + hard statistical/math coding (NOT agentic loops)
 alias serve-code='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
@@ -275,65 +275,18 @@ model-check() {
   done
 }
 
-goose-with() {
-  _llm_reset
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" "$1" || return 1
-  until curl -sf http://localhost:8080/v1/models >/dev/null 2>&1; do sleep 0.5; done
-  local model_name=$(curl -sf http://localhost:8080/v1/models | python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
-  goose session --openai-host http://localhost:8080/v1 --openai-model "$model_name"
-}
-alias goose-code='goose-with hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias goose-think='goose-with hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
 
-alias aider-code='podman run -it --rm --network=host --userns=keep-id \
-  -v "$PWD":/app:z -w /app \
-  -e OPENAI_API_BASE=http://localhost:8080/v1 \
-  -e OPENAI_API_KEY=dummy \
-  paulgauthier/aider \
-  --model openai/qwen3.6-35b-a3b'
-
-# Creates a temp dir with goose config for the containerised binary (v1.30.x).
-# Returns the dir path; caller mounts it at /home/goose/.config/goose (writable, not :ro).
-# v1.30.x uses flat GOOSE_PROVIDER/GOOSE_MODEL keys, not the providers: nesting of v1.36.x.
-_goose_tmp_config() {
-  local model_name="$1"
-  local cfgdir
-  cfgdir=$(mktemp -d)
-  cat > "$cfgdir/config.yaml" <<YAML
-GOOSE_TELEMETRY_ENABLED: true
-GOOSE_PROVIDER: openai
-GOOSE_MODEL: $model_name
-OPENAI_BASE_URL: http://localhost:8080/v1
-OPENAI_HOST: http://localhost:8080
-OPENAI_BASE_PATH: v1/chat/completions
-OPENAI_API_KEY: dummy
-GOOSE_CLI_THEME: dark
-GOOSE_CLI_DARK_THEME: gruvbox-dark
-YAML
-  echo "$cfgdir"
-}
-
-goose-safe-1() {
+opencode-safe-1() {
   local target_dir="${1:-$PWD}"
-  local model_name="${2}"
   local abs_dir="$(realpath "$target_dir")"
 
   if [[ "$abs_dir" == "$HOME" ]]; then
-    echo "Error: Cannot run goose-safe-1 with write access to your entire home directory."
+    echo "Error: Cannot run opencode-safe-1 with write access to your entire home directory."
     return 1
   fi
 
-  if [[ -z "$model_name" ]]; then
-    model_name=$(curl -sf http://localhost:8080/v1/models | python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
-    if [[ -z "$model_name" ]]; then
-      echo -e "\033[31mError: Could not detect a model on localhost:8080. Are you sure the engine is running?\033[0m"
-      return 1
-    fi
-  fi
-
-  echo -e "\033[33mWARNING: You are giving Goose WRITE access to directory: $abs_dir (including subdirectories)\033[0m"
+  echo -e "\033[33mWARNING: You are giving OpenCode WRITE access to directory: $abs_dir (including subdirectories)\033[0m"
   echo -e "\033[33mAnd READ access to everywhere else in: $HOME\033[0m"
-  echo -e "\033[36mModel auto-detected: $model_name\033[0m"
   if read -q "choice?Do you want to proceed? [y/N] "; then
     echo
   else
@@ -341,44 +294,28 @@ goose-safe-1() {
     return 1
   fi
 
-  local cfg; cfg=$(_goose_tmp_config "$model_name")
-  # --security-opt label=disable prevents SELinux from recursively relabeling the entire $HOME.
-  # The more specific mount (-v $abs_dir) overrides the read-only $HOME mount.
-  # --network=host gives it full internet access to search online generally.
   podman run -it --rm \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -v "$HOME":"$HOME":ro \
     -v "$abs_dir":"$abs_dir" \
-    -v "$cfg":/home/goose/.config/goose:z \
+    -v "$HOME/.config/opencode":"$HOME/.config/opencode":ro \
     -w "$abs_dir" \
-    ghcr.io/block/goose:latest \
-    session "${@:3}"
-  rm -rf "$cfg"
+    anomalyco/opencode "${@:2}"
 }
 
-goose-safe-2() {
+opencode-safe-2() {
   local target_dir="${1:-$PWD}"
-  local model_name="${2}"
   local abs_dir="$(realpath "$target_dir")"
 
   if [[ "$abs_dir" == "$HOME" ]]; then
-    echo "Error: Cannot run goose-safe-2 with write access to your entire home directory."
+    echo "Error: Cannot run opencode-safe-2 with write access to your entire home directory."
     return 1
   fi
 
-  if [[ -z "$model_name" ]]; then
-    model_name=$(curl -sf http://localhost:8080/v1/models | python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
-    if [[ -z "$model_name" ]]; then
-      echo -e "\033[31mError: Could not detect a model on localhost:8080. Are you sure the engine is running?\033[0m"
-      return 1
-    fi
-  fi
-
-  echo -e "\033[33mWARNING: You are giving Goose WRITE access to directory: $abs_dir (including subdirectories)\033[0m"
-  echo -e "\033[33mGoose will have NO read access to the rest of the system.\033[0m"
-  echo -e "\033[36mModel auto-detected: $model_name\033[0m"
+  echo -e "\033[33mWARNING: You are giving OpenCode WRITE access to directory: $abs_dir (including subdirectories)\033[0m"
+  echo -e "\033[33mOpenCode will have NO read access to the rest of the system.\033[0m"
   if read -q "choice?Do you want to proceed? [y/N] "; then
     echo
   else
@@ -386,46 +323,31 @@ goose-safe-2() {
     return 1
   fi
 
-  local cfg; cfg=$(_goose_tmp_config "$model_name")
-  # Omitting the $HOME mount completely isolates the container filesystem.
-  # --network=host still gives it full internet access to search online generally.
   podman run -it --rm \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -v "$abs_dir":"$abs_dir" \
-    -v "$cfg":/home/goose/.config/goose:z \
+    -v "$HOME/.config/opencode":"$HOME/.config/opencode":ro \
     -w "$abs_dir" \
-    ghcr.io/block/goose:latest \
-    session "${@:3}"
-  rm -rf "$cfg"
+    anomalyco/opencode "${@:2}"
 }
 
-goose-safe-3() {
+opencode-safe-3() {
   local target_file="${1}"
-  local model_name="${2}"
 
   if [[ -z "$target_file" || ! -f "$target_file" ]]; then
-    echo "Error: goose-safe-3 requires a specific existing FILE as an argument."
-    echo "Usage: goose-safe-3 /path/to/file.ext [model_name]"
+    echo "Error: opencode-safe-3 requires a specific existing FILE as an argument."
+    echo "Usage: opencode-safe-3 /path/to/file.ext [args...]"
     return 1
-  fi
-
-  if [[ -z "$model_name" ]]; then
-    model_name=$(curl -sf http://localhost:8080/v1/models | python3 -c "import sys, json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
-    if [[ -z "$model_name" ]]; then
-      echo -e "\033[31mError: Could not detect a model on localhost:8080. Are you sure the engine is running?\033[0m"
-      return 1
-    fi
   fi
 
   local abs_file="$(realpath "$target_file")"
   local abs_dir="$(dirname "$abs_file")"
 
-  echo -e "\033[33mWARNING: You are giving Goose WRITE access to exactly ONE FILE: $abs_file\033[0m"
+  echo -e "\033[33mWARNING: You are giving OpenCode WRITE access to exactly ONE FILE: $abs_file\033[0m"
   echo -e "\033[33mAnd READ access to everywhere else in: $HOME\033[0m"
   echo -e "\033[33m(A writable, temporary in-memory /tmp is also provided)\033[0m"
-  echo -e "\033[36mModel auto-detected: $model_name\033[0m"
   if read -q "choice?Do you want to proceed? [y/N] "; then
     echo
   else
@@ -433,19 +355,14 @@ goose-safe-3() {
     return 1
   fi
 
-  local cfg; cfg=$(_goose_tmp_config "$model_name")
-  # --tmpfs /tmp creates a writable, temporary in-memory scratchpad.
-  # -v "$abs_file":"$abs_file" mounts just the specific file as writable over the RO home mount.
   podman run -it --rm \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -v "$HOME":"$HOME":ro \
     -v "$abs_file":"$abs_file" \
-    -v "$cfg":/home/goose/.config/goose:z \
+    -v "$HOME/.config/opencode":"$HOME/.config/opencode":ro \
     --tmpfs /tmp \
     -w "$abs_dir" \
-    ghcr.io/block/goose:latest \
-    session "${@:3}"
-  rm -rf "$cfg"
+    anomalyco/opencode "${@:2}"
 }

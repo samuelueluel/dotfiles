@@ -11,15 +11,15 @@
       <key>settings</key>
       <dict>
         <key>background</key>
-        <string>#693638</string>
+        <string>#6E3840</string>
         <key>foreground</key>
-        <string>#F0B6B6</string>
+        <string>#E2D8D0</string>
         <key>caret</key>
         <string>#1AAAD4</string>
         <key>selection</key>
         <string>#1AAAD4</string>
         <key>selectionForeground</key>
-        <string>#F0B6B6</string>
+        <string>#E2D8D0</string>
         <key>lineHighlight</key>
         <string>#8B3F3F</string>
       </dict>
@@ -41,7 +41,7 @@
       <key>name</key><string>String</string>
       <key>scope</key><string>string, string.quoted, string.template</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#A1C4B4</string></dict>
+      <dict><key>foreground</key><string>#96E050</string></dict>
     </dict>
 
     <!-- String escapes / regex: globe_mallow — special chars deserve bright accent -->
@@ -57,14 +57,14 @@
       <key>name</key><string>Number</string>
       <key>scope</key><string>constant.numeric</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#D4B820</string></dict>
+      <dict><key>foreground</key><string>#ED6D42</string></dict>
     </dict>
 
     <dict>
       <key>name</key><string>Constant</string>
       <key>scope</key><string>constant.language, constant.other</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#D4B820</string></dict>
+      <dict><key>foreground</key><string>#ED6D42</string></dict>
     </dict>
 
     <!-- Keywords / storage: turquoise — primary accent, control flow -->
@@ -103,7 +103,7 @@
       <key>name</key><string>Variable</string>
       <key>scope</key><string>variable, variable.other, variable.parameter</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#F0B6B6</string></dict>
+      <dict><key>foreground</key><string>#E2D8D0</string></dict>
     </dict>
 
     <!-- Self / this: turquoise — language-special variable, accent treatment -->
