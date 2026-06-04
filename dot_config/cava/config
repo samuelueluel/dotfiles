@@ -246,7 +246,7 @@ mono_option = average
 # a terminal that can change color definitions such as Gnome-terminal or rxvt.
 # default is to keep current terminal color
 background = default
-foreground = '#B06F75'
+foreground = '#D6AA7E'
 
 # SDL and sdl_glsl only support hex code colors, these are the default:
 ; background = '#111111'
@@ -272,10 +272,10 @@ foreground = '#B06F75'
 horizontal_gradient = 1
 horizontal_gradient_color_1 = '#D4B820'
 horizontal_gradient_color_2 = '#E8A76A'
-horizontal_gradient_color_3 = '#B06F75'
+horizontal_gradient_color_3 = '#D6AA7E'
 horizontal_gradient_color_4 = '#E78AA1'
-horizontal_gradient_color_5 = '#E06840'
-horizontal_gradient_color_6 = '#6E8C78'
+horizontal_gradient_color_5 = '#ED6D42'
+horizontal_gradient_color_6 = '#A1C4B4'
 horizontal_gradient_color_7 = '#4BB7BA'
 horizontal_gradient_color_8 = '#1AAAD4'
 

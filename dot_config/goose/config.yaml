@@ -1,5 +1,12 @@
 GOOSE_TELEMETRY_ENABLED: true
 extensions:
+  searxng:
+    enabled: true
+    name: searxng
+    type: stdio
+    cmd: /var/home/samuel/.config/goose/searxng-venv/bin/python3
+    args:
+    - /var/home/samuel/.config/goose/searxng_mcp.py
   chatrecall:
     enabled: false
     type: platform
@@ -60,9 +67,9 @@ extensions:
     enabled: true
     type: builtin
     name: developer
-    description: default
+    description: Write and edit files, and execute shell commands
     display_name: Developer
-    timeout: 300
+    timeout: null
     bundled: true
     available_tools: []
   orchestrator:
@@ -97,8 +104,8 @@ extensions:
     display_name: Summarize
     bundled: true
     available_tools: []
-OPENAI_BASE_URL: http://localhost:8080/v1
-OPENAI_HOST: http://localhost:8080
+OPENAI_BASE_URL: http://localhost:3000/api/v1
+OPENAI_HOST: http://localhost:3000
 OPENAI_BASE_PATH: v1/chat/completions
 OPENAI_TIMEOUT: '600'
 active_provider: openai
@@ -106,4 +113,10 @@ providers:
   openai:
     enabled: true
     model: unsloth/Qwen3.6-35B-A3B-MTP-GGUF
+    api_key: sk-6869f13e80764e0ab07cb09a9ef5ea98
     configured: true
+GOOSE_CLI_THEME: ansi
+GOOSE_CLI_DARK_THEME: gruvbox-dark
+GOOSE_CLI_SHOW_COST: true
+env:
+  OPENAI_API_KEY: sk-6869f13e80764e0ab07cb09a9ef5ea98

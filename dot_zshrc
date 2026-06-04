@@ -197,6 +197,7 @@ function claude() {
 }
 
 # Local LLM (Ramalama / Goose / Aider) — §2.B, §2.D, §2.F
+export OPENAI_API_KEY=sk-6869f13e80764e0ab07cb09a9ef5ea98
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
 MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75"
 CTX=131072  # context window for the server (applies to ALL clients: WebUI, Goose, etc.)
@@ -306,6 +307,8 @@ OPENAI_BASE_URL: http://localhost:8080/v1
 OPENAI_HOST: http://localhost:8080
 OPENAI_BASE_PATH: v1/chat/completions
 OPENAI_API_KEY: dummy
+GOOSE_CLI_THEME: dark
+GOOSE_CLI_DARK_THEME: gruvbox-dark
 YAML
   echo "$cfgdir"
 }

@@ -197,7 +197,7 @@ FOCUS_RING_CIRCLE = (
 
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
 FOCUS_RING_COLOR = ("#1AAAD4", 1.00)  # focused window border ring (theme gold)
-FOCUS_FILL_COLOR = ("#B06F75", 1.00)  # focused window background fill (turquoise)
+FOCUS_FILL_COLOR = ("#D6AA7E", 1.00)  # focused window background fill (turquoise)
 INACTIVE_FILL_COLOR = ("#693638", 1.00)  # non-focused window fill (chimayo red)
 NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
 BG_COLOR = ("#000000", 1.00)  # outer panel background, old #1F1F26
@@ -205,7 +205,7 @@ WS_BG_COLOR = ("#2E2E38", 1.00)  # workspace background
 OUTER_BORDER_COLOR = ("#504858", 1.00)  # outer panel border
 COLUMN_COLOR = ("#693638", 1.00)  # non-spine column background (chimayo red)
 SPINE_COLOR = ("#693638", 1.00)  # spine column background (chimayo red)
-WS_RING_COLOR = ("#B06F75", 1.00)  # focused-workspace ring (turquoise)
+WS_RING_COLOR = ("#D6AA7E", 1.00)  # focused-workspace ring (turquoise)
 SPINE_LINE_COLOR = ("#D4B820", 1.00)  # faint vertical accent through the spine column
 TAG_DOT_COLOR = ("#D4B820", 1.00)  # color of dots / dots with numbers on window tiles (chamisa)
 
@@ -1218,7 +1218,7 @@ window {{
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: inset 0 0 0 {BORDER_WIDTH}px #B06F75, 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
+    box-shadow: inset 0 0 0 {BORDER_WIDTH}px #D6AA7E, 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
 }}
 
 .minimap-tile-focused {{
@@ -1247,7 +1247,7 @@ window {{
     border: none;
     border-radius: 8px;
     padding: 4px;
-    box-shadow: inset 0 0 0 4px #B06F75, 0 0 0 2px rgb(0, 0, 0), 0 3px 6px rgba(0, 0, 0, 0.95), 0 6px 12px rgba(0, 0, 0, 0.95);
+    box-shadow: inset 0 0 0 4px #D6AA7E, 0 0 0 2px rgb(0, 0, 0), 0 3px 6px rgba(0, 0, 0, 0.95), 0 6px 12px rgba(0, 0, 0, 0.95);
 }}
 
 .minimap-tile-focused.minimap-stacked {{

@@ -2,41 +2,41 @@
 # Source of truth for all theme ports
 
 [palette]
-red_rock     = "#693638"  # background
-gypsum       = "#F2F0EC"  # foreground / primary text
-turquoise    = "#1AAAD4"  # accent, cursor, selection
-sandia       = "#B06F75"  # UI chrome — borders, dim labels, elements not meant to be read closely
-juniper      = "#6E8C78"  # success / positive
-chamisa      = "#D4B820"  # warning / error / distinct accent — jarring by design, use sparingly
-globe_mallow = "#E06840"  # bright accent — highlights, active UI elements
-sandstone    = "#D4956A"  # secondary readable text — canyon wall tan
-gray         = "#716E75"  # unobtrusive / dim
-basalt       = "#1A1614"  # deep UI dark / volcanic black
+red_rock      = "#693638"  # background
+pink_sandstone = "#F0B6B6"  # foreground / primary text
+turquoise     = "#1AAAD4"  # accent, cursor, selection
+lichen        = "#A1C4B4"  # success / positive
+chamisa       = "#D4B820"  # warning / error / distinct accent — jarring by design, use sparingly
+prickly_pear  = "#ED2658"  # dark magenta accent
+globe_mallow  = "#ED6D42"  # bright accent — highlights, active UI elements
+sandstone     = "#D6AA7E"  # secondary readable text — canyon wall tan
+gray          = "#716E75"  # unobtrusive / dim
+basalt        = "#1A1614"  # deep UI dark / volcanic black
 
 [terminal]
 background           = "#693638"
-foreground           = "#F2F0EC"
+foreground           = "#F0B6B6"
 cursor               = "#1AAAD4"
-cursor_text          = "#F2F0EC"
+cursor_text          = "#F0B6B6"
 selection_background = "#1AAAD4"
-selection_foreground = "#F2F0EC"
+selection_foreground = "#F0B6B6"
 
 # ANSI 0–7 (normal)
-ansi_0  = "#F2F0EC"  # black   → gypsum (regular text)
+ansi_0  = "#F0B6B6"  # black   → pink_sandstone (regular text)
 ansi_1  = "#D4B820"  # red     → chamisa
-ansi_2  = "#6E8C78"  # green   → juniper
-ansi_3  = "#B06F75"  # yellow  → sandia
+ansi_2  = "#A1C4B4"  # green   → lichen
+ansi_3  = "#ED2658"  # yellow  → prickly_pear
 ansi_4  = "#1AAAD4"  # blue    → turquoise
-ansi_5  = "#E06840"  # magenta → globe mallow
+ansi_5  = "#ED6D42"  # magenta → globe_mallow
 ansi_6  = "#1AAAD4"  # cyan    → turquoise
-ansi_7  = "#B06F75"  # white   → sandia
+ansi_7  = "#D6AA7E"  # white   → sandstone
 
 # ANSI 8–15 (bright)
 ansi_8  = "#716E75"  # bright black   → gray
 ansi_9  = "#D4B820"  # bright red     → chamisa
-ansi_10 = "#6E8C78"  # bright green   → juniper
-ansi_11 = "#B06F75"  # bright yellow  → sandia
+ansi_10 = "#A1C4B4"  # bright green   → lichen
+ansi_11 = "#ED2658"  # bright yellow  → prickly_pear
 ansi_12 = "#1AAAD4"  # bright blue    → turquoise
-ansi_13 = "#E06840"  # bright magenta → globe mallow
+ansi_13 = "#ED6D42"  # bright magenta → globe_mallow
 ansi_14 = "#1AAAD4"  # bright cyan    → turquoise
-ansi_15 = "#B06F75"  # bright white   → sandia
+ansi_15 = "#D6AA7E"  # bright white   → sandstone

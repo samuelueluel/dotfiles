@@ -12,10 +12,10 @@
     modal_backdrop: false,
     preview_label_style: (fg: "yellow"),
     preview_metadata_group_style: (fg: "yellow", modifiers: "Bold"),
-    highlighted_item_style: (fg: "#E06840", modifiers: "Bold"),
+    highlighted_item_style: (fg: "#ED6D42", modifiers: "Bold"),
     current_item_style: (fg: "black", bg: "blue"),
-    borders_style: (fg: "#B06F75"),
-    highlight_border_style: (fg: "#B06F75"),
+    borders_style: (fg: "#D6AA7E"),
+    highlight_border_style: (fg: "#D6AA7E"),
     symbols: (
         song: "",
         dir: "",
@@ -44,28 +44,28 @@
         symbols: ["│", "█", "▲", "▼"],
         track_style: (),
         ends_style: (),
-        thumb_style: (fg: "#B06F75"),
+        thumb_style: (fg: "#D6AA7E"),
     ),
     tab_bar: (
         active_style: (fg: "black", bg: "blue"),
-        inactive_style: (fg: "#B06F75"),
+        inactive_style: (fg: "#D6AA7E"),
     ),
     lyrics: (
         timestamp: false
     ),
     cava: (
         bar_color: Gradient({
-            0: "#E06840",
+            0: "#ED6D42",
             25: "#E8A76A",
-            50: "#B06F75",
+            50: "#D6AA7E",
             75: "#E78AA1",
-            100: "#E06840",
+            100: "#ED6D42",
         }),
     ),
     browser_song_format: [
         (
             kind: Group([
-                (kind: Property(Track), style: (fg: "#B06F75")),
+                (kind: Property(Track), style: (fg: "#D6AA7E")),
                 (kind: Text(" ")),
             ])
         ),
@@ -81,40 +81,40 @@
                     (kind: Transform(Replace(
                         content: (kind: Sticker("like")),
                         replacements: [
-                            (match: "2", replace: (kind: Text("❤ "), style: (fg: "#6E8C78"))),
+                            (match: "2", replace: (kind: Text("❤ "), style: (fg: "#A1C4B4"))),
                             (match: "1", replace: (kind: Text("  "))),
                         ]
                     )), default: (kind: Text("  "))),
-                    (kind: Property(Track), style: (fg: "#B06F75")),
+                    (kind: Property(Track), style: (fg: "#D6AA7E")),
                     (kind: Text(" ")),
                     (kind: Property(Title), default: (kind: Property(Filename)))
                 ]),
-                style: (fg: "#F2F0EC"),
+                style: (fg: "#F0B6B6"),
                 default: (kind: Text("Unknown"))
             ),
-            label_prop: (kind: Text("Title"), style: (fg: "#B06F75")),
+            label_prop: (kind: Text("Title"), style: (fg: "#D6AA7E")),
             width: "40%",
         ),
         (
-            prop: (kind: Property(Artist), style: (fg: "#D4956A"),
-                default: (kind: Text("Unknown"), style: (fg: "#D4956A"))
+            prop: (kind: Property(Artist), style: (fg: "#D6AA7E"),
+                default: (kind: Text("Unknown"), style: (fg: "#D6AA7E"))
             ),
-            label_prop: (kind: Text("Artist"), style: (fg: "#B06F75")),
+            label_prop: (kind: Text("Artist"), style: (fg: "#D6AA7E")),
             width: "20%",
         ),
         (
             prop: (
-                kind: Property(Album), style: (fg: "#D4956A"),
-                default: (kind: Text("Unknown Album"), style: (fg: "#D4956A"))
+                kind: Property(Album), style: (fg: "#D6AA7E"),
+                default: (kind: Text("Unknown Album"), style: (fg: "#D6AA7E"))
             ),
-            label_prop: (kind: Text("Album"), style: (fg: "#B06F75")),
+            label_prop: (kind: Text("Album"), style: (fg: "#D6AA7E")),
             width: "35%",
         ),
         (
-            prop: (kind: Property(Duration), style: (fg: "#F2F0EC"),
-                default: (kind: Text("-"), style: (fg: "#F2F0EC"))
+            prop: (kind: Property(Duration), style: (fg: "#F0B6B6"),
+                default: (kind: Text("-"), style: (fg: "#F0B6B6"))
             ),
-            label_prop: (kind: Text("Time"), style: (fg: "#B06F75")),
+            label_prop: (kind: Text("Time"), style: (fg: "#D6AA7E")),
             width: "5%",
             alignment: Right,
         ),
@@ -138,9 +138,9 @@
                 border_symbols: Double,
                 border_title: [
                     (kind: Text(" ")),
-                    (kind: Property(Status(Elapsed)), style: (fg: "#E06840")),
-                    (kind: Text(" / "), style: (fg: "#E06840")),
-                    (kind: Property(Status(Duration)), style: (fg: "#E06840")),
+                    (kind: Property(Status(Elapsed)), style: (fg: "#ED6D42")),
+                    (kind: Text(" / "), style: (fg: "#ED6D42")),
+                    (kind: Property(Status(Duration)), style: (fg: "#ED6D42")),
                     (kind: Text(" "))
                 ],
                 border_title_position: Bottom,
@@ -159,10 +159,10 @@
         )),
         "title": Pane(Property(
             content: [
-                (kind: Property(Song(Track)), style: (fg: "#E06840", modifiers: "Bold")),
+                (kind: Property(Song(Track)), style: (fg: "#ED6D42", modifiers: "Bold")),
                 (kind: Text(" ")),
-                (kind: Property(Song(Title)), style: (fg: "#E06840", modifiers: "Bold"),
-                    default: (kind: Text("No Song"), style: (fg: "#E06840", modifiers: "Bold"))),
+                (kind: Property(Song(Title)), style: (fg: "#ED6D42", modifiers: "Bold"),
+                    default: (kind: Text("No Song"), style: (fg: "#ED6D42", modifiers: "Bold"))),
             ], align: Center, scroll_speed: 1
         )),
         "volume": Pane(Volume(kind: Slider(symbols: (filled: "─", thumb: "●", track: "─")))),
@@ -181,10 +181,10 @@
         )),
         "artist_and_album": Pane(Property(
             content: [
-                (kind: Property(Song(Artist)), style: (fg: "#E06840", modifiers: "Bold"),
-                    default: (kind: Text("Unknown"), style: (fg: "#E06840", modifiers: "Bold"))),
-                (kind: Text(" - "), style: (fg: "#E06840")),
-                (kind: Property(Song(Album)), style: (fg: "#E06840"), default: (kind: Text("Unknown Album"), style: (fg: "#E06840"))),
+                (kind: Property(Song(Artist)), style: (fg: "#ED6D42", modifiers: "Bold"),
+                    default: (kind: Text("Unknown"), style: (fg: "#ED6D42", modifiers: "Bold"))),
+                (kind: Text(" - "), style: (fg: "#ED6D42")),
+                (kind: Property(Song(Album)), style: (fg: "#ED6D42"), default: (kind: Text("Unknown Album"), style: (fg: "#ED6D42"))),
             ], align: Center, scroll_speed: 1
         )),
         "states": Split(
@@ -214,8 +214,8 @@
         "input_mode": Pane(Property(
             content: [
                 (kind: Transform(Replace(content: (kind: Property(Status(InputMode()))), replacements: [
-                    (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "black", bg: "#6E8C78"))),
-                    (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "black", bg: "#E06840"))),
+                    (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "black", bg: "#A1C4B4"))),
+                    (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "black", bg: "#ED6D42"))),
                 ])))
             ], align: Center
         )),
@@ -223,15 +223,15 @@
             direction: Vertical,
             panes: [
                 (size: "1", pane: Pane(Empty())),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#E06840", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#D4956A"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#D4956A"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#ED6D42", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#D6AA7E"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#D6AA7E"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
                 (size: "0", pane: Pane(Empty())),
                 (size: "1", pane: Component("volume")),
                 (size: "0", pane: Pane(Empty())),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#6E8C78"), default: (kind: Text("-"), style: (fg: "#6E8C78")))], align: Center))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("grouping"))), style: (fg: "#6E8C78"), default: (kind: Text("-"), style: (fg: "#6E8C78")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("date"))), style: (fg: "#6E8C78"), default: (kind: Text("-"), style: (fg: "#6E8C78")))], align: Center))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#A1C4B4"), default: (kind: Text("-"), style: (fg: "#A1C4B4")))], align: Center))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("grouping"))), style: (fg: "#A1C4B4"), default: (kind: Text("-"), style: (fg: "#A1C4B4")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("date"))), style: (fg: "#A1C4B4"), default: (kind: Text("-"), style: (fg: "#A1C4B4")))], align: Center))),
                 (size: "1", pane: Pane(Empty())),
             ]
         ),
@@ -239,12 +239,12 @@
         "song_extra_info": Split(
             direction: Vertical,
             panes: [
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#E06840", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#D4956A"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#D4956A"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("date"))), style: (fg: "#6E8C78"), default: (kind: Text("-")))], align: Center))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#6E8C78"), default: (kind: Text("-")))], align: Center))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("grouping"))), style: (fg: "#6E8C78"), default: (kind: Text("-")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#ED6D42", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#D6AA7E"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#D6AA7E"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("date"))), style: (fg: "#A1C4B4"), default: (kind: Text("-")))], align: Center))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#A1C4B4"), default: (kind: Text("-")))], align: Center))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("grouping"))), style: (fg: "#A1C4B4"), default: (kind: Text("-")))], align: Center, scroll_speed: 1))),
             ]
         ),
 
@@ -292,8 +292,8 @@
                     size: "10",
                     pane: Pane(Property(content: [
                         (kind: Transform(Replace(content: (kind: Property(Status(InputMode()))), replacements: [
-                            (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "black", bg: "#6E8C78"))),
-                            (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "black", bg: "#E06840"))),
+                            (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "black", bg: "#A1C4B4"))),
+                            (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "black", bg: "#ED6D42"))),
                         ])))
                     ], align: Center))
                 ),

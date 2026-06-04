@@ -10,17 +10,17 @@ parent = "default"
 AlertWarn = "#D4B820"
 
 # 2. Generic History Entries: White (Confirmed key: Base)
-Base = "#F2F0EC"
+Base = "#F0B6B6"
 
 # 3. Timestamps, Borders, & Guidance: Dusty Rose
-Annotation = "#B06F75"
-Muted = "#B06F75"
-Title = "#B06F75"
-Guidance = "#B06F75"
+Annotation = "#D6AA7E"
+Muted = "#D6AA7E"
+Title = "#D6AA7E"
+Guidance = "#D6AA7E"
 
 # 4. Selection Highlight & Failed Duration: Theme Turquoise
 # (These are linked to the same key in this version of Atuin)
 AlertError = "#1AAAD4"
 
 # 5. Pass Indicator: Theme Green
-AlertInfo = "#6E8C78"
+AlertInfo = "#A1C4B4"

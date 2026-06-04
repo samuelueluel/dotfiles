@@ -19,16 +19,16 @@ $line_break$character"""
 palette = 'noctalia'
 
 [palettes.noctalia]
-color_fg0   = '#F2F0EC'
+color_fg0   = '#F0B6B6'
 color_black = '#000000'
-color_bg1   = '#B06F75'
+color_bg1   = '#D6AA7E'
 color_bg3   = '#716E75'
 color_blue  = '#1AAAD4'
 color_aqua  = '#693638'
-color_green = '#6E8C78'
-color_orange = '#E06840'
-color_purple = '#E06840'
-color_red   = '#E06840'
+color_green = '#A1C4B4'
+color_orange = '#ED6D42'
+color_purple = '#ED6D42'
+color_red   = '#ED6D42'
 color_yellow = '#1AAAD4'
 
 [os]

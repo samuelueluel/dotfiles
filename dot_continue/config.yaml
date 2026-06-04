@@ -44,10 +44,10 @@ models:
     roles:
       - autocomplete
 
-  - name: NPU Embeddings
+  - name: iGPU Embeddings
     provider: openai
-    model: embed-gemma-300m-FLM     # silent NPU embedder; nomic-embed is higher quality but iGPU (§ 8.C)
-    apiBase: http://localhost:13305/api/v1
+    model: Qwen/Qwen3-Embedding-8B-GGUF   # exact served id from :8082/v1/models (serve-embedder)
+    apiBase: http://localhost:8082/v1      # iGPU embedder — NPU disabled (§ 5.B.4, § 8.E.2)
     apiKey: dummy
     roles:
       - embed

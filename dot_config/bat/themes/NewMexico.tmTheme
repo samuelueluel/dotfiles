@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>name</key>
-  <string>Noctalia</string>
+  <string>NewMexico</string>
   <key>settings</key>
   <array>
 
@@ -17,7 +17,7 @@
         <key>caret</key>
         <string>#1AAAD4</string>
         <key>selection</key>
-        <string>#000000</string>
+        <string>#1AAAD4</string>
         <key>selectionForeground</key>
         <string>#F0B6B6</string>
         <key>lineHighlight</key>
@@ -25,6 +25,7 @@
       </dict>
     </dict>
 
+    <!-- Comments: gray — unobtrusive, near-invisible -->
     <dict>
       <key>name</key><string>Comment</string>
       <key>scope</key><string>comment, punctuation.definition.comment</string>
@@ -35,6 +36,7 @@
       </dict>
     </dict>
 
+    <!-- Strings: juniper — positive/healthy, readable -->
     <dict>
       <key>name</key><string>String</string>
       <key>scope</key><string>string, string.quoted, string.template</string>
@@ -42,13 +44,15 @@
       <dict><key>foreground</key><string>#A1C4B4</string></dict>
     </dict>
 
+    <!-- String escapes / regex: globe_mallow — special chars deserve bright accent -->
     <dict>
       <key>name</key><string>String Escape / Regex</string>
       <key>scope</key><string>constant.character.escape, string.regexp</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#D4B820</string></dict>
+      <dict><key>foreground</key><string>#ED6D42</string></dict>
     </dict>
 
+    <!-- Numbers / constants: chamisa — should stand out, infrequent enough to be fine -->
     <dict>
       <key>name</key><string>Number</string>
       <key>scope</key><string>constant.numeric</string>
@@ -63,6 +67,7 @@
       <dict><key>foreground</key><string>#D4B820</string></dict>
     </dict>
 
+    <!-- Keywords / storage: turquoise — primary accent, control flow -->
     <dict>
       <key>name</key><string>Keyword</string>
       <key>scope</key><string>keyword, keyword.control, keyword.operator.word</string>
@@ -77,6 +82,7 @@
       <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
+    <!-- Types / classes: globe_mallow — bright accent for type-level constructs -->
     <dict>
       <key>name</key><string>Type / Class</string>
       <key>scope</key><string>entity.name.type, entity.name.class, entity.other.inherited-class, support.type, support.class</string>
@@ -84,13 +90,15 @@
       <dict><key>foreground</key><string>#ED6D42</string></dict>
     </dict>
 
+    <!-- Functions: sandstone — secondary readable text; appears everywhere, must not be jarring -->
     <dict>
       <key>name</key><string>Function</string>
       <key>scope</key><string>entity.name.function, support.function, meta.function-call.generic</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#D4B820</string></dict>
+      <dict><key>foreground</key><string>#D6AA7E</string></dict>
     </dict>
 
+    <!-- Variables: gypsum — primary text, most common token -->
     <dict>
       <key>name</key><string>Variable</string>
       <key>scope</key><string>variable, variable.other, variable.parameter</string>
@@ -98,6 +106,7 @@
       <dict><key>foreground</key><string>#F0B6B6</string></dict>
     </dict>
 
+    <!-- Self / this: turquoise — language-special variable, accent treatment -->
     <dict>
       <key>name</key><string>Self / This</string>
       <key>scope</key><string>variable.language</string>
@@ -105,6 +114,7 @@
       <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
+    <!-- Operators / punctuation: sandstone — UI chrome, not meant to be read closely -->
     <dict>
       <key>name</key><string>Operator</string>
       <key>scope</key><string>keyword.operator</string>
@@ -119,6 +129,7 @@
       <dict><key>foreground</key><string>#D6AA7E</string></dict>
     </dict>
 
+    <!-- Tags: turquoise — active/structural elements -->
     <dict>
       <key>name</key><string>Tag</string>
       <key>scope</key><string>entity.name.tag, meta.tag</string>
@@ -126,11 +137,12 @@
       <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
+    <!-- Tag attributes: sandstone — secondary info on a tag, not the tag itself -->
     <dict>
       <key>name</key><string>Tag Attribute</string>
       <key>scope</key><string>entity.other.attribute-name</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#D4B820</string></dict>
+      <dict><key>foreground</key><string>#D6AA7E</string></dict>
     </dict>
 
     <dict>
@@ -143,6 +155,7 @@
       </dict>
     </dict>
 
+    <!-- Markup headings: turquoise bold — primary navigation/structure in Goose output -->
     <dict>
       <key>name</key><string>Markup Heading</string>
       <key>scope</key><string>markup.heading, entity.name.section</string>
@@ -153,16 +166,18 @@
       </dict>
     </dict>
 
+    <!-- Markup bold: globe_mallow bold — bright accent, appropriate for emphasis; not chamisa which is jarring -->
     <dict>
       <key>name</key><string>Markup Bold</string>
       <key>scope</key><string>markup.bold</string>
       <key>settings</key>
       <dict>
-        <key>foreground</key><string>#D4B820</string>
+        <key>foreground</key><string>#ED6D42</string>
         <key>fontStyle</key><string>bold</string>
       </dict>
     </dict>
 
+    <!-- Markup italic: sandstone — secondary emphasis, UI chrome treatment -->
     <dict>
       <key>name</key><string>Markup Italic</string>
       <key>scope</key><string>markup.italic</string>
@@ -173,23 +188,26 @@
       </dict>
     </dict>
 
+    <!-- Links: turquoise underline — cursor/active/navigation color -->
     <dict>
       <key>name</key><string>Markup Link</string>
       <key>scope</key><string>markup.underline.link, string.other.link</string>
       <key>settings</key>
       <dict>
-        <key>foreground</key><string>#A1C4B4</string>
+        <key>foreground</key><string>#1AAAD4</string>
         <key>fontStyle</key><string>underline</string>
       </dict>
     </dict>
 
+    <!-- Inline code: sandstone — secondary readable text, distinct from prose -->
     <dict>
       <key>name</key><string>Markup Inline Code</string>
       <key>scope</key><string>markup.inline.raw, markup.raw</string>
       <key>settings</key>
-      <dict><key>foreground</key><string>#A1C4B4</string></dict>
+      <dict><key>foreground</key><string>#D6AA7E</string></dict>
     </dict>
 
+    <!-- Config keys: turquoise — primary accent for structured data keys -->
     <dict>
       <key>name</key><string>Config Key</string>
       <key>scope</key><string>meta.mapping.key, support.type.property-name</string>
@@ -197,6 +215,7 @@
       <dict><key>foreground</key><string>#1AAAD4</string></dict>
     </dict>
 
+    <!-- Config sections: globe_mallow bold — section headers are structural, bright accent -->
     <dict>
       <key>name</key><string>Config Section</string>
       <key>scope</key><string>entity.name.section.toml, entity.name.section.ini</string>

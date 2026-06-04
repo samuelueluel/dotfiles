@@ -115,12 +115,12 @@ sort_alphabetically = true
 #selection_bg = "#000000"
 #selection_fg = "#FFFFFF"
 #match_fg = "#D4B820"
-#border_fg = "#B06F75"
+#border_fg = "#D6AA7E"
 #result_name_fg = "#FFFFFF"
 #result_value_fg = "#FFFFFF"
-#result_line_number_fg = "#B06F75"
+#result_line_number_fg = "#D6AA7E"
 #result_count_fg = "#D4B820"
-#preview_title_fg = "#B06F75"
+#preview_title_fg = "#D6AA7E"
 
 # Keybindings and Events
 # ----------------------------------------------------------------------------
