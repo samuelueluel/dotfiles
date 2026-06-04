@@ -5,6 +5,6 @@ for f in "$@"; do
     if [[ "$p" == *.pdf ]]; then
         systemd-run --user --no-block flatpak run org.kde.okular "$p"
     else
-        code --reuse-window "$p"
+        zed "$p"
     fi
 done

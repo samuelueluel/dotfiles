@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly rebuild of opencode safe container image
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

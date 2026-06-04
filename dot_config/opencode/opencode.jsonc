@@ -17,9 +17,9 @@
     "searxng": {
       "enabled": true,
       "type": "local",
-      "command": ["/var/home/samuel/.config/goose/searxng-venv/bin/python3"],
+      "command": ["/var/home/samuel/.config/opencode/searxng-venv/bin/python3"],
       "args": [
-        "/var/home/samuel/.config/goose/searxng_mcp.py"
+        "/var/home/samuel/.config/opencode/searxng_mcp.py"
       ]
     },
     "stata": {

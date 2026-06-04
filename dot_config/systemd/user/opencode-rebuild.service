@@ -1,0 +1,10 @@
+[Unit]
+Description=Rebuild opencode safe container image
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=podman build --pull=newer -t localhost/opencode-safe:latest %h/.config/opencode
+StandardOutput=journal
+StandardError=journal

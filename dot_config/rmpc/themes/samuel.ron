@@ -202,10 +202,10 @@
                     size: "6",
                     pane: Pane(Property(content: [
                         (kind: Text("["), style: (fg: "blue", modifiers: "Bold")),
-                        (kind: Property(Status(RepeatV2(on_label: "z", off_label: "z", on_style: (fg: "red"), off_style: (fg: "yellow"))))),
-                        (kind: Property(Status(RandomV2(on_label: "x", off_label: "x", on_style: (fg: "red"), off_style: (fg: "yellow"))))),
-                        (kind: Property(Status(ConsumeV2(on_label: "c", off_label: "c", oneshot_label: "c", on_style: (fg: "red"), off_style: (fg: "yellow"), oneshot_style: (fg: "magenta"))))),
-                        (kind: Property(Status(SingleV2(on_label: "v", off_label: "v", oneshot_label: "v", on_style: (fg: "red"), off_style: (fg: "yellow"), oneshot_style: (fg: "magenta"))))),
+                        (kind: Property(Status(RepeatV2(on_label: "z", off_label: "z", on_style: (fg: "#E78AA1"), off_style: (fg: "#DA9E8A"))))),
+                        (kind: Property(Status(RandomV2(on_label: "x", off_label: "x", on_style: (fg: "#E78AA1"), off_style: (fg: "#DA9E8A"))))),
+                        (kind: Property(Status(ConsumeV2(on_label: "c", off_label: "c", oneshot_label: "c", on_style: (fg: "#E78AA1"), off_style: (fg: "#DA9E8A"), oneshot_style: (fg: "#ED6D42"))))),
+                        (kind: Property(Status(SingleV2(on_label: "v", off_label: "v", oneshot_label: "v", on_style: (fg: "#E78AA1"), off_style: (fg: "#DA9E8A"), oneshot_style: (fg: "#ED6D42"))))),
                         (kind: Text("]"), style: (fg: "blue", modifiers: "Bold")),
                     ], align: Right))
                 ),
@@ -214,8 +214,8 @@
         "input_mode": Pane(Property(
             content: [
                 (kind: Transform(Replace(content: (kind: Property(Status(InputMode()))), replacements: [
-                    (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "black", bg: "#96E050"))),
-                    (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "black", bg: "#ED6D42"))),
+                 (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "#1A1614", bg: "#96E050", modifiers: "Bold"))),
+                            (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "#1A1614", bg: "#ED6D42", modifiers: "Bold"))),
                 ])))
             ], align: Center
         )),
@@ -224,8 +224,8 @@
             panes: [
                 (size: "1", pane: Pane(Empty())),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#ED6D42", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#E2D8D0"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#E2D8D0"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#ED6D42"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#ED6D42"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
                 (size: "0", pane: Pane(Empty())),
                 (size: "1", pane: Component("volume")),
                 (size: "0", pane: Pane(Empty())),
@@ -240,8 +240,8 @@
             direction: Vertical,
             panes: [
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Title)), style: (fg: "#ED6D42", modifiers: "Bold"), default: (kind: Text("No Song")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#E2D8D0"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#E2D8D0"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#ED6D42"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#ED6D42"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("date"))), style: (fg: "#96E050"), default: (kind: Text("-")))], align: Center))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#96E050"), default: (kind: Text("-")))], align: Center))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("grouping"))), style: (fg: "#96E050"), default: (kind: Text("-")))], align: Center, scroll_speed: 1))),
@@ -253,13 +253,13 @@
             panes: [
                 (size: "1", pane: Component("volume")),
                 (size: "1", pane: Pane(Property(content: [
-                    (kind: Property(Status(RepeatV2(on_label: "rep", off_label: "rep", on_style: (fg: "red"), off_style: (fg: "yellow"))))),
+                    (kind: Property(Status(RepeatV2(on_label: "rep", off_label: "rep", on_style: (fg: "#E78AA1"), off_style: (fg: "#DA9E8A"))))),
                     (kind: Text("  ")),
-                    (kind: Property(Status(RandomV2(on_label: "rnd", off_label: "rnd", on_style: (fg: "red"), off_style: (fg: "yellow"))))),
+                    (kind: Property(Status(RandomV2(on_label: "rnd", off_label: "rnd", on_style: (fg: "#E78AA1"), off_style: (fg: "#DA9E8A"))))),
                     (kind: Text("  ")),
-                    (kind: Property(Status(ConsumeV2(on_label: "csm", off_label: "csm", oneshot_label: "csm", on_style: (fg: "red"), off_style: (fg: "yellow"), oneshot_style: (fg: "magenta"))))),
+                    (kind: Property(Status(ConsumeV2(on_label: "csm", off_label: "csm", oneshot_label: "csm", on_style: (fg: "#E78AA1"), off_style: (fg: "#DA9E8A"), oneshot_style: (fg: "#ED6D42"))))),
                     (kind: Text("  ")),
-                    (kind: Property(Status(SingleV2(on_label: "sgl", off_label: "sgl", oneshot_label: "sgl", on_style: (fg: "red"), off_style: (fg: "yellow"), oneshot_style: (fg: "magenta"))))),
+                    (kind: Property(Status(SingleV2(on_label: "sgl", off_label: "sgl", oneshot_label: "sgl", on_style: (fg: "#E78AA1"), off_style: (fg: "#DA9E8A"), oneshot_style: (fg: "#ED6D42"))))),
                 ], align: Center))),
             ]
         ),
@@ -292,8 +292,8 @@
                     size: "10",
                     pane: Pane(Property(content: [
                         (kind: Transform(Replace(content: (kind: Property(Status(InputMode()))), replacements: [
-                            (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "black", bg: "#96E050"))),
-                            (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "black", bg: "#ED6D42"))),
+                  (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "#1A1614", bg: "#96E050", modifiers: "Bold"))),
+                            (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "#1A1614", bg: "#ED6D42", modifiers: "Bold"))),
                         ])))
                     ], align: Center))
                 ),
