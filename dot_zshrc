@@ -296,7 +296,12 @@ opencode-safe-1() {
     return 1
   fi
 
+  setopt localtraps
+  local container_name="opencode-safe-1-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
   podman run -it --rm \
+    --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
@@ -329,7 +334,12 @@ opencode-safe-2() {
     return 1
   fi
 
+  setopt localtraps
+  local container_name="opencode-safe-2-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
   podman run -it --rm \
+    --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
@@ -364,7 +374,12 @@ opencode-safe-3() {
     return 1
   fi
 
+  setopt localtraps
+  local container_name="opencode-safe-3-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
   podman run -it --rm \
+    --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
