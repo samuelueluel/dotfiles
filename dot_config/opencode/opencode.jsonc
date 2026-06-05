@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
   "provider": {
     "ramalama": {
       "npm": "@ai-sdk/openai-compatible",
