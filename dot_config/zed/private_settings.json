@@ -17,13 +17,9 @@
   "preview_tabs": {
     "enabled": true
   },
-  "tabs": {
-    "file_icons": false
-  },
   "tab_bar": {
     "show_tab_bar_buttons": true,
-    "show_nav_history_buttons": true,
-    "show": false
+    "show_nav_history_buttons": true
   },
   "title_bar": {
     "show_branch_status_icon": true,
@@ -31,31 +27,73 @@
     "show_user_menu": true,
     "show_onboarding_banner": true,
     "show_project_items": true,
-    "show_branch_name": false,
-    "show_menus": false,
+    "show_branch_name": true,
+    "show_menus": true,
     "show_sign_in": true
   },
-  "status_bar": {
-    "show_active_file": false
-  },
   "outline_panel": {
-    "dock": "left"
+    "dock": "right"
   },
   "collaboration_panel": {
     "button": true,
-    "dock": "left"
+    "dock": "right"
   },
   "agent": {
-    "dock": "right",
+    "default_model": {
+      "provider": "ramalama-local",
+      "model": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+    },
+    "dock": "left",
     "favorite_models": [],
-    "model_parameters": []
+    "model_parameters": [],
+    // Workaround for Zed bug #53135: buffer_codegen's streaming path can't handle
+    // thinking/reasoning tokens and aborts (no diff). Disabling streaming tools fixes
+    // inline assist for local thinking models. (agent panel uses the non-streaming path.)
+    "inline_assistant_use_streaming_tools": false
+  },
+  // Local Ramalama :8080 — for inline assist, agent panel, git commit messages, etc.
+  // API key: set RAMALAMA_LOCAL_API_KEY=dummy in your environment (or zed won't connect)
+  "language_models": {
+    "openai_compatible": {
+      "ramalama-local": {
+        "api_url": "http://localhost:8080/v1",
+        "available_models": [
+          {
+            "name": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+            "display_name": "Qwen3.6-35B (local)",
+            "max_tokens": 131072,
+            "capabilities": {
+              "tools": true,
+              "images": false,
+              "parallel_tool_calls": false,
+              "prompt_cache_key": false,
+              "chat_completions": true,
+              "interleaved_reasoning": true
+            }
+          }
+        ]
+      }
+    }
+  },
+  // OpenCode via ACP — reads model config from ~/.config/opencode/opencode.jsonc (local Ramalama :8080)
+  "agent_servers": {
+    "OpenCode": {
+      "type": "custom",
+      "command": "/home/linuxbrew/.linuxbrew/bin/opencode",
+      "args": ["acp", "--cwd", "/var/home/samuel"]
+    }
+  },
+  // FIM edit prediction — Qwen2.5-Coder-1.5B on :8081 (start with: serve-autocomplete)
+  // To re-enable: change provider back to "open_ai_compatible_api"
+  "edit_predictions": {
+    "provider": "none"
   },
   "git_panel": {
-    "dock": "left"
+    "dock": "right"
   },
   "buffer_font_weight": 600.0,
   "project_panel": {
-    "dock": "left",
+    "dock": "right",
     "button": true
   },
   "ui_font_family": "IBM Plex Sans",
@@ -78,5 +116,5 @@
     "dark": "Noctalia Blur"
   },
   "vim_mode": true,
-  "relative_line_numbers": true,
+  "relative_line_numbers": "enabled",
 }

@@ -378,3 +378,6 @@ opencode-safe-3() {
     -w "$abs_dir" \
     localhost/opencode-safe:latest "${@:2}"
 }
+
+# Zed local LLM provider API key (dummy — no auth needed for Ramalama)
+export RAMALAMA_LOCAL_API_KEY=dummy

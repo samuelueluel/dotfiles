@@ -31,6 +31,9 @@ environment {
     XCURSOR_THEME "oreo_white_cursors"
     XCURSOR_SIZE "32"
     PATH "{{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/.cargo/bin:{{ .chezmoi.homeDir }}/.npm-global/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin"
+    // Dummy key so Zed's local Ramalama provider (ramalama-local) authenticates without
+    // the broken Secret Service keyring. Ramalama ignores the value; Zed just needs it set.
+    RAMALAMA_LOCAL_API_KEY "dummy"
 }
 
 // ============================================================
