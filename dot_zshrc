@@ -223,13 +223,14 @@ serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on al
     && echo "▶ serving $1 (no MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 # Three "main models" — they swap through the one :8080 slot (container 'llm'), one at a time:
-#   serve-code  → fast MoE, everyday agentic driver (OpenCode/Aider/terminal)
-#   serve-think → dense reasoning, high-stakes paper critique/synthesis
-#   serve-edit  → Gemma 4 31B, copyediting + hard statistical/math coding (NOT agentic loops)
-alias serve-code='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-code-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-think='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-edit='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
+#   serve-qwen-moe      → Qwen3.6 35B-A3B MoE, MTP on  (everyday driver, OpenCode/Aider/terminal)
+#   serve-qwen-moe-nospec → same, MTP off              (A/B quality comparison)
+#   serve-qwen-dense    → Qwen3.6 27B dense, MTP on    (high-stakes paper critique/synthesis)
+#   serve-gemma4-dense  → Gemma 4 31B, no MTP          (copyediting + hard math, NOT agentic loops)
+alias serve-qwen-moe='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-moe-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-dense='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-gemma4-dense='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
 alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
 # Small FIM autocomplete model for Zed (Continue → :8081). Runs on the iGPU ALONGSIDE

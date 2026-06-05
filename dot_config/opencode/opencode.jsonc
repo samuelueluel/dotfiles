@@ -9,11 +9,39 @@
         "apiKey": "dummy"
       },
       "models": {
-        "unsloth/Qwen3.6-35B-A3B-MTP-GGUF": {}
+        // MoE everyday driver — serve-qwen-moe
+        "unsloth/Qwen3.6-35B-A3B-MTP-GGUF": {
+          "name": "Qwen3.6 35B-A3B MoE",
+          "temperature": true,
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        // Dense reasoning — serve-qwen-dense
+        "unsloth/Qwen3.6-27B-MTP-GGUF": {
+          "name": "Qwen3.6 27B Dense",
+          "temperature": true,
+          "limit": { "context": 131072, "output": 32768 }
+        },
+        // Copyediting / hard math — serve-gemma4-dense (no MTP)
+        "unsloth/gemma-4-31b-it-GGUF": {
+          "name": "Gemma 4 31B",
+          "temperature": true,
+          "limit": { "context": 131072, "output": 16384 }
+        }
       }
     }
   },
   "model": "ramalama/unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+  // build/plan: OpenCode's built-ins, given explicit temperature so they don't use API defaults.
+  // agent: MoE-only, no-think, for tight Stata/coding loops — plan mode not needed here.
+  "agent": {
+    "build": { "temperature": 0.6, "top_p": 0.95 },
+    "plan":  { "temperature": 0.6, "top_p": 0.95 },
+    "agent": {
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "prompt": "/no_think"
+    }
+  },
   "mcp": {
     "searxng": {
       "enabled": true,
