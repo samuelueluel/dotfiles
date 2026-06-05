@@ -113,8 +113,11 @@
   "theme": {
     "mode": "dark",
     "light": "One Light",
-    "dark": "Noctalia Blur"
+    "dark": "New Mexico"
   },
   "vim_mode": true,
   "relative_line_numbers": "enabled",
+  "minimap": {
+    "show": "always"
+  }
 }
