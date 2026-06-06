@@ -49,10 +49,16 @@
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
 
-- AI: Serve Qwen3.6 35B-A3B MoE, MTP on — everyday driver (background) | serve-qwen-moe
-- AI: Serve Qwen3.6 35B-A3B MoE, MTP off — quality A/B (background) | serve-qwen-moe-nospec
-- AI: Serve Qwen3.6 27B dense, MTP on — paper critique/synthesis (background) | serve-qwen-dense
-- AI: Serve Gemma 4 31B — copyedit + hard math, no MTP (background) | serve-gemma4-dense
+- AI: Serve Qwen3.6 35B-A3B MoE Q4, MTP off (fast iterative coding) | serve-qwen-moe-Q4
+- AI: Serve Qwen3.6 35B-A3B MoE Q4, MTP on | serve-qwen-moe-Q4-mtp
+- AI: Serve Qwen3.6 35B-A3B MoE Q8, MTP off | serve-qwen-moe-Q8
+- AI: Serve Qwen3.6 35B-A3B MoE Q8, MTP on | serve-qwen-moe-Q8-mtp
+- AI: Serve Qwen3.6 27B Dense Q4, MTP off | serve-qwen-dense-Q4
+- AI: Serve Qwen3.6 27B Dense Q4, MTP on | serve-qwen-dense-Q4-mtp
+- AI: Serve Qwen3.6 27B Dense Q8, MTP off | serve-qwen-dense-Q8
+- AI: Serve Qwen3.6 27B Dense Q8, MTP on (high-stakes critique) | serve-qwen-dense-Q8-mtp
+- AI: Serve Gemma 4 31B Dense Q4, MTP off | serve-gemma4-dense-Q4
+- AI: Serve Gemma 4 31B Dense Q8, MTP off (copyedit + hard math) | serve-gemma4-dense-Q8
 - AI: Serve autocomplete model (background) | serve-autocomplete
 - AI: Serve vector embedder (background) | serve-embedder
 - AI: Stop main model (:8080) | stop-main

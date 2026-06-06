@@ -224,15 +224,23 @@ serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on al
   ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" "$1" \
     && echo "▶ serving $1 (no MTP, ctx $CTX) at http://localhost:8080/v1"
 }
-# Three "main models" — they swap through the one :8080 slot (container 'llm'), one at a time:
-#   serve-qwen-moe      → Qwen3.6 35B-A3B MoE, MTP on  (everyday driver, OpenCode/Aider/terminal)
-#   serve-qwen-moe-nospec → same, MTP off              (A/B quality comparison)
-#   serve-qwen-dense    → Qwen3.6 27B dense, MTP on    (high-stakes paper critique/synthesis)
-#   serve-gemma4-dense  → Gemma 4 31B, no MTP          (copyediting + hard math, NOT agentic loops)
-alias serve-qwen-moe='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-moe-nospec='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-dense='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-gemma4-dense='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
+# Main Models — swapping through the one :8080 slot (container 'llm'), one at a time
+
+# Qwen3.6 MoE (35B-A3B)
+alias serve-qwen-moe-Q4='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q4_K_M'
+alias serve-qwen-moe-Q4-mtp='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q4_K_M'
+alias serve-qwen-moe-Q8='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-moe-Q8-mtp='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+
+# Qwen3.6 Dense (27B)
+alias serve-qwen-dense-Q4='serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:Q4_K_M'
+alias serve-qwen-dense-Q4-mtp='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:Q4_K_M'
+alias serve-qwen-dense-Q8='serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-dense-Q8-mtp='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+
+# Gemma 4 Dense (31B)
+alias serve-gemma4-dense-Q4='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q4_K_M'
+alias serve-gemma4-dense-Q8='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
 alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
 # Small FIM autocomplete model for Zed (Continue → :8081). Runs on the iGPU ALONGSIDE
