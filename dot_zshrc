@@ -272,20 +272,42 @@ serve-embedder() {
 }
 alias stop-embedder="ramalama stop embedder"
 
-# Show which model is actually loaded on each port (id from /v1/models = source of truth).
-# Tags the chat port MoE/dense: an "A<N>B" suffix (active params) = MoE, plain count = dense.
+# Show exactly which model file and settings are loaded on each port.
+# Parses both the /v1/models API and the host process list for the exact .gguf name and MTP status.
 model-check() {
-  local p name id tag
+  local p name id tag full_cmd exact_file mtp_status
   for entry in "8080:main" "8081:autocomplete" "8082:embedder"; do
     p="${entry%%:*}"; name="${entry##*:}"
+    
+    # Get the base ID from the API to confirm it is actually responding
     id=$(curl -sf "http://localhost:$p/v1/models" 2>/dev/null \
            | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+           
     if [[ -z "$id" ]]; then
       printf '  :%s  %-13s —\n' "$p" "$name"
-    else
+      continue
+    fi
+    
+    # Grab the running command to find the true filename and MTP status
+    full_cmd=$(ps -eo args | grep "[l]lama-server" | grep -- "--port $p" | head -1)
+    
+    if [[ -n "$full_cmd" ]]; then
+      exact_file=$(echo "$full_cmd" | grep -o -- '--model [^ ]*' | cut -d' ' -f2 | xargs basename 2>/dev/null)
+      [[ -z "$exact_file" ]] && exact_file="$id"
+      
+      if echo "$full_cmd" | grep -q "draft-mtp"; then
+        mtp_status=" [MTP: ON]"
+      else
+        [[ "$p" == 8080 ]] && mtp_status=" [MTP: OFF]" || mtp_status=""
+      fi
+      
       tag=""
       [[ "$p" == 8080 ]] && { [[ "$id" == *A[0-9]*B* ]] && tag=" (MoE)" || tag=" (dense)"; }
-      printf '  :%s  %-13s %s%s\n' "$p" "$name" "$id" "$tag"
+      
+      printf '  :%s  %-13s %s%s%s\n' "$p" "$name" "$exact_file" "$tag" "$mtp_status"
+    else
+      # Fallback if parsing fails but API responded
+      printf '  :%s  %-13s %s\n' "$p" "$name" "$id"
     fi
   done
 }
