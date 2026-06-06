@@ -4,3 +4,4 @@
 
 calcure                        # Modern TUI calendar and task manager
 headroom-ai[proxy,code,mcp] --python python3.13  # LLM context optimizer and proxy (pyo3 caps at 3.13; needs brew python@3.13 + gcc)
+git+https://github.com/kyuz0/llama-toolboxes-cockpit.git

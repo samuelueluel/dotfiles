@@ -49,10 +49,10 @@
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
 
-- AI: Serve fast MoE model — agentic coding (background) | serve-code
-- AI: Serve MoE model, MTP off (quality A/B) | serve-code-nospec
-- AI: Serve dense reasoning model (background) | serve-think
-- AI: Serve Gemma 4 31B — copyedit + hard stats (background) | serve-edit
+- AI: Serve Qwen3.6 35B-A3B MoE, MTP on — everyday driver (background) | serve-qwen-moe
+- AI: Serve Qwen3.6 35B-A3B MoE, MTP off — quality A/B (background) | serve-qwen-moe-nospec
+- AI: Serve Qwen3.6 27B dense, MTP on — paper critique/synthesis (background) | serve-qwen-dense
+- AI: Serve Gemma 4 31B — copyedit + hard math, no MTP (background) | serve-gemma4-dense
 - AI: Serve autocomplete model (background) | serve-autocomplete
 - AI: Serve vector embedder (background) | serve-embedder
 - AI: Stop main model (:8080) | stop-main

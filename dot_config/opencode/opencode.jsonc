@@ -31,16 +31,13 @@
     }
   },
   "model": "ramalama/unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
-  // build/plan: OpenCode's built-ins, given explicit temperature so they don't use API defaults.
-  // agent: MoE-only, no-think, for tight Stata/coding loops — plan mode not needed here.
+  // Explicit sampling params for OpenCode's three built-in modes.
+  // /no_think is intentionally absent — it is a soft prefix, not a hard toggle, so it is unreliable.
+  // The model decides when to think based on task difficulty.
   "agent": {
     "build": { "temperature": 0.6, "top_p": 0.95 },
     "plan":  { "temperature": 0.6, "top_p": 0.95 },
-    "agent": {
-      "temperature": 0.7,
-      "top_p": 0.8,
-      "prompt": "/no_think"
-    }
+    "agent": { "temperature": 0.7, "top_p": 0.8 }
   },
   "mcp": {
     "searxng": {

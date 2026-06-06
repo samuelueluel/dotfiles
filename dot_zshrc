@@ -207,6 +207,8 @@ CTX=131072  # context window for the server (applies to ALL clients: WebUI, Open
 # Without the wait, ramalama serve races the old socket, finds 8080 "busy", and
 # silently auto-assigns a random port — breaking every client (WebUI/OpenCode/aider).
 _llm_reset() {
+  echo "Pulling latest $RAMA_IMG …"
+  podman pull "$RAMA_IMG"
   ramalama stop llm 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8080 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
@@ -239,6 +241,8 @@ alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loa
 # real code completion has to live on the iGPU — §2.J / §8.E.2. Served id: Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF
 AUTOCOMPLETE_MODEL=hf://Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M
 serve-autocomplete() {
+  echo "Pulling latest $RAMA_IMG …"
+  podman pull "$RAMA_IMG"
   ramalama stop coder 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8081 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
@@ -250,6 +254,8 @@ alias stop-autocomplete='ramalama stop coder'
 # Serve an embedder model on the iGPU alongside the main model and autocomplete
 EMBED_MODEL="hf://Qwen/Qwen3-Embedding-8B-GGUF:Q4_K_M"
 serve-embedder() {
+  echo "Pulling latest $RAMA_IMG …"
+  podman pull "$RAMA_IMG"
   ramalama stop embedder 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8082 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done

@@ -309,14 +309,33 @@ def parse_state(workspaces_raw, windows_raw):
     # switch to that workspace.
     for ws in ws_by_id.values():
         active_col_pos = 0  # default: leftmost
-        awid = ws["active_window_id"]
-        if awid and awid in win_by_id:
-            pos = win_by_id[awid]["layout"].get("pos_in_scrolling_layout")
-            if pos:
-                target_col_idx = pos[0]
-                sorted_col_indices = sorted(ws["columns"].keys())
-                if target_col_idx in sorted_col_indices:
-                    active_col_pos = sorted_col_indices.index(target_col_idx)
+        sorted_col_indices = sorted(ws["columns"].keys())
+
+        # Prefer the focused window's column over active_window_id. The
+        # is_focused flag is updated immediately by WindowFocusChanged, but
+        # active_window_id only catches up on the subsequent
+        # WorkspaceActiveWindowChanged. Using is_focused avoids a render where
+        # the focus ring and the spine point to different columns.
+        focused_col_idx = None
+        for col_idx, tiles in ws["columns"].items():
+            for tile in tiles:
+                if tile["is_focused"]:
+                    focused_col_idx = col_idx
+                    break
+            if focused_col_idx is not None:
+                break
+
+        if focused_col_idx is not None and focused_col_idx in sorted_col_indices:
+            active_col_pos = sorted_col_indices.index(focused_col_idx)
+        else:
+            awid = ws["active_window_id"]
+            if awid and awid in win_by_id:
+                pos = win_by_id[awid]["layout"].get("pos_in_scrolling_layout")
+                if pos:
+                    target_col_idx = pos[0]
+                    if target_col_idx in sorted_col_indices:
+                        active_col_pos = sorted_col_indices.index(target_col_idx)
+
         ws["active_col_pos"] = active_col_pos
 
     result = sorted(ws_by_id.values(), key=lambda w: w["idx"])
@@ -433,6 +452,13 @@ class MinimapWindow(Gtk.Window):
             n_cols = len(ws["columns"])
             l_max = max(l_max, acp)
             r_max = max(r_max, n_cols - 1 - acp)
+            if ws["is_focused"]:
+                # Lock the grid width to the maximum possible extent for the
+                # focused workspace so it never resizes as focus moves between
+                # columns. Without this, m shrinks when the active column is
+                # near the centre (single workspace case), shifting all tiles.
+                l_max = max(l_max, n_cols - 1)
+                r_max = max(r_max, n_cols - 1)
 
         # M is the distance from the spine to the edge of the symmetrical grid
         m = max(l_max, r_max)
@@ -619,14 +645,17 @@ class MinimapWindow(Gtk.Window):
 
             grid_row += 1
 
-        # Add a dummy spacer to the first and last columns to ensure symmetry
-        # even if no workspace uses those columns.
+        # Span a dummy row across every grid column so GTK's column_homogeneous
+        # flag sees a widget in each column and allocates equal width to all of
+        # them.  Without this, GTK collapses unoccupied interior columns to 0 px
+        # when there is only one workspace, making the gap between tiles appear
+        # to change as focus (and therefore start_col) shifts.  The inter-
+        # workspace spacer incidentally did this for the multi-workspace case,
+        # which is why that case worked correctly.
         if grid_width > 0:
-            for c in [0, grid_width - 1]:
-                spacer = Gtk.Box()
-                # 47 is the calculated width of a tile column (ICON_SIZE+2*CELL_PAD+2*BORDER_WIDTH+2*padding)
-                spacer.set_size_request(51, 1)
-                grid.attach(spacer, c, grid_row, 1, 1)
+            spacer = Gtk.Box()
+            spacer.set_size_request(1, 1)
+            grid.attach(spacer, 0, grid_row, grid_width, 1)
 
         # Wrap grid in an Overlay so the spine line can paint on TOP of tile
         # faces, giving a continuous vertical accent from top to bottom.
