@@ -12,6 +12,9 @@ unsetopt beep
 # Vi mode
 bindkey -v
 KEYTIMEOUT=1
+# Modern keyboards send DEL (\x7f) for backspace, but zsh vi mode only binds ^H (\x08) by default.
+# This ensures backspace works in both vicmd and viins keymaps.
+bindkey '^?' backward-delete-char
 
 # Cursor: beam in insert, block in normal
 function zle-keymap-select {
