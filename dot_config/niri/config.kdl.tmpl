@@ -46,6 +46,8 @@ input {
         xkb {
             // I don't use this because I want Caps Lock = Mod even if not using Niri
             //options "caps:menu" // caps:super = Caps Lock becomes Mod, altwin:menu_win = Physical Start button becomes the 'Menu' key
+            rules "evdev_custom"
+            options "custom:fk13"
         }
         numlock // Enable numlock on startup, omitting this setting disables it.
     }

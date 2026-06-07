@@ -1,0 +1,3 @@
+partial function_keys xkb_symbols "default" {
+    key <FK13> { [ F13 ] };
+};

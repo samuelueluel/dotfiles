@@ -1,0 +1,4 @@
+! option                  =  symbols
+  custom:fk13             =  +fk13key(default)
+
+! include %S/evdev
