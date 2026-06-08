@@ -81,6 +81,11 @@
       "type": "custom",
       "command": "/home/linuxbrew/.linuxbrew/bin/opencode",
       "args": ["acp", "--cwd", "/var/home/samuel"]
+    },
+    "Goose": {
+      "type": "custom",
+      "command": "goose",
+      "args": ["acp"]
     }
   },
   // FIM edit prediction — Qwen2.5-Coder-1.5B on :8081 (start with: serve-autocomplete)

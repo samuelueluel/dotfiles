@@ -227,6 +227,13 @@ serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on al
   ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" "$1" \
     && echo "▶ serving $1 (no MTP, ctx $CTX) at http://localhost:8080/v1"
 }
+serve-llm-draft() {  # speculative decoding with a separate draft model
+  echo "Ensuring draft model $2 is pulled..."
+  ramalama pull "$2"
+  _llm_reset
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" --model-draft "$2" "$1" \
+    && echo "▶ serving $1 with draft $2 (MTP, ctx $CTX) at http://localhost:8080/v1"
+}
 # Main Models — swapping through the one :8080 slot (container 'llm'), one at a time
 
 # Qwen3.6 MoE (35B-A3B)
@@ -244,6 +251,12 @@ alias serve-qwen-dense-Q8-mtp='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8
 # Gemma 4 Dense (31B)
 alias serve-gemma4-dense-Q4='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q4_K_M'
 alias serve-gemma4-dense-Q8='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
+alias serve-gemma4-dense-Q8-mtp='serve-llm-draft hf://unsloth/gemma-4-31b-it-GGUF:Q8_0 hf://Radamanthys11/Gemma-4-31B-it-assistant-GGUF:Q8_0'
+
+# Gemma 4 MoE (26B-A4B)
+alias serve-gemma4-moe-Q8='serve-llm-nospec hf://unsloth/gemma-4-26b-a4b-it-GGUF:Q8_0'
+alias serve-gemma4-moe-Q8-mtp='serve-llm-draft hf://unsloth/gemma-4-26b-a4b-it-GGUF:Q8_0 hf://Radamanthys11/Gemma-4-26B-A4B-it-assistant-GGUF:Q8_0'
+
 alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
 # Small FIM autocomplete model for Zed (Continue → :8081). Runs on the iGPU ALONGSIDE
