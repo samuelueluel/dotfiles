@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "python-repl": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-python-repl"]
+    },
+    "stata": {
+      "command": "node",
+      "args": ["/var/home/samuel/.agents/skills/stata/stata-mcp-entry.js"]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "defaultProvider": "local",
+  "defaultModel": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+  "theme": "ghostty-dark",
+  "skills": [],
+  "packages": [
+    {
+      "source": "npm:pi-mcp-adapter",
+      "extensions": [
+        "extensions/mcp/index.ts"
+      ]
+    },
+    {
+      "source": "npm:pi-agent-extensions",
+      "extensions": [
+        "extensions/answer/index.ts",
+        "extensions/ask-user/index.ts",
+        "extensions/btw/index.ts",
+        "extensions/context/index.ts",
+        "extensions/cwd-history/index.ts",
+        "extensions/files/index.ts",
+        "extensions/handoff/index.ts",
+        "extensions/loop/index.ts",
+        "extensions/notify/index.ts",
+        "extensions/powerline-footer/index.ts",
+        "extensions/session-breakdown/index.ts",
+        "extensions/sessions/index.ts",
+        "extensions/todos/index.ts",
+        "extensions/whimsical/index.ts"
+      ]
+    },
+    {
+      "source": "npm:pi-web-access"
+    },
+    {
+      "source": "npm:pi-markdown-preview"
+    }
+  ],
+  "extensions": [
+    "extensions/modes.ts"
+  ],
+  "lastChangelogVersion": "0.78.1"
+}

@@ -38,6 +38,7 @@ desktop-notifications = false
 confirm-close-surface = false
 gtk-single-instance = true
 quit-after-last-window-closed = false
+scrollback-limit = 100000
 
 # Window
 background-opacity = 0.9

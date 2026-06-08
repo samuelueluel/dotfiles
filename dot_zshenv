@@ -12,6 +12,9 @@ fi
 # export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.npm-global/bin:/usr/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin"
 # export FORCE_COLOR=1 #maybe not necessary after export
 
+# Force GTK4 renderer to use 'ngl' (next-gen OpenGL) to stabilize GTK4 apps like Ghostty under Wayland on AMD hardware
+export GSK_RENDERER=ngl
+
 
 
 # Sourced for EVERY zsh process

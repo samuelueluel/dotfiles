@@ -21,10 +21,9 @@ command = "cclip get '{split:\t:0}'"
 
 [keybindings]
 enter = "actions:copy"
-alt-space = "actions:copy"
 ctrl-c = "actions:copy"
 
 [actions.copy]
 description = "Copy to clipboard"
 command = "cclip copy '{split:\t:0}'"
-mode = "execute"
+mode = "fork"

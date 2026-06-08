@@ -1,5 +1,12 @@
 GOOSE_TELEMETRY_ENABLED: true
 extensions:
+  stata:
+    enabled: false
+    name: stata
+    type: stdio
+    cmd: node
+    args:
+    - /var/home/samuel/.agents/skills/stata/stata-mcp-entry.js
   searxng:
     enabled: true
     name: searxng
@@ -24,7 +31,7 @@ extensions:
     bundled: true
     available_tools: []
   extensionmanager:
-    enabled: true
+    enabled: false
     type: platform
     name: Extension Manager
     description: Enable extension management tools for discovering, enabling, and disabling extensions
@@ -32,7 +39,7 @@ extensions:
     bundled: true
     available_tools: []
   skills:
-    enabled: true
+    enabled: false
     type: platform
     name: skills
     description: Discover and provide skill instructions from filesystem and builtins
@@ -40,7 +47,7 @@ extensions:
     bundled: true
     available_tools: []
   apps:
-    enabled: true
+    enabled: false
     type: platform
     name: apps
     description: Create and manage custom Goose apps through chat. Apps are HTML/CSS/JavaScript and run in sandboxed windows.
@@ -56,7 +63,7 @@ extensions:
     bundled: true
     available_tools: []
   analyze:
-    enabled: true
+    enabled: false
     type: platform
     name: analyze
     description: 'Analyze code structure with tree-sitter: directory overviews, file details, symbol call graphs'
@@ -104,8 +111,8 @@ extensions:
     display_name: Summarize
     bundled: true
     available_tools: []
-OPENAI_BASE_URL: http://localhost:3000/api/v1
-OPENAI_HOST: http://localhost:3000
+OPENAI_BASE_URL: http://localhost:8080/v1
+OPENAI_HOST: http://localhost:8080
 OPENAI_BASE_PATH: v1/chat/completions
 OPENAI_TIMEOUT: '600'
 active_provider: openai
@@ -113,7 +120,7 @@ providers:
   openai:
     enabled: true
     model: unsloth/Qwen3.6-35B-A3B-MTP-GGUF
-    api_key: sk-6869f13e80764e0ab07cb09a9ef5ea98
+    api_key: dummy
     configured: true
 GOOSE_CLI_THEME: ansi
 GOOSE_CLI_DARK_THEME: gruvbox-dark

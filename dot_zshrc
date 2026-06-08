@@ -436,3 +436,468 @@ opencode-safe-3() {
 
 # Zed local LLM provider API key (dummy — no auth needed for Ramalama)
 export RAMALAMA_LOCAL_API_KEY=dummy
+
+# Default pi alias to prevent auto-discovery of skills
+alias pi='pi --no-skills'
+
+alias pi-rebuild='podman build --no-cache -t localhost/pi-safe:latest "$HOME/dotfiles/dot_pi"'
+
+pi-safe-1() {
+  local target_dir="${1:-$PWD}"
+  local abs_dir="$(realpath "$target_dir")"
+
+  if [[ "$abs_dir" == "$HOME" ]]; then
+    echo "Error: Cannot run pi-safe-1 with write access to your entire home directory."
+    return 1
+  fi
+
+  echo -e "\033[33mWARNING: You are giving Pi WRITE access to directory: $abs_dir (including subdirectories)\033[0m"
+  echo -e "\033[33mAnd READ access to everywhere else in: $HOME\033[0m"
+  if read -q "choice?Do you want to proceed? [y/N] "; then
+    echo
+  else
+    echo -e "\nAborted."
+    return 1
+  fi
+
+  setopt localtraps
+  local container_name="pi-safe-1-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
+  podman run -it --rm \
+    --name "$container_name" \
+    --network=host \
+    --userns=keep-id \
+    --security-opt label=disable \
+    -e HOME="$HOME" \
+    -v "$HOME":"$HOME":ro \
+    -v "$abs_dir":"$abs_dir" \
+    -v "$HOME/.pi":"$HOME/.pi" \
+    -v "$HOME/.agents":"$HOME/.agents":ro \
+    -w "$abs_dir" \
+    localhost/pi-safe:latest --no-skills "${@:2}"
+}
+
+pi-safe-2() {
+  local target_dir="${1:-$PWD}"
+  local abs_dir="$(realpath "$target_dir")"
+
+  if [[ "$abs_dir" == "$HOME" ]]; then
+    echo "Error: Cannot run pi-safe-2 with write access to your entire home directory."
+    return 1
+  fi
+
+  echo -e "\033[33mWARNING: You are giving Pi WRITE access to directory: $abs_dir (including subdirectories)\033[0m"
+  echo -e "\033[33mPi will have NO read access to the rest of the system.\033[0m"
+  if read -q "choice?Do you want to proceed? [y/N] "; then
+    echo
+  else
+    echo -e "\nAborted."
+    return 1
+  fi
+
+  setopt localtraps
+  local container_name="pi-safe-2-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
+  podman run -it --rm \
+    --name "$container_name" \
+    --network=host \
+    --userns=keep-id \
+    --security-opt label=disable \
+    -e HOME="$HOME" \
+    -v "$abs_dir":"$abs_dir" \
+    -v "$HOME/.pi":"$HOME/.pi" \
+    -v "$HOME/.agents":"$HOME/.agents":ro \
+    -w "$abs_dir" \
+    localhost/pi-safe:latest --no-skills "${@:2}"
+}
+
+pi-safe-3() {
+  local target_file="${1}"
+
+  if [[ -z "$target_file" || ! -f "$target_file" ]]; then
+    echo "Error: pi-safe-3 requires a specific existing FILE as an argument."
+    echo "Usage: pi-safe-3 /path/to/file.ext [args...]"
+    return 1
+  fi
+
+  local abs_file="$(realpath "$target_file")"
+  local abs_dir="$(dirname "$abs_file")"
+
+  echo -e "\033[33mWARNING: You are giving Pi READ/WRITE access to exactly ONE FILE: $abs_file\033[0m"
+  echo -e "\033[33mPi will have NO access anywhere else (writable /tmp only).\033[0m"
+  if read -q "choice?Do you want to proceed? [y/N] "; then
+    echo
+  else
+    echo -e "\nAborted."
+    return 1
+  fi
+
+  setopt localtraps
+  local container_name="pi-safe-3-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
+  podman run -it --rm \
+    --name "$container_name" \
+    --network=host \
+    --userns=keep-id \
+    --security-opt label=disable \
+    -e HOME="$HOME" \
+    -v "$abs_file":"$abs_file" \
+    -v "$HOME/.pi":"$HOME/.pi" \
+    -v "$HOME/.agents":"$HOME/.agents":ro \
+    --tmpfs /tmp \
+    -w "$abs_dir" \
+    localhost/pi-safe:latest --no-skills "${@:2}"
+}
+
+# Dedicated Stata aliases
+pi-stata() {
+  local args=()
+  for s in ~/.agents/skills/stata*; do
+    args+=("--skill" "$s")
+  done
+  command pi --no-skills "${args[@]}" "$@"
+}
+
+pi-stata-safe-1() {
+  local args=()
+  for s in ~/.agents/skills/stata*; do
+    args+=("--skill" "$s")
+  done
+  pi-safe-1 "$1" "${args[@]}" "${@:2}"
+}
+
+pi-stata-safe-2() {
+  local args=()
+  for s in ~/.agents/skills/stata*; do
+    args+=("--skill" "$s")
+  done
+  pi-safe-2 "$1" "${args[@]}" "${@:2}"
+}
+
+pi-stata-safe-3() {
+  local args=()
+  for s in ~/.agents/skills/stata*; do
+    args+=("--skill" "$s")
+  done
+  pi-safe-3 "$1" "${args[@]}" "${@:2}"
+}
+
+# --- GOOSE ALIASES ---
+
+alias goose-rebuild='podman build --no-cache -t localhost/goose-safe:latest "$HOME/.config/goose"'
+
+_goose_resolve_params() {
+  # 1. Query active model from local Ramalama instance
+  local model_id
+  model_id=$(curl -sf "http://localhost:8080/v1/models" 2>/dev/null \
+         | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+  # 2. Defaults (aligned with opencode.jsonc)
+  local ctx_limit=131072
+  local max_tokens=16384
+  local temp=0.6
+
+  if [[ "$model_id" == *Qwen3.6-35B-A3B* ]]; then
+    ctx_limit=131072
+    max_tokens=16384
+  elif [[ "$model_id" == *Qwen3.6-27B* ]]; then
+    ctx_limit=131072
+    max_tokens=32768
+  elif [[ "$model_id" == *gemma-4-31b* ]]; then
+    ctx_limit=131072
+    max_tokens=16384
+  fi
+
+  export GOOSE_CONTEXT_LIMIT="$ctx_limit"
+  export GOOSE_MAX_TOKENS="$max_tokens"
+  export GOOSE_TEMPERATURE="$temp"
+  export GOOSE_MODE="smart_approve"
+}
+
+goose() {
+  local clean_args=()
+  local skills=()
+  
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skill)
+        skills+=("$2")
+        shift 2
+        ;;
+      *)
+        clean_args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  _goose_resolve_params
+
+  local tmpfile=""
+  if [[ ${#skills[@]} -gt 0 ]]; then
+    tmpfile="/tmp/goose_skills_$$"
+    cat "${skills[@]}" > "$tmpfile"
+    
+    GOOSE_MOIM_MESSAGE_FILE="$tmpfile" command goose "${clean_args[@]}"
+    local ret=$?
+    rm -f "$tmpfile"
+    return $ret
+  else
+    command goose "${clean_args[@]}"
+  fi
+}
+
+goose-safe-1() {
+  local target_dir="${1:-$PWD}"
+  local abs_dir="$(realpath "$target_dir")"
+
+  if [[ "$abs_dir" == "$HOME" ]]; then
+    echo "Error: Cannot run goose-safe-1 with write access to your entire home directory."
+    return 1
+  fi
+
+  local clean_args=()
+  local skills=()
+  
+  [[ $# -gt 0 ]] && shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skill)
+        skills+=("$2")
+        shift 2
+        ;;
+      *)
+        clean_args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  _goose_resolve_params
+
+  echo -e "[33mWARNING: You are giving Goose WRITE access to directory: $abs_dir (including subdirectories)[0m"
+  echo -e "[33mAnd READ access to everywhere else in: $HOME[0m"
+  if ! read -q "choice?Do you want to proceed? [y/N] "; then
+    echo -e "
+Aborted."
+    return 1
+  fi
+  echo
+
+  setopt localtraps
+  local container_name="goose-safe-1-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
+  local tmpfile=""
+  local moim_arg=""
+  if [[ ${#skills[@]} -gt 0 ]]; then
+    tmpfile="/tmp/goose_skills_$$"
+    cat "${skills[@]}" > "$tmpfile"
+    moim_arg="-e GOOSE_MOIM_MESSAGE_FILE=$tmpfile -v $tmpfile:$tmpfile"
+  fi
+
+  podman run -it --rm \
+    --name "$container_name" \
+    --network=host \
+    --userns=keep-id \
+    --security-opt label=disable \
+    -e HOME="$HOME" \
+    -e GOOSE_CONTEXT_LIMIT \
+    -e GOOSE_MAX_TOKENS \
+    -e GOOSE_TEMPERATURE \
+    -e GOOSE_MODE \
+    $moim_arg \
+    -v "$HOME":"$HOME":ro \
+    -v "$abs_dir":"$abs_dir" \
+    -v "$HOME/.config/goose":"$HOME/.config/goose" \
+    -v "$HOME/.local/state/goose":"$HOME/.local/state/goose" \
+    -v "$HOME/.local/share/goose":"$HOME/.local/share/goose" \
+    -v "/home/linuxbrew/.linuxbrew":"/home/linuxbrew/.linuxbrew":ro \
+    -v "$HOME/.agents":"$HOME/.agents":ro \
+    -w "$abs_dir" \
+    localhost/goose-safe:latest session "${clean_args[@]}"
+    
+  if [[ -n "$tmpfile" ]]; then rm -f "$tmpfile"; fi
+}
+
+goose-safe-2() {
+  local target_dir="${1:-$PWD}"
+  local abs_dir="$(realpath "$target_dir")"
+
+  if [[ "$abs_dir" == "$HOME" ]]; then
+    echo "Error: Cannot run goose-safe-2 with write access to your entire home directory."
+    return 1
+  fi
+
+  local clean_args=()
+  local skills=()
+  
+  [[ $# -gt 0 ]] && shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skill)
+        skills+=("$2")
+        shift 2
+        ;;
+      *)
+        clean_args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  _goose_resolve_params
+
+  echo -e "[33mWARNING: You are giving Goose WRITE access to directory: $abs_dir (including subdirectories)[0m"
+  echo -e "[33mGoose will have NO read access to the rest of the system.[0m"
+  if ! read -q "choice?Do you want to proceed? [y/N] "; then
+    echo -e "
+Aborted."
+    return 1
+  fi
+  echo
+
+  setopt localtraps
+  local container_name="goose-safe-2-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
+  local tmpfile=""
+  local moim_arg=""
+  if [[ ${#skills[@]} -gt 0 ]]; then
+    tmpfile="/tmp/goose_skills_$$"
+    cat "${skills[@]}" > "$tmpfile"
+    moim_arg="-e GOOSE_MOIM_MESSAGE_FILE=$tmpfile -v $tmpfile:$tmpfile"
+  fi
+
+  podman run -it --rm \
+    --name "$container_name" \
+    --network=host \
+    --userns=keep-id \
+    --security-opt label=disable \
+    -e HOME="$HOME" \
+    -e GOOSE_CONTEXT_LIMIT \
+    -e GOOSE_MAX_TOKENS \
+    -e GOOSE_TEMPERATURE \
+    -e GOOSE_MODE \
+    $moim_arg \
+    -v "$abs_dir":"$abs_dir" \
+    -v "$HOME/.config/goose":"$HOME/.config/goose" \
+    -v "$HOME/.local/state/goose":"$HOME/.local/state/goose" \
+    -v "$HOME/.local/share/goose":"$HOME/.local/share/goose" \
+    -v "/home/linuxbrew/.linuxbrew":"/home/linuxbrew/.linuxbrew":ro \
+    -v "$HOME/.agents":"$HOME/.agents":ro \
+    -w "$abs_dir" \
+    localhost/goose-safe:latest session "${clean_args[@]}"
+    
+  if [[ -n "$tmpfile" ]]; then rm -f "$tmpfile"; fi
+}
+
+goose-safe-3() {
+  local target_file="${1}"
+
+  if [[ -z "$target_file" || ! -f "$target_file" ]]; then
+    echo "Error: goose-safe-3 requires a specific existing FILE as an argument."
+    echo "Usage: goose-safe-3 /path/to/file.ext [args...]"
+    return 1
+  fi
+
+  local abs_file="$(realpath "$target_file")"
+  local abs_dir="$(dirname "$abs_file")"
+
+  local clean_args=()
+  local skills=()
+  
+  [[ $# -gt 0 ]] && shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skill)
+        skills+=("$2")
+        shift 2
+        ;;
+      *)
+        clean_args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  _goose_resolve_params
+
+  echo -e "[33mWARNING: You are giving Goose READ/WRITE access to exactly ONE FILE: $abs_file[0m"
+  echo -e "[33mGoose will have NO access anywhere else (writable /tmp only).[0m"
+  if ! read -q "choice?Do you want to proceed? [y/N] "; then
+    echo -e "
+Aborted."
+    return 1
+  fi
+  echo
+
+  setopt localtraps
+  local container_name="goose-safe-3-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+
+  local tmpfile=""
+  local moim_arg=""
+  if [[ ${#skills[@]} -gt 0 ]]; then
+    tmpfile="/tmp/goose_skills_$$"
+    cat "${skills[@]}" > "$tmpfile"
+    moim_arg="-e GOOSE_MOIM_MESSAGE_FILE=$tmpfile -v $tmpfile:$tmpfile"
+  fi
+
+  podman run -it --rm \
+    --name "$container_name" \
+    --network=host \
+    --userns=keep-id \
+    --security-opt label=disable \
+    -e HOME="$HOME" \
+    -e GOOSE_CONTEXT_LIMIT \
+    -e GOOSE_MAX_TOKENS \
+    -e GOOSE_TEMPERATURE \
+    -e GOOSE_MODE \
+    $moim_arg \
+    -v "$abs_file":"$abs_file" \
+    -v "$HOME/.config/goose":"$HOME/.config/goose" \
+    -v "$HOME/.local/state/goose":"$HOME/.local/state/goose" \
+    -v "$HOME/.local/share/goose":"$HOME/.local/share/goose" \
+    -v "/home/linuxbrew/.linuxbrew":"/home/linuxbrew/.linuxbrew":ro \
+    -v "$HOME/.agents":"$HOME/.agents":ro \
+    --tmpfs /tmp \
+    -w "$abs_dir" \
+    localhost/goose-safe:latest session "${clean_args[@]}"
+    
+  if [[ -n "$tmpfile" ]]; then rm -f "$tmpfile"; fi
+}
+goose-stata() {
+  local args=()
+  for s in ~/.agents/skills/stata*; do
+    args+=("--skill" "$s")
+  done
+  goose "${args[@]}" "$@"
+}
+
+goose-stata-safe-1() {
+  local args=()
+  for s in ~/.agents/skills/stata*; do
+    args+=("--skill" "$s")
+  done
+  goose-safe-1 "$1" "${args[@]}" "${@:2}"
+}
+
+goose-stata-safe-2() {
+  local args=()
+  for s in ~/.agents/skills/stata*; do
+    args+=("--skill" "$s")
+  done
+  goose-safe-2 "$1" "${args[@]}" "${@:2}"
+}
+
+goose-stata-safe-3() {
+  local args=()
+  for s in ~/.agents/skills/stata*; do
+    args+=("--skill" "$s")
+  done
+  goose-safe-3 "$1" "${args[@]}" "${@:2}"
+}

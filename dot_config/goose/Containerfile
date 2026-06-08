@@ -1,0 +1,10 @@
+FROM ubuntu:26.04
+RUN apt-get update -qq && apt-get install -y -qq curl ca-certificates git python3 python3-venv bzip2 && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh && \
+    bash nodesource_setup.sh && \
+    apt-get install -y -qq nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# The goose binary will be mapped from the host to /home/linuxbrew/.linuxbrew/bin/goose
+# So we set it as the entrypoint
+ENTRYPOINT ["/home/linuxbrew/.linuxbrew/bin/goose"]
