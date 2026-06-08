@@ -83,6 +83,10 @@
       "args": ["acp", "--cwd", "/var/home/samuel"]
     },
     "Goose": {
+      "default_config_options": {
+        "provider": "goose",
+        "mode": "smart_approve"
+      },
       "type": "custom",
       "command": "goose",
       "args": ["acp"]

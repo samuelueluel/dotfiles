@@ -50,4 +50,4 @@ You cannot run `sudo`. Handle it as follows:
 
 ## Preferences
 - When unsure, search quality sources. Official docs preferred; Reddit/StackOverflow acceptable if cited.
-- **Do not spawn subagents or sub-sessions** (such as Scout, Explore, or General). Spawning subagents on local models causes severe performance overhead and slows execution to a crawl. You must perform all file modifications, web searches, and command executions directly in this primary session.
+- **Subagents are permitted:** Continuous batching has been enabled on the local model server, so you can freely spawn subagents for parallel execution without crippling performance.

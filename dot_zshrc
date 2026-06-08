@@ -202,8 +202,8 @@ function claude() {
 # Local LLM (Ramalama / OpenCode / Aider) — §2.B, §2.D, §2.F
 export OPENAI_API_KEY=sk-6869f13e80764e0ab07cb09a9ef5ea98
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
-MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75"
-CTX=131072  # context window for the server (applies to ALL clients: WebUI, OpenCode, etc.)
+MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 -ub 1024 -t 16 --poll 50 --parallel 4"
+CTX=262144  # context window for the server (applies to ALL clients: WebUI, OpenCode, etc.)
 
 # Stop the MAIN-model container (only) AND wait for :8080 to release before re-serving.
 # Stops just 'llm' (not --all) so the :8081 autocomplete model survives a main-model swap.
@@ -224,14 +224,14 @@ serve-llm() {
 }
 serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on alias
   _llm_reset
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" "$1" \
-    && echo "▶ serving $1 (no MTP, ctx $CTX) at http://localhost:8080/v1"
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "--parallel 4" "$1" \
+    && echo "▶ serving $1 (no MTP, ctx $CTX, parallel 4) at http://localhost:8080/v1"
 }
 serve-llm-draft() {  # speculative decoding with a separate draft model
   echo "Ensuring draft model $2 is pulled..."
   ramalama pull "$2"
   _llm_reset
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" --model-draft "$2" "$1" \
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS $3" --model-draft "$2" "$1" \
     && echo "▶ serving $1 with draft $2 (MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 # Main Models — swapping through the one :8080 slot (container 'llm'), one at a time
@@ -242,6 +242,9 @@ alias serve-qwen-moe-Q4-mtp='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q4_
 alias serve-qwen-moe-Q8='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 alias serve-qwen-moe-Q8-mtp='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 
+
+
+
 # Qwen3.6 Dense (27B)
 alias serve-qwen-dense-Q4='serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:Q4_K_M'
 alias serve-qwen-dense-Q4-mtp='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:Q4_K_M'
@@ -249,13 +252,17 @@ alias serve-qwen-dense-Q8='serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD
 alias serve-qwen-dense-Q8-mtp='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
 
 # Gemma 4 Dense (31B)
-alias serve-gemma4-dense-Q4='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q4_K_M'
-alias serve-gemma4-dense-Q8='serve-llm-nospec hf://unsloth/gemma-4-31b-it-GGUF:Q8_0'
-alias serve-gemma4-dense-Q8-mtp='serve-llm-draft hf://unsloth/gemma-4-31b-it-GGUF:Q8_0 hf://Radamanthys11/Gemma-4-31B-it-assistant-GGUF:Q8_0'
+
+alias serve-gemma4-dense-QAT4='serve-llm-nospec hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL'
+alias serve-gemma4-dense-QAT4-mtp='serve-llm-draft hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf'
+alias serve-gemma4-dense-Q8='serve-llm-nospec https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf'
+alias serve-gemma4-dense-Q8-mtp='serve-llm-draft https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/MTP/gemma-4-31B-it-MTP-Q8_0.gguf'
 
 # Gemma 4 MoE (26B-A4B)
-alias serve-gemma4-moe-Q8='serve-llm-nospec hf://unsloth/gemma-4-26b-a4b-it-GGUF:Q8_0'
-alias serve-gemma4-moe-Q8-mtp='serve-llm-draft hf://unsloth/gemma-4-26b-a4b-it-GGUF:Q8_0 hf://Radamanthys11/Gemma-4-26B-A4B-it-assistant-GGUF:Q8_0'
+alias serve-gemma4-moe-QAT4='serve-llm-nospec hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL'
+alias serve-gemma4-moe-QAT4-mtp='serve-llm-draft hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0.gguf'
+alias serve-gemma4-moe-Q8='serve-llm-nospec https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf'
+alias serve-gemma4-moe-Q8-mtp='serve-llm-draft https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/MTP/gemma-4-26B-A4B-it-MTP-Q8_0.gguf'
 
 alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
@@ -270,8 +277,8 @@ serve-autocomplete() {
   ramalama stop coder 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8081 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 "$AUTOCOMPLETE_MODEL" \
-    && echo "▶ serving autocomplete (FIM) at http://localhost:8081/v1"
+  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args "--parallel 1" "$AUTOCOMPLETE_MODEL" \
+    && echo "▶ serving autocomplete (FIM, parallel 1) at http://localhost:8081/v1"
 }
 alias stop-autocomplete='ramalama stop coder'
 
@@ -283,8 +290,8 @@ serve-embedder() {
   ramalama stop embedder 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8082 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n embedder -p 8082 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--embedding" "$EMBED_MODEL" \
-    && echo "▶ serving embedder at http://localhost:8082/v1"
+  ramalama serve -d -n embedder -p 8082 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--embedding --parallel 1" "$EMBED_MODEL" \
+    && echo "▶ serving embedder (parallel 1) at http://localhost:8082/v1"
 }
 alias stop-embedder="ramalama stop embedder"
 
@@ -618,7 +625,7 @@ _goose_resolve_params() {
     max_tokens=16384
   elif [[ "$model_id" == *Qwen3.6-27B* ]]; then
     ctx_limit=131072
-    max_tokens=32768
+    max_tokens=16384
   elif [[ "$model_id" == *gemma-4-31b* ]]; then
     ctx_limit=131072
     max_tokens=16384
