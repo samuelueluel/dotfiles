@@ -1,12 +1,12 @@
 {
   "mcpServers": {
-    "python-repl": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-python-repl"]
+    "searxng": {
+      "command": "/var/home/samuel/.agents/mcp/searxng/venv/bin/python3",
+      "args": ["/var/home/samuel/.agents/mcp/searxng/searxng_mcp.py"]
     },
     "stata": {
-      "command": "node",
-      "args": ["/var/home/samuel/.agents/skills/stata/stata-mcp-entry.js"]
+      "command": "uvx",
+      "args": ["mcp-stata"]
     }
   }
 }

@@ -25,6 +25,7 @@ command = "bat --color=always --style=plain --theme=Noctalia \"{{ .obsidian.vaul
 enter = "actions:obsidian-open"
 alt-space = "actions:obsidian-open"
 ctrl-c = "actions:copy"
+ctrl-p = "actions:copy-absolute"
 
 [actions.obsidian-open]
 description = "Open in Obsidian (New Tab)"
@@ -34,4 +35,9 @@ mode = "execute"
 [actions.copy]
 description = "Copy to clipboard (stripped)"
 command = "printf '%s' \"{strip_ansi}\" | wl-copy"
+mode = "fork"
+
+[actions.copy-absolute]
+description = "Copy absolute path to clipboard"
+command = "printf '%s/%s' \"{{ .obsidian.vault_path }}\" \"{strip_ansi}\" | wl-copy"
 mode = "fork"

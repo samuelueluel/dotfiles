@@ -1,8 +1,12 @@
-FROM ubuntu:26.04
-RUN apt-get update -qq && apt-get install -y -qq curl ca-certificates git && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh && \
-    bash nodesource_setup.sh && \
-    apt-get install -y -qq nodejs && \
-    npm install -g pi-coding-agent pi-mcp-adapter pi-agent-extensions pi-web-access pi-markdown-preview && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+FROM docker.io/homebrew/ubuntu24.04:latest
+
+# Copy your host's Brewfile
+COPY dot_Brewfile-container /tmp/Brewfile
+
+# Run your Brewfile
+RUN brew bundle --file=/tmp/Brewfile
+
+# Ensure pi and its extensions are available globally
+RUN npm install -g pi-mcp-adapter pi-agent-extensions pi-web-access pi-markdown-preview
+
 ENTRYPOINT ["pi"]

@@ -19,7 +19,7 @@
         "unsloth/Qwen3.6-27B-MTP-GGUF": {
           "name": "Qwen3.6 27B Dense",
           "temperature": true,
-          "limit": { "context": 131072, "output": 32768 }
+          "limit": { "context": 131072, "output": 16384 }
         },
         // Copyediting / hard math — serve-gemma4-dense (no MTP)
         "unsloth/gemma-4-31b-it-GGUF": {
@@ -43,16 +43,16 @@
     "searxng": {
       "enabled": true,
       "type": "local",
-      "command": ["/var/home/samuel/.config/opencode/searxng-venv/bin/python3"],
-      "args": [
-        "/var/home/samuel/.config/opencode/searxng_mcp.py"
+      "command": [
+        "/var/home/samuel/.agents/mcp/searxng/venv/bin/python3",
+        "/var/home/samuel/.agents/mcp/searxng/searxng_mcp.py"
       ]
     },
     "stata": {
-      "enabled": true,
+      "enabled": false,
       "type": "local",
-      "command": ["uvx"],
-      "args": [
+      "command": [
+        "uvx",
         "mcp-stata"
       ]
     }

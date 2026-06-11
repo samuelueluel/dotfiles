@@ -3,5 +3,10 @@ use = "yazi-rs/plugins:full-border"
 rev = "1962818"
 hash = "6fa6a05a81c98dd000fbca3cca6e9682"
 
+[[plugin.deps]]
+use = "yazi-rs/plugins:toggle-pane"
+rev = "598cdb6"
+hash = "9c7987da2d2a2120dac33abb64132004"
+
 [flavor]
 deps = []

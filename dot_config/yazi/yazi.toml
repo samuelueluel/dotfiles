@@ -1,5 +1,5 @@
 [mgr]
-ratio = [1, 4, 4]
+ratio = [0, 3, 7]
 linemode = "mtime"
 
 [opener]
@@ -31,3 +31,6 @@ prepend_rules = [
   { mime = "inode/x-empty",           use = "edit" },
   { mime = "*", use = "open" },
 ]
+
+[preview]
+wrap = "yes"

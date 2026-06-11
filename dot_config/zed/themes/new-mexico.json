@@ -54,8 +54,8 @@
         "icon": "#DA9E8A",
         "icon.accent": "#1AAAD4",
 
-        "search.match_background": "#005B6180",
-        "search.active_match_background": "#1AAAD480",
+        "search.match_background": "#ED2658FF",
+        "search.active_match_background": "#1AAAD4FF",
 
         "players": [
           {

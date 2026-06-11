@@ -4,16 +4,16 @@ extensions:
     enabled: false
     name: stata
     type: stdio
-    cmd: node
+    cmd: uvx
     args:
-    - /var/home/samuel/.agents/skills/stata/stata-mcp-entry.js
+    - mcp-stata
   searxng:
     enabled: true
     name: searxng
     type: stdio
-    cmd: /var/home/samuel/.config/goose/searxng-venv/bin/python3
+    cmd: /var/home/samuel/.agents/mcp/searxng/venv/bin/python3
     args:
-    - /var/home/samuel/.config/goose/searxng_mcp.py
+    - /var/home/samuel/.agents/mcp/searxng/searxng_mcp.py
   chatrecall:
     enabled: false
     type: platform
@@ -127,3 +127,4 @@ GOOSE_CLI_DARK_THEME: gruvbox-dark
 GOOSE_CLI_SHOW_COST: true
 env:
   OPENAI_API_KEY: sk-6869f13e80764e0ab07cb09a9ef5ea98
+GOOSE_MODE: smart_approve

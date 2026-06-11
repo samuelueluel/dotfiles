@@ -202,7 +202,7 @@ function claude() {
 # Local LLM (Ramalama / OpenCode / Aider) — §2.B, §2.D, §2.F
 export OPENAI_API_KEY=sk-6869f13e80764e0ab07cb09a9ef5ea98
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
-MTP_OPTS="--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 -ub 1024 -t 16 --poll 50 --parallel 4"
+MTP_OPTS="-ngl 999 --no-mmap --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75 -ub 1024 -t 16 --slot-prompt-similarity 0.8 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048 --context-shift --cache-ram 61440"
 CTX=262144  # context window for the server (applies to ALL clients: WebUI, OpenCode, etc.)
 
 # Stop the MAIN-model container (only) AND wait for :8080 to release before re-serving.
@@ -217,52 +217,70 @@ _llm_reset() {
   while ss -tln 2>/dev/null | grep -q ':8080 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
 }
 
+# NOTE: The Qwen3.6 chat-template fix (froggeric) is applied by overwriting the
+# chat_template_extracted blob in ramalama's store, NOT here. ramalama already mounts
+# that blob into the container and auto-passes --chat-template-file, so a custom flag
+# pointing at a host path would fail (host path isn't mounted in the container).
+# Re-apply after a model re-pull: see ~/.local/share/ramalama/README-qwen-template.md
 serve-llm() {
   _llm_reset
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS" "$1" \
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args="$MTP_OPTS" "$1" \
     && echo "▶ serving $1 (MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on alias
   _llm_reset
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "--parallel 4" "$1" \
-    && echo "▶ serving $1 (no MTP, ctx $CTX, parallel 4) at http://localhost:8080/v1"
+  local p_opts="${PARALLEL_OPTS:---parallel 1}"
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args="$p_opts" "$1" \
+    && echo "▶ serving $1 (no MTP, ctx $CTX, $p_opts) at http://localhost:8080/v1"
 }
 serve-llm-draft() {  # speculative decoding with a separate draft model
   echo "Ensuring draft model $2 is pulled..."
   ramalama pull "$2"
   _llm_reset
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args "$MTP_OPTS $3" --model-draft "$2" "$1" \
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args="$MTP_OPTS $3" --model-draft "$2" "$1" \
     && echo "▶ serving $1 with draft $2 (MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 # Main Models — swapping through the one :8080 slot (container 'llm'), one at a time
 
 # Qwen3.6 MoE (35B-A3B)
-alias serve-qwen-moe-Q4='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q4_K_M'
-alias serve-qwen-moe-Q4-mtp='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q4_K_M'
-alias serve-qwen-moe-Q8='serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-moe-Q8-mtp='serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-
-
-
+alias serve-qwen-moe-Q4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL'
+alias serve-qwen-moe-Q4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL'
+alias serve-qwen-moe-Q4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL'
+alias serve-qwen-moe-Q4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL'
+alias serve-qwen-moe-Q8-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-moe-Q8-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-moe-Q8-mtp-p1='MTP_OPTS="${MTP_OPTS/--spec-draft-n-max 3/--spec-draft-n-max 2} --parallel 1" serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-moe-Q8-mtp-p2='MTP_OPTS="${MTP_OPTS/--spec-draft-n-max 3/--spec-draft-n-max 2} --parallel 2" serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
 
 # Qwen3.6 Dense (27B)
-alias serve-qwen-dense-Q4='serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:Q4_K_M'
-alias serve-qwen-dense-Q4-mtp='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:Q4_K_M'
-alias serve-qwen-dense-Q8='serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-dense-Q8-mtp='serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-dense-Q4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
+alias serve-qwen-dense-Q4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
+alias serve-qwen-dense-Q4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
+alias serve-qwen-dense-Q4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
+alias serve-qwen-dense-Q8-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-dense-Q8-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-dense-Q8-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+alias serve-qwen-dense-Q8-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
 
 # Gemma 4 Dense (31B)
-
-alias serve-gemma4-dense-QAT4='serve-llm-nospec hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL'
-alias serve-gemma4-dense-QAT4-mtp='serve-llm-draft hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf'
-alias serve-gemma4-dense-Q8='serve-llm-nospec https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf'
-alias serve-gemma4-dense-Q8-mtp='serve-llm-draft https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/MTP/gemma-4-31B-it-MTP-Q8_0.gguf'
+alias serve-gemma4-dense-QAT4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL'
+alias serve-gemma4-dense-QAT4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL'
+alias serve-gemma4-dense-QAT4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf'
+alias serve-gemma4-dense-QAT4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf'
+alias serve-gemma4-dense-Q8-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf'
+alias serve-gemma4-dense-Q8-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf'
+alias serve-gemma4-dense-Q8-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/MTP/gemma-4-31B-it-MTP-Q8_0.gguf'
+alias serve-gemma4-dense-Q8-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/MTP/gemma-4-31B-it-MTP-Q8_0.gguf'
 
 # Gemma 4 MoE (26B-A4B)
-alias serve-gemma4-moe-QAT4='serve-llm-nospec hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL'
-alias serve-gemma4-moe-QAT4-mtp='serve-llm-draft hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0.gguf'
-alias serve-gemma4-moe-Q8='serve-llm-nospec https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf'
-alias serve-gemma4-moe-Q8-mtp='serve-llm-draft https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/MTP/gemma-4-26B-A4B-it-MTP-Q8_0.gguf'
+alias serve-gemma4-moe-QAT4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL'
+alias serve-gemma4-moe-QAT4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL'
+alias serve-gemma4-moe-QAT4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0.gguf'
+alias serve-gemma4-moe-QAT4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0.gguf'
+alias serve-gemma4-moe-Q8-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf'
+alias serve-gemma4-moe-Q8-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf'
+alias serve-gemma4-moe-Q8-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/MTP/gemma-4-26B-A4B-it-MTP-Q8_0.gguf'
+alias serve-gemma4-moe-Q8-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/MTP/gemma-4-26B-A4B-it-MTP-Q8_0.gguf'
 
 alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
@@ -277,7 +295,7 @@ serve-autocomplete() {
   ramalama stop coder 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8081 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args "--parallel 1" "$AUTOCOMPLETE_MODEL" \
+  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--parallel 1" "$AUTOCOMPLETE_MODEL" \
     && echo "▶ serving autocomplete (FIM, parallel 1) at http://localhost:8081/v1"
 }
 alias stop-autocomplete='ramalama stop coder'
@@ -298,7 +316,7 @@ alias stop-embedder="ramalama stop embedder"
 # Show exactly which model file and settings are loaded on each port.
 # Parses both the /v1/models API and the host process list for the exact .gguf name and MTP status.
 model-check() {
-  local p name id tag full_cmd exact_file mtp_status
+  local p name id tag full_cmd exact_file mtp_status p_status
   for entry in "8080:main" "8081:autocomplete" "8082:embedder"; do
     p="${entry%%:*}"; name="${entry##*:}"
     
@@ -327,7 +345,21 @@ model-check() {
       tag=""
       [[ "$p" == 8080 ]] && { [[ "$id" == *A[0-9]*B* ]] && tag=" (MoE)" || tag=" (dense)"; }
       
-      printf '  :%s  %-13s %s%s%s\n' "$p" "$name" "$exact_file" "$tag" "$mtp_status"
+      p_status=""
+      if [[ "$p" == 8080 ]]; then
+        local parallel_slots="1"
+        if echo "$full_cmd" | grep -q -- "--parallel"; then
+          parallel_slots=$(echo "$full_cmd" | grep -o -- '--parallel [0-9]*' | cut -d' ' -f2)
+        fi
+        local actual_ctx=$(curl -sf "http://localhost:$p/props" 2>/dev/null | jq -r '.default_generation_settings.n_ctx' 2>/dev/null)
+        if [[ -n "$actual_ctx" && "$actual_ctx" != "null" ]]; then
+          p_status=" [p${parallel_slots} | $(( actual_ctx / 1000 ))k ctx]"
+        else
+          p_status=" [p${parallel_slots}]"
+        fi
+      fi
+      
+      printf '  :%s  %-13s %s%s%s%s\n' "$p" "$name" "$exact_file" "$tag" "$mtp_status" "$p_status"
     else
       # Fallback if parsing fails but API responded
       printf '  :%s  %-13s %s\n' "$p" "$name" "$id"
@@ -336,9 +368,31 @@ model-check() {
 }
 
 
+# Disable legacy Claude Code fallback (prevents reading CLAUDE.md)
+export OPENCODE_DISABLE_CLAUDE_CODE=1
+
 alias opencode-rebuild='podman build --no-cache -t localhost/opencode-safe:latest "$HOME/.config/opencode"'
 
+_opencode_sync_context() {
+  local server_ctx
+  server_ctx=$(curl -sf "http://localhost:8080/props" 2>/dev/null | jq -r '.default_generation_settings.n_ctx' 2>/dev/null)
+  local config_file="$HOME/.config/opencode/opencode.jsonc"
+  if [[ -f "$config_file" ]]; then
+    if [[ -n "$server_ctx" && "$server_ctx" =~ ^[0-9]+$ ]]; then
+      sed -i -E "s/\"context\": [0-9]+/\"context\": $server_ctx/g" "$config_file"
+    else
+      sed -i -E "s/\"context\": [0-9]+/\"context\": 262144/g" "$config_file"
+    fi
+  fi
+}
+
+opencode() {
+  _opencode_sync_context
+  command opencode "$@"
+}
+
 opencode-safe-1() {
+  _opencode_sync_context
   local target_dir="${1:-$PWD}"
   local abs_dir="$(realpath "$target_dir")"
 
@@ -358,14 +412,17 @@ opencode-safe-1() {
 
   setopt localtraps
   local container_name="opencode-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -v "$HOME":"$HOME":ro \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.config/opencode":"$HOME/.config/opencode":ro \
@@ -377,6 +434,7 @@ opencode-safe-1() {
 }
 
 opencode-safe-2() {
+  _opencode_sync_context
   local target_dir="${1:-$PWD}"
   local abs_dir="$(realpath "$target_dir")"
 
@@ -396,14 +454,17 @@ opencode-safe-2() {
 
   setopt localtraps
   local container_name="opencode-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.config/opencode":"$HOME/.config/opencode":ro \
     -v "$HOME/.local/share/opencode":"$HOME/.local/share/opencode" \
@@ -414,6 +475,7 @@ opencode-safe-2() {
 }
 
 opencode-safe-3() {
+  _opencode_sync_context
   local target_file="${1}"
 
   if [[ -z "$target_file" || ! -f "$target_file" ]]; then
@@ -436,14 +498,17 @@ opencode-safe-3() {
 
   setopt localtraps
   local container_name="opencode-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -v "$abs_file":"$abs_file" \
     -v "$HOME/.config/opencode":"$HOME/.config/opencode":ro \
     -v "$HOME/.local/share/opencode":"$HOME/.local/share/opencode" \
@@ -457,10 +522,7 @@ opencode-safe-3() {
 # Zed local LLM provider API key (dummy — no auth needed for Ramalama)
 export RAMALAMA_LOCAL_API_KEY=dummy
 
-# Default pi alias to prevent auto-discovery of skills
-alias pi='pi --no-skills'
-
-alias pi-rebuild='podman build --no-cache -t localhost/pi-safe:latest "$HOME/dotfiles/dot_pi"'
+alias pi-rebuild='podman build --no-cache -t localhost/pi-safe:latest -f "$HOME/dotfiles/dot_pi/Containerfile" "$HOME/dotfiles"'
 
 pi-safe-1() {
   local target_dir="${1:-$PWD}"
@@ -482,20 +544,23 @@ pi-safe-1() {
 
   setopt localtraps
   local container_name="pi-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -v "$HOME":"$HOME":ro \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
     -w "$abs_dir" \
-    localhost/pi-safe:latest --no-skills "${@:2}"
+    localhost/pi-safe:latest "${@:2}"
 }
 
 pi-safe-2() {
@@ -518,19 +583,22 @@ pi-safe-2() {
 
   setopt localtraps
   local container_name="pi-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
     -w "$abs_dir" \
-    localhost/pi-safe:latest --no-skills "${@:2}"
+    localhost/pi-safe:latest "${@:2}"
 }
 
 pi-safe-3() {
@@ -556,52 +624,61 @@ pi-safe-3() {
 
   setopt localtraps
   local container_name="pi-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -v "$abs_file":"$abs_file" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
     --tmpfs /tmp \
     -w "$abs_dir" \
-    localhost/pi-safe:latest --no-skills "${@:2}"
+    localhost/pi-safe:latest "${@:2}"
 }
 
-# Dedicated Stata aliases
-pi-stata() {
+# tau: pi with all skills loaded EXCEPT Stata
+tau() {
   local args=()
-  for s in ~/.agents/skills/stata*; do
+  for s in ~/.agents/skills/*; do
+    [[ -d "$s" ]] || continue
+    [[ "${s:t}" == stata* ]] && continue
     args+=("--skill" "$s")
   done
   command pi --no-skills "${args[@]}" "$@"
 }
 
-pi-stata-safe-1() {
-  local args=()
-  for s in ~/.agents/skills/stata*; do
+# tau-safe-N: sandboxed pi-safe with all skills EXCEPT Stata
+_tau_skill_args() {
+  local s
+  for s in ~/.agents/skills/*; do
+    [[ -d "$s" ]] || continue
+    [[ "${s:t}" == stata* ]] && continue
     args+=("--skill" "$s")
   done
+}
+
+tau-safe-1() {
+  local args=("--no-skills")
+  _tau_skill_args
   pi-safe-1 "$1" "${args[@]}" "${@:2}"
 }
 
-pi-stata-safe-2() {
-  local args=()
-  for s in ~/.agents/skills/stata*; do
-    args+=("--skill" "$s")
-  done
+tau-safe-2() {
+  local args=("--no-skills")
+  _tau_skill_args
   pi-safe-2 "$1" "${args[@]}" "${@:2}"
 }
 
-pi-stata-safe-3() {
-  local args=()
-  for s in ~/.agents/skills/stata*; do
-    args+=("--skill" "$s")
-  done
+tau-safe-3() {
+  local args=("--no-skills")
+  _tau_skill_args
   pi-safe-3 "$1" "${args[@]}" "${@:2}"
 }
 
@@ -615,20 +692,33 @@ _goose_resolve_params() {
   model_id=$(curl -sf "http://localhost:8080/v1/models" 2>/dev/null \
          | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 
+  # Dynamically fetch actual context slot size (n_ctx) from llama-server
+  local server_ctx
+  server_ctx=$(curl -sf "http://localhost:8080/props" 2>/dev/null \
+         | jq -r '.default_generation_settings.n_ctx' 2>/dev/null)
+
   # 2. Defaults (aligned with opencode.jsonc)
-  local ctx_limit=131072
+  local ctx_limit=262144
   local max_tokens=16384
   local temp=0.6
 
   if [[ "$model_id" == *Qwen3.6-35B-A3B* ]]; then
-    ctx_limit=131072
+    ctx_limit=262144
     max_tokens=16384
   elif [[ "$model_id" == *Qwen3.6-27B* ]]; then
-    ctx_limit=131072
+    ctx_limit=262144
     max_tokens=16384
   elif [[ "$model_id" == *gemma-4-31b* ]]; then
-    ctx_limit=131072
+    ctx_limit=262144
     max_tokens=16384
+  fi
+
+  # 3. Dynamic context override (safe clamp)
+  # If the server reports a smaller slot size (e.g. 131072 from -p2), trust the server
+  if [[ -n "$server_ctx" && "$server_ctx" =~ ^[0-9]+$ ]]; then
+    if (( server_ctx < ctx_limit )); then
+      ctx_limit="$server_ctx"
+    fi
   fi
 
   export GOOSE_CONTEXT_LIMIT="$ctx_limit"
@@ -709,7 +799,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
   local tmpfile=""
   local moim_arg=""
@@ -719,12 +809,15 @@ Aborted."
     moim_arg="-e GOOSE_MOIM_MESSAGE_FILE=$tmpfile -v $tmpfile:$tmpfile"
   fi
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -e GOOSE_CONTEXT_LIMIT \
     -e GOOSE_MAX_TOKENS \
     -e GOOSE_TEMPERATURE \
@@ -782,7 +875,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
   local tmpfile=""
   local moim_arg=""
@@ -792,12 +885,15 @@ Aborted."
     moim_arg="-e GOOSE_MOIM_MESSAGE_FILE=$tmpfile -v $tmpfile:$tmpfile"
   fi
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -e GOOSE_CONTEXT_LIMIT \
     -e GOOSE_MAX_TOKENS \
     -e GOOSE_TEMPERATURE \
@@ -857,7 +953,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT HUP INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
 
   local tmpfile=""
   local moim_arg=""
@@ -867,12 +963,15 @@ Aborted."
     moim_arg="-e GOOSE_MOIM_MESSAGE_FILE=$tmpfile -v $tmpfile:$tmpfile"
   fi
 
-  podman run -it --rm \
+  podman run --init -it --rm \
     --name "$container_name" \
     --network=host \
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
+    -e TERM \
+    -e COLORTERM \
+    -e LANG \
     -e GOOSE_CONTEXT_LIMIT \
     -e GOOSE_MAX_TOKENS \
     -e GOOSE_TEMPERATURE \

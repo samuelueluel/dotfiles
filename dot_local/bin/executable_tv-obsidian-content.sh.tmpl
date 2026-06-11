@@ -7,7 +7,7 @@ echo -n "Search content: "
 read -r query
 [ -z "$query" ] && exit 0
 
-selected=$(
+output=$(
     $RG -l --glob "*.md" "$query" "$VAULT_DIR" |
     awk -v vault_dir="$VAULT_DIR/" '{
       path = $0;
@@ -35,10 +35,22 @@ selected=$(
        --preview-word-wrap \
        --preview-border=thick \
        --input-header="Results: $query" \
-       --layout=portrait
+       --layout=portrait \
+       --expect="ctrl-p;ctrl-c"
 )
 
-[ -z "$selected" ] && exit 0
+[ -z "$output" ] && exit 0
+
+key=$(echo "$output" | head -n 1)
+selected=$(echo "$output" | tail -n +2)
+
+if [ "$key" = "ctrl-p" ]; then
+    printf "%s/%s" "$VAULT_DIR" "$selected" | wl-copy
+    exit 0
+elif [ "$key" = "ctrl-c" ]; then
+    printf "%s" "$selected" | wl-copy
+    exit 0
+fi
 
 if obsidian files total >/dev/null 2>&1; then
     obsidian open "path=$selected" newtab

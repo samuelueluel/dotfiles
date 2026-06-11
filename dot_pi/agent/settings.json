@@ -1,13 +1,16 @@
 {
   "defaultProvider": "local",
   "defaultModel": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
-  "theme": "ghostty-dark",
-  "skills": [],
+  "theme": "noctalia",
+  "skills": [
+    "/var/home/samuel/.agents/skills"
+  ],
+  "enableSkillCommands": true,
   "packages": [
     {
       "source": "npm:pi-mcp-adapter",
       "extensions": [
-        "extensions/mcp/index.ts"
+        "index.ts"
       ]
     },
     {
@@ -22,22 +25,24 @@
         "extensions/handoff/index.ts",
         "extensions/loop/index.ts",
         "extensions/notify/index.ts",
-        "extensions/powerline-footer/index.ts",
         "extensions/session-breakdown/index.ts",
         "extensions/sessions/index.ts",
-        "extensions/todos/index.ts",
-        "extensions/whimsical/index.ts"
+        "extensions/todos/index.ts"
       ]
+    },
+    {
+      "source": "npm:pi-markdown-preview"
     },
     {
       "source": "npm:pi-web-access"
     },
-    {
-      "source": "npm:pi-markdown-preview"
-    }
+    "extensions/pi-tool-display"
   ],
   "extensions": [
-    "extensions/modes.ts"
+    "extensions/modes.ts",
+    "extensions/powerline-footer.ts",
+    "extensions/spawn-subagent.ts"
   ],
-  "lastChangelogVersion": "0.78.1"
+  "lastChangelogVersion": "0.79.1",
+  "hideThinkingBlock": false
 }

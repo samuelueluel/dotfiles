@@ -24,7 +24,10 @@ const PLAN_WHITELIST = new Set([
 async function askUser(query: string, ctx: any, details?: string): Promise<boolean> {
   const promptText = details ? `${details}\n\n${query}` : query;
   const answer = await ctx.ui.input("Approval Required", promptText);
-  const clean = (answer || "").trim().toLowerCase();
+  if (answer === null || answer === undefined) {
+    return false;
+  }
+  const clean = answer.trim().toLowerCase();
   return clean === "y" || clean === "yes" || clean === "";
 }
 

@@ -1,0 +1,17 @@
+# Essential CLI tools for Pi and other AI coding agents
+# This is a minimized Brewfile specifically for the pi-safe container
+
+brew "bat"         # cat with syntax highlighting
+brew "fd"          # find replacement (often used by agents for fast searching)
+brew "fzf"         # fuzzy finder
+brew "gcc"         # C compiler — needed to build Python packages with native extensions
+brew "gh"          # GitHub CLI
+brew "jq"          # standard JSON processor
+brew "pipx"        # isolated Python CLI tool installer
+brew "python@3.13" # Python environment for MCP servers or scripts
+brew "ripgrep"     # grep replacement (heavy agent dependency)
+brew "tree"        # directory visualization
+brew "wget"        # standard downloader
+brew "yq"          # YAML/TOML processor
+brew "pi-coding-agent" # the AI agent itself
+brew "eza"             # ls replacement
