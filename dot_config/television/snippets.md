@@ -49,11 +49,18 @@
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
 
-- AI: Serve Qwen3.6 35B-A3B MoE Q8, MTP on (DEFAULT CODER) | serve-qwen-moe-Q8-mtp
-- AI: Serve Qwen3.6 27B Dense Q4, MTP on (DEFAULT REASONER) | serve-qwen-dense-Q4-mtp
-- AI: Serve Qwen3.6 35B-A3B MoE Q4, MTP on (RAM Fallback Coder) | serve-qwen-moe-Q4-mtp
-- AI: Serve Qwen3.6 27B Dense Q8, MTP on (Strict Math/Proofs) | serve-qwen-dense-Q8-mtp
-- AI: Serve Gemma 4 31B Dense Q8 (Copyedit + Hard Stats) | serve-gemma4-dense-Q8
+- AI: Serve Qwen3.6 35B-A3B MoE Q8, MTP on | serve-qwen-moe-Q8-mtp-p1
+- AI: Serve Qwen3.6 35B-A3B MoE Q8, MTP on | serve-qwen-moe-Q8-mtp-p2
+- AI: Serve Qwen3.6 27B Dense Q4, MTP on | serve-qwen-dense-Q4-mtp-p1
+- AI: Serve Qwen3.6 27B Dense Q4, MTP on | serve-qwen-dense-Q4-mtp-p2
+- AI: Serve Qwen3.6 35B-A3B MoE Q4, MTP on | serve-qwen-moe-Q4-mtp-p1
+- AI: Serve Qwen3.6 35B-A3B MoE Q4, MTP on | serve-qwen-moe-Q4-mtp-p2
+- AI: Serve Qwen3.6 27B Dense Q8, MTP on | serve-qwen-dense-Q8-mtp-p1
+- AI: Serve Qwen3.6 27B Dense Q8, MTP on | serve-qwen-dense-Q8-mtp-p2
+- AI: Serve Gemma 4 31B Dense QAT4 | serve-gemma4-dense-QAT4-p1
+- AI: Serve Gemma 4 31B Dense QAT4 | serve-gemma4-dense-QAT4-p2
+- AI: Serve Gemma 4 31B Dense QAT4, MTP on | serve-gemma4-dense-QAT4-mtp-p1
+- AI: Serve Gemma 4 31B Dense QAT4, MTP on | serve-gemma4-dense-QAT4-mtp-p2
 - AI: Serve autocomplete model (background) | serve-autocomplete
 - AI: Serve vector embedder (background) | serve-embedder
 - AI: Stop main model (:8080) | stop-main

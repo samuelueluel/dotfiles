@@ -60,3 +60,4 @@ keybind = ctrl+q=text:\x1b\x7f
 keybind = ctrl+w=text:\x7f
 keybind = alt+q=text:\x01
 keybind = alt+e=text:\x05
+keybind = ctrl+enter=unbind

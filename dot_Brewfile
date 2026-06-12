@@ -31,6 +31,7 @@ brew "television"  # fuzzy finder TUI with live previews
 brew "tealdeer"    # simplified man pages (fast Rust tldr client)
 brew "yq"          # jq-style processor for YAML/TOML/XML
 brew "ouch"        # archive tool (zip, tar, gz, zst, etc.)
+brew "pandoc"       # universal document converter (used by pi-markdown-preview)
 brew "vdirsyncer"  # sync CalDAV/CardDAV calendars/contacts to local storage
 brew "yt-dlp"      # video downloader
 brew "starship"    # cross-shell prompt

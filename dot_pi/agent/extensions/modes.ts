@@ -2,25 +2,174 @@ import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import readline from "readline";
 
 // Mode state
 let currentMode: "plan" | "manual" | "auto" = "manual";
 
-// Whitelist of safe read-only tools for Plan Mode
-const PLAN_WHITELIST = new Set([
+// ──────────────────────────────────────────────
+// Shared read-only tool set
+// Plan mode: strict whitelist (adds bash for shell exploration)
+// Manual mode: these pass through without gating; everything else is gated
+// ──────────────────────────────────────────────
+const COMMON_READ_ONLY = new Set([
+  // File reading
   "read",
   "view_file",
-  "list_dir",
-  "grep_search",
-  "find",
-  "ls",
   "cat",
+  "ls",
+  "list_dir",
+  "find",
+  // Search
+  "web_search",
+  "code_search",
+  "grep_search",
+  // Content fetching
+  "fetch_content",
+  "get_search_content",
+  // MCP — allows all MCP tools (includes Searxng web search)
+  "mcp",
+  // Export (renders to PDF/HTML/PNG without modifying project files)
+  "preview_export",
+  // Subagent delegation
+  "spawn_subagent",
+  // Todo (metadata operations, not project file modifications)
+  "todo",
+  // Control flow
+  "signal_loop_success",
+  // UI / interaction
   "ask_user",
-  "answer"
+  "answer",
 ]);
 
-// Helper to ask the user a question using Pi's native UI
+// Plan mode: strict whitelist — only these tools are allowed
+const PLAN_WHITELIST = new Set([...COMMON_READ_ONLY, "bash"]);
+
+// Manual mode: tools that require approval (modifications & executions)
+const MANUAL_GATED = new Set(["write", "edit", "bash", "stata", "python-repl"]);
+
+// ──────────────────────────────────────────────
+// Safe bash commands for Plan & Manual modes (read-only only)
+// Commands are whitelisted by their first word (command name)
+// ──────────────────────────────────────────────
+const SAFE_BASH_COMMANDS = new Set([
+  // Search & grep
+  "rg",
+  "fd",
+  "grep",
+  "ag",
+  "pt",
+  "ripgrep",
+  // File system info
+  "ls",
+  "tree",
+  "stat",
+  "file",
+  "find",
+  "du",
+  "df",
+  "pwd",
+  "which",
+  "type",
+  // Output formatting
+  "column",
+  "fmt",
+  "expand",
+  "unexpand",
+  "fold",
+  "paste",
+  "pr",
+  // File content (read-only)
+  "cat",
+  "head",
+  "tail",
+  "less",
+  "more",
+  "zcat",
+  "zless",
+  "nl",
+  "tac",
+  "rev",
+  // Data/Config Processing (read-only only)
+  "jq",
+  // Text processing (read-only only)
+  "sort",
+  "uniq",
+  "wc",
+  "cut",
+  "tr",
+  "diff",
+  "comm",
+  "join",
+  // System/Debugging (read-only only)
+  "lsof",
+  "ss",
+  "netstat",
+  "lspci",
+  "lsusb",
+  "lscpu",
+  "dmidecode",
+  "lsblk",
+  // System info (read-only only)
+  "env",
+  "printenv",
+  "whoami",
+  "id",
+  "uptime",
+  "free",
+  "ps",
+  "cal",
+  // Crypto/Integrity (read-only only)
+  "sha1sum",
+  "cksum",
+  // Math & encoding
+  "bc",
+  "md5sum",
+  "sha256sum",
+  "base64",
+  "xxd",
+  "hexdump",
+  "od",
+  "strings",
+  "nm",
+  "objdump",
+  "readelf",
+  // Timing/Benchmarking
+  "time",
+  // Documentation
+  "man",
+  "info",
+  "apropos",
+  "whatis",
+  // Other read-only utilities
+  "echo",
+  "true",
+  "false",
+]);
+
+// ──────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────
+
+// Extract the first command from a bash command string
+function getFirstCommand(command: string): string {
+  const trimmed = command.trim();
+  if (!trimmed) return "";
+
+  // Handle subshell, pipes, etc. - get the first command
+  const firstPart = trimmed.split(/[\s|;&$()]/)[0];
+  return firstPart;
+}
+
+// Check if a bash command is safe for Plan mode (read-only only)
+function isPlanSafeBashCommand(command: string): boolean {
+  const firstCmd = getFirstCommand(command);
+  if (!firstCmd) return true; // Empty command is safe
+
+  // Check if the command is in our whitelist
+  return SAFE_BASH_COMMANDS.has(firstCmd);
+}
+
+// Ask the user a question using Pi's native UI
 async function askUser(query: string, ctx: any, details?: string): Promise<boolean> {
   const promptText = details ? `${details}\n\n${query}` : query;
   const answer = await ctx.ui.input("Approval Required", promptText);
@@ -31,7 +180,7 @@ async function askUser(query: string, ctx: any, details?: string): Promise<boole
   return clean === "y" || clean === "yes" || clean === "";
 }
 
-// Helper to generate diff text
+// Generate a diff between old and new file content
 function getDiff(filePath: string, oldContent: string, newContent: string): string {
   const tempDir = os.tmpdir();
   const oldTemp = path.join(tempDir, `pi_old_${Date.now()}_${path.basename(filePath)}`);
@@ -57,13 +206,57 @@ function getDiff(filePath: string, oldContent: string, newContent: string): stri
   }
 }
 
+// Get current working-tree git diff (for post-execution display)
+function getGitDiff(): string {
+  try {
+    return execSync("git diff --color=always", { encoding: "utf8" });
+  } catch {
+    return "";
+  }
+}
+
+// Extract file paths that a bash command appears to write to
+function extractModifiedFiles(command: string): string[] {
+  const files = new Set<string>();
+
+  // Shell redirects: > file  or  >> file
+  const redirectMatch = command.match(/>{1,2}\s*([^\s;|&>]+)/g);
+  if (redirectMatch) {
+    for (const m of redirectMatch) {
+      const file = m.replace(/^>{1,2}\s*/, "");
+      if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && fs.existsSync(file)) {
+        files.add(file);
+      }
+    }
+  }
+
+  // tee [-options] file
+  const teeMatch = command.match(/tee\s+(?:-[a-zA-Z]+\s+)*([^\s;|&]+)/g);
+  if (teeMatch) {
+    for (const m of teeMatch) {
+      const file = m.replace(/^tee\s+(?:-[a-zA-Z]+\s+)* /, "");
+      if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && fs.existsSync(file)) {
+        files.add(file);
+      }
+    }
+  }
+
+  return Array.from(files);
+}
+
+// ──────────────────────────────────────────────
+// Plugin entry point
+// ──────────────────────────────────────────────
 export default function (pi: any) {
-  // Register Slash Commands
+  // ── Slash Commands ──
   pi.registerCommand("plan", {
-    description: "Switch to Plan Mode (Read-Only Planning)",
+    description: "Switch to Plan Mode (Read-Only Planning with full exploration tools)",
     handler: async (args: any, ctx: any) => {
       currentMode = "plan";
-      ctx.ui.notify("Workflow Mode set to PLAN. All file writes and code executions are blocked.", "info");
+      ctx.ui.notify(
+        "Workflow Mode set to PLAN. Read-only exploration with safe bash commands (rg, git, grep, etc.).",
+        "info",
+      );
     },
   });
 
@@ -71,7 +264,10 @@ export default function (pi: any) {
     description: "Switch to Manual Mode (Gated approvals with diffs)",
     handler: async (args: any, ctx: any) => {
       currentMode = "manual";
-      ctx.ui.notify("Workflow Mode set to MANUAL. File edits will show diffs; commands will require approval.", "info");
+      ctx.ui.notify(
+        "Workflow Mode set to MANUAL. Read-only tools unrestricted; file edits and commands require approval with diffs.",
+        "info",
+      );
     },
   });
 
@@ -79,7 +275,10 @@ export default function (pi: any) {
     description: "Switch to Auto Mode (Fully autonomous execution)",
     handler: async (args: any, ctx: any) => {
       currentMode = "auto";
-      ctx.ui.notify("Workflow Mode set to AUTO. Full autonomy enabled. A final diff will be shown at completion.", "info");
+      ctx.ui.notify(
+        "Workflow Mode set to AUTO. Full autonomy enabled. A final diff will be shown at completion.",
+        "info",
+      );
     },
   });
 
@@ -90,23 +289,45 @@ export default function (pi: any) {
     },
   });
 
-  // Intercept Tool Calls
+  // ── Tool Call Interceptor ──
   pi.on("tool_call", async (event: any, ctx: any) => {
-    // 1. PLAN MODE
+    // ── 1. PLAN MODE ──
     if (currentMode === "plan") {
-      if (!PLAN_WHITELIST.has(event.toolName)) {
+      // Non-bash tools: use the whitelist
+      if (event.toolName !== "bash" && !PLAN_WHITELIST.has(event.toolName)) {
         ctx.ui.notify(`[Plan Mode] Blocked tool execution: ${event.toolName}`, "error");
         return {
           block: true,
-          reason: `You are currently in Plan mode (read-only). You are not allowed to use the '${event.toolName}' tool. Explain your proposed changes or code in the chat and ask the user for approval first.`
+          reason: `You are currently in Plan mode (read-only). You are not allowed to use the '${event.toolName}' tool. Explain your proposed changes or code in the chat and ask the user for approval first.`,
         };
       }
+
+      // Bash: check if the command is safe (read-only only)
+      if (event.toolName === "bash") {
+        const command = event.input.command || "";
+        if (!isPlanSafeBashCommand(command)) {
+          const firstCmd = getFirstCommand(command);
+          ctx.ui.notify(`[Plan Mode] Blocked bash: '${firstCmd}' is not in the safe command whitelist`, "error");
+          return {
+            block: true,
+            reason: `You are currently in Plan mode (read-only). Bash commands are restricted to safe read-only operations. '${firstCmd}' is not in the whitelist. Use approved commands like rg, git, grep, ls, etc.`,
+          };
+        }
+        // Command is safe — allow it through
+        return {};
+      }
+
       return {};
     }
 
-    // 2. MANUAL MODE
+    // ── 2. MANUAL MODE ──
     if (currentMode === "manual") {
-      // Direct file edits: write
+      // Common read-only tools pass through without approval
+      if (COMMON_READ_ONLY.has(event.toolName)) {
+        return {};
+      }
+
+      // ── write: show diff before approval ──
       if (event.toolName === "write") {
         const filePath = event.input.path || event.input.targetFile;
         const newContent = event.input.content || event.input.code || "";
@@ -122,14 +343,14 @@ export default function (pi: any) {
           ctx.ui.notify(`Write blocked: ${filePath}`, "error");
           return {
             block: true,
-            reason: `User rejected writing to ${filePath}. Please revise your changes.`
+            reason: `User rejected writing to ${filePath}. Please revise your changes.`,
           };
         }
         ctx.ui.notify(`Approved writing to ${filePath}`, "success");
         return {};
       }
 
-      // Direct file edits: edit
+      // ── edit: show diff before approval ──
       if (event.toolName === "edit") {
         const filePath = event.input.path || event.input.targetFile;
         const oldText = event.input.oldText;
@@ -154,30 +375,54 @@ export default function (pi: any) {
           ctx.ui.notify(`Edits blocked: ${filePath}`, "error");
           return {
             block: true,
-            reason: `User rejected editing ${filePath}. Please revise your changes.`
+            reason: `User rejected editing ${filePath}. Please revise your changes.`,
           };
         }
         ctx.ui.notify(`Approved edits to ${filePath}`, "success");
         return {};
       }
 
-      // Shell execution: bash
+      // ── bash: check whitelist first, then approval if needed ──
       if (event.toolName === "bash") {
         const command = event.input.command || "";
-        const details = `--- Proposed Command to Run ---\n$ ${command}`;
+
+        // Check if the command is in the safe whitelist
+        if (isPlanSafeBashCommand(command)) {
+          // Safe command - allow without approval
+          ctx.ui.notify(`Command approved (safe): ${command.substring(0, 60)}${command.length > 60 ? '...' : ''}`, "success");
+          return {};
+        }
+
+        // Not in whitelist - show command + affected file contents before approval
+        const modifiedFiles = extractModifiedFiles(command);
+
+        let details = `--- Proposed Command to Run ---\n$ ${command}`;
+
+        if (modifiedFiles.length > 0) {
+          details += `\n\nAffected files (current content):\n`;
+          for (const file of modifiedFiles) {
+            if (fs.existsSync(file)) {
+              const content = fs.readFileSync(file, "utf8");
+              const truncated =
+                content.length > 2000 ? content.substring(0, 2000) + "\n... (truncated)" : content;
+              details += `\n--- ${file} ---\n${truncated}\n`;
+            }
+          }
+        }
+
         const approved = await askUser(`Execute command? [Y/n] `, ctx, details);
         if (!approved) {
           ctx.ui.notify(`Command blocked: ${command.substring(0, 30)}...`, "error");
           return {
             block: true,
-            reason: `User rejected execution of command: "${command}".`
+            reason: `User rejected execution of command: "${command}".`,
           };
         }
         ctx.ui.notify(`Command execution approved`, "success");
         return {};
       }
 
-      // MCP execution tools: stata and python-repl
+      // ── stata / python-repl: show code before approval ──
       if (event.toolName === "stata" || event.toolName === "python-repl") {
         const code = event.input.code || event.input.command || "";
         const details = `--- Proposed Code to Run (${event.toolName}) ---\n${code}`;
@@ -186,18 +431,31 @@ export default function (pi: any) {
           ctx.ui.notify(`Execution blocked`, "error");
           return {
             block: true,
-            reason: `User rejected execution of ${event.toolName} code.`
+            reason: `User rejected execution of ${event.toolName} code.`,
           };
         }
         ctx.ui.notify(`${event.toolName} execution approved`, "success");
         return {};
       }
+
+      // ── catch-all: gate any unrecognized non-read-only tool ──
+      const details = `Tool: ${event.toolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
+      const approved = await askUser(`Allow tool '${event.toolName}'? [Y/n] `, ctx, details);
+      if (!approved) {
+        ctx.ui.notify(`Tool '${event.toolName}' blocked`, "error");
+        return {
+          block: true,
+          reason: `User rejected tool '${event.toolName}'.`,
+        };
+      }
+      ctx.ui.notify(`Tool '${event.toolName}' approved`, "success");
+      return {};
     }
 
     return {};
   });
 
-  // End of session / agent completion hook
+  // ── Session-end hook (auto mode only) ──
   pi.on("agent_end", async (event: any, ctx: any) => {
     if (currentMode === "auto") {
       console.log(`\n\x1b[32m=== Auto Mode Run Finished. Displaying final diffs ===\x1b[0m`);

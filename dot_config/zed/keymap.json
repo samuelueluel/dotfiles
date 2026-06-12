@@ -15,7 +15,8 @@
     "bindings": {
       "alt-space": "editor::Newline",
       "ctrl-space": "command_palette::Toggle",
-      "ctrl-r": "editor::ReloadFile"
+      "ctrl-r": "editor::ReloadFile",
+      "ctrl-shift-z": "editor::Redo"
     }
   },
   {

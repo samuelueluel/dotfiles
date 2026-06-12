@@ -203,6 +203,21 @@ function claude() {
 export OPENAI_API_KEY=sk-6869f13e80764e0ab07cb09a9ef5ea98
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
 MTP_OPTS="-ngl 999 --no-mmap --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75 -ub 1024 -t 16 --slot-prompt-similarity 0.8 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048 --context-shift --cache-ram 61440"
+# Cap thinking tokens to prevent infinite reasoning loops (post-Apr-10 llama.cpp bug: default budget = -1/unrestricted).
+# 50000 is a loop-breaker, not a target: clears even very long legitimate reasoning, still well below a true (unbounded) runaway.
+REASONING_OPTS="--reasoning on --reasoning-budget 50000"
+# Injected verbatim BEFORE the </think> tag when the budget is hit — the model reads it as its own thought, then answers.
+# So it must be natural first-person prose (the "Wait," cue redirects thinking models well), NOT a bracketed token.
+# Passed via --env, not --runtime-args, so it can keep its spaces: ramalama word-splits --runtime-args. (llama.cpp: LLAMA_ARG_THINK_BUDGET_MESSAGE)
+THINK_BUDGET_MSG="Wait, I've used my full reasoning budget and I'm starting to loop. I already have enough to answer well, so I'll stop thinking now and write my final response."
+# Qwen3.6 reasoning-model sampling (coding-tuned). Set SERVER-SIDE because these are llama.cpp DEFAULTS that
+# only apply when a client omits the field — so GUI clients (Open WebUI etc.) that send their own values still win,
+# and this effectively only reaches clients that send nothing (e.g. Pi, which has no sampling config — feature req #1837).
+# Values per Qwen thinking-mode guidance; presence-penalty kept mild (0.5) so it curbs loops without penalising the
+# repeated brackets/indent/keywords that legitimately recur in code. Do NOT lower temp toward 0 — greedy decoding makes
+# Qwen reasoning models loop. Applied to Qwen3.6 only (guarded by model id in the serve fns); Gemma keeps its own defaults.
+QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5"
+MTP_OPTS="$MTP_OPTS $REASONING_OPTS"
 CTX=262144  # context window for the server (applies to ALL clients: WebUI, OpenCode, etc.)
 
 # Stop the MAIN-model container (only) AND wait for :8080 to release before re-serving.
@@ -224,20 +239,23 @@ _llm_reset() {
 # Re-apply after a model re-pull: see ~/.local/share/ramalama/README-qwen-template.md
 serve-llm() {
   _llm_reset
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args="$MTP_OPTS" "$1" \
+  local samp=""; [[ "$1" == *Qwen3.6* ]] && samp=" $QWEN_SAMPLING"  # Qwen3.6 only (MoE + Dense, MTP path)
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --env "LLAMA_ARG_THINK_BUDGET_MESSAGE=$THINK_BUDGET_MSG" --runtime-args="$MTP_OPTS$samp" "$1" \
     && echo "▶ serving $1 (MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on alias
   _llm_reset
   local p_opts="${PARALLEL_OPTS:---parallel 1}"
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args="$p_opts" "$1" \
+  local samp=""; [[ "$1" == *Qwen3.6* ]] && samp=" $QWEN_SAMPLING"  # Qwen3.6 only (MoE + Dense, no-MTP path)
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --env "LLAMA_ARG_THINK_BUDGET_MESSAGE=$THINK_BUDGET_MSG" --runtime-args="$p_opts $REASONING_OPTS$samp" "$1" \
     && echo "▶ serving $1 (no MTP, ctx $CTX, $p_opts) at http://localhost:8080/v1"
 }
 serve-llm-draft() {  # speculative decoding with a separate draft model
   echo "Ensuring draft model $2 is pulled..."
   ramalama pull "$2"
   _llm_reset
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --runtime-args="$MTP_OPTS $3" --model-draft "$2" "$1" \
+  local samp=""; [[ "$1" == *Qwen3.6* ]] && samp=" $QWEN_SAMPLING"  # Qwen3.6 guard (Gemma draft path falls through to its own defaults)
+  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --env "LLAMA_ARG_THINK_BUDGET_MESSAGE=$THINK_BUDGET_MSG" --runtime-args="$MTP_OPTS $3$samp" --model-draft "$2" "$1" \
     && echo "▶ serving $1 with draft $2 (MTP, ctx $CTX) at http://localhost:8080/v1"
 }
 # Main Models — swapping through the one :8080 slot (container 'llm'), one at a time
@@ -267,20 +285,6 @@ alias serve-gemma4-dense-QAT4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec 
 alias serve-gemma4-dense-QAT4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL'
 alias serve-gemma4-dense-QAT4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf'
 alias serve-gemma4-dense-QAT4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf'
-alias serve-gemma4-dense-Q8-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf'
-alias serve-gemma4-dense-Q8-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf'
-alias serve-gemma4-dense-Q8-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/MTP/gemma-4-31B-it-MTP-Q8_0.gguf'
-alias serve-gemma4-dense-Q8-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/MTP/gemma-4-31B-it-MTP-Q8_0.gguf'
-
-# Gemma 4 MoE (26B-A4B)
-alias serve-gemma4-moe-QAT4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL'
-alias serve-gemma4-moe-QAT4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL'
-alias serve-gemma4-moe-QAT4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0.gguf'
-alias serve-gemma4-moe-QAT4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft hf://unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-26B-A4B-it-qat-assistant-MTP-Q8_0.gguf'
-alias serve-gemma4-moe-Q8-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf'
-alias serve-gemma4-moe-Q8-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf'
-alias serve-gemma4-moe-Q8-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/MTP/gemma-4-26B-A4B-it-MTP-Q8_0.gguf'
-alias serve-gemma4-moe-Q8-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q8_0.gguf https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/MTP/gemma-4-26B-A4B-it-MTP-Q8_0.gguf'
 
 alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
@@ -651,34 +655,56 @@ tau() {
     [[ "${s:t}" == stata* ]] && continue
     args+=("--skill" "$s")
   done
+  for s in ~/.pi/agent/skills/*; do
+    [[ -d "$s" ]] || continue
+    args+=("--skill" "$s")
+  done
   command pi --no-skills "${args[@]}" "$@"
 }
 
 # tau-safe-N: sandboxed pi-safe with all skills EXCEPT Stata
-_tau_skill_args() {
+tau-safe-1() {
+  local args=("--no-skills")
   local s
   for s in ~/.agents/skills/*; do
     [[ -d "$s" ]] || continue
     [[ "${s:t}" == stata* ]] && continue
     args+=("--skill" "$s")
   done
-}
-
-tau-safe-1() {
-  local args=("--no-skills")
-  _tau_skill_args
+  for s in ~/.pi/agent/skills/*; do
+    [[ -d "$s" ]] || continue
+    args+=("--skill" "$s")
+  done
   pi-safe-1 "$1" "${args[@]}" "${@:2}"
 }
 
 tau-safe-2() {
   local args=("--no-skills")
-  _tau_skill_args
+  local s
+  for s in ~/.agents/skills/*; do
+    [[ -d "$s" ]] || continue
+    [[ "${s:t}" == stata* ]] && continue
+    args+=("--skill" "$s")
+  done
+  for s in ~/.pi/agent/skills/*; do
+    [[ -d "$s" ]] || continue
+    args+=("--skill" "$s")
+  done
   pi-safe-2 "$1" "${args[@]}" "${@:2}"
 }
 
 tau-safe-3() {
   local args=("--no-skills")
-  _tau_skill_args
+  local s
+  for s in ~/.agents/skills/*; do
+    [[ -d "$s" ]] || continue
+    [[ "${s:t}" == stata* ]] && continue
+    args+=("--skill" "$s")
+  done
+  for s in ~/.pi/agent/skills/*; do
+    [[ -d "$s" ]] || continue
+    args+=("--skill" "$s")
+  done
   pi-safe-3 "$1" "${args[@]}" "${@:2}"
 }
 
