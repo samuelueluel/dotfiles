@@ -6,6 +6,9 @@ import os from "os";
 // Mode state
 let currentMode: "plan" | "manual" | "auto" = "manual";
 
+// Store original file contents for Auto mode diffing
+const autoModeOriginalContents = new Map<string, string | null>();
+
 // ──────────────────────────────────────────────
 // Shared read-only tool set
 // Plan mode: strict whitelist (adds bash for shell exploration)
@@ -162,11 +165,39 @@ function getFirstCommand(command: string): string {
 
 // Check if a bash command is safe for Plan mode (read-only only)
 function isPlanSafeBashCommand(command: string): boolean {
-  const firstCmd = getFirstCommand(command);
-  if (!firstCmd) return true; // Empty command is safe
+  // If it redirects output to a file (other than /dev/null), it's not purely read-only
+  const modifiedFiles = extractModifiedFiles(command);
+  if (modifiedFiles.length > 0) return false;
 
-  // Check if the command is in our whitelist
-  return SAFE_BASH_COMMANDS.has(firstCmd);
+  // Split by control operators to evaluate every command in the pipeline/list
+  // e.g. "ls | grep foo && rm bar" -> ["ls ", " grep foo ", " rm bar"]
+  const parts = command.split(/\||&&|\|\||;/);
+  
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    
+    // Get the first actual command word (ignoring env vars like FOO=bar)
+    const words = trimmed.split(/\s+/);
+    let cmdWord = "";
+    for (const w of words) {
+      if (/^[a-zA-Z_][a-zA-Z0-9_]*=/.test(w)) continue;
+      cmdWord = w;
+      break;
+    }
+    
+    if (!cmdWord) continue;
+    
+    // Strip common subshell wrappers if they are attached to the word
+    cmdWord = cmdWord.replace(/^\$\(/, "").replace(/^`/, "");
+
+    // If any command is NOT in the whitelist, the whole string is unsafe
+    if (!SAFE_BASH_COMMANDS.has(cmdWord)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // Ask the user a question using Pi's native UI
@@ -181,7 +212,7 @@ async function askUser(query: string, ctx: any, details?: string): Promise<boole
 }
 
 // Generate a diff between old and new file content
-function getDiff(filePath: string, oldContent: string, newContent: string): string {
+function getDiff(filePath: string, oldContent: string, newContent: string, colorize: boolean = false): string {
   const tempDir = os.tmpdir();
   const oldTemp = path.join(tempDir, `pi_old_${Date.now()}_${path.basename(filePath)}`);
   const newTemp = path.join(tempDir, `pi_new_${Date.now()}_${path.basename(filePath)}`);
@@ -190,7 +221,7 @@ function getDiff(filePath: string, oldContent: string, newContent: string): stri
   fs.writeFileSync(newTemp, newContent);
 
   try {
-    const diffCmd = `git diff --no-index "${oldTemp}" "${newTemp}"`;
+    const diffCmd = `git diff --no-index ${colorize ? '--color=always ' : ''}"${oldTemp}" "${newTemp}"`;
     return execSync(diffCmd, { encoding: "utf8" });
   } catch (error: any) {
     if (error.stdout) {
@@ -224,7 +255,7 @@ function extractModifiedFiles(command: string): string[] {
   if (redirectMatch) {
     for (const m of redirectMatch) {
       const file = m.replace(/^>{1,2}\s*/, "");
-      if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && fs.existsSync(file)) {
+      if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && file !== "/dev/null") {
         files.add(file);
       }
     }
@@ -235,7 +266,7 @@ function extractModifiedFiles(command: string): string[] {
   if (teeMatch) {
     for (const m of teeMatch) {
       const file = m.replace(/^tee\s+(?:-[a-zA-Z]+\s+)* /, "");
-      if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && fs.existsSync(file)) {
+      if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && file !== "/dev/null") {
         files.add(file);
       }
     }
@@ -275,6 +306,7 @@ export default function (pi: any) {
     description: "Switch to Auto Mode (Fully autonomous execution)",
     handler: async (args: any, ctx: any) => {
       currentMode = "auto";
+      autoModeOriginalContents.clear(); // Reset tracking when switching to auto
       ctx.ui.notify(
         "Workflow Mode set to AUTO. Full autonomy enabled. A final diff will be shown at completion.",
         "info",
@@ -318,6 +350,32 @@ export default function (pi: any) {
       }
 
       return {};
+    }
+
+    // ── 3. AUTO MODE TRACKING ──
+    if (currentMode === "auto") {
+      if (event.toolName === "write" || event.toolName === "edit") {
+        const filePath = event.input.path || event.input.targetFile;
+        if (filePath && !autoModeOriginalContents.has(filePath)) {
+          if (fs.existsSync(filePath)) {
+            autoModeOriginalContents.set(filePath, fs.readFileSync(filePath, "utf8"));
+          } else {
+            autoModeOriginalContents.set(filePath, null);
+          }
+        }
+      } else if (event.toolName === "bash") {
+        const command = event.input.command || "";
+        const modifiedFiles = extractModifiedFiles(command);
+        for (const filePath of modifiedFiles) {
+          if (!autoModeOriginalContents.has(filePath)) {
+            if (fs.existsSync(filePath)) {
+              autoModeOriginalContents.set(filePath, fs.readFileSync(filePath, "utf8"));
+            } else {
+              autoModeOriginalContents.set(filePath, null);
+            }
+          }
+        }
+      }
     }
 
     // ── 2. MANUAL MODE ──
@@ -459,16 +517,33 @@ export default function (pi: any) {
   pi.on("agent_end", async (event: any, ctx: any) => {
     if (currentMode === "auto") {
       console.log(`\n\x1b[32m=== Auto Mode Run Finished. Displaying final diffs ===\x1b[0m`);
-      try {
-        const finalDiff = execSync("git diff --color=always", { encoding: "utf8" });
-        if (finalDiff.trim()) {
-          console.log(finalDiff);
-        } else {
-          console.log("No git changes detected.");
-        }
-      } catch (error) {
-        console.error("Could not run git diff:", error);
+      let hasDiffs = false;
+
+      for (const [filePath, oldContent] of autoModeOriginalContents.entries()) {
+        const fileExists = fs.existsSync(filePath);
+        const newContent = fileExists ? fs.readFileSync(filePath, "utf8") : null;
+        
+        // Skip if there are no changes
+        if (oldContent === newContent) continue;
+        
+        hasDiffs = true;
+        console.log(`\n\x1b[36m--- Changes for ${filePath} ---\x1b[0m\n`);
+        
+        const diffOutput = getDiff(
+          filePath,
+          oldContent || "",
+          newContent || "",
+          true // colorize
+        );
+        console.log(diffOutput);
       }
+
+      if (!hasDiffs) {
+        console.log("No file changes detected during this run.");
+      }
+
+      // Reset for next run
+      autoModeOriginalContents.clear();
     }
   });
 }

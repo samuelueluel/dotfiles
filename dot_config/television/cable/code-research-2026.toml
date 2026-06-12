@@ -1,0 +1,37 @@
+[metadata]
+name = "1-Code (Research-2026)"
+description = "Browse research code and data files"
+
+[source]
+command = "fd -H -t f . /var/home/samuel/Dropbox/Research-2026/ | awk '{ sub(\"^/var/home/samuel/Dropbox/Research-2026/\", \"\"); match($0, /.*\\//); dir = substr($0, 1, RLENGTH); file = substr($0, RLENGTH+1); printf \"\\033[36m%s\\033[0m%s\\n\", dir, file }'"
+ansi = true
+output = "{strip_ansi}"
+
+[ui]
+orientation = "portrait"
+
+[ui.preview_panel]
+size = 70
+scrollbar = true
+word_wrap = true
+border_type = "thick"
+hidden = false
+
+[preview]
+command = "bash -c 'p=\"/var/home/samuel/Dropbox/Research-2026/$1\"; bat --color=always --style=plain --theme=Noctalia \"$p\"' -- '{strip_ansi}'"
+
+[keybindings]
+enter = "actions:open"
+alt-space = "actions:open"
+ctrl-c = "actions:copy"
+
+[actions.open]
+description = "Open file"
+command = "bash -c '/var/home/samuel/.local/bin/tv-open \"$@\"' -- {split:\\n:..|map:{strip_ansi|prepend:/var/home/samuel/Dropbox/Research-2026/|append:'|prepend:'}|join: }"
+mode = "execute"
+separator = "\n"
+
+[actions.copy]
+description = "Copy to clipboard (full path)"
+command = "printf '%s' \"{strip_ansi}\" | sed 's|^|/var/home/samuel/Dropbox/Research-2026/|' | wl-copy"
+mode = "fork"

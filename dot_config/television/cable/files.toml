@@ -8,11 +8,11 @@ ansi = true
 output = "{strip_ansi}"
 
 [ui]
-orientation = "landscape"
+orientation = "portrait"
 
 [ui.preview_panel]
 # Preview panel size (percentage of screen width/height)
-size = 50
+size = 70
 #header = ""
 #footer = ""
 scrollbar = true
