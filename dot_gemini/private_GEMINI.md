@@ -2,13 +2,13 @@
 
 If an `AGENTS.md` file exists in the current working directory or any ancestor directory (up to the project root), read it immediately before starting any work.
 
-When asked to remember something (e.g. "remember this", "make a note of that"), write a brief note as a new file in `~/Dropbox/Sam_Personal_Vault/30_Personal/00_Personal-Inbox/LLM-Memories/`.
+When asked to remember something (e.g. "remember this", "make a note of that"), write a brief note as a new file in `~/Dropbox/Sam-Obsidian-Vault/30_Personal/00_Personal-Inbox/LLM-Memories/`.
 
 # Samuel's System Context
 
 ## System
 - **Linux OS:** Custom Universal Blue atomic image based on Fedora Atomic 44, built with BlueBuild. Image called **turquoise-halo**.
-    - Build process: `~/Dropbox/Sam_Personal_Vault/10_Projects/Custom-Image/Build-Process.md` (read only if needed)
+    - Build process: `~/Dropbox/Sam-Obsidian-Vault/10_Projects/Custom-Image/Build-Process.md` (read only if needed)
 - **Machine:** HP ZBook Ultra G1a 14" (SBKPFV3)
 - **CPU:** AMD Ryzen AI MAX+ PRO 395 (32 threads) @ 5.19 GHz (Strix Halo)
 - **GPU:** AMD Radeon 8060S (integrated)
@@ -49,7 +49,7 @@ Main GitHub-synced repositories:
 **Important:** When editing a file tracked by Chezmoi, edit directly then run `chezmoi add <file>`, unless it is tracked as a `.tmpl` file — `.tmpl` files do not work with `chezmoi add` and changes must be made directly. After any changes to files in these repos, prompt Samuel to commit and push.
 
 ## Obsidian Notes
-- Personal vault is at `~/Dropbox/Sam_Personal_Vault/`
+- Personal vault is at `~/Dropbox/Sam-Obsidian-Vault/`
 
 ## Sudo / Privileged Commands
 You cannot run `sudo`. Handle it as follows:

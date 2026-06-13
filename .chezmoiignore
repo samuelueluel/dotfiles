@@ -1,4 +1,5 @@
 zen-extensions
+.config/zen/*/chrome/zen-themes.css
 
 # noctalia-shell replaces these; sources kept in repo but no longer deployed
 .config/swayidle

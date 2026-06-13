@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mcp-stata": {
+      "command": "uvx",
+      "args": [
+        "mcp-stata"
+      ],
+      "env": {
+        "STATA_PATH": "/usr/local/stata19/stata-mp",
+        "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"
+      }
+    }
+  }
+}

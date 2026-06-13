@@ -1,6 +1,6 @@
 ---
 name: obsidian
-description: Manages reading, writing, creating, editing, listing, and modifying files and directories in Samuel&apos;s Obsidian vault at `~/Dropbox/Sam_Personal_Vault/`. Use when working with Obsidian, markdown vault notes, creating new notes, filing documents, or following vault formatting and naming conventions.
+description: Manages reading, writing, creating, editing, listing, and modifying files and directories in Samuel&apos;s Obsidian vault at `~/Dropbox/Sam-Obsidian-Vault/`. Use when working with Obsidian, markdown vault notes, creating new notes, filing documents, or following vault formatting and naming conventions.
 ---
 
 # Obsidian Vault
@@ -8,7 +8,7 @@ description: Manages reading, writing, creating, editing, listing, and modifying
 ## Quick start
 
 When creating or editing a note, follow these core conventions:
-- **Location:** `~/Dropbox/Sam_Personal_Vault/`
+- **Location:** `~/Dropbox/Sam-Obsidian-Vault/`
 - **Filename:** Title-Case-With-Hyphens.md (e.g., `Local-LLMs.md`). Brief — folder provides context. No spaces or special characters.
   - Academic pattern: `Author-Year.md` or `Author-Year-Slug.md` (e.g., `Baker-2025-DiD.md`)
 - **Title:** The filename acts as the title. **Do not** repeat it as a heading. Start the note body directly at `H1` (`#`).
@@ -27,9 +27,9 @@ When creating or editing a note, follow these core conventions:
 4. **Never** create new top-level folders without asking.
 
 ### 2. Editing an Existing Note
-1. You **must** commit (not push) the vault before editing an existing file:
+1. **Before editing**, commit the current vault state as a pre-edit snapshot:
    ```bash
-   git -C ~/Dropbox/Sam_Personal_Vault add -A && git -C ~/Dropbox/Sam_Personal_Vault commit -m "brief description"
+   git -C ~/Dropbox/Sam-Obsidian-Vault add -A && git -C ~/Dropbox/Sam-Obsidian-Vault commit -m "pre-edit snapshot" --allow-empty
    ```
 2. Apply changes respecting heading numbering (do not use formatting in headings):
    - `H1` (`#`) -> `# 1 First Section Title`, `# 2 Second Section Title`, etc
@@ -38,7 +38,11 @@ When creating or editing a note, follow these core conventions:
    - The `#` is the markdown heading marker; the number is the heading text.
    - Sub-sections reset under each parent: H1 `1` → H2 `1.1`, `1.2` → H2 `2` → H2 `2.1`, `2.2`.
    - Replace placeholder titles with relevant titles.
-3. Use color syntax for formatting, avoiding `**bold**`:
+3. **After editing**, commit and push the changes:
+   ```bash
+   git -C ~/Dropbox/Sam-Obsidian-Vault add -A && git -C ~/Dropbox/Sam-Obsidian-Vault commit -m "brief description of edit" && git -C ~/Dropbox/Sam-Obsidian-Vault push
+   ```
+4. Use color syntax for formatting, avoiding `**bold**`:
    - `~={green}text=~` (mid-sentence highlight)
    - `~={orange}text=~` (organizational highlight)
    - `~={magenta}text=~` (warning or danger)

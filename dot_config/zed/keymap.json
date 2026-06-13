@@ -16,7 +16,8 @@
       "alt-space": "editor::Newline",
       "ctrl-space": "command_palette::Toggle",
       "ctrl-r": "editor::ReloadFile",
-      "ctrl-shift-z": "editor::Redo"
+      "ctrl-shift-z": "editor::Redo",
+      "shift-enter": ["task::Spawn", { "task_name": "Run selection in Stata" }]
     }
   },
   {

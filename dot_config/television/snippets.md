@@ -71,3 +71,8 @@
 - AI: OpenCode sandbox (read ~, write current dir) | opencode-safe-1
 - AI: OpenCode sandbox (strict read/write current dir) | opencode-safe-2
 - AI: OpenCode sandbox (write single file) | opencode-safe-3 ""
+
+- Stata: Start Stata in tmux session | tmux new-session -d -s stata '/usr/local/stata19/stata-mp'
+- Stata: Kill stata tmux session | tmux kill-session -t stata
+- Stata: List all tmux sessions | tmux list-sessions
+- Stata: Check for running Stata processes | pgrep -la stata

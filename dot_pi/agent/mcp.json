@@ -6,7 +6,12 @@
     },
     "stata": {
       "command": "uvx",
-      "args": ["mcp-stata"]
+      "args": ["mcp-stata"],
+      "lifecycle": "eager",
+      "env": {
+        "STATA_PATH": "/usr/local/stata19/stata-mp",
+        "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"
+      }
     }
   }
 }

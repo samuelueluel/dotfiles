@@ -9,7 +9,7 @@ If this file exists, you MUST read it thoroughly before acting. It contains the 
 ## System
 - **Linux OS:** Custom Universal Blue atomic image based on Fedora Atomic 44 and built with BlueBuild
     1. Custom image is called **turquoise-halo**
-    2. Build process: `~/Dropbox/Sam_Personal_Vault/30_Personal/20_Personal-Interests/Custom-Image/Turquoise-Halo Image Build Process.md` (read only when necessary). 
+    2. Build process: `~/Dropbox/Sam-Obsidian-Vault/30_Personal/20_Personal-Interests/Custom-Image/Turquoise-Halo Image Build Process.md` (read only when necessary). 
 - **WM/compositor:** Niri (scrolling Wayland compositor)
 - **Display manager:** greetd + gtkgreet
 - **Shell:** zsh
@@ -47,7 +47,7 @@ Three GitHub-synced repositories:
 **Important** When editing a file tracked by Chezmoi, edit directly then run `chezmoi add <file>`, unless it is tracked as .tmpl file---.tmpl's do not work with `chezmoi add` and the changes need to be added directly. After any changes to files in these repos, prompt Samuel to commit and push.
 
 ## Obsidian Notes
-- Personal vault is at ~/Dropbox/Sam_Personal_Vault/ 
+- Personal vault is at ~/Dropbox/Sam-Obsidian-Vault/ 
 
 ## Sudo / Privileged Commands
 You cannot run `sudo`. Handle it as follows:
@@ -60,6 +60,6 @@ You cannot run `sudo`. Handle it as follows:
 ## Memory Protocol
 If the user explicitly asks you to "remember this", "save this for later", or store a memory:
 1. You must use your file writing tools to create or append to a Markdown note in:
-   `~/Dropbox/Sam_Personal_Vault/30_Personal/00_Personal-Inbox/LLM-Memories/`
+   `~/Dropbox/Sam-Obsidian-Vault/30_Personal/00_Personal-Inbox/LLM-Memories/`
 2. Name the file concisely based on the topic. 
 3. If a file for this general topic already exists, append the new information to the bottom of the existing file rather than creating a duplicate.
