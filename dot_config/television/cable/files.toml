@@ -11,8 +11,7 @@ output = "{strip_ansi}"
 orientation = "portrait"
 
 [ui.preview_panel]
-# Preview panel size (percentage of screen width/height)
-size = 70
+size = 60
 #header = ""
 #footer = ""
 scrollbar = true
