@@ -170,8 +170,65 @@ function isPlanSafeBashCommand(command: string): boolean {
   if (modifiedFiles.length > 0) return false;
 
   // Split by control operators to evaluate every command in the pipeline/list
-  // e.g. "ls | grep foo && rm bar" -> ["ls ", " grep foo ", " rm bar"]
-  const parts = command.split(/\||&&|\|\||;/);
+  // while respecting single and double quotes.
+  const parts: string[] = [];
+  let currentPart = "";
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+
+    if (escapeNext) {
+      currentPart += char;
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      currentPart += char;
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      currentPart += char;
+      continue;
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      currentPart += char;
+      continue;
+    }
+
+    if (!inSingleQuote && !inDoubleQuote) {
+      if (char === '|' && command[i + 1] === '|') {
+        parts.push(currentPart);
+        currentPart = "";
+        i++;
+        continue;
+      }
+      if (char === '&' && command[i + 1] === '&') {
+        parts.push(currentPart);
+        currentPart = "";
+        i++;
+        continue;
+      }
+      if (char === '|' || char === ';') {
+        parts.push(currentPart);
+        currentPart = "";
+        continue;
+      }
+    }
+
+    currentPart += char;
+  }
+  if (currentPart) {
+    parts.push(currentPart);
+  }
   
   for (const part of parts) {
     const trimmed = part.trim();
@@ -250,19 +307,48 @@ function getGitDiff(): string {
 function extractModifiedFiles(command: string): string[] {
   const files = new Set<string>();
 
+  // Remove quoted strings to avoid false positives with > or tee inside quotes
+  let unquotedCommand = "";
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escapeNext = false;
+  
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+    if (!inSingleQuote && !inDoubleQuote) {
+      unquotedCommand += char;
+    }
+  }
+
   // Shell redirects: > file  or  >> file
-  const redirectMatch = command.match(/>{1,2}\s*([^\s;|&>]+)/g);
+  const redirectMatch = unquotedCommand.match(/>{1,2}\s*([^\s;|&>]+)/g);
   if (redirectMatch) {
     for (const m of redirectMatch) {
       const file = m.replace(/^>{1,2}\s*/, "");
-      if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && file !== "/dev/null") {
+      if (!file.startsWith("$") && !/^&(\d+|-)$/.test(file) && !file.includes("*") && !file.includes("?") && file !== "/dev/null") {
         files.add(file);
       }
     }
   }
 
   // tee [-options] file
-  const teeMatch = command.match(/tee\s+(?:-[a-zA-Z]+\s+)*([^\s;|&]+)/g);
+  const teeMatch = unquotedCommand.match(/tee\s+(?:-[a-zA-Z]+\s+)*([^\s;|&]+)/g);
   if (teeMatch) {
     for (const m of teeMatch) {
       const file = m.replace(/^tee\s+(?:-[a-zA-Z]+\s+)* /, "");

@@ -43,10 +43,10 @@ When creating or editing a note, follow these core conventions:
    git -C ~/Dropbox/Sam-Obsidian-Vault add -A && git -C ~/Dropbox/Sam-Obsidian-Vault commit -m "brief description of edit" && git -C ~/Dropbox/Sam-Obsidian-Vault push
    ```
 4. Use color syntax for formatting, avoiding `**bold**`:
-   - `~={green}text=~` (mid-sentence highlight)
-   - `~={orange}text=~` (organizational highlight)
-   - `~={magenta}text=~` (warning or danger)
-   Note the trailing `=~`.
+   - `~={green}text=~` (mid-sentence highlight, e.g. definitions or emphasis)
+   - `~={orange}text=~` (organizational highlight, e.g. mid-body headings or repeated structure---not formal headings like #.)
+   - `~={magenta}text=~` (warning or danger, e.g. critical emphasis about a command breaking something on your computer)
+   Note the trailing `=~`. When possible it is better to highlight connected segments of sentences rather than whole sentences or paragraphs.
 
 ### 3. Adding Links, Embeds, and Callouts
 - **Internal:** `[[wikilink]]` or `[[wikilink|alias]]`
