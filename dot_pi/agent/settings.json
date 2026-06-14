@@ -43,6 +43,6 @@
     "extensions/powerline-footer.ts",
     "extensions/spawn-subagent.ts"
   ],
-  "lastChangelogVersion": "0.79.1",
+  "lastChangelogVersion": "0.79.2",
   "hideThinkingBlock": false
 }

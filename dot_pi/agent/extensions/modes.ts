@@ -4,7 +4,8 @@ import path from "path";
 import os from "os";
 
 // Mode state
-let currentMode: "plan" | "manual" | "auto" = "manual";
+let currentMode: "plan" | "manual" | "auto" | "orchestrator" = 
+  (process.argv.includes("-a") || process.argv.includes("--approve")) ? "auto" : "manual";
 
 // Store original file contents for Auto mode diffing
 const autoModeOriginalContents = new Map<string, string | null>();
@@ -33,8 +34,11 @@ const COMMON_READ_ONLY = new Set([
   "mcp",
   // Export (renders to PDF/HTML/PNG without modifying project files)
   "preview_export",
-  // Subagent delegation
-  "spawn_subagent",
+  // NOTE: spawn_subagent is deliberately NOT here. It launches a fully autonomous
+  // `pi -a` worker that writes files and runs bash with no gating, so allowing it in
+  // the read-only/gated modes would silently bypass Plan and Manual safety. It is
+  // explicitly permitted only in Orchestrator mode (see the orchestrator branch below),
+  // and falls through to approval-gating in Manual mode.
   // Todo (metadata operations, not project file modifications)
   "todo",
   // Control flow
@@ -348,13 +352,12 @@ function extractModifiedFiles(command: string): string[] {
   }
 
   // tee [-options] file
-  const teeMatch = unquotedCommand.match(/tee\s+(?:-[a-zA-Z]+\s+)*([^\s;|&]+)/g);
-  if (teeMatch) {
-    for (const m of teeMatch) {
-      const file = m.replace(/^tee\s+(?:-[a-zA-Z]+\s+)* /, "");
-      if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && file !== "/dev/null") {
-        files.add(file);
-      }
+  const teeRegex = /tee\s+(?:-[a-zA-Z]+\s+)*([^\s;|&]+)/g;
+  let teeMatch: RegExpExecArray | null;
+  while ((teeMatch = teeRegex.exec(unquotedCommand)) !== null) {
+    const file = teeMatch[1]; // capture group is the filename, options already consumed
+    if (!file.startsWith("$") && !file.includes("*") && !file.includes("?") && file !== "/dev/null") {
+      files.add(file);
     }
   }
 
@@ -400,6 +403,36 @@ export default function (pi: any) {
     },
   });
 
+  pi.registerCommand("orchestrator", {
+    description: "Switch to Orchestrator Mode (Manager-only, delegates to local model)",
+    handler: async (args: any, ctx: any) => {
+      currentMode = "orchestrator";
+      ctx.ui.notify(
+        "Workflow Mode set to ORCHESTRATOR. You are now a manager. You must delegate all tasks via the 'delegate' tool.",
+        "info",
+      );
+    },
+  });
+
+  // Inject system context dynamically into the context stream
+  pi.on("context", (event: any) => {
+    if (currentMode === "orchestrator") {
+      event.messages.push({
+        role: "user",
+        content: [{
+          type: "text",
+          text: `[SYSTEM REMINDER] You are in ORCHESTRATOR mode. You are a Manager/Architect on an expensive frontier model. Spend your tokens on UNDERSTANDING and PLANNING, not on writing code or verbose output.
+- You CANNOT use mutation tools ('write', 'edit', 'bash'). You act ONLY through the 'delegate' tool plus read-only tools. Route ALL work — even simple tasks — through 'delegate'.
+- DO use your read-only tools freely (read, grep/search, list, fetch) to investigate the codebase BEFORE delegating — a plan grounded in the actual files, conventions, and signatures is far more likely to succeed on the first try and saves expensive re-delegation. Good investigation is the best use of your tokens.
+- Do NOT write implementation code yourself. Writing code here wastes expensive tokens and defeats the purpose. Hand the worker a SCHEMATIC PLAN (files to create/change, key function signatures, libraries, constraints, acceptance criteria) and let the LOCAL worker write the actual code.
+- Keep your visible OUTPUT terse: a brief schematic plan, then the 'delegate' call. Do not echo the worker's code back to the user. (Terseness applies to what you write, not to how much you investigate.)
+- The worker is a slow local model with a blank context. If a 'delegate' call times out, it was almost certainly too big/slow — RAISE timeoutSeconds and/or SPLIT the task; do NOT lower the timeout. A timed-out worker may have written files before being killed, so check the working tree.
+- Review the worker's output. On failure, diagnose and re-delegate with corrected, still-schematic instructions.`
+        }]
+      });
+    }
+  });
+
   pi.registerCommand("mode", {
     description: "Display the active workflow mode",
     handler: async (args: any, ctx: any) => {
@@ -409,6 +442,17 @@ export default function (pi: any) {
 
   // ── Tool Call Interceptor ──
   pi.on("tool_call", async (event: any, ctx: any) => {
+    // ── 0. 'delegate' is the orchestrator's mandatory tool — block it everywhere else.
+    //    (Both delegate and spawn_subagent register at startup, so the tool exists in
+    //    every session; this keeps it usable only when Orchestrator mode is active.)
+    if (event.toolName === "delegate" && currentMode !== "orchestrator") {
+      ctx.ui.notify(`Blocked 'delegate' — only available in Orchestrator mode.`, "error");
+      return {
+        block: true,
+        reason: `The 'delegate' tool is only for Orchestrator mode (activate it with /orchestrator). In this mode, use 'spawn_subagent' if you need to delegate a messy multi-step task, or just do the work yourself with your normal tools.`,
+      };
+    }
+
     // ── 1. PLAN MODE ──
     if (currentMode === "plan") {
       // Non-bash tools: use the whitelist
@@ -416,7 +460,7 @@ export default function (pi: any) {
         ctx.ui.notify(`[Plan Mode] Blocked tool execution: ${event.toolName}`, "error");
         return {
           block: true,
-          reason: `You are currently in Plan mode (read-only). You are not allowed to use the '${event.toolName}' tool. Explain your proposed changes or code in the chat and ask the user for approval first.`,
+          reason: `You are in Plan mode. You cannot use potentially destructive commands or mutation tools like '${event.toolName}'. Your job is strictly to research and explain your proposed changes in the chat. Ask the user for approval or wait for them to switch to Auto or Manual mode before making modifications.`,
         };
       }
 
@@ -428,7 +472,7 @@ export default function (pi: any) {
           ctx.ui.notify(`[Plan Mode] Blocked bash: '${firstCmd}' is not in the safe command whitelist`, "error");
           return {
             block: true,
-            reason: `You are currently in Plan mode (read-only). Bash commands are restricted to safe read-only operations. '${firstCmd}' is not in the whitelist. Use approved commands like rg, git, grep, ls, etc.`,
+            reason: `You are in Plan mode. You cannot use potentially destructive bash commands. Bash commands are restricted strictly to safe read-only operations. '${firstCmd}' is not in the whitelist. Use approved commands like rg, git, grep, ls, etc., and explain your plan to the user in chat.`,
           };
         }
         // Command is safe — allow it through
@@ -462,6 +506,19 @@ export default function (pi: any) {
           }
         }
       }
+    }
+
+    // ── 4. ORCHESTRATOR MODE ──
+    if (currentMode === "orchestrator") {
+      // Orchestrator can only use read-only tools and the 'delegate' tool.
+      if (!COMMON_READ_ONLY.has(event.toolName) && event.toolName !== "delegate") {
+        ctx.ui.notify(`[Orchestrator Mode] Blocked tool execution: ${event.toolName}`, "error");
+        return {
+          block: true,
+          reason: `You are in Orchestrator mode. You are not allowed to use '${event.toolName}'. Your job is strictly to plan and delegate tasks to the local worker model using the 'delegate' tool, and review its output. You cannot edit files or run commands directly.`,
+        };
+      }
+      return {};
     }
 
     // ── 2. MANUAL MODE ──
