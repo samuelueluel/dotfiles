@@ -5,6 +5,8 @@ import os from "os";
 
 // Mode state
 let currentMode: "plan" | "manual" | "auto" | "orchestrator" = 
+  process.env.PI_DEFAULT_MODE === "orchestrator" ? "orchestrator" :
+  process.env.PI_DEFAULT_MODE === "plan" ? "plan" :
   (process.argv.includes("-a") || process.argv.includes("--approve")) ? "auto" : "manual";
 
 // Store original file contents for Auto mode diffing
@@ -30,8 +32,6 @@ const COMMON_READ_ONLY = new Set([
   // Content fetching
   "fetch_content",
   "get_search_content",
-  // MCP — allows all MCP tools (includes Searxng web search)
-  "mcp",
   // Export (renders to PDF/HTML/PNG without modifying project files)
   "preview_export",
   // NOTE: spawn_subagent is deliberately NOT here. It launches a fully autonomous
@@ -283,13 +283,44 @@ function getDiff(filePath: string, oldContent: string, newContent: string, color
 
   try {
     const diffCmd = `git diff --no-index ${colorize ? '--color=always ' : ''}"${oldTemp}" "${newTemp}"`;
-    return execSync(diffCmd, { encoding: "utf8" });
-  } catch (error: any) {
-    if (error.stdout) {
-      return error.stdout;
-    } else {
-      return `Failed to generate diff: ${error.message}`;
+    let output: string;
+    try {
+      output = execSync(diffCmd, { encoding: "utf8" });
+    } catch (error: any) {
+      if (error.stdout) {
+        output = error.stdout;
+      } else {
+        return `Failed to generate diff: ${error.message}`;
+      }
     }
+
+    // Strip ANSI codes for header-line detection, then clean up temp paths.
+    const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;:?]*[a-zA-Z]/g, "");
+    const isNewFile = !oldContent;
+
+    output = output
+      .split("\n")
+      .filter(line => {
+        const bare = stripAnsi(line);
+        // Drop the "diff --git a/tmp/... b/tmp/..." and "index ..." header lines —
+        // they reference temp paths and add no value when we already print the filename.
+        return !bare.startsWith("diff --git") && !bare.startsWith("index ");
+      })
+      .map(line => {
+        const bare = stripAnsi(line);
+        // Replace temp paths in the --- / +++ lines with real paths.
+        if (bare.startsWith("--- ")) {
+          const label = isNewFile ? "/dev/null" : `a/${filePath}`;
+          return colorize ? `\x1b[31m--- ${label}\x1b[0m` : `--- ${label}`;
+        }
+        if (bare.startsWith("+++ ")) {
+          return colorize ? `\x1b[33m+++ b/${filePath}\x1b[0m` : `+++ b/${filePath}`;
+        }
+        return line;
+      })
+      .join("\n");
+
+    return output;
   } finally {
     try {
       if (fs.existsSync(oldTemp)) fs.unlinkSync(oldTemp);
@@ -418,16 +449,19 @@ export default function (pi: any) {
   pi.on("context", (event: any) => {
     if (currentMode === "orchestrator") {
       event.messages.push({
-        role: "user",
+        role: "system",
         content: [{
           type: "text",
-          text: `[SYSTEM REMINDER] You are in ORCHESTRATOR mode. You are a Manager/Architect on an expensive frontier model. Spend your tokens on UNDERSTANDING and PLANNING, not on writing code or verbose output.
-- You CANNOT use mutation tools ('write', 'edit', 'bash'). You act ONLY through the 'delegate' tool plus read-only tools. Route ALL work — even simple tasks — through 'delegate'.
-- DO use your read-only tools freely (read, grep/search, list, fetch) to investigate the codebase BEFORE delegating — a plan grounded in the actual files, conventions, and signatures is far more likely to succeed on the first try and saves expensive re-delegation. Good investigation is the best use of your tokens.
-- Do NOT write implementation code yourself. Writing code here wastes expensive tokens and defeats the purpose. Hand the worker a SCHEMATIC PLAN (files to create/change, key function signatures, libraries, constraints, acceptance criteria) and let the LOCAL worker write the actual code.
-- Keep your visible OUTPUT terse: a brief schematic plan, then the 'delegate' call. Do not echo the worker's code back to the user. (Terseness applies to what you write, not to how much you investigate.)
-- The worker is a slow local model with a blank context. If a 'delegate' call times out, it was almost certainly too big/slow — RAISE timeoutSeconds and/or SPLIT the task; do NOT lower the timeout. A timed-out worker may have written files before being killed, so check the working tree.
-- Review the worker's output. On failure, diagnose and re-delegate with corrected, still-schematic instructions.`
+          text: `[ORCHESTRATOR MODE] You are a Manager/Architect on an expensive frontier model. Your job is routing and reviewing — not implementing.
+- File writes and code execution go through the \`delegate\` tool. Read-only tools (read, grep, fetch_content, safe bash like cat/grep/echo) are available for quick lookups only, not for grunt work.
+- PASS-THROUGH FIRST: On your first \`delegate\` call, forward the user's request to the worker as-is — skip pre-investigation. Only investigate and add guidance if the worker fails or struggles.
+- NEVER write implementation code in your own thinking or text output. No code blocks, no function bodies, no script content — not even as a "draft." If you notice yourself doing this, stop and call \`delegate\` instead. A one-sentence description ("write a Python script that polls /props and prints model name and n_ctx") is a complete plan.
+- Do NOT do grunt work (counting lines, grepping files, tallying values) in your own reasoning — hand those off too.
+- AFTER THE WORKER REPORTS: Accept a plausible result — the worker ran the code, you didn't. Only re-delegate if the worker explicitly reports an error, the output is clearly incomplete, or a file the worker claims to have written is missing (verify with a read). Do not start a review loop.
+- Pass the worker a SCHEMATIC PLAN (files to create/change, key signatures, libraries, constraints) — not pre-written code.
+- Keep your OUTPUT terse: a brief plan, then the \`delegate\` call. Do not echo the worker's code back to the user.
+- The worker is a slow local model with a blank context. If a \`delegate\` call times out, RAISE timeoutSeconds and/or split the task; do NOT lower the timeout. A timed-out worker may have written files before being killed — check the working tree.
+- On failure: diagnose from the worker's trace and hand off corrected, still-schematic instructions.`
         }]
       });
     }
@@ -510,12 +544,29 @@ export default function (pi: any) {
 
     // ── 4. ORCHESTRATOR MODE ──
     if (currentMode === "orchestrator") {
-      // Orchestrator can only use read-only tools and the 'delegate' tool.
-      if (!COMMON_READ_ONLY.has(event.toolName) && event.toolName !== "delegate") {
+      // Allow bash with the same safe-command filter as Plan mode — cat, grep, echo, git, etc.
+      // This lets the Manager do quick read-only lookups without an extra delegation.
+      // Mutation commands (write, rm, python3, etc.) are still blocked by the filter.
+      if (event.toolName === "bash") {
+        const command = event.input?.command || "";
+        if (!isPlanSafeBashCommand(command)) {
+          const firstCmd = getFirstCommand(command);
+          ctx.ui.notify(`[Orchestrator Mode] Blocked bash: '${firstCmd}'`, "error");
+          return {
+            block: true,
+            reason: `In Orchestrator mode, only read-only bash commands (cat, grep, echo, git, ls, etc.) are allowed. '${firstCmd}' is not in the safe list. Hand this work off to the worker instead.`,
+          };
+        }
+        return {};
+      }
+
+      // MCP tools are named mcp__server__tool — prefix-match to allow all of them.
+      const isReadOnly = COMMON_READ_ONLY.has(event.toolName) || event.toolName.startsWith("mcp__");
+      if (!isReadOnly && event.toolName !== "delegate") {
         ctx.ui.notify(`[Orchestrator Mode] Blocked tool execution: ${event.toolName}`, "error");
         return {
           block: true,
-          reason: `You are in Orchestrator mode. You are not allowed to use '${event.toolName}'. Your job is strictly to plan and delegate tasks to the local worker model using the 'delegate' tool, and review its output. You cannot edit files or run commands directly.`,
+          reason: `You are in Orchestrator mode. You are not allowed to use '${event.toolName}'. Route this work to the worker using the \`delegate\` tool.`,
         };
       }
       return {};
@@ -670,8 +721,10 @@ export default function (pi: any) {
         if (oldContent === newContent) continue;
         
         hasDiffs = true;
-        console.log(`\n\x1b[36m--- Changes for ${filePath} ---\x1b[0m\n`);
-        
+        const isNewFile = oldContent === null;
+        const label = isNewFile ? `${filePath}  \x1b[32m(new file)\x1b[0m` : filePath;
+        console.log(`\n\x1b[1;36m╔══ ${label} ══╗\x1b[0m\n`);
+
         const diffOutput = getDiff(
           filePath,
           oldContent || "",

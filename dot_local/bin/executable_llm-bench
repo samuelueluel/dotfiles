@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+"""
+LLM benchmark using llama-server's native /completion endpoint.
+Uses server-side timings for accuracy; captures MTP acceptance rate.
+
+Metrics reported:
+  TTFT      — time to first token (= prompt processing time, server-measured)
+  out t/s   — output tokens/s including MTP speculative decoding
+  pp t/s    — prompt processing tokens/s
+  mtp acc%  — MTP draft token acceptance rate
+"""
+
+import argparse
+import json
+import statistics
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+
+BENCH_DIR = Path.home() / ".local/share/ramalama/benchmarks"
+
+# Padding text used to construct prompts of target token length (~4 chars/token).
+_PAD = (
+    "The quick brown fox jumps over the lazy dog. "
+    "Pack my box with five dozen liquor jugs. "
+    "How vexingly quick daft zebras jump. "
+) * 200
+
+
+def _pad_prompt(target_tokens: int) -> str:
+    return _PAD[: target_tokens * 4] + "\n\nBriefly say hello."
+
+
+def _request(base_url: str, prompt: str, n_predict: int) -> dict:
+    """Non-streaming /completion request. Returns server timings dict."""
+    payload = json.dumps({
+        "prompt": prompt,
+        "n_predict": n_predict,
+        "stream": False,
+        "temperature": 0.0,
+        "cache_prompt": False,
+    }).encode()
+
+    req = urllib.request.Request(
+        f"{base_url}/completion",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    t_wall_start = time.perf_counter()
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            body = json.loads(resp.read())
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Request failed: {e}") from e
+    t_wall = (time.perf_counter() - t_wall_start) * 1000  # ms
+
+    timings = body.get("timings", {})
+    return {
+        "wall_ms":       t_wall,
+        "ttft_ms":       timings.get("prompt_ms", 0),
+        "output_tps":    timings.get("predicted_per_second", 0),
+        "prompt_tps":    timings.get("prompt_per_second", 0),
+        "prompt_tokens": timings.get("prompt_n", body.get("tokens_evaluated", 0)),
+        "gen_tokens":    timings.get("predicted_n", body.get("tokens_predicted", 0)),
+        "draft_n":       timings.get("draft_n", 0),
+        "draft_acc":     timings.get("draft_n_accepted", 0),
+    }
+
+
+def _server_model(base_url: str) -> str:
+    try:
+        with urllib.request.urlopen(f"{base_url}/v1/models", timeout=5) as r:
+            return json.loads(r.read()).get("data", [{}])[0].get("id", "unknown")
+    except Exception:
+        return "unknown"
+
+
+def _p95(vals: list) -> float:
+    if not vals:
+        return 0.0
+    s = sorted(vals)
+    return s[min(int(len(s) * 0.95), len(s) - 1)]
+
+
+def run_bench(base_url: str, prompt_sizes: list, gen_tokens: int, reps: int, verbose: bool) -> list:
+    results = []
+    total = len(prompt_sizes) * reps
+    done = 0
+
+    for n_prompt in prompt_sizes:
+        prompt = _pad_prompt(n_prompt)
+
+        rows = []
+        for rep in range(reps):
+            done += 1
+            print(f"  [{done}/{total}] ~{n_prompt}t prompt, rep {rep+1}/{reps} …", end=" ", flush=True)
+
+            try:
+                r = _request(base_url, prompt, gen_tokens)
+            except RuntimeError as e:
+                print(f"FAILED: {e}")
+                continue
+
+            rows.append(r)
+
+            if r["draft_n"] > 0:
+                acc_pct = 100 * r["draft_acc"] / r["draft_n"]
+                mtp_str = f"  MTP {acc_pct:.0f}% ({r['draft_acc']}/{r['draft_n']})"
+            else:
+                mtp_str = ""
+
+            if verbose:
+                print(
+                    f"TTFT {r['ttft_ms']:.0f}ms  "
+                    f"out {r['output_tps']:.1f}t/s  "
+                    f"pp {r['prompt_tps']:.1f}t/s"
+                    f"{mtp_str}  "
+                    f"({r['prompt_tokens']}p/{r['gen_tokens']}g)"
+                )
+            else:
+                print(f"TTFT {r['ttft_ms']:.0f}ms  out {r['output_tps']:.1f}t/s{mtp_str}")
+
+        if not rows:
+            continue
+
+        def _agg(key):
+            vals = [r[key] for r in rows]
+            return {"min": min(vals), "avg": statistics.mean(vals), "p95": _p95(vals), "max": max(vals)}
+
+        draft_total = sum(r["draft_n"] for r in rows)
+        draft_acc_total = sum(r["draft_acc"] for r in rows)
+
+        results.append({
+            "target_prompt_tokens": n_prompt,
+            "actual_prompt_tokens": round(statistics.mean(r["prompt_tokens"] for r in rows)),
+            "gen_tokens":           gen_tokens,
+            "reps":                 len(rows),
+            "ttft_ms":              _agg("ttft_ms"),
+            "output_tps":           _agg("output_tps"),
+            "prompt_tps":           _agg("prompt_tps"),
+            "wall_ms":              _agg("wall_ms"),
+            "mtp_acceptance_pct":   round(100 * draft_acc_total / draft_total, 1) if draft_total > 0 else None,
+        })
+
+    return results
+
+
+def print_table(results: list) -> None:
+    has_mtp = any(r["mtp_acceptance_pct"] is not None for r in results)
+    hdr = f"{'prompt':>8}  {'TTFT avg':>9} {'p95':>8}  {'out t/s avg':>11} {'max':>8}  {'pp t/s avg':>10}"
+    if has_mtp:
+        hdr += f"  {'MTP acc%':>8}"
+    print()
+    print(hdr)
+    print("─" * (len(hdr) + 2))
+    for r in results:
+        pt = r["actual_prompt_tokens"]
+        t  = r["ttft_ms"]
+        o  = r["output_tps"]
+        p  = r["prompt_tps"]
+        line = (
+            f"{pt:>8}  "
+            f"{t['avg']:>9.0f} {t['p95']:>8.0f}  "
+            f"{o['avg']:>11.1f} {o['max']:>8.1f}  "
+            f"{p['avg']:>10.1f}"
+        )
+        if has_mtp:
+            acc = r["mtp_acceptance_pct"]
+            line += f"  {acc:>7.1f}%" if acc is not None else f"  {'—':>8}"
+        print(line)
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="Benchmark llama-server (TTFT, output t/s, pp t/s, MTP acceptance)"
+    )
+    ap.add_argument("-p", "--prompts", default="128,512,2048",
+                    help="Comma-separated prompt token targets (default: 128,512,2048)")
+    ap.add_argument("-n", "--gen", type=int, default=128,
+                    help="Output tokens to generate per request (default: 128)")
+    ap.add_argument("-r", "--reps", type=int, default=3,
+                    help="Repetitions per prompt size (default: 3)")
+    ap.add_argument("--url", default="http://localhost:8080",
+                    help="Server base URL (default: http://localhost:8080)")
+    ap.add_argument("-v", "--verbose", action="store_true",
+                    help="Show per-request details")
+    ap.add_argument("-o", "--output", metavar="FILE",
+                    help="Save JSON to FILE (default: auto in benchmarks dir)")
+    args = ap.parse_args()
+
+    base_url = args.url.rstrip("/")
+    prompt_sizes = [int(x.strip()) for x in args.prompts.split(",")]
+
+    model = _server_model(base_url)
+    print(f"Server: {base_url}  model: {model}")
+    print(f"Prompts: {args.prompts} tokens  gen: {args.gen}  reps: {args.reps}")
+    print()
+
+    try:
+        results = run_bench(base_url, prompt_sizes, args.gen, args.reps, args.verbose)
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+        sys.exit(1)
+
+    print_table(results)
+
+    BENCH_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    slug = model.replace("/", "_")[:60]
+    out_path = Path(args.output) if args.output else BENCH_DIR / f"{ts}_{slug}.json"
+
+    out_path.write_text(json.dumps({
+        "timestamp": ts,
+        "model": model,
+        "server_url": base_url,
+        "config": {"gen_tokens": args.gen, "reps": args.reps},
+        "results": results,
+    }, indent=2))
+    print(f"\nSaved: {out_path}")
+
+
+if __name__ == "__main__":
+    main()

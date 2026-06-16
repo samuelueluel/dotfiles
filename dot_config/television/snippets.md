@@ -49,18 +49,7 @@
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
 
-- AI: Serve Qwen3.6 35B-A3B MoE Q8, MTP on | serve-qwen-moe-Q8-mtp-p1
-- AI: Serve Qwen3.6 35B-A3B MoE Q8, MTP on | serve-qwen-moe-Q8-mtp-p2
-- AI: Serve Qwen3.6 27B Dense Q4, MTP on | serve-qwen-dense-Q4-mtp-p1
-- AI: Serve Qwen3.6 27B Dense Q4, MTP on | serve-qwen-dense-Q4-mtp-p2
-- AI: Serve Qwen3.6 35B-A3B MoE Q4, MTP on | serve-qwen-moe-Q4-mtp-p1
-- AI: Serve Qwen3.6 35B-A3B MoE Q4, MTP on | serve-qwen-moe-Q4-mtp-p2
-- AI: Serve Qwen3.6 27B Dense Q8, MTP on | serve-qwen-dense-Q8-mtp-p1
-- AI: Serve Qwen3.6 27B Dense Q8, MTP on | serve-qwen-dense-Q8-mtp-p2
-- AI: Serve Gemma 4 31B Dense QAT4 | serve-gemma4-dense-QAT4-p1
-- AI: Serve Gemma 4 31B Dense QAT4 | serve-gemma4-dense-QAT4-p2
-- AI: Serve Gemma 4 31B Dense QAT4, MTP on | serve-gemma4-dense-QAT4-mtp-p1
-- AI: Serve Gemma 4 31B Dense QAT4, MTP on | serve-gemma4-dense-QAT4-mtp-p2
+- AI: Serve local model (interactive picker) | serve-local
 - AI: Serve autocomplete model (background) | serve-autocomplete
 - AI: Serve vector embedder (background) | serve-embedder
 - AI: Stop main model (:8080) | stop-main
@@ -68,9 +57,18 @@
 - AI: Stop vector embedder | stop-embedder
 - AI: Stop all running models | ramalama stop --all
 - AI: Check which models are loaded | model-check
-- AI: OpenCode sandbox (read ~, write current dir) | opencode-safe-1
-- AI: OpenCode sandbox (strict read/write current dir) | opencode-safe-2
-- AI: OpenCode sandbox (write single file) | opencode-safe-3 ""
+
+- AI: Pi cloud agent (model + thinking picker) | pi-cloud
+- AI: Tau cloud agent (model + thinking picker) | tau-cloud
+- AI: Pi sandboxed (path + isolation picker) | pi-safe
+- AI: Tau sandboxed (path + isolation picker) | tau-safe
+
+- AI: Pi orchestrator (model + thinking picker) | pi-orch
+- AI: Attach to orchestrator session | orch-attach
+- AI: Kill orchestrator session | orch-kill
+- AI: List archived worker logs | orch-logs
+- AI: Rebuild worker agent dir (after pi update) | bash ~/.pi/build-worker-agent.sh
+- AI: Rebuild manager agent dir (after pi update) | bash ~/.pi/build-manager-agent.sh
 
 - Stata: Start Stata in tmux session | tmux new-session -d -s stata '/usr/local/stata19/stata-mp'
 - Stata: Kill stata tmux session | tmux kill-session -t stata

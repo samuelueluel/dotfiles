@@ -53,8 +53,15 @@ command -v bat >/dev/null && alias cat='bat'
 ZSH_CACHE="$HOME/.cache/zsh"
 [[ -d "$ZSH_CACHE" ]] || mkdir -p "$ZSH_CACHE"
 
+# gum theme — New Mexico palette (see Theme.md)
+# turquoise (#1AAAD4) = primary accent: cursor, selection, active borders
+# pink_sandstone (#DA9E8A) = secondary text / UI chrome
+export GUM_CHOOSE_CURSOR_FOREGROUND="#1AAAD4"
+export GUM_CHOOSE_SELECTED_FOREGROUND="#1AAAD4"
+export GUM_CHOOSE_HEADER_FOREGROUND="#DA9E8A"
+
 # fzf global options (colors, keybinds, UI)
-export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char,alt-space:accept' --gutter=' ' --scrollbar='█' --color='bg:-1,gutter:-1,border:#6E3840,separator:#B06F75,preview-border:#B06F75,hl:#ED6D42,hl+:#ED6D42,pointer:#ED6D42,marker:#ED6D42,bg+:#000000,prompt:#ED6D42,info:#B06F75,header:#B06F75,scrollbar:#ED6D42'"
+export FZF_DEFAULT_OPTS="--bind 'alt-w:up,alt-s:down,alt-a:backward-char,alt-d:forward-char,alt-space:accept' --gutter=' ' --scrollbar='█' --color='bg:-1,gutter:-1,border:#6E3840,separator:#DA9E8A,preview-border:#DA9E8A,hl:#ED6D42,hl+:#ED6D42,pointer:#ED6D42,marker:#ED6D42,bg+:#000000,prompt:#ED6D42,info:#DA9E8A,header:#DA9E8A,scrollbar:#ED6D42'"
 
 # zoxide: smart cd
 if command -v zoxide >/dev/null; then
@@ -200,9 +207,9 @@ function claude() {
 }
 
 # Local LLM (Ramalama / OpenCode / Aider) — §2.B, §2.D, §2.F
-export OPENAI_API_KEY=sk-6869f13e80764e0ab07cb09a9ef5ea98
+# OPENAI_API_KEY is set in ~/.zshenv.local (placeholder for local llama.cpp compat)
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
-MTP_OPTS="-ngl 999 --no-mmap --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75 -ub 1024 -t 16 --slot-prompt-similarity 0.8 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048 --context-shift --cache-ram 61440"
+MTP_OPTS="-ngl 999 --no-mmap --direct-io --kv-unified -fa 1 -ub 2048 -b 8192 --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75 -t 16 --slot-prompt-similarity 0.8 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048 --context-shift --cache-ram 61440"
 # Cap thinking tokens to prevent infinite reasoning loops (post-Apr-10 llama.cpp bug: default budget = -1/unrestricted).
 # 50000 is a loop-breaker, not a target: clears even very long legitimate reasoning, still well below a true (unbounded) runaway.
 REASONING_OPTS="--reasoning on --reasoning-budget 50000"
@@ -258,33 +265,61 @@ serve-llm-draft() {  # speculative decoding with a separate draft model
   ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --env "LLAMA_ARG_THINK_BUDGET_MESSAGE=$THINK_BUDGET_MSG" --runtime-args="$MTP_OPTS $3$samp" --model-draft "$2" "$1" \
     && echo "▶ serving $1 with draft $2 (MTP, ctx $CTX) at http://localhost:8080/v1"
 }
-# Main Models — swapping through the one :8080 slot (container 'llm'), one at a time
+# Interactive main-model picker — gum menus for model / quant / MTP / parallel slots.
+# Replaces the 20 individual serve-* aliases. Usage: serve-local
+serve-local() {
+  local model_key quant mtp parallel uri draft_uri mtp_opts_local
+  local -a quant_opts
 
-# Qwen3.6 MoE (35B-A3B)
-alias serve-qwen-moe-Q4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL'
-alias serve-qwen-moe-Q4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL'
-alias serve-qwen-moe-Q4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL'
-alias serve-qwen-moe-Q4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL'
-alias serve-qwen-moe-Q8-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-moe-Q8-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-moe-Q8-mtp-p1='MTP_OPTS="${MTP_OPTS/--spec-draft-n-max 3/--spec-draft-n-max 2} --parallel 1" serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-moe-Q8-mtp-p2='MTP_OPTS="${MTP_OPTS/--spec-draft-n-max 3/--spec-draft-n-max 2} --parallel 2" serve-llm hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL'
+  model_key=$(gum choose \
+    --header "serve · model" \
+    "qwen-moe    Qwen3.6 MoE 35B-A3B" \
+    "qwen-dense  Qwen3.6 Dense 27B" \
+    "gemma4      Gemma 4 Dense 31B") || return 1
+  model_key="${model_key%%[ ]*}"
 
-# Qwen3.6 Dense (27B)
-alias serve-qwen-dense-Q4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
-alias serve-qwen-dense-Q4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
-alias serve-qwen-dense-Q4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
-alias serve-qwen-dense-Q4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL'
-alias serve-qwen-dense-Q8-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-dense-Q8-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-dense-Q8-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
-alias serve-qwen-dense-Q8-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL'
+  case "$model_key" in
+    qwen-moe)   quant_opts=("Q4" "Q8") ;;
+    qwen-dense) quant_opts=("Q4" "Q8") ;;
+    gemma4)     quant_opts=("QAT4")    ;;
+  esac
 
-# Gemma 4 Dense (31B)
-alias serve-gemma4-dense-QAT4-p1='PARALLEL_OPTS="--parallel 1" serve-llm-nospec hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL'
-alias serve-gemma4-dense-QAT4-p2='PARALLEL_OPTS="--parallel 2" serve-llm-nospec hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL'
-alias serve-gemma4-dense-QAT4-mtp-p1='MTP_OPTS="${MTP_OPTS} --parallel 1" serve-llm-draft hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf'
-alias serve-gemma4-dense-QAT4-mtp-p2='MTP_OPTS="${MTP_OPTS} --parallel 2" serve-llm-draft hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf'
+  if [[ ${#quant_opts[@]} -gt 1 ]]; then
+    quant=$(gum choose --header "serve · quantization" "${quant_opts[@]}") || return 1
+  else
+    quant="${quant_opts[1]}"
+  fi
+
+  mtp=$(gum choose --header "serve · MTP (multi-token prediction)" "on" "off") || return 1
+  parallel=$(gum choose --header "serve · parallel slots" "1" "2") || return 1
+
+  # Resolve URIs
+  local GEMMA4_DRAFT="https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf"
+  case "$model_key-$quant" in
+    qwen-moe-Q4)    uri="hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL" ;;
+    qwen-moe-Q8)    uri="hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL" ;;
+    qwen-dense-Q4)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL"     ;;
+    qwen-dense-Q8)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL"     ;;
+    gemma4-QAT4)    uri="hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL"  ;;
+  esac
+
+  if [[ "$mtp" == "on" ]]; then
+    # Qwen MoE Q8: cap spec-draft-n-max at 2 — n=3 benchmarked slower on Vulkan
+    # (extra draft token compute overhead outweighs acceptance gain vs ROCm)
+    if [[ "$model_key-$quant" == "qwen-moe-Q8" ]]; then
+      mtp_opts_local="${MTP_OPTS/--spec-draft-n-max 3/--spec-draft-n-max 2} --parallel $parallel"
+    else
+      mtp_opts_local="$MTP_OPTS --parallel $parallel"
+    fi
+    if [[ "$model_key" == "gemma4" ]]; then
+      MTP_OPTS="$mtp_opts_local" serve-llm-draft "$uri" "$GEMMA4_DRAFT"
+    else
+      MTP_OPTS="$mtp_opts_local" serve-llm "$uri"
+    fi
+  else
+    PARALLEL_OPTS="--parallel $parallel" serve-llm-nospec "$uri"
+  fi
+}
 
 alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
@@ -316,6 +351,7 @@ serve-embedder() {
     && echo "▶ serving embedder (parallel 1) at http://localhost:8082/v1"
 }
 alias stop-embedder="ramalama stop embedder"
+
 
 # Show exactly which model file and settings are loaded on each port.
 # Parses both the /v1/models API and the host process list for the exact .gguf name and MTP status.
@@ -369,6 +405,30 @@ model-check() {
       printf '  :%s  %-13s %s\n' "$p" "$name" "$id"
     fi
   done
+
+  # Pi cloud agents — read state files written by pi-cloud / tau-cloud
+  echo ""
+  local _state_dir="$HOME/.pi/running"
+  local _found_pi=0 _f _spid _type _m _t _short
+  if [[ -d "$_state_dir" ]]; then
+    for _f in "$_state_dir"/*.state(N); do
+      _spid="${${_f:t}%.state}"
+      # Skip stale files (shell that launched pi is gone)
+      kill -0 "$_spid" 2>/dev/null || { rm -f "$_f"; continue; }
+      _type=$(grep '^type=' "$_f" | cut -d= -f2)
+      _m=$(grep    '^model=' "$_f" | cut -d= -f2)
+      _t=$(grep    '^thinking=' "$_f" | cut -d= -f2)
+      case "$_m" in
+        *deepseek-v4-pro)   _short="dsv4pro" ;;
+        *deepseek-v4-flash) _short="dsv4fl"  ;;
+        *claude-opus-4*)    _short="opus"    ;;
+        *)                  _short="$_m"     ;;
+      esac
+      printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
+      _found_pi=1
+    done
+  fi
+  (( _found_pi )) || printf '  pi-cloud  —\n'
 }
 
 
@@ -559,6 +619,8 @@ pi-safe-1() {
     -e TERM \
     -e COLORTERM \
     -e LANG \
+    -e OPENROUTER_API_KEY \
+    ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
     -v "$HOME":"$HOME":ro \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
@@ -598,6 +660,7 @@ pi-safe-2() {
     -e TERM \
     -e COLORTERM \
     -e LANG \
+    -e OPENROUTER_API_KEY \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
@@ -639,12 +702,51 @@ pi-safe-3() {
     -e TERM \
     -e COLORTERM \
     -e LANG \
+    -e OPENROUTER_API_KEY \
     -v "$abs_file":"$abs_file" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
     --tmpfs /tmp \
     -w "$abs_dir" \
     localhost/pi-safe:latest "${@:2}"
+}
+
+# Gum wrapper: pick isolation level then delegate to pi-safe-N.
+# Accepts a file OR directory as $1. For levels 1-2, a file path is resolved to
+# its parent dir (so write access covers the containing directory). Level 3 requires
+# a file; passing a directory errors. Defaults to $PWD when no path is given.
+pi-safe() {
+  local target="${1:-$PWD}" abs_target abs_dir is_file=0
+
+  abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
+  if [[ -f "$abs_target" ]]; then
+    is_file=1
+    abs_dir="$(dirname "$abs_target")"
+  elif [[ -d "$abs_target" ]]; then
+    abs_dir="$abs_target"
+  else
+    echo "Error: '$target' does not exist."
+    return 1
+  fi
+
+  local level
+  level=$(gum choose \
+    --header "pi-safe · isolation level" \
+    "1   write to dir  +  read all of \$HOME" \
+    "2   write to dir  +  no read elsewhere" \
+    "3   write to single file only") || return 1
+  level="${level%%[ ]*}"
+
+  case "$level" in
+    1|2) pi-safe-${level} "$abs_dir" "${@:2}" ;;
+    3)
+      if (( !is_file )); then
+        echo "Error: level 3 requires a file path, not a directory."
+        return 1
+      fi
+      pi-safe-3 "$abs_target" "${@:2}"
+      ;;
+  esac
 }
 
 # tau: pi with all skills loaded EXCEPT Stata
@@ -707,6 +809,225 @@ tau-safe-3() {
   done
   pi-safe-3 "$1" "${args[@]}" "${@:2}"
 }
+
+# Gum wrapper: pick isolation level then delegate to tau-safe-N.
+# Same path-resolution logic as pi-safe.
+tau-safe() {
+  local target="${1:-$PWD}" abs_target abs_dir is_file=0
+
+  abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
+  if [[ -f "$abs_target" ]]; then
+    is_file=1
+    abs_dir="$(dirname "$abs_target")"
+  elif [[ -d "$abs_target" ]]; then
+    abs_dir="$abs_target"
+  else
+    echo "Error: '$target' does not exist."
+    return 1
+  fi
+
+  local level
+  level=$(gum choose \
+    --header "tau-safe · isolation level" \
+    "1   write to dir  +  read all of \$HOME" \
+    "2   write to dir  +  no read elsewhere" \
+    "3   write to single file only") || return 1
+  level="${level%%[ ]*}"
+
+  case "$level" in
+    1|2) tau-safe-${level} "$abs_dir" "${@:2}" ;;
+    3)
+      if (( !is_file )); then
+        echo "Error: level 3 requires a file path, not a directory."
+        return 1
+      fi
+      tau-safe-3 "$abs_target" "${@:2}"
+      ;;
+  esac
+}
+
+# --- ORCHESTRATOR ALIASES ---
+# Dual-pane tmux Orchestrator: a frontier Manager (left pane) routes execution to the local
+# worker (right pane) via `delegate`. Naming:
+#   pi-orch-<model>  — what you TYPE. Dual-pane SESSION launcher (calls orch-session.sh).
+#   pi-mgr-<model>   — the Manager itself (orchestrator mode + ~/.pi/manager-agent). Run inside
+#                      pane 0 by orch-session.sh; also usable standalone for a single-pane Manager.
+#   pi-dsv4pro       — vanilla OpenRouter gateway, NO orchestrator config (plain chat use).
+# Only ONE orchestrator session ('orch') runs at a time (single worker-pane marker); to switch
+# Manager models, run `orch-kill` first. See Orchestrator.md.
+
+# Interactive cloud model picker — gum dropdown for model + thinking effort.
+# Usage: pi-cloud [extra pi flags...]
+pi-cloud() {
+  local model_choice model_key model_flag default_thinking thinking_choice
+  local -a thinking_opts
+
+  model_choice=$(gum choose \
+    --header "pi · select model" \
+    "dsv4pro   DeepSeek V4 Pro" \
+    "dsv4fl    DeepSeek V4 Flash" \
+    "opus      Claude Opus 4.8") || return 1
+  [[ -z "$model_choice" ]] && return 1
+
+  model_key="${model_choice%%[ ]*}"
+  case "$model_key" in
+    dsv4pro) model_flag="openrouter/deepseek/deepseek-v4-pro";  default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
+    dsv4fl)  model_flag="openrouter/deepseek/deepseek-v4-flash"; default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
+    opus)    model_flag="openrouter/anthropic/claude-opus-4.8";  default_thinking="high";  thinking_opts=("low" "medium" "high") ;;
+    *)       return 1 ;;
+  esac
+
+  thinking_choice=$(gum choose \
+    --header "pi · thinking effort  (default: $default_thinking)" \
+    --selected "$default_thinking" \
+    "${thinking_opts[@]}") || return 1
+  [[ -z "$thinking_choice" ]] && return 1
+
+  local _state_dir="$HOME/.pi/running"
+  mkdir -p "$_state_dir"
+  local _state_file="$_state_dir/$$.state"
+  printf 'type=pi-cloud\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
+  { pi --model "$model_flag" --thinking "$thinking_choice" "$@" } always { rm -f "$_state_file" }
+}
+
+# Manager-identity launchers (orchestrator mode + ~/.pi/manager-agent dir).
+alias pi-mgr-dsv4pro="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi --model openrouter/deepseek/deepseek-v4-pro --thinking xhigh"
+alias pi-mgr-dsv4fl="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi --model openrouter/deepseek/deepseek-v4-flash --thinking xhigh"
+alias pi-mgr-opus="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi --model openrouter/anthropic/claude-opus-4.8 --thinking high"
+
+# Interactive orchestrator launcher — gum model + thinking pickers, then hands off to orch-session.sh.
+pi-orch() {
+  rm -f "$HOME/.pi/orch-safe-level" "$HOME/.pi/orch-safe-target"
+  local model_choice model_key model_flag default_thinking thinking_choice
+  local -a thinking_opts
+
+  model_choice=$(gum choose \
+    --header "pi-orch · select manager model" \
+    "dsv4pro   DeepSeek V4 Pro" \
+    "dsv4fl    DeepSeek V4 Flash" \
+    "opus      Claude Opus 4.8") || return 1
+  [[ -z "$model_choice" ]] && return 1
+
+  model_key="${model_choice%%[ ]*}"
+  case "$model_key" in
+    dsv4pro) model_flag="openrouter/deepseek/deepseek-v4-pro";  default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
+    dsv4fl)  model_flag="openrouter/deepseek/deepseek-v4-flash"; default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
+    opus)    model_flag="openrouter/anthropic/claude-opus-4.8";  default_thinking="high";  thinking_opts=("low" "medium" "high") ;;
+    *)       return 1 ;;
+  esac
+
+  thinking_choice=$(gum choose \
+    --header "pi-orch · thinking effort  (default: $default_thinking)" \
+    --selected "$default_thinking" \
+    "${thinking_opts[@]}") || return 1
+  [[ -z "$thinking_choice" ]] && return 1
+
+  local mgr_cmd="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi --model $model_flag --thinking $thinking_choice"
+  "$HOME/.pi/orch-session.sh" "$mgr_cmd"
+}
+
+# tmux session helpers
+alias orch-attach="tmux attach -t orch"
+alias orch-kill="tmux kill-session -t orch 2>/dev/null && echo 'orch session killed' || echo 'no orch session running'"
+alias orch-logs="ls -lt \"\$HOME/.pi/orch-logs\" 2>/dev/null | head -20"
+alias orch-dump="node \"\$HOME/.pi/orch-dump.mjs\""
+
+# Fully sandboxed Orchestrator launcher (Manager + Worker containerized).
+pi-orch-safe() {
+  local target="${1:-$PWD}" abs_target abs_dir is_file=0
+
+  abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
+  if [[ -f "$abs_target" ]]; then
+    is_file=1
+    abs_dir="$(dirname "$abs_target")"
+  elif [[ -d "$abs_target" ]]; then
+    abs_dir="$abs_target"
+  else
+    echo "Error: '$target' does not exist."
+    return 1
+  fi
+
+  local level
+  level=$(gum choose \
+    --header "pi-orch-safe · isolation level" \
+    "1   write to dir  +  read all of \$HOME" \
+    "2   write to dir  +  no read elsewhere" \
+    "3   write to single file only") || return 1
+  level="${level%%[ ]*}"
+
+  if [[ "$level" == "3" && (( !is_file )) ]]; then
+    echo "Error: level 3 requires a file path, not a directory."
+    return 1
+  fi
+
+  local model_choice model_key model_flag default_thinking thinking_choice
+  local -a thinking_opts
+
+  model_choice=$(gum choose \
+    --header "pi-orch-safe · select manager model" \
+    "dsv4pro   DeepSeek V4 Pro" \
+    "dsv4fl    DeepSeek V4 Flash" \
+    "opus      Claude Opus 4.8") || return 1
+  [[ -z "$model_choice" ]] && return 1
+
+  model_key="${model_choice%%[ ]*}"
+  case "$model_key" in
+    dsv4pro) model_flag="openrouter/deepseek/deepseek-v4-pro";  default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
+    dsv4fl)  model_flag="openrouter/deepseek/deepseek-v4-flash"; default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
+    opus)    model_flag="openrouter/anthropic/claude-opus-4.8";  default_thinking="high";  thinking_opts=("low" "medium" "high") ;;
+  esac
+
+  thinking_choice=$(gum choose \
+    --header "pi-orch-safe · thinking effort  (default: $default_thinking)" \
+    --selected "$default_thinking" \
+    "${thinking_opts[@]}") || return 1
+  [[ -z "$thinking_choice" ]] && return 1
+
+  echo "$level" > "$HOME/.pi/orch-safe-level"
+  echo "$abs_target" > "$HOME/.pi/orch-safe-target"
+
+  local mgr_cmd="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi-safe-${level} \"$abs_target\" --model $model_flag --thinking $thinking_choice"
+  "$HOME/.pi/orch-session.sh" "$mgr_cmd"
+}
+
+# Interactive cloud model picker for tau (pi without Stata skills).
+# Usage: tau-cloud [extra pi flags...]
+tau-cloud() {
+  local model_choice model_key model_flag default_thinking thinking_choice
+  local -a thinking_opts
+
+  model_choice=$(gum choose \
+    --header "tau · select model" \
+    "dsv4pro   DeepSeek V4 Pro" \
+    "dsv4fl    DeepSeek V4 Flash" \
+    "opus      Claude Opus 4.8") || return 1
+  [[ -z "$model_choice" ]] && return 1
+
+  model_key="${model_choice%%[ ]*}"
+  case "$model_key" in
+    dsv4pro) model_flag="openrouter/deepseek/deepseek-v4-pro";  default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
+    dsv4fl)  model_flag="openrouter/deepseek/deepseek-v4-flash"; default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
+    opus)    model_flag="openrouter/anthropic/claude-opus-4.8";  default_thinking="high";  thinking_opts=("low" "medium" "high") ;;
+    *)       return 1 ;;
+  esac
+
+  thinking_choice=$(gum choose \
+    --header "tau · thinking effort  (default: $default_thinking)" \
+    --selected "$default_thinking" \
+    "${thinking_opts[@]}") || return 1
+  [[ -z "$thinking_choice" ]] && return 1
+
+  local _state_dir="$HOME/.pi/running"
+  mkdir -p "$_state_dir"
+  local _state_file="$_state_dir/$$.state"
+  printf 'type=tau-cloud\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
+  { tau --model "$model_flag" --thinking "$thinking_choice" "$@" } always { rm -f "$_state_file" }
+}
+
+# --- STATA TMUX HELPERS ---
+alias stata-tmux="tmux new-session -d -s stata '/usr/local/stata19/stata-mp' && echo 'Stata started in tmux session: stata (attach with stata-attach)'"
+alias stata-attach="tmux attach -t stata"
+alias stata-kill="tmux kill-session -t stata 2>/dev/null && echo 'stata session killed' || echo 'no stata session running'"
 
 # --- GOOSE ALIASES ---
 

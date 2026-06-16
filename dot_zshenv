@@ -29,3 +29,9 @@ path=(
   $path
 )
 export PATH
+
+# Source local untracked variables
+if [[ -f "$HOME/.zshenv.local" ]]; then
+  source "$HOME/.zshenv.local"
+fi
+
