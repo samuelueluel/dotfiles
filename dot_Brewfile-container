@@ -15,3 +15,6 @@ brew "wget"        # standard downloader
 brew "yq"          # YAML/TOML processor
 brew "pi-coding-agent" # the AI agent itself
 brew "eza"             # ls replacement
+brew "tmux"            # terminal multiplexer for consultation workflows
+brew "uv"              # Python package installer/runner — needed for mcp-stata via uvx
+brew "ncurses"         # required by Stata's shared library (pystata / mcp-stata)

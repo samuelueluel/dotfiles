@@ -62,13 +62,8 @@
 - AI: Tau cloud agent (model + thinking picker) | tau-cloud
 - AI: Pi sandboxed (path + isolation picker) | pi-safe
 - AI: Tau sandboxed (path + isolation picker) | tau-safe
+- AI: Rebuild Pi container image | pi-rebuild
 
-- AI: Pi orchestrator (model + thinking picker) | pi-orch
-- AI: Attach to orchestrator session | orch-attach
-- AI: Kill orchestrator session | orch-kill
-- AI: List archived worker logs | orch-logs
-- AI: Rebuild worker agent dir (after pi update) | bash ~/.pi/build-worker-agent.sh
-- AI: Rebuild manager agent dir (after pi update) | bash ~/.pi/build-manager-agent.sh
 
 - Stata: Start Stata in tmux session | tmux new-session -d -s stata '/usr/local/stata19/stata-mp'
 - Stata: Kill stata tmux session | tmux kill-session -t stata

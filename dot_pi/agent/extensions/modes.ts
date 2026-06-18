@@ -4,8 +4,7 @@ import path from "path";
 import os from "os";
 
 // Mode state
-let currentMode: "plan" | "manual" | "auto" | "orchestrator" = 
-  process.env.PI_DEFAULT_MODE === "orchestrator" ? "orchestrator" :
+let currentMode: "plan" | "manual" | "auto" =
   process.env.PI_DEFAULT_MODE === "plan" ? "plan" :
   (process.argv.includes("-a") || process.argv.includes("--approve")) ? "auto" : "manual";
 
@@ -34,11 +33,6 @@ const COMMON_READ_ONLY = new Set([
   "get_search_content",
   // Export (renders to PDF/HTML/PNG without modifying project files)
   "preview_export",
-  // NOTE: spawn_subagent is deliberately NOT here. It launches a fully autonomous
-  // `pi -a` worker that writes files and runs bash with no gating, so allowing it in
-  // the read-only/gated modes would silently bypass Plan and Manual safety. It is
-  // explicitly permitted only in Orchestrator mode (see the orchestrator branch below),
-  // and falls through to approval-gating in Manual mode.
   // Todo (metadata operations, not project file modifications)
   "todo",
   // Control flow
@@ -434,39 +428,6 @@ export default function (pi: any) {
     },
   });
 
-  pi.registerCommand("orchestrator", {
-    description: "Switch to Orchestrator Mode (Manager-only, delegates to local model)",
-    handler: async (args: any, ctx: any) => {
-      currentMode = "orchestrator";
-      ctx.ui.notify(
-        "Workflow Mode set to ORCHESTRATOR. You are now a manager. You must delegate all tasks via the 'delegate' tool.",
-        "info",
-      );
-    },
-  });
-
-  // Inject system context dynamically into the context stream
-  pi.on("context", (event: any) => {
-    if (currentMode === "orchestrator") {
-      event.messages.push({
-        role: "system",
-        content: [{
-          type: "text",
-          text: `[ORCHESTRATOR MODE] You are a Manager/Architect on an expensive frontier model. Your job is routing and reviewing — not implementing.
-- File writes and code execution go through the \`delegate\` tool. Read-only tools (read, grep, fetch_content, safe bash like cat/grep/echo) are available for quick lookups only, not for grunt work.
-- PASS-THROUGH FIRST: On your first \`delegate\` call, forward the user's request to the worker as-is — skip pre-investigation. Only investigate and add guidance if the worker fails or struggles.
-- NEVER write implementation code in your own thinking or text output. No code blocks, no function bodies, no script content — not even as a "draft." If you notice yourself doing this, stop and call \`delegate\` instead. A one-sentence description ("write a Python script that polls /props and prints model name and n_ctx") is a complete plan.
-- Do NOT do grunt work (counting lines, grepping files, tallying values) in your own reasoning — hand those off too.
-- AFTER THE WORKER REPORTS: Accept a plausible result — the worker ran the code, you didn't. Only re-delegate if the worker explicitly reports an error, the output is clearly incomplete, or a file the worker claims to have written is missing (verify with a read). Do not start a review loop.
-- Pass the worker a SCHEMATIC PLAN (files to create/change, key signatures, libraries, constraints) — not pre-written code.
-- Keep your OUTPUT terse: a brief plan, then the \`delegate\` call. Do not echo the worker's code back to the user.
-- The worker is a slow local model with a blank context. If a \`delegate\` call times out, RAISE timeoutSeconds and/or split the task; do NOT lower the timeout. A timed-out worker may have written files before being killed — check the working tree.
-- On failure: diagnose from the worker's trace and hand off corrected, still-schematic instructions.`
-        }]
-      });
-    }
-  });
-
   pi.registerCommand("mode", {
     description: "Display the active workflow mode",
     handler: async (args: any, ctx: any) => {
@@ -476,17 +437,6 @@ export default function (pi: any) {
 
   // ── Tool Call Interceptor ──
   pi.on("tool_call", async (event: any, ctx: any) => {
-    // ── 0. 'delegate' is the orchestrator's mandatory tool — block it everywhere else.
-    //    (Both delegate and spawn_subagent register at startup, so the tool exists in
-    //    every session; this keeps it usable only when Orchestrator mode is active.)
-    if (event.toolName === "delegate" && currentMode !== "orchestrator") {
-      ctx.ui.notify(`Blocked 'delegate' — only available in Orchestrator mode.`, "error");
-      return {
-        block: true,
-        reason: `The 'delegate' tool is only for Orchestrator mode (activate it with /orchestrator). In this mode, use 'spawn_subagent' if you need to delegate a messy multi-step task, or just do the work yourself with your normal tools.`,
-      };
-    }
-
     // ── 1. PLAN MODE ──
     if (currentMode === "plan") {
       // Non-bash tools: use the whitelist
@@ -540,36 +490,6 @@ export default function (pi: any) {
           }
         }
       }
-    }
-
-    // ── 4. ORCHESTRATOR MODE ──
-    if (currentMode === "orchestrator") {
-      // Allow bash with the same safe-command filter as Plan mode — cat, grep, echo, git, etc.
-      // This lets the Manager do quick read-only lookups without an extra delegation.
-      // Mutation commands (write, rm, python3, etc.) are still blocked by the filter.
-      if (event.toolName === "bash") {
-        const command = event.input?.command || "";
-        if (!isPlanSafeBashCommand(command)) {
-          const firstCmd = getFirstCommand(command);
-          ctx.ui.notify(`[Orchestrator Mode] Blocked bash: '${firstCmd}'`, "error");
-          return {
-            block: true,
-            reason: `In Orchestrator mode, only read-only bash commands (cat, grep, echo, git, ls, etc.) are allowed. '${firstCmd}' is not in the safe list. Hand this work off to the worker instead.`,
-          };
-        }
-        return {};
-      }
-
-      // MCP tools are named mcp__server__tool — prefix-match to allow all of them.
-      const isReadOnly = COMMON_READ_ONLY.has(event.toolName) || event.toolName.startsWith("mcp__");
-      if (!isReadOnly && event.toolName !== "delegate") {
-        ctx.ui.notify(`[Orchestrator Mode] Blocked tool execution: ${event.toolName}`, "error");
-        return {
-          block: true,
-          reason: `You are in Orchestrator mode. You are not allowed to use '${event.toolName}'. Route this work to the worker using the \`delegate\` tool.`,
-        };
-      }
-      return {};
     }
 
     // ── 2. MANUAL MODE ──

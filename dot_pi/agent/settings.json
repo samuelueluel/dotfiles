@@ -40,8 +40,7 @@
   ],
   "extensions": [
     "extensions/modes.ts",
-    "extensions/powerline-footer.ts",
-    "extensions/spawn-subagent.ts"
+    "extensions/powerline-footer.ts"
   ],
   "lastChangelogVersion": "0.79.2",
   "hideThinkingBlock": false

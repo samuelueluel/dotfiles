@@ -422,6 +422,7 @@ model-check() {
         *deepseek-v4-pro)   _short="dsv4pro" ;;
         *deepseek-v4-flash) _short="dsv4fl"  ;;
         *claude-opus-4*)    _short="opus"    ;;
+        *glm-5.2*)          _short="glm52"   ;;
         *)                  _short="$_m"     ;;
       esac
       printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
@@ -484,7 +485,7 @@ opencode-safe-1() {
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
-    -e TERM \
+    -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
     -v "$HOME":"$HOME":ro \
@@ -526,7 +527,7 @@ opencode-safe-2() {
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
-    -e TERM \
+    -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
     -v "$abs_dir":"$abs_dir" \
@@ -570,7 +571,7 @@ opencode-safe-3() {
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
-    -e TERM \
+    -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
     -v "$abs_file":"$abs_file" \
@@ -616,7 +617,7 @@ pi-safe-1() {
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
-    -e TERM \
+    -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
@@ -626,7 +627,8 @@ pi-safe-1() {
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
     -w "$abs_dir" \
-    localhost/pi-safe:latest "${@:2}"
+    --entrypoint tmux \
+    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
 }
 
 pi-safe-2() {
@@ -657,15 +659,17 @@ pi-safe-2() {
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
-    -e TERM \
+    -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
+    -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
     -w "$abs_dir" \
-    localhost/pi-safe:latest "${@:2}"
+    --entrypoint tmux \
+    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
 }
 
 pi-safe-3() {
@@ -699,329 +703,349 @@ pi-safe-3() {
     --userns=keep-id \
     --security-opt label=disable \
     -e HOME="$HOME" \
-    -e TERM \
+    -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
     -v "$abs_file":"$abs_file" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
+    -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
     --tmpfs /tmp \
     -w "$abs_dir" \
-    localhost/pi-safe:latest "${@:2}"
+    --entrypoint tmux \
+    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
 }
 
-# Gum wrapper: pick isolation level then delegate to pi-safe-N.
-# Accepts a file OR directory as $1. For levels 1-2, a file path is resolved to
-# its parent dir (so write access covers the containing directory). Level 3 requires
-# a file; passing a directory errors. Defaults to $PWD when no path is given.
-pi-safe() {
-  local target="${1:-$PWD}" abs_target abs_dir is_file=0
+# pi-safe-stata-1: pi-safe-1 + Stata binary mounted read-only.
+# The agent can run do-files and read logs. All of $HOME is read-only so datasets
+# in $HOME are readable but not writable — the agent can only write to the project dir.
+# Datasets outside $HOME are invisible (not mounted).
+pi-safe-stata-1() {
+  local target_dir="${1:-$PWD}"
+  local abs_dir="$(realpath "$target_dir")"
 
-  abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
-  if [[ -f "$abs_target" ]]; then
-    is_file=1
-    abs_dir="$(dirname "$abs_target")"
-  elif [[ -d "$abs_target" ]]; then
-    abs_dir="$abs_target"
-  else
-    echo "Error: '$target' does not exist."
+  if [[ "$abs_dir" == "$HOME" ]]; then
+    echo "Error: Cannot run pi-safe-stata-1 with write access to your entire home directory."
     return 1
   fi
 
-  local level
-  level=$(gum choose \
-    --header "pi-safe · isolation level" \
-    "1   write to dir  +  read all of \$HOME" \
-    "2   write to dir  +  no read elsewhere" \
-    "3   write to single file only") || return 1
-  level="${level%%[ ]*}"
+  echo -e "\033[33mWARNING: You are giving Pi WRITE access to directory: $abs_dir (including subdirectories)\033[0m"
+  echo -e "\033[33mAnd READ access to everywhere else in: $HOME\033[0m"
+  echo -e "\033[33mStata is mounted read-only — agent can run do-files and read logs.\033[0m"
+  if read -q "choice?Do you want to proceed? [y/N] "; then
+    echo
+  else
+    echo -e "\nAborted."
+    return 1
+  fi
 
-  case "$level" in
-    1|2) pi-safe-${level} "$abs_dir" "${@:2}" ;;
-    3)
-      if (( !is_file )); then
-        echo "Error: level 3 requires a file path, not a directory."
-        return 1
+  setopt localtraps
+  local container_name="pi-safe-stata-1-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+
+  podman run --init -it --rm \
+    --name "$container_name" \
+    --network=host \
+    --userns=keep-id \
+    --security-opt label=disable \
+    -e HOME="$HOME" \
+    -e TERM=xterm-256color \
+    -e COLORTERM \
+    -e LANG \
+    -e OPENROUTER_API_KEY \
+    -e "PATH=/usr/local/stata19:${PATH}" \
+    -e PYSTATA_HOME=/usr/local/stata19 \
+    -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
+    ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
+    -v "$HOME":"$HOME":ro \
+    -v "$abs_dir":"$abs_dir" \
+    -v "$HOME/.pi":"$HOME/.pi" \
+    -v "$HOME/.agents":"$HOME/.agents":ro \
+    -v /usr/local/stata19:/usr/local/stata19:ro \
+        -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
+    -w "$abs_dir" \
+    --entrypoint tmux \
+    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
+}
+
+# pi-safe-stata-2: Stata binary + write to project dir only. No read access outside
+# the project dir. Use when data and code are co-located in the same directory.
+pi-safe-stata-2() {
+  local target_dir="${1:-$PWD}"
+  local abs_dir="$(realpath "$target_dir")"
+
+  if [[ "$abs_dir" == "$HOME" ]]; then
+    echo "Error: Cannot run pi-safe-stata-2 with write access to your entire home directory."
+    return 1
+  fi
+
+  echo -e "\033[33mWARNING: You are giving Pi WRITE access to directory: $abs_dir (including subdirectories)\033[0m"
+  echo -e "\033[33mPi will have NO read access outside this directory.\033[0m"
+  echo -e "\033[33mStata is mounted read-only — agent can run do-files and read logs.\033[0m"
+  if read -q "choice?Do you want to proceed? [y/N] "; then
+    echo
+  else
+    echo -e "\nAborted."
+    return 1
+  fi
+
+  setopt localtraps
+  local container_name="pi-safe-stata-2-$$"
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+
+  podman run --init -it --rm \
+    --name "$container_name" \
+    --network=host \
+    --userns=keep-id \
+    --security-opt label=disable \
+    -e HOME="$HOME" \
+    -e TERM=xterm-256color \
+    -e COLORTERM \
+    -e LANG \
+    -e OPENROUTER_API_KEY \
+    -e "PATH=/usr/local/stata19:${PATH}" \
+    -e PYSTATA_HOME=/usr/local/stata19 \
+    -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
+    ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
+    -v "$abs_dir":"$abs_dir" \
+    -v "$HOME/.pi":"$HOME/.pi" \
+    -v "$HOME/.agents":"$HOME/.agents":ro \
+    -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
+    -v /usr/local/stata19:/usr/local/stata19:ro \
+        -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
+    -w "$abs_dir" \
+    --entrypoint tmux \
+    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
+}
+
+# ============================================================
+# AGENT LAUNCH COMMANDS
+# ============================================================
+# pi      = local model, Stata skills/binary excluded, optional sandboxing
+# pihat   = cloud model, Stata skills/binary excluded, optional sandboxing
+# beta    = local model, Stata skills + MCP + binary,  always sandboxed
+# betahat = cloud model, Stata skills + MCP + binary,  always sandboxed
+#
+# "Stata skills/binary excluded": no Stata skill files loaded, MCP will not start,
+#   Stata binary never mounted. Use for general coding tasks.
+# "Stata skills + MCP + binary": all Stata skills and MCP config loaded;
+#   /usr/local/stata19 mounted so the agent can actually run do-files.
+#
+# pihat / betahat write a state file to ~/.pi/running/ for status monitoring.
+
+# Helper: populate global _PI_SKILL_ARGS with --no-skills + --skill for all skills except stata*
+_pi_nonstata_skills() {
+  typeset -ga _PI_SKILL_ARGS
+  _PI_SKILL_ARGS=("--no-skills")
+  local s
+  for s in ~/.agents/skills/*; do
+    [[ -d "$s" ]] || continue
+    [[ "${s:t}" == stata* ]] && continue
+    _PI_SKILL_ARGS+=("--skill" "$s")
+  done
+  for s in ~/.pi/agent/skills/*; do
+    [[ -d "$s" ]] || continue
+    _PI_SKILL_ARGS+=("--skill" "$s")
+  done
+}
+
+pi() {
+  _pi_nonstata_skills
+
+  local go
+  go=$(gum choose --header "pi · run in container?" \
+    "no   unsandboxed" \
+    "yes  sandboxed") || return 1
+
+  case "${go%%[ ]*}" in
+    no)
+      command pi "${_PI_SKILL_ARGS[@]}" "$@"
+      ;;
+    yes)
+      local target="${1:-$PWD}" abs_target is_file=0
+      abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
+      [[ -f "$abs_target" ]] && is_file=1
+
+      local level
+      level=$(gum choose --header "pi · isolation level" \
+        "1   write to dir  +  read all of \$HOME" \
+        "2   write to dir  +  no read elsewhere" \
+        "3   write to single file only") || return 1
+      level="${level%%[ ]*}"
+
+      if [[ "$level" == "3" ]] && (( !is_file )); then
+        echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
-      pi-safe-3 "$abs_target" "${@:2}"
+
+      pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" "${@:2}"
       ;;
   esac
 }
 
-# tau: pi with all skills loaded EXCEPT Stata
-tau() {
-  local args=()
-  for s in ~/.agents/skills/*; do
-    [[ -d "$s" ]] || continue
-    [[ "${s:t}" == stata* ]] && continue
-    args+=("--skill" "$s")
-  done
-  for s in ~/.pi/agent/skills/*; do
-    [[ -d "$s" ]] || continue
-    args+=("--skill" "$s")
-  done
-  command pi --no-skills "${args[@]}" "$@"
-}
+pihat() {
+  local model_choice model_key model_flag default_thinking thinking_choice
+  local -a thinking_opts
 
-# tau-safe-N: sandboxed pi-safe with all skills EXCEPT Stata
-tau-safe-1() {
-  local args=("--no-skills")
-  local s
-  for s in ~/.agents/skills/*; do
-    [[ -d "$s" ]] || continue
-    [[ "${s:t}" == stata* ]] && continue
-    args+=("--skill" "$s")
-  done
-  for s in ~/.pi/agent/skills/*; do
-    [[ -d "$s" ]] || continue
-    args+=("--skill" "$s")
-  done
-  pi-safe-1 "$1" "${args[@]}" "${@:2}"
-}
+  model_choice=$(gum choose \
+    --header "pihat · select model" \
+    "dsv4pro   DeepSeek V4 Pro" \
+    "dsv4fl    DeepSeek V4 Flash" \
+    "opus      Claude Opus 4.8" \
+    "glm52     GLM 5.2") || return 1
+  [[ -z "$model_choice" ]] && return 1
 
-tau-safe-2() {
-  local args=("--no-skills")
-  local s
-  for s in ~/.agents/skills/*; do
-    [[ -d "$s" ]] || continue
-    [[ "${s:t}" == stata* ]] && continue
-    args+=("--skill" "$s")
-  done
-  for s in ~/.pi/agent/skills/*; do
-    [[ -d "$s" ]] || continue
-    args+=("--skill" "$s")
-  done
-  pi-safe-2 "$1" "${args[@]}" "${@:2}"
-}
+  model_key="${model_choice%%[ ]*}"
+  case "$model_key" in
+    dsv4pro) 
+      model_flag="openrouter/deepseek/deepseek-v4-pro"
+      default_thinking="xhigh"
+      thinking_opts=("high" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
+      ;;
+    dsv4fl)  
+      model_flag="openrouter/deepseek/deepseek-v4-flash"
+      default_thinking="xhigh"
+      thinking_opts=("high" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
+      ;;
+    opus)
+      model_flag="openrouter/anthropic/claude-opus-4.8"
+      default_thinking="high"
+      thinking_opts=("low" "medium" "high")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    glm52)
+      model_flag="openrouter/z-ai/glm-5.2"
+      default_thinking="xhigh"
+      thinking_opts=("high" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    *)       return 1 ;;
+  esac
 
-tau-safe-3() {
-  local args=("--no-skills")
-  local s
-  for s in ~/.agents/skills/*; do
-    [[ -d "$s" ]] || continue
-    [[ "${s:t}" == stata* ]] && continue
-    args+=("--skill" "$s")
-  done
-  for s in ~/.pi/agent/skills/*; do
-    [[ -d "$s" ]] || continue
-    args+=("--skill" "$s")
-  done
-  pi-safe-3 "$1" "${args[@]}" "${@:2}"
-}
+  thinking_choice=$(gum choose \
+    --header "pihat · thinking effort  (default: $default_thinking)" \
+    --selected "$default_thinking" \
+    "${thinking_opts[@]}") || return 1
+  [[ -z "$thinking_choice" ]] && return 1
 
-# Gum wrapper: pick isolation level then delegate to tau-safe-N.
-# Same path-resolution logic as pi-safe.
-tau-safe() {
-  local target="${1:-$PWD}" abs_target abs_dir is_file=0
+  _pi_nonstata_skills
 
-  abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
-  if [[ -f "$abs_target" ]]; then
-    is_file=1
-    abs_dir="$(dirname "$abs_target")"
-  elif [[ -d "$abs_target" ]]; then
-    abs_dir="$abs_target"
-  else
-    echo "Error: '$target' does not exist."
-    return 1
-  fi
+  local go
+  go=$(gum choose --header "pihat · run in container?" \
+    "no   unsandboxed" \
+    "yes  sandboxed") || return 1
 
-  local level
-  level=$(gum choose \
-    --header "tau-safe · isolation level" \
-    "1   write to dir  +  read all of \$HOME" \
-    "2   write to dir  +  no read elsewhere" \
-    "3   write to single file only") || return 1
-  level="${level%%[ ]*}"
+  local _state_dir="$HOME/.pi/running"
+  mkdir -p "$_state_dir"
+  local _state_file="$_state_dir/$$.state"
+  printf 'type=pihat\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
 
-  case "$level" in
-    1|2) tau-safe-${level} "$abs_dir" "${@:2}" ;;
-    3)
-      if (( !is_file )); then
-        echo "Error: level 3 requires a file path, not a directory."
-        return 1
+  case "${go%%[ ]*}" in
+    no)
+      { command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "$@" } \
+        always { rm -f "$_state_file" }
+      ;;
+    yes)
+      local target="${1:-$PWD}" abs_target is_file=0
+      abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
+      [[ -f "$abs_target" ]] && is_file=1
+
+      local level
+      level=$(gum choose --header "pihat · isolation level" \
+        "1   write to dir  +  read all of \$HOME" \
+        "2   write to dir  +  no read elsewhere" \
+        "3   write to single file only") || return 1
+      level="${level%%[ ]*}"
+
+      if [[ "$level" == "3" ]] && (( !is_file )); then
+        echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
-      tau-safe-3 "$abs_target" "${@:2}"
+
+      { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
+        always { rm -f "$_state_file" }
       ;;
   esac
 }
 
-# --- ORCHESTRATOR ALIASES ---
-# Dual-pane tmux Orchestrator: a frontier Manager (left pane) routes execution to the local
-# worker (right pane) via `delegate`. Naming:
-#   pi-orch-<model>  — what you TYPE. Dual-pane SESSION launcher (calls orch-session.sh).
-#   pi-mgr-<model>   — the Manager itself (orchestrator mode + ~/.pi/manager-agent). Run inside
-#                      pane 0 by orch-session.sh; also usable standalone for a single-pane Manager.
-#   pi-dsv4pro       — vanilla OpenRouter gateway, NO orchestrator config (plain chat use).
-# Only ONE orchestrator session ('orch') runs at a time (single worker-pane marker); to switch
-# Manager models, run `orch-kill` first. See Orchestrator.md.
-
-# Interactive cloud model picker — gum dropdown for model + thinking effort.
-# Usage: pi-cloud [extra pi flags...]
-pi-cloud() {
-  local model_choice model_key model_flag default_thinking thinking_choice
-  local -a thinking_opts
-
-  model_choice=$(gum choose \
-    --header "pi · select model" \
-    "dsv4pro   DeepSeek V4 Pro" \
-    "dsv4fl    DeepSeek V4 Flash" \
-    "opus      Claude Opus 4.8") || return 1
-  [[ -z "$model_choice" ]] && return 1
-
-  model_key="${model_choice%%[ ]*}"
-  case "$model_key" in
-    dsv4pro) model_flag="openrouter/deepseek/deepseek-v4-pro";  default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
-    dsv4fl)  model_flag="openrouter/deepseek/deepseek-v4-flash"; default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
-    opus)    model_flag="openrouter/anthropic/claude-opus-4.8";  default_thinking="high";  thinking_opts=("low" "medium" "high") ;;
-    *)       return 1 ;;
-  esac
-
-  thinking_choice=$(gum choose \
-    --header "pi · thinking effort  (default: $default_thinking)" \
-    --selected "$default_thinking" \
-    "${thinking_opts[@]}") || return 1
-  [[ -z "$thinking_choice" ]] && return 1
-
-  local _state_dir="$HOME/.pi/running"
-  mkdir -p "$_state_dir"
-  local _state_file="$_state_dir/$$.state"
-  printf 'type=pi-cloud\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
-  { pi --model "$model_flag" --thinking "$thinking_choice" "$@" } always { rm -f "$_state_file" }
-}
-
-# Manager-identity launchers (orchestrator mode + ~/.pi/manager-agent dir).
-alias pi-mgr-dsv4pro="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi --model openrouter/deepseek/deepseek-v4-pro --thinking xhigh"
-alias pi-mgr-dsv4fl="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi --model openrouter/deepseek/deepseek-v4-flash --thinking xhigh"
-alias pi-mgr-opus="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi --model openrouter/anthropic/claude-opus-4.8 --thinking high"
-
-# Interactive orchestrator launcher — gum model + thinking pickers, then hands off to orch-session.sh.
-pi-orch() {
-  rm -f "$HOME/.pi/orch-safe-level" "$HOME/.pi/orch-safe-target"
-  local model_choice model_key model_flag default_thinking thinking_choice
-  local -a thinking_opts
-
-  model_choice=$(gum choose \
-    --header "pi-orch · select manager model" \
-    "dsv4pro   DeepSeek V4 Pro" \
-    "dsv4fl    DeepSeek V4 Flash" \
-    "opus      Claude Opus 4.8") || return 1
-  [[ -z "$model_choice" ]] && return 1
-
-  model_key="${model_choice%%[ ]*}"
-  case "$model_key" in
-    dsv4pro) model_flag="openrouter/deepseek/deepseek-v4-pro";  default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
-    dsv4fl)  model_flag="openrouter/deepseek/deepseek-v4-flash"; default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
-    opus)    model_flag="openrouter/anthropic/claude-opus-4.8";  default_thinking="high";  thinking_opts=("low" "medium" "high") ;;
-    *)       return 1 ;;
-  esac
-
-  thinking_choice=$(gum choose \
-    --header "pi-orch · thinking effort  (default: $default_thinking)" \
-    --selected "$default_thinking" \
-    "${thinking_opts[@]}") || return 1
-  [[ -z "$thinking_choice" ]] && return 1
-
-  local mgr_cmd="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi --model $model_flag --thinking $thinking_choice"
-  "$HOME/.pi/orch-session.sh" "$mgr_cmd"
-}
-
-# tmux session helpers
-alias orch-attach="tmux attach -t orch"
-alias orch-kill="tmux kill-session -t orch 2>/dev/null && echo 'orch session killed' || echo 'no orch session running'"
-alias orch-logs="ls -lt \"\$HOME/.pi/orch-logs\" 2>/dev/null | head -20"
-alias orch-dump="node \"\$HOME/.pi/orch-dump.mjs\""
-
-# Fully sandboxed Orchestrator launcher (Manager + Worker containerized).
-pi-orch-safe() {
-  local target="${1:-$PWD}" abs_target abs_dir is_file=0
-
+beta() {
+  local target="${1:-$PWD}" abs_target
   abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
-  if [[ -f "$abs_target" ]]; then
-    is_file=1
-    abs_dir="$(dirname "$abs_target")"
-  elif [[ -d "$abs_target" ]]; then
-    abs_dir="$abs_target"
-  else
-    echo "Error: '$target' does not exist."
-    return 1
-  fi
+  [[ -d "$abs_target" ]] || { echo "Error: '$target' is not a directory."; return 1; }
 
   local level
-  level=$(gum choose \
-    --header "pi-orch-safe · isolation level" \
-    "1   write to dir  +  read all of \$HOME" \
-    "2   write to dir  +  no read elsewhere" \
-    "3   write to single file only") || return 1
+  level=$(gum choose --header "beta · isolation level" \
+    "1   write to dir  +  read all of \$HOME  +  Stata binary mounted" \
+    "2   write to dir  +  no read elsewhere   +  Stata binary mounted") || return 1
   level="${level%%[ ]*}"
 
-  if [[ "$level" == "3" && (( !is_file )) ]]; then
-    echo "Error: level 3 requires a file path, not a directory."
-    return 1
-  fi
-
-  local model_choice model_key model_flag default_thinking thinking_choice
-  local -a thinking_opts
-
-  model_choice=$(gum choose \
-    --header "pi-orch-safe · select manager model" \
-    "dsv4pro   DeepSeek V4 Pro" \
-    "dsv4fl    DeepSeek V4 Flash" \
-    "opus      Claude Opus 4.8") || return 1
-  [[ -z "$model_choice" ]] && return 1
-
-  model_key="${model_choice%%[ ]*}"
-  case "$model_key" in
-    dsv4pro) model_flag="openrouter/deepseek/deepseek-v4-pro";  default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
-    dsv4fl)  model_flag="openrouter/deepseek/deepseek-v4-flash"; default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
-    opus)    model_flag="openrouter/anthropic/claude-opus-4.8";  default_thinking="high";  thinking_opts=("low" "medium" "high") ;;
-  esac
-
-  thinking_choice=$(gum choose \
-    --header "pi-orch-safe · thinking effort  (default: $default_thinking)" \
-    --selected "$default_thinking" \
-    "${thinking_opts[@]}") || return 1
-  [[ -z "$thinking_choice" ]] && return 1
-
-  echo "$level" > "$HOME/.pi/orch-safe-level"
-  echo "$abs_target" > "$HOME/.pi/orch-safe-target"
-
-  local mgr_cmd="PI_DEFAULT_MODE=orchestrator PI_CODING_AGENT_DIR=\"$HOME/.pi/manager-agent\" pi-safe-${level} \"$abs_target\" --model $model_flag --thinking $thinking_choice"
-  "$HOME/.pi/orch-session.sh" "$mgr_cmd"
+  pi-safe-stata-${level} "${abs_target}" "${@:2}"
 }
 
-# Interactive cloud model picker for tau (pi without Stata skills).
-# Usage: tau-cloud [extra pi flags...]
-tau-cloud() {
+betahat() {
   local model_choice model_key model_flag default_thinking thinking_choice
   local -a thinking_opts
 
   model_choice=$(gum choose \
-    --header "tau · select model" \
+    --header "betahat · select model" \
     "dsv4pro   DeepSeek V4 Pro" \
     "dsv4fl    DeepSeek V4 Flash" \
-    "opus      Claude Opus 4.8") || return 1
+    "opus      Claude Opus 4.8" \
+    "glm52     GLM 5.2") || return 1
   [[ -z "$model_choice" ]] && return 1
 
   model_key="${model_choice%%[ ]*}"
   case "$model_key" in
-    dsv4pro) model_flag="openrouter/deepseek/deepseek-v4-pro";  default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
-    dsv4fl)  model_flag="openrouter/deepseek/deepseek-v4-flash"; default_thinking="xhigh"; thinking_opts=("high" "xhigh") ;;
-    opus)    model_flag="openrouter/anthropic/claude-opus-4.8";  default_thinking="high";  thinking_opts=("low" "medium" "high") ;;
+    dsv4pro) 
+      model_flag="openrouter/deepseek/deepseek-v4-pro"
+      default_thinking="xhigh"
+      thinking_opts=("high" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
+      ;;
+    dsv4fl)  
+      model_flag="openrouter/deepseek/deepseek-v4-flash"
+      default_thinking="xhigh"
+      thinking_opts=("high" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
+      ;;
+    opus)
+      model_flag="openrouter/anthropic/claude-opus-4.8"
+      default_thinking="high"
+      thinking_opts=("low" "medium" "high")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    glm52)
+      model_flag="openrouter/z-ai/glm-5.2"
+      default_thinking="xhigh"
+      thinking_opts=("high" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
     *)       return 1 ;;
   esac
 
   thinking_choice=$(gum choose \
-    --header "tau · thinking effort  (default: $default_thinking)" \
+    --header "betahat · thinking effort  (default: $default_thinking)" \
     --selected "$default_thinking" \
     "${thinking_opts[@]}") || return 1
   [[ -z "$thinking_choice" ]] && return 1
 
+  local target="${1:-$PWD}" abs_target
+  abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
+  [[ -d "$abs_target" ]] || { echo "Error: '$target' is not a directory."; return 1; }
+
+  local level
+  level=$(gum choose --header "betahat · isolation level" \
+    "1   write to dir  +  read all of \$HOME  +  Stata binary mounted" \
+    "2   write to dir  +  no read elsewhere   +  Stata binary mounted") || return 1
+  level="${level%%[ ]*}"
+
   local _state_dir="$HOME/.pi/running"
   mkdir -p "$_state_dir"
   local _state_file="$_state_dir/$$.state"
-  printf 'type=tau-cloud\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
-  { tau --model "$model_flag" --thinking "$thinking_choice" "$@" } always { rm -f "$_state_file" }
+  printf 'type=betahat\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
+  { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
+    always { rm -f "$_state_file" }
 }
 
 # --- STATA TMUX HELPERS ---
@@ -1252,6 +1276,7 @@ Aborted."
     -v "$HOME/.local/share/goose":"$HOME/.local/share/goose" \
     -v "/home/linuxbrew/.linuxbrew":"/home/linuxbrew/.linuxbrew":ro \
     -v "$HOME/.agents":"$HOME/.agents":ro \
+    -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
     -w "$abs_dir" \
     localhost/goose-safe:latest session "${clean_args[@]}"
     
@@ -1330,6 +1355,7 @@ Aborted."
     -v "$HOME/.local/share/goose":"$HOME/.local/share/goose" \
     -v "/home/linuxbrew/.linuxbrew":"/home/linuxbrew/.linuxbrew":ro \
     -v "$HOME/.agents":"$HOME/.agents":ro \
+    -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
     --tmpfs /tmp \
     -w "$abs_dir" \
     localhost/goose-safe:latest session "${clean_args[@]}"

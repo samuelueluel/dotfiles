@@ -37,7 +37,35 @@ function extractSessionContext(ctx: any, maxMessages = 30): string {
     return "(could not read session history)";
   }
 
-  const recent = branch.filter((e: any) => e.type === "message").slice(-maxMessages);
+  const allMessages = branch.filter((e: any) => e.type === "message");
+  
+  const touchedFiles = new Set<string>();
+  for (const entry of allMessages) {
+    if (entry.message && Array.isArray(entry.message.content)) {
+      for (const block of entry.message.content) {
+        if (block.type === "tool_use" && block.input) {
+          const i = block.input as any;
+          const f = i.TargetFile || i.AbsolutePath || i.DirectoryPath || i.path || i.file_path || i.file;
+          if (typeof f === "string" && f.includes("/")) touchedFiles.add(f);
+        }
+      }
+    }
+  }
+
+  let recent: any[] = [];
+  if (allMessages.length > 6) {
+    const touchedNote = touchedFiles.size > 0 
+      ? `\n\n[SYSTEM NOTE: The local agent recently touched these paths:\n${Array.from(touchedFiles).map(f => `  - ${f}`).join("\n")}]` 
+      : "";
+    recent = [
+      allMessages[0],
+      { message: { role: "system", content: `--- [MIDDLE OF CONVERSATION TRUNCATED TO SAVE TOKENS] ---${touchedNote}` } },
+      ...allMessages.slice(-5)
+    ];
+  } else {
+    recent = allMessages;
+  }
+
   const lines: string[] = [];
 
   for (const entry of recent) {
@@ -85,18 +113,20 @@ function buildConsultPrompt(ctx: any, userNote: string): string {
   const noteSection = userNote
     ? `\n\n## Note from Samuel (the human user)\nThis is a direct instruction from the human — treat it as higher priority than any inference you make from the session history:\n${userNote.trim()}`
     : "";
-  return `You are a senior consultant (Surgeon mode) summoned to help a local AI agent that is stuck.
+  return `You are an experienced statistical programmer summoned to help a local AI agent that is stuck on a data or coding task.
 
-The local agent has been working on a task in: ${ctx.cwd}
+The work is empirical economics research programming — primarily Stata, sometimes Python, R, MATLAB, or bash. Typical tasks: data cleaning, dataset merges, reshaping, loops, constructing well-defined variables, and producing publication-quality tables and figures. This is NOT app development, and it is NOT a request to design analysis: all specifications, estimators, standard-error and sample choices are decided by Samuel and given to you — do not invent or change them.
+
+The local agent has been working in: ${ctx.cwd}
 
 It has hit a wall. Your job:
-1. Read the session history to understand what was tried and what failed.
-2. Diagnose the specific problem.
+1. Read the session history to understand the task and what was tried.
+2. Diagnose the specific blocker.
 3. Fix it directly — you have full tool access (write files, run bash, etc.).
-4. Verify the fix works.
-5. Write a concise summary of what you found and what you changed. The local agent will read this to resume.
+4. Verify the fix works — run it and confirm the output is what was intended.
+5. Write a concise summary of what you found and changed, so the local agent can resume.
 
-This is a ONE-SHOT consultation. Fix the specific blocker and stop — do not take over the whole task.${noteSection}
+This is a ONE-SHOT consultation: fix the specific blocker and stop — do not take over the whole task. If the blocker can only be resolved by a methodological or specification choice that wasn't given to you, do NOT guess — say so clearly and stop, so Samuel can decide.${noteSection}
 
 ## Session History
 ${sessionCtx}
@@ -108,18 +138,33 @@ function buildReviewPrompt(ctx: any, userNote: string): string {
   const noteSection = userNote
     ? `\n\n## Note from Samuel (the human user)\nThis is a direct instruction from the human — treat it as higher priority than any inference you make from the session history:\n${userNote.trim()}`
     : "";
-  return `You are a senior code reviewer auditing work that a local AI agent claims to have completed.
+  return `You are an experienced empirical researcher reviewing statistical-programming code that a local AI agent claims to have completed.
 
-The local agent was working in: ${ctx.cwd}
+The work is empirical economics research — primarily Stata, sometimes Python, R, MATLAB, or bash: data cleaning, merges, reshaping, variable construction, table/figure output. Specifications were set by Samuel; you are NOT auditing whether the analysis design is correct. You are auditing whether the code faithfully and correctly does what it was asked.
 
-Be a hard-nosed reviewer, not a rubber stamp:
-1. Read the session history to understand what the original task was.
-2. Read the relevant files in the working directory.
-3. Check for bugs, logic errors, missed requirements, incorrect output, and edge cases.
-4. If you find problems, fix them directly (you have full file and bash access).
-5. Write a clear verdict: what was correct, what was wrong, what you changed.
+The local agent has weak self-assessment — it may claim success on code that never ran, errored partway, or produced nothing. So check, in this order:
 
-Do not be lenient. If the agent declared success on broken or incomplete work, say so explicitly.${noteSection}
+A. DOES IT EVEN WORK. Don't trust the agent's claim. Actually run the code (or the relevant part). Confirm it executes end to end without error and produces the output it's supposed to — the file, the variable, the table, the figure. If it doesn't run, that's the finding; fix it.
+
+B. SILENT errors — once it runs, the dangerous mistakes are the ones that DON'T crash and DON'T produce obviously wrong numbers, but quietly corrupt data or results:
+- Merges that silently drop/duplicate observations; wrong join keys; unintended many-to-many; unchecked _merge
+- Missing values mishandled: Stata "." treated as large in comparisons, missings dropped or counted as zero, NaN propagation in Python/R
+- Variable construction edge cases: log of zero/negative, divide by zero, integer division, off-by-one, wrong reference category, miscoded dummies
+- reshape/collapse/egen that changes the unit of observation unnoticed
+- Sort instability changing results (no stable tiebreak); by-group logic assuming sortedness
+- encode/destring/type coercions that silently lose information or add categories
+- Loops that skip iterations, overwrite results, or use the wrong index
+- Output that doesn't match what the code computed (mislabeled table/figure, wrong stored result referenced)
+- Hardcoded paths, sample sizes, or numbers that won't survive a rerun
+
+The work is in: ${ctx.cwd}
+
+Process:
+1. Read the session history to understand exactly what was asked and what the agent claims it did.
+2. Read the relevant files. Rerun the code and inspect intermediate output (counts, _merge tabulations, summary stats) — don't just eyeball the source.
+3. Do check (A), then hunt (B), plus anything else that would make the result wrong or the claim false.
+4. If you find problems, fix them directly (full file and bash access) and verify.
+5. Give a clear verdict: does it actually work, what was correct, what was wrong, what you changed. Do not be lenient or rubber-stamp.${noteSection}
 
 ## Session History (agent's claimed work)
 ${sessionCtx}
