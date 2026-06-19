@@ -1,6 +1,6 @@
 {
   "defaultProvider": "local",
-  "defaultModel": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+  "defaultModel": "Qwen3.6-Dense-27B-Q4",
   "theme": "noctalia",
   "skills": [
     "/var/home/samuel/.agents/skills"
@@ -42,6 +42,6 @@
     "extensions/modes.ts",
     "extensions/powerline-footer.ts"
   ],
-  "lastChangelogVersion": "0.79.2",
+  "lastChangelogVersion": "0.79.6",
   "hideThinkingBlock": false
 }

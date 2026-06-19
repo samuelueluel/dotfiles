@@ -469,7 +469,7 @@ opencode-safe-1() {
 
   setopt localtraps
   local container_name="opencode-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -511,7 +511,7 @@ opencode-safe-2() {
 
   setopt localtraps
   local container_name="opencode-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -555,7 +555,7 @@ opencode-safe-3() {
 
   setopt localtraps
   local container_name="opencode-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -601,7 +601,7 @@ pi-safe-1() {
 
   setopt localtraps
   local container_name="pi-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -643,7 +643,7 @@ pi-safe-2() {
 
   setopt localtraps
   local container_name="pi-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -687,7 +687,7 @@ pi-safe-3() {
 
   setopt localtraps
   local container_name="pi-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -734,7 +734,7 @@ pi-safe-stata-1() {
 
   setopt localtraps
   local container_name="pi-safe-stata-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -784,7 +784,7 @@ pi-safe-stata-2() {
 
   setopt localtraps
   local container_name="pi-safe-stata-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -871,6 +871,30 @@ for m in loaded:
 print("slots (loaded/max): " + "  ".join(
     "%s=%d/%s" % (k, counts.get(k, 0), v) for k, v in mm.items()))
 '
+
+  # Cloud agents (pihat / betahat) — state files written at launch, removed on exit
+  echo ""
+  local _state_dir="$HOME/.pi/running"
+  local _found_pi=0 _f _spid _type _m _t _short
+  if [[ -d "$_state_dir" ]]; then
+    for _f in "$_state_dir"/*.state(N); do
+      _spid="${${_f:t}%.state}"
+      kill -0 "$_spid" 2>/dev/null || { rm -f "$_f"; continue; }
+      _type=$(grep '^type=' "$_f" | cut -d= -f2)
+      _m=$(grep    '^model=' "$_f" | cut -d= -f2)
+      _t=$(grep    '^thinking=' "$_f" | cut -d= -f2)
+      case "$_m" in
+        *deepseek-v4-pro)   _short="dsv4pro" ;;
+        *deepseek-v4-flash) _short="dsv4fl"  ;;
+        *claude-opus-4*)    _short="opus"    ;;
+        *glm-5.2*)          _short="glm52"   ;;
+        *)                  _short="$_m"     ;;
+      esac
+      printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
+      _found_pi=1
+    done
+  fi
+  (( _found_pi )) || printf '  cloud     —\n'
 }
 
 # lem-unload: drop ALL models from RAM (server stays up, weights stay on disk)
@@ -1257,7 +1281,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   local tmpfile=""
   local moim_arg=""
@@ -1333,7 +1357,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   local tmpfile=""
   local moim_arg=""
@@ -1412,7 +1436,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM
+  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
 
   local tmpfile=""
   local moim_arg=""

@@ -1,11 +1,20 @@
 [mgr]
 prepend_keymap = [
+	# Sort overrides to auto-switch column linemode
+	{ on = [ ",", "m" ], run = [ "sort mtime --reverse=no", "linemode mtime" ], desc = "Sort by modified time (show modified time)" },
+	{ on = [ ",", "M" ], run = [ "sort mtime --reverse=yes", "linemode mtime" ], desc = "Sort by modified time (reverse, show modified time)" },
+	{ on = [ ",", "b" ], run = [ "sort btime --reverse=no", "linemode btime" ], desc = "Sort by birth time (show birth time)" },
+	{ on = [ ",", "B" ], run = [ "sort btime --reverse=yes", "linemode btime" ], desc = "Sort by birth time (reverse, show birth time)" },
+	{ on = [ ",", "s" ], run = [ "sort size --reverse=no", "linemode size" ], desc = "Sort by size (show size)" },
+	{ on = [ ",", "S" ], run = [ "sort size --reverse=yes", "linemode size" ], desc = "Sort by size (reverse, show size)" },
+
 	{ on = "<C-Space>", run = "cd --interactive", desc = "Change directory interactively" },
 { on = "<C-f>", run = "plugin fzf-nav", desc = "Fuzzy jump (fzf)" },
 	{ on = "<C-g>", run = "plugin fazif folder_search", desc = "Fuzzy jump to directory (fzf)" },
 	{ on = "<C-h>", run = "shell 'yazi-rg-search' --block", desc = "Search by content (ripgrep)" },
 	{ on = "<C-j>", run = "filter", desc = "Filter files" },
-	{ on = "<C-s>", run = "plugin toggle-pane max-preview", desc = "Maximize/restore preview pane" },
+	{ on = "<C-Left>", run = "plugin toggle-pane max-preview", desc = "Maximize/restore preview pane" },
+	{ on = "<C-Right>", run = "plugin toggle-pane min-preview", desc = "Hide/restore preview pane" },
 	{ on = "<C-a>", run = "create", desc = "Create file/folder" },
 	{ on = "<C-n>", run = "shell 'obsidian-fzf-files' --block", desc = "Fuzzy search Obsidian notes" },
 	{ on = "<C-i>", run = "shell 'obsidian-fzf-search' --block", desc = "Grep Obsidian note content" },
