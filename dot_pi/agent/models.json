@@ -1,0 +1,39 @@
+{
+  "providers": {
+    "local": {
+      "baseUrl": "http://127.0.0.1:13305/api/v1",
+      "api": "openai-completions",
+      "apiKey": "dummy",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "Qwen3.6-MoE-35B-Q4",
+          "name": "Qwen3.6 MoE 35B Q4 (Lemonade)",
+          "reasoning": true,
+          "contextWindow": 262144
+        },
+        {
+          "id": "Qwen3.6-MoE-35B-Q8",
+          "name": "Qwen3.6 MoE 35B Q8 (Lemonade)",
+          "reasoning": true,
+          "contextWindow": 262144
+        },
+        {
+          "id": "Qwen3.6-Dense-27B-Q4",
+          "name": "Qwen3.6 Dense 27B Q4 (Lemonade)",
+          "reasoning": true,
+          "contextWindow": 262144
+        },
+        {
+          "id": "Qwen3.6-Dense-27B-Q8",
+          "name": "Qwen3.6 Dense 27B Q8 (Lemonade)",
+          "reasoning": true,
+          "contextWindow": 262144
+        }
+      ]
+    }
+  }
+}

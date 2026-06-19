@@ -49,20 +49,23 @@
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
 
-- AI: Serve local model (interactive picker) | serve-local
+- AI: Pi agent - local model, sandboxed (model/MTP/parallel picker) | pi
+- AI: Beta agent - local model, Stata-mounted | beta
+- AI: Pi cloud agent (OpenRouter picker) | pihat
+- AI: Beta cloud agent (OpenRouter picker) | betahat
+- AI: Rebuild Pi container image | pi-rebuild
+
+- AI: Lemonade status (loaded models + slots) | lem-status
+- AI: Lemonade unload all models | lem-unload
+- AI: Lemonade logs (downloads / activity) | podman logs --tail 20 lemonade
+- AI: Restart Lemonade (reload recipe/registry) | podman restart lemonade
+
 - AI: Serve autocomplete model (background) | serve-autocomplete
 - AI: Serve vector embedder (background) | serve-embedder
-- AI: Stop main model (:8080) | stop-main
 - AI: Stop autocomplete model | stop-autocomplete
 - AI: Stop vector embedder | stop-embedder
-- AI: Stop all running models | ramalama stop --all
+- AI: Stop all ramalama models | ramalama stop --all
 - AI: Check which models are loaded | model-check
-
-- AI: Pi cloud agent (model + thinking picker) | pi-cloud
-- AI: Tau cloud agent (model + thinking picker) | tau-cloud
-- AI: Pi sandboxed (path + isolation picker) | pi-safe
-- AI: Tau sandboxed (path + isolation picker) | tau-safe
-- AI: Rebuild Pi container image | pi-rebuild
 
 
 - Stata: Start Stata in tmux session | tmux new-session -d -s stata '/usr/local/stata19/stata-mp'

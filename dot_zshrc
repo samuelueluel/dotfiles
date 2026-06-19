@@ -222,7 +222,7 @@ THINK_BUDGET_MSG="Wait, I've used my full reasoning budget and I'm starting to l
 # and this effectively only reaches clients that send nothing (e.g. Pi, which has no sampling config — feature req #1837).
 # Values per Qwen thinking-mode guidance; presence-penalty kept mild (0.5) so it curbs loops without penalising the
 # repeated brackets/indent/keywords that legitimately recur in code. Do NOT lower temp toward 0 — greedy decoding makes
-# Qwen reasoning models loop. Applied to Qwen3.6 only (guarded by model id in the serve fns); Gemma keeps its own defaults.
+# Qwen reasoning models loop. Applied to Qwen3.6 only (guarded by model id in the serve fns).
 QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5"
 MTP_OPTS="$MTP_OPTS $REASONING_OPTS"
 CTX=262144  # context window for the server (applies to ALL clients: WebUI, OpenCode, etc.)
@@ -261,7 +261,7 @@ serve-llm-draft() {  # speculative decoding with a separate draft model
   echo "Ensuring draft model $2 is pulled..."
   ramalama pull "$2"
   _llm_reset
-  local samp=""; [[ "$1" == *Qwen3.6* ]] && samp=" $QWEN_SAMPLING"  # Qwen3.6 guard (Gemma draft path falls through to its own defaults)
+  local samp=""; [[ "$1" == *Qwen3.6* ]] && samp=" $QWEN_SAMPLING"  # Qwen3.6 guard
   ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --env "LLAMA_ARG_THINK_BUDGET_MESSAGE=$THINK_BUDGET_MSG" --runtime-args="$MTP_OPTS $3$samp" --model-draft "$2" "$1" \
     && echo "▶ serving $1 with draft $2 (MTP, ctx $CTX) at http://localhost:8080/v1"
 }
@@ -274,14 +274,12 @@ serve-local() {
   model_key=$(gum choose \
     --header "serve · model" \
     "qwen-moe    Qwen3.6 MoE 35B-A3B" \
-    "qwen-dense  Qwen3.6 Dense 27B" \
-    "gemma4      Gemma 4 Dense 31B") || return 1
+    "qwen-dense  Qwen3.6 Dense 27B") || return 1
   model_key="${model_key%%[ ]*}"
 
   case "$model_key" in
     qwen-moe)   quant_opts=("Q4" "Q8") ;;
     qwen-dense) quant_opts=("Q4" "Q8") ;;
-    gemma4)     quant_opts=("QAT4")    ;;
   esac
 
   if [[ ${#quant_opts[@]} -gt 1 ]]; then
@@ -294,13 +292,11 @@ serve-local() {
   parallel=$(gum choose --header "serve · parallel slots" "1" "2") || return 1
 
   # Resolve URIs
-  local GEMMA4_DRAFT="https://huggingface.co/Janvitos/gemma-4-31B-it-qat-assistant-MTP-Q8_0-GGUF/resolve/main/gemma-4-31B-it-qat-assistant-MTP-Q8_0.gguf"
   case "$model_key-$quant" in
     qwen-moe-Q4)    uri="hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL" ;;
     qwen-moe-Q8)    uri="hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL" ;;
     qwen-dense-Q4)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL"     ;;
     qwen-dense-Q8)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL"     ;;
-    gemma4-QAT4)    uri="hf://unsloth/gemma-4-31B-it-qat-GGUF:UD-Q4_K_XL"  ;;
   esac
 
   if [[ "$mtp" == "on" ]]; then
@@ -311,11 +307,7 @@ serve-local() {
     else
       mtp_opts_local="$MTP_OPTS --parallel $parallel"
     fi
-    if [[ "$model_key" == "gemma4" ]]; then
-      MTP_OPTS="$mtp_opts_local" serve-llm-draft "$uri" "$GEMMA4_DRAFT"
-    else
-      MTP_OPTS="$mtp_opts_local" serve-llm "$uri"
-    fi
+    MTP_OPTS="$mtp_opts_local" serve-llm "$uri"
   else
     PARALLEL_OPTS="--parallel $parallel" serve-llm-nospec "$uri"
   fi
@@ -850,8 +842,101 @@ _pi_nonstata_skills() {
   done
 }
 
+# --- LEMONADE HELPERS ---
+LEM_API="http://127.0.0.1:13305/api/v1"
+
+# lem-status: show all loaded models across every slot category, not just the LLM
+lem-status() {
+  local out
+  out=$(curl -s -m 5 "$LEM_API/health" 2>/dev/null) || { echo "Lemonade not reachable on $LEM_API"; return 1; }
+  [[ -z "$out" ]] && { echo "Lemonade not reachable on $LEM_API"; return 1; }
+  print -r -- "$out" | python3 -c '
+import sys, json
+d = json.load(sys.stdin)
+loaded = d.get("all_models_loaded") or []
+print("server: %s  (v%s)" % (d.get("status", "?"), d.get("version", "?")))
+if not loaded:
+    print("loaded: none (RAM clear)")
+else:
+    print("loaded models:")
+    for m in loaded:
+        pin = " [pinned]" if m.get("pinned") else ""
+        print("  - %-11s %s  (%s, %s)%s" % (
+            m.get("type", "?"), m.get("model_name", "?"),
+            m.get("device", "?"), m.get("status", "?"), pin))
+mm = d.get("max_models") or {}
+counts = {}
+for m in loaded:
+    counts[m.get("type", "?")] = counts.get(m.get("type", "?"), 0) + 1
+print("slots (loaded/max): " + "  ".join(
+    "%s=%d/%s" % (k, counts.get(k, 0), v) for k, v in mm.items()))
+'
+}
+
+# lem-unload: drop ALL models from RAM (server stays up, weights stay on disk)
+lem-unload() {
+  local out
+  out=$(curl -s -m 10 -X POST "$LEM_API/unload" -H 'Content-Type: application/json' -d '{}' 2>/dev/null) \
+    || { echo "Lemonade not reachable on $LEM_API"; return 1; }
+  print -r -- "$out" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("message", "(no response)"))' 2>/dev/null \
+    || print -r -- "$out"
+}
+
+_pi_pick_local_model() {
+  local choice
+  choice=$(gum choose --header "select model  (Lemonade · one loads at a time)" \
+    "moe-q4     Qwen3.6 MoE 35B    Q4" \
+    "moe-q8     Qwen3.6 MoE 35B    Q8" \
+    "dense-q4   Qwen3.6 Dense 27B  Q4" \
+    "dense-q8   Qwen3.6 Dense 27B  Q8") || return 1
+  case "${choice%%[ ]*}" in
+    moe-q4)   print -r -- "Qwen3.6-MoE-35B-Q4" ;;
+    moe-q8)   print -r -- "Qwen3.6-MoE-35B-Q8" ;;
+    dense-q4) print -r -- "Qwen3.6-Dense-27B-Q4" ;;
+    dense-q8) print -r -- "Qwen3.6-Dense-27B-Q8" ;;
+    *) return 1 ;;
+  esac
+}
+
+# _lem_preload <model_id>: pick MTP (Qwen only) + parallel, then load the model
+# with those as a flag-level override merged over its saved recipe, so the agent
+# connects to exactly the config chosen here.
+_lem_preload() {
+  local id="$1" args="" mtp par
+  # real reachability check first, so a slow load is not mistaken for a dead server
+  if ! curl -s -m 5 "$LEM_API/health" >/dev/null 2>&1; then
+    print -r -- "Lemonade not reachable on $LEM_API (container up? try 'podman start lemonade')"
+    return 1
+  fi
+  if [[ "$id" == Qwen* ]]; then
+    mtp=$(gum choose --header "MTP speculative decoding" --selected "on" "on" "off") || return 1
+    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+  fi
+  par=$(gum choose --header "parallel slots" --selected "1" "1" "2") || return 1
+  args+=" --parallel $par"
+  args="${args# }"
+
+  # if the weights are not downloaded yet, the load also pulls them (can be tens of GB)
+  local note="loading ${id}  [override: ${args}]"
+  curl -s -m 10 "$LEM_API/models" 2>/dev/null | grep -q "\"$id\"" \
+    || note="first load of ${id}: downloading weights (several minutes) then loading  [override: ${args}]"
+
+  local resp
+  resp=$(gum spin --show-output --title "$note" -- \
+    curl -s -m 1800 -X POST "$LEM_API/load" -H 'Content-Type: application/json' \
+    -d "{\"model_name\":\"${id}\",\"llamacpp_args\":\"${args}\"}")
+  print -r -- "$resp" | grep -q '"status":"success"' && return 0
+  print -r -- "load failed: ${resp:-timed out; check 'podman logs lemonade' or 'lem-status'}"
+  return 1
+}
+
 pi() {
   _pi_nonstata_skills
+
+  local model_id
+  model_id=$(_pi_pick_local_model) || return 1
+  _lem_preload "$model_id" || return 1
+  local model_flag="local/$model_id"
 
   local go
   go=$(gum choose --header "pi · run in container?" \
@@ -860,7 +945,7 @@ pi() {
 
   case "${go%%[ ]*}" in
     no)
-      command pi "${_PI_SKILL_ARGS[@]}" "$@"
+      command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" "$@"
       ;;
     yes)
       local target="${1:-$PWD}" abs_target is_file=0
@@ -878,7 +963,7 @@ pi() {
         echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
 
-      pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" "${@:2}"
+      pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" "${@:2}"
       ;;
   esac
 }
@@ -974,13 +1059,18 @@ beta() {
   abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
   [[ -d "$abs_target" ]] || { echo "Error: '$target' is not a directory."; return 1; }
 
+  local model_id
+  model_id=$(_pi_pick_local_model) || return 1
+  _lem_preload "$model_id" || return 1
+  local model_flag="local/$model_id"
+
   local level
   level=$(gum choose --header "beta · isolation level" \
     "1   write to dir  +  read all of \$HOME  +  Stata binary mounted" \
     "2   write to dir  +  no read elsewhere   +  Stata binary mounted") || return 1
   level="${level%%[ ]*}"
 
-  pi-safe-stata-${level} "${abs_target}" "${@:2}"
+  pi-safe-stata-${level} "${abs_target}" --model "$model_flag" "${@:2}"
 }
 
 betahat() {
@@ -1077,9 +1167,6 @@ _goose_resolve_params() {
     ctx_limit=262144
     max_tokens=16384
   elif [[ "$model_id" == *Qwen3.6-27B* ]]; then
-    ctx_limit=262144
-    max_tokens=16384
-  elif [[ "$model_id" == *gemma-4-31b* ]]; then
     ctx_limit=262144
     max_tokens=16384
   fi
