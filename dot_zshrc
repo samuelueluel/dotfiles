@@ -469,7 +469,7 @@ opencode-safe-1() {
 
   setopt localtraps
   local container_name="opencode-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -511,7 +511,7 @@ opencode-safe-2() {
 
   setopt localtraps
   local container_name="opencode-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -555,7 +555,7 @@ opencode-safe-3() {
 
   setopt localtraps
   local container_name="opencode-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -601,7 +601,7 @@ pi-safe-1() {
 
   setopt localtraps
   local container_name="pi-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -620,7 +620,7 @@ pi-safe-1() {
     -v "$HOME/.agents":"$HOME/.agents":ro \
     -w "$abs_dir" \
     --entrypoint tmux \
-    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
+    localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
 }
 
 pi-safe-2() {
@@ -643,7 +643,7 @@ pi-safe-2() {
 
   setopt localtraps
   local container_name="pi-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -661,7 +661,7 @@ pi-safe-2() {
     -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
     -w "$abs_dir" \
     --entrypoint tmux \
-    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
+    localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
 }
 
 pi-safe-3() {
@@ -687,7 +687,7 @@ pi-safe-3() {
 
   setopt localtraps
   local container_name="pi-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -706,7 +706,7 @@ pi-safe-3() {
     --tmpfs /tmp \
     -w "$abs_dir" \
     --entrypoint tmux \
-    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
+    localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
 }
 
 # pi-safe-stata-1: pi-safe-1 + Stata binary mounted read-only.
@@ -734,7 +734,7 @@ pi-safe-stata-1() {
 
   setopt localtraps
   local container_name="pi-safe-stata-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -758,7 +758,7 @@ pi-safe-stata-1() {
         -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
     -w "$abs_dir" \
     --entrypoint tmux \
-    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
+    localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
 }
 
 # pi-safe-stata-2: Stata binary + write to project dir only. No read access outside
@@ -784,7 +784,7 @@ pi-safe-stata-2() {
 
   setopt localtraps
   local container_name="pi-safe-stata-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -808,7 +808,7 @@ pi-safe-stata-2() {
         -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
     -w "$abs_dir" \
     --entrypoint tmux \
-    localhost/pi-safe:latest -u new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
+    localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
 }
 
 # ============================================================
@@ -1281,7 +1281,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-1-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   local tmpfile=""
   local moim_arg=""
@@ -1357,7 +1357,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-2-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   local tmpfile=""
   local moim_arg=""
@@ -1436,7 +1436,7 @@ Aborted."
 
   setopt localtraps
   local container_name="goose-safe-3-$$"
-  trap 'podman kill "$container_name" 2>/dev/null' EXIT INT TERM HUP
+  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   local tmpfile=""
   local moim_arg=""

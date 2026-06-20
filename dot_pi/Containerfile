@@ -1,12 +1,28 @@
-FROM docker.io/homebrew/ubuntu24.04:latest
+FROM docker.io/library/ubuntu:26.04
 
-# Copy your host's Brewfile
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    file \
+    git \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN NONINTERACTIVE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+
 COPY dot_Brewfile-container /tmp/Brewfile
-
-# Run your Brewfile
 RUN brew bundle --file=/tmp/Brewfile
 
-# Ensure pi and its extensions are available globally
 RUN npm install -g pi-mcp-adapter pi-agent-extensions pi-web-access pi-markdown-preview
+
+# tmux config loaded by the launch wrappers (podman run --entrypoint tmux ... -f /etc/pi-tmux.conf).
+# tmux daemonizes its server, which double-forks and reparents to PID 1 (tini). Without this,
+# closing the terminal kills only the tmux client; the detached server keeps tini alive, so the
+# container never stops and `podman run` never returns — which freezes the whole single-instance
+# Ghostty process. These two lines make the server die the instant the last client goes away,
+# so the container tears down cleanly on terminal close.
+RUN printf 'set -g destroy-unattached on\nset-hook -g client-detached "kill-server"\n' > /etc/pi-tmux.conf
 
 ENTRYPOINT ["pi"]

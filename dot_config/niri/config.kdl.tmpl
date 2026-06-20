@@ -538,7 +538,7 @@ binds {
     // WINDOW MANAGEMENT
     // -----------------------------------
 
-    Mod+Ctrl+Q hotkey-overlay-title="Close window"  repeat=false { spawn "/usr/bin/smart-close.sh"; }
+    Mod+Ctrl+Q hotkey-overlay-title="Close window"  repeat=false { spawn "/var/home/samuel/.config/niri/smart-close.sh"; }
     Mod+P hotkey-overlay-title="Toggle window floating" { toggle-window-floating; } // note this will also make non-floating windows sticky, but buggy
     Mod+Ctrl+P hotkey-overlay-title="Toggle window follow mode" { spawn "/usr/bin/nirius" "toggle-follow-mode"; }
 
