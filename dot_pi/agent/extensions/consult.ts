@@ -9,17 +9,21 @@ const execAsync = promisify(exec);
 // ──────────────────────────────────────────────────────────────────────────────
 
 const MODELS = {
-  dsv4pro: { flag: "openrouter/deepseek/deepseek-v4-pro",   thinking: "xhigh", label: "DeepSeek V4 Pro"  },
-  dsv4fl:  { flag: "openrouter/deepseek/deepseek-v4-flash", thinking: "xhigh", label: "DeepSeek V4 Flash" },
-  opus:    { flag: "openrouter/anthropic/claude-opus-4.8",  thinking: "high",  label: "Claude Opus 4.8"  },
+  dsv4pro:   { flag: "openrouter/deepseek/deepseek-v4-pro",   thinking: "xhigh", label: "DeepSeek V4 Pro", provider: "pi" },
+  dsv4fl:    { flag: "openrouter/deepseek/deepseek-v4-flash", thinking: "xhigh", label: "DeepSeek V4 Flash", provider: "pi" },
+  opus:      { flag: "openrouter/anthropic/claude-opus-4.8",  thinking: "high",  label: "Claude Opus 4.8", provider: "pi" },
+  gemini35f: { flag: "Gemini 3.5 Flash (High)",             thinking: "high",  label: "Gemini 3.5 Flash (High)", provider: "agy" },
+  gemini31p: { flag: "Gemini 3.1 Pro (High)",               thinking: "high",  label: "Gemini 3.1 Pro (High)", provider: "agy" },
 } as const;
 
 type ModelKey = keyof typeof MODELS;
 
 const MODEL_MENU_OPTIONS = [
-  "dsv4pro — DeepSeek V4 Pro (xhigh thinking, default)",
-  "dsv4fl  — DeepSeek V4 Flash (xhigh thinking, cheaper)",
-  "opus    — Claude Opus 4.8 (high thinking)",
+  "dsv4pro   — DeepSeek V4 Pro (xhigh thinking, default)",
+  "dsv4fl    — DeepSeek V4 Flash (xhigh thinking, cheaper)",
+  "opus      — Claude Opus 4.8 (high thinking)",
+  "gemini35f — Gemini 3.5 Flash (High, Google AI Pro)",
+  "gemini31p — Gemini 3.1 Pro (High, Google AI Pro)",
 ];
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -31,14 +35,108 @@ function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;:?]*[a-zA-Z]/g, "");
 }
 
-function extractSessionContext(ctx: any, maxMessages = 30): string {
-  let branch: any[] = [];
-  try { branch = ctx.sessionManager.getBranch(); } catch {
-    return "(could not read session history)";
+function getOriginalGoal(branch: any[]): string {
+  const allMessages = branch.filter((e: any) => e.type === "message");
+  if (allMessages.length === 0) return "No objective set.";
+  const firstMsg = allMessages[0].message;
+  if (!firstMsg) return "No objective set.";
+
+  let text = "";
+  if (typeof firstMsg.content === "string") {
+    text = firstMsg.content;
+  } else if (Array.isArray(firstMsg.content)) {
+    text = firstMsg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
+  }
+  return text.trim() || "(Empty prompt)";
+}
+
+function getWorkspaceState(cwd: string): { gitStatus: string; gitDiff: string } {
+  let gitStatus = "Workspace is not a Git repository or git is not installed.";
+  let gitDiff = "";
+
+  try {
+    // Check if git is initialized
+    execSync("git rev-parse --is-inside-work-tree", { cwd, stdio: "ignore" });
+    
+    // Get porcelain status
+    gitStatus = execSync("git status --porcelain", { cwd, encoding: "utf8" }).trim();
+    if (!gitStatus) {
+      gitStatus = "Clean (no uncommitted changes).";
+    }
+
+    // Get diff of changes (capped at ~10,000 characters to prevent blowing up the context)
+    const diffRaw = execSync("git diff HEAD", { cwd, encoding: "utf8" }).trim();
+    if (diffRaw) {
+      gitDiff = diffRaw.length > 10000 ? diffRaw.slice(0, 10000) + "\n\n[... Diff truncated due to length ...]" : diffRaw;
+    } else {
+      gitDiff = "No changes made to tracked files yet.";
+    }
+  } catch (e) {
+    // Ignore error, workspace might not be a git repo
   }
 
+  return { gitStatus, gitDiff };
+}
+
+function extractRecentExecutionState(branch: any[]): string {
   const allMessages = branch.filter((e: any) => e.type === "message");
+  if (allMessages.length === 0) return "No commands run yet.";
+
+  // Find the last assistant message and the tool results that follow it
+  let lastAssistantIdx = -1;
+  for (let i = allMessages.length - 1; i >= 0; i--) {
+    if (allMessages[i].message?.role === "assistant") {
+      lastAssistantIdx = i;
+      break;
+    }
+  }
+
+  if (lastAssistantIdx === -1) {
+    return "No agent commands have been run in this session.";
+  }
+
+  const resultLines: string[] = [];
+  const assistantMsg = allMessages[lastAssistantIdx].message;
   
+  // Extract assistant thoughts / instructions
+  if (Array.isArray(assistantMsg.content)) {
+    const textBlocks = assistantMsg.content.filter((c: any) => c.type === "text").map((c: any) => c.text);
+    if (textBlocks.length > 0) {
+      resultLines.push(`### Agent Thoughts:\n${textBlocks.join("\n").trim()}`);
+    }
+  }
+
+  // Extract the tool calls and their results in the messages after the assistant message
+  const followUpMessages = allMessages.slice(lastAssistantIdx);
+  for (const entry of followUpMessages) {
+    const msg = entry.message;
+    if (!msg || !Array.isArray(msg.content)) continue;
+    
+    for (const block of msg.content) {
+      if (block.type === "tool_use") {
+        const inputStr = JSON.stringify(block.input ?? {});
+        resultLines.push(`- **Executed Tool**: \`${block.name}\` with inputs: \`${inputStr.length > 300 ? inputStr.slice(0, 300) + "..." : inputStr}\``);
+      } else if (block.type === "tool_result") {
+        let contentText = typeof block.content === "string"
+          ? block.content
+          : (Array.isArray(block.content)
+              ? block.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("")
+              : "");
+        contentText = stripAnsi(contentText).trim();
+        if (contentText.length > 2000) {
+          contentText = contentText.slice(0, 2000) + "\n\n[... Output truncated ...]";
+        }
+        const errorTag = block.is_error ? " (FAILED)" : " (SUCCESS)";
+        resultLines.push(`- **Tool Result${errorTag}**:\n\`\`\`\n${contentText || "(empty output)"}\n\`\`\``);
+      }
+    }
+  }
+
+  return resultLines.join("\n\n");
+}
+
+function getTouchedFilesList(branch: any[]): string[] {
+  const allMessages = branch.filter((e: any) => e.type === "message");
   const touchedFiles = new Set<string>();
   for (const entry of allMessages) {
     if (entry.message && Array.isArray(entry.message.content)) {
@@ -51,57 +149,40 @@ function extractSessionContext(ctx: any, maxMessages = 30): string {
       }
     }
   }
+  return Array.from(touchedFiles);
+}
 
-  let recent: any[] = [];
-  if (allMessages.length > 6) {
-    const touchedNote = touchedFiles.size > 0 
-      ? `\n\n[SYSTEM NOTE: The local agent recently touched these paths:\n${Array.from(touchedFiles).map(f => `  - ${f}`).join("\n")}]` 
-      : "";
-    recent = [
-      allMessages[0],
-      { message: { role: "system", content: `--- [MIDDLE OF CONVERSATION TRUNCATED TO SAVE TOKENS] ---${touchedNote}` } },
-      ...allMessages.slice(-5)
-    ];
-  } else {
-    recent = allMessages;
+function extractSessionContext(ctx: any): string {
+  let branch: any[] = [];
+  try { branch = ctx.sessionManager.getBranch(); } catch {
+    return "(could not read session history)";
   }
 
-  const lines: string[] = [];
+  const goal = getOriginalGoal(branch);
+  const state = getWorkspaceState(ctx.cwd);
+  const execState = extractRecentExecutionState(branch);
+  const touchedFiles = getTouchedFilesList(branch);
 
-  for (const entry of recent) {
-    const msg = entry.message;
-    if (!msg) continue;
-    const role: string = msg.role || "unknown";
-    const content = msg.content;
-    const parts: string[] = [];
+  const touchedFilesSection = touchedFiles.length > 0
+    ? `\n\n### Touched Paths\nThe local agent recently modified or inspected these files:\n${touchedFiles.map(f => `- ${f}`).join("\n")}`
+    : "";
 
-    if (typeof content === "string") {
-      parts.push(content);
-    } else if (Array.isArray(content)) {
-      for (const block of content) {
-        if (block.type === "text" && block.text?.trim()) {
-          parts.push(block.text.trim());
-        } else if (block.type === "tool_use") {
-          const inputStr = JSON.stringify(block.input ?? {});
-          parts.push(`[TOOL: ${block.name}(${inputStr.length > 300 ? inputStr.slice(0, 300) + "…" : inputStr})]`);
-        } else if (block.type === "tool_result") {
-          let r = typeof block.content === "string"
-            ? block.content
-            : (Array.isArray(block.content)
-                ? block.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("")
-                : "");
-          r = stripAnsi(r).replace(/\s+/g, " ").trim();
-          if (r.length > 600) r = r.slice(0, 600) + "…";
-          parts.push(`[RESULT${block.is_error ? " ERROR" : ""}: ${r}]`);
-        }
-      }
-    }
+  return `## 1. Original Goal
+${goal}
 
-    const text = parts.join("\n").trim();
-    if (text) lines.push(`[${role.toUpperCase()}]\n${text}`);
-  }
+## 2. Workspace State (Git Status)
+\`\`\`
+${state.gitStatus}
+\`\`\`
 
-  return lines.join("\n\n---\n\n") || "(empty session)";
+## 3. Uncommitted Changes (Git Diff)
+\`\`\`diff
+${state.gitDiff || "No changes made to tracked files."}
+\`\`\`
+
+## 4. Recent Execution State
+${execState}${touchedFilesSection}
+`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -175,10 +256,15 @@ ${sessionCtx}
 // JSONL log parsing — extract summary from the frontier model's output
 // ──────────────────────────────────────────────────────────────────────────────
 
-function extractSummary(logFile: string): string {
+function extractSummary(logFile: string, provider: string): string {
   let raw = "";
   try { raw = fs.readFileSync(logFile, "utf8"); } catch {
     return "(no output captured)";
+  }
+
+  if (provider === "agy") {
+    // agy --print writes raw plain-text markdown response directly to stdout/logFile
+    return `\nSummary:\n${raw}`;
   }
 
   let lastText = "";
@@ -270,8 +356,9 @@ async function runFrontier(
         `export DONE_FILE=${JSON.stringify(doneFile)}`,
         `export ARCHIVE_FILE=${JSON.stringify(archiveFile)}`,
         `export LABEL=${JSON.stringify(label)}`,
-        `export MODEL_FLAG=${JSON.stringify(`--model ${model.flag}`)}`,
+        `export MODEL_FLAG=${JSON.stringify(model.flag)}`,
         `export THINKING_FLAG=${JSON.stringify(model.thinking)}`,
+        `export PROVIDER=${JSON.stringify(model.provider)}`,
         `exec bash ${JSON.stringify(`${home}/.pi/consult-run.sh`)}`,
       ].join("\n") + "\n", "utf8");
       fs.chmodSync(paneScript, 0o755);
@@ -298,8 +385,11 @@ async function runFrontier(
       ctx.ui.notify(`(no tmux — running silently, this may take a while…)`, "warn");
       let output = "";
       try {
+        const cmd = model.provider === "agy"
+          ? `agy --model ${JSON.stringify(model.flag)} --dangerously-skip-permissions --print @${promptFile}`
+          : `pi --model ${model.flag} --thinking ${model.thinking} --mode json -p -a --no-session -xt ask_user @${promptFile}`;
         const result = await execAsync(
-          `pi --model ${model.flag} --thinking ${model.thinking} --mode json -p -a --no-session -xt ask_user @${promptFile}`,
+          cmd,
           { cwd: ctx.cwd, env: { ...process.env }, maxBuffer: 50 * 1024 * 1024 }
         );
         output = result.stdout + (result.stderr ?? "");
@@ -313,7 +403,7 @@ async function runFrontier(
       }
     }
 
-    const summary = extractSummary(logFile);
+    const summary = extractSummary(logFile, model.provider);
     const status = exitCode !== 0 ? `finished with errors (exit ${exitCode})` : "completed";
     const intro  = `[${label} (${modelKey}) ${status}]\n`;
 

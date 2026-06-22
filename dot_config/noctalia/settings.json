@@ -361,7 +361,7 @@
   },
   "general": {
     "allowPanelsOnScreenWithoutBar": true,
-    "allowPasswordWithFprintd": false,
+    "allowPasswordWithFprintd": true,
     "animationDisabled": true,
     "animationSpeed": 1,
     "autoStartAuth": false,

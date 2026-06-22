@@ -13,7 +13,7 @@ RUN NONINTERACTIVE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Hom
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
 
 COPY dot_Brewfile-container /tmp/Brewfile
-RUN brew bundle --file=/tmp/Brewfile
+RUN brew bundle --file=/tmp/Brewfile --jobs=1
 
 RUN npm install -g pi-mcp-adapter pi-agent-extensions pi-web-access pi-markdown-preview
 
@@ -23,6 +23,6 @@ RUN npm install -g pi-mcp-adapter pi-agent-extensions pi-web-access pi-markdown-
 # container never stops and `podman run` never returns — which freezes the whole single-instance
 # Ghostty process. These two lines make the server die the instant the last client goes away,
 # so the container tears down cleanly on terminal close.
-RUN printf 'set -g destroy-unattached on\nset-hook -g client-detached "kill-server"\n' > /etc/pi-tmux.conf
+RUN printf 'if-shell "test -f ~/.tmux.conf" "source-file ~/.tmux.conf"\nset -g destroy-unattached on\nset-hook -g client-detached "kill-server"\nset -g extended-keys on\nset -g extended-keys-format csi-u\n' > /etc/pi-tmux.conf
 
 ENTRYPOINT ["pi"]

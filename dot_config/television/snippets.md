@@ -68,7 +68,8 @@
 - AI: Check which models are loaded | model-check
 
 
-- Stata: Start Stata in tmux session | tmux new-session -d -s stata '/usr/local/stata19/stata-mp'
+- Stata: Open Stata GUI (detached) | xstata-mp 2>/dev/null & disown
+- Stata: Start Stata in tmux session | tmux new-session -s stata '/usr/local/stata19/stata-mp'
 - Stata: Kill stata tmux session | tmux kill-session -t stata
 - Stata: List all tmux sessions | tmux list-sessions
 - Stata: Check for running Stata processes | pgrep -la stata

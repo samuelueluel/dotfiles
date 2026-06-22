@@ -42,6 +42,6 @@
     "extensions/modes.ts",
     "extensions/powerline-footer.ts"
   ],
-  "lastChangelogVersion": "0.79.6",
+  "lastChangelogVersion": "0.79.8",
   "hideThinkingBlock": false
 }

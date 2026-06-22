@@ -756,6 +756,7 @@ pi-safe-stata-1() {
     -v "$HOME/.agents":"$HOME/.agents":ro \
     -v /usr/local/stata19:/usr/local/stata19:ro \
         -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
+    -v "$HOME/.cache/uv":"$HOME/.cache/uv" \
     -w "$abs_dir" \
     --entrypoint tmux \
     localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
@@ -806,6 +807,7 @@ pi-safe-stata-2() {
     -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
     -v /usr/local/stata19:/usr/local/stata19:ro \
         -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
+    -v "$HOME/.cache/uv":"$HOME/.cache/uv" \
     -w "$abs_dir" \
     --entrypoint tmux \
     localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"

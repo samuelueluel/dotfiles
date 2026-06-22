@@ -5,6 +5,24 @@
     }
   },
   {
+    "context": "Workspace && !ProjectPanel",
+    "bindings": {
+      "ctrl-left": "project_panel::ToggleFocus"
+    }
+  },
+  {
+    "context": "Editor",
+    "bindings": {
+      "ctrl-left": "project_panel::ToggleFocus"
+    }
+  },
+  {
+    "context": "ProjectPanel",
+    "bindings": {
+      "ctrl-left": "workspace::ToggleRightDock"
+    }
+  },
+  {
     "context": "Workspace",
     "bindings": {
       "ctrl-space": "command_palette::Toggle"
