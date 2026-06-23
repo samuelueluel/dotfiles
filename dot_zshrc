@@ -613,11 +613,13 @@ pi-safe-1() {
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
+    -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
     -v "$HOME":"$HOME":ro \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
+    ${XDG_RUNTIME_DIR:+-v} ${XDG_RUNTIME_DIR:+/run/user/1000/pulse/native:/run/user/1000/pulse/native} \
     -w "$abs_dir" \
     --entrypoint tmux \
     localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
@@ -655,10 +657,12 @@ pi-safe-2() {
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
+    -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
     -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
+    ${XDG_RUNTIME_DIR:+-v} ${XDG_RUNTIME_DIR:+/run/user/1000/pulse/native:/run/user/1000/pulse/native} \
     -w "$abs_dir" \
     --entrypoint tmux \
     localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
@@ -699,10 +703,12 @@ pi-safe-3() {
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
+    -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_file":"$abs_file" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
     -v "$HOME/.tmux.conf":"$HOME/.tmux.conf":ro \
+    ${XDG_RUNTIME_DIR:+-v} ${XDG_RUNTIME_DIR:+/run/user/1000/pulse/native:/run/user/1000/pulse/native} \
     --tmpfs /tmp \
     -w "$abs_dir" \
     --entrypoint tmux \
@@ -749,6 +755,7 @@ pi-safe-stata-1() {
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
+    -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
     -v "$HOME":"$HOME":ro \
     -v "$abs_dir":"$abs_dir" \
@@ -757,6 +764,7 @@ pi-safe-stata-1() {
     -v /usr/local/stata19:/usr/local/stata19:ro \
         -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
     -v "$HOME/.cache/uv":"$HOME/.cache/uv" \
+    ${XDG_RUNTIME_DIR:+-v} ${XDG_RUNTIME_DIR:+/run/user/1000/pulse/native:/run/user/1000/pulse/native} \
     -w "$abs_dir" \
     --entrypoint tmux \
     localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
@@ -800,6 +808,7 @@ pi-safe-stata-2() {
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
+    -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
@@ -808,6 +817,7 @@ pi-safe-stata-2() {
     -v /usr/local/stata19:/usr/local/stata19:ro \
         -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
     -v "$HOME/.cache/uv":"$HOME/.cache/uv" \
+    ${XDG_RUNTIME_DIR:+-v} ${XDG_RUNTIME_DIR:+/run/user/1000/pulse/native:/run/user/1000/pulse/native} \
     -w "$abs_dir" \
     --entrypoint tmux \
     localhost/pi-safe:latest -u -f /etc/pi-tmux.conf new-session -A -s pi "pi $(printf '%q ' "${@:2}")"
@@ -972,6 +982,7 @@ pi() {
   case "${go%%[ ]*}" in
     no)
       command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" "$@"
+      printf '\a'
       ;;
     yes)
       local target="${1:-$PWD}" abs_target is_file=0
@@ -990,6 +1001,7 @@ pi() {
       fi
 
       pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" "${@:2}"
+      printf '\a'
       ;;
   esac
 }
@@ -1056,7 +1068,7 @@ pihat() {
   case "${go%%[ ]*}" in
     no)
       { command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "$@" } \
-        always { rm -f "$_state_file" }
+        always { rm -f "$_state_file"; printf '\a' }
       ;;
     yes)
       local target="${1:-$PWD}" abs_target is_file=0
@@ -1075,7 +1087,7 @@ pihat() {
       fi
 
       { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
-        always { rm -f "$_state_file" }
+        always { rm -f "$_state_file"; printf '\a' }
       ;;
   esac
 }
@@ -1097,6 +1109,7 @@ beta() {
   level="${level%%[ ]*}"
 
   pi-safe-stata-${level} "${abs_target}" --model "$model_flag" "${@:2}"
+  printf '\a'
 }
 
 betahat() {
@@ -1161,11 +1174,11 @@ betahat() {
   local _state_file="$_state_dir/$$.state"
   printf 'type=betahat\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
   { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
-    always { rm -f "$_state_file" }
+    always { rm -f "$_state_file"; printf '\a' }
 }
 
 # --- STATA TMUX HELPERS ---
-alias stata-tmux="tmux new-session -d -s stata '/usr/local/stata19/stata-mp' && echo 'Stata started in tmux session: stata (attach with stata-attach)'"
+alias stata-start="tmux new-session -s stata '/usr/local/stata19/stata-mp'"
 alias stata-attach="tmux attach -t stata"
 alias stata-kill="tmux kill-session -t stata 2>/dev/null && echo 'stata session killed' || echo 'no stata session running'"
 

@@ -11,6 +11,10 @@
 
 CONFIG="$HOME/.config/niri/config.kdl"
 BACKUP="$HOME/.cache/niri-config-backup.kdl"
+GHOSTTY_CONFIG="$HOME/.config/ghostty/config.ghostty"
+GHOSTTY_BACKUP="$HOME/.cache/niri-tile-toggle-ghostty-backup.ghostty"
+WALLPAPER_BACKUP="$HOME/.cache/niri-tile-toggle-wallpaper"
+TILE_WALLPAPER="$HOME/Pictures/Wallpapers/black.png"
 STATE_FILE="$HOME/.cache/niri-tile-toggle"
 COLUMNS_FILE="$HOME/.cache/niri-tile-toggle-columns"
 
@@ -161,8 +165,11 @@ if [ -f "$STATE_FILE" ]; then
     # 1. Freeze screen before any changes
     niri msg action do-screen-transition -d 1000
 
-    # 2. Restore config (niri reloads asynchronously)
+    # 2. Restore configs (niri reloads asynchronously)
     cp "$BACKUP" "$CONFIG"
+    cp "$GHOSTTY_BACKUP" "$GHOSTTY_CONFIG"
+    pkill -SIGUSR2 ghostty
+    noctalia msg wallpaper-set "$(cat "$WALLPAPER_BACKUP")"
 
     # Wait for niri to pick up the new gaps/border values before we apply
     # pixel-based column widths — otherwise the saved correction (computed
@@ -172,7 +179,7 @@ if [ -f "$STATE_FILE" ]; then
     # 3. Restore column widths
     restore_column_widths
 
-    rm -f "$STATE_FILE" "$BACKUP" "$COLUMNS_FILE"
+    rm -f "$STATE_FILE" "$BACKUP" "$GHOSTTY_BACKUP" "$WALLPAPER_BACKUP" "$COLUMNS_FILE"
     cp "$COLUMNS_FILE" "$HOME/.cache/niri-tile-toggle-columns-debug" 2>/dev/null || true
 else
     # ENTERING TILE MODE
@@ -181,8 +188,13 @@ else
     save_column_widths > "$COLUMNS_FILE"
     cp "$COLUMNS_FILE" "$HOME/.cache/niri-tile-toggle-columns-debug"
 
-    # 2. Snapshot config, then apply tile-mode values
+    # 2. Snapshot configs, then apply tile-mode values
     cp "$CONFIG" "$BACKUP"
+    cp "$GHOSTTY_CONFIG" "$GHOSTTY_BACKUP"
+    noctalia msg wallpaper-get > "$WALLPAPER_BACKUP"
+    noctalia msg wallpaper-set "$TILE_WALLPAPER"
+    sed -i --follow-symlinks 's/^background-opacity = .*/background-opacity = 1/' "$GHOSTTY_CONFIG"
+    pkill -SIGUSR2 ghostty
     sed -i --follow-symlinks 's/center-focused-column "[^"]*"/center-focused-column "never"/' "$CONFIG"
     sed -i --follow-symlinks 's/^\(\s*\)gaps [0-9]\+/\1gaps 2/' "$CONFIG"
     sed -i --follow-symlinks "s/width [0-9]\\+ \\/\\/ \\*\\*don't remove this comment, it's needed by niri-tile-toggle\\*\\*/width 2 \\/\\/ \\*\\*don't remove this comment, it's needed by niri-tile-toggle\\*\\*/" "$CONFIG"

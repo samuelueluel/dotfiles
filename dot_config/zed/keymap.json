@@ -7,19 +7,19 @@
   {
     "context": "Workspace && !ProjectPanel",
     "bindings": {
-      "ctrl-left": "project_panel::ToggleFocus"
+      "ctrl-right": "project_panel::ToggleFocus"
     }
   },
   {
     "context": "Editor",
     "bindings": {
-      "ctrl-left": "project_panel::ToggleFocus"
+      "ctrl-right": "project_panel::ToggleFocus"
     }
   },
   {
     "context": "ProjectPanel",
     "bindings": {
-      "ctrl-left": "workspace::ToggleRightDock"
+      "ctrl-right": "workspace::ToggleRightDock"
     }
   },
   {

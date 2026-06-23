@@ -34,8 +34,8 @@
     "show_onboarding_banner": true,
     "show_project_items": true,
     "show_branch_name": true,
-    "show_menus": true,
-    "show_sign_in": true
+    "show_menus": false,
+    "show_sign_in": false
   },
   "outline_panel": {
     "dock": "right"
@@ -141,6 +141,6 @@
   "vim_mode": true,
   "relative_line_numbers": "disabled",
   "minimap": {
-    "show": "always"
+    "show": "never"
   }
 }
