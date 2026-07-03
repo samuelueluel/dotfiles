@@ -196,15 +196,6 @@ fi
 # Auto-load SSH key on first terminal (added by sjust ssh-setup)
 [[ -S "$SSH_AUTH_SOCK" ]] && { ssh-add -l &>/dev/null || SSH_ASKPASS_REQUIRE=never ssh-add ~/.ssh/id_ed25519 &>/dev/null; }
 
-# headroom wrap for claude
-export HEADROOM_REQUIRE_RUST_CORE=false
-function claude() {
-    if command -v headroom >/dev/null; then
-        headroom wrap claude "$@"
-    else
-        command claude "$@"
-    fi
-}
 
 # Local LLM (Ramalama / OpenCode / Aider) — §2.B, §2.D, §2.F
 # OPENAI_API_KEY is set in ~/.zshenv.local (placeholder for local llama.cpp compat)
@@ -810,6 +801,7 @@ pi-safe-stata-2() {
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
+    -v "$HOME/ado":"$HOME/ado":ro \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
@@ -947,6 +939,7 @@ _lem_preload() {
   if [[ "$id" == Qwen* ]]; then
     mtp=$(gum choose --header "MTP speculative decoding" --selected "on" "on" "off") || return 1
     [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    args+=" $QWEN_SAMPLING"
   fi
   par=$(gum choose --header "parallel slots" --selected "1" "1" "2") || return 1
   args+=" --parallel $par"
@@ -1178,7 +1171,10 @@ betahat() {
 }
 
 # --- STATA TMUX HELPERS ---
-alias stata-start="tmux new-session -s stata '/usr/local/stata19/stata-mp'"
+# Function (not alias) so $PWD expands at call time, not shell startup:
+# the new tmux session starts in the dir you launch from, so c(pwd) in
+# Stata is the project root (used by project_globals.do for path macros).
+stata-start() { tmux new-session -s stata -c "$PWD" '/usr/local/stata19/stata-mp'; }
 alias stata-attach="tmux attach -t stata"
 alias stata-kill="tmux kill-session -t stata 2>/dev/null && echo 'stata session killed' || echo 'no stata session running'"
 

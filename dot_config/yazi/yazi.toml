@@ -15,6 +15,10 @@ view_pdf = [
 open = [
   { run = 'xdg-open "$1"', desc = "xdg-open", orphan = true },
 ]
+extract = [
+  { run = 'ouch d -y "$@"', desc = "Extract here with ouch", for = "unix" },
+]
+
 
 [open]
 prepend_rules = [
@@ -29,8 +33,14 @@ prepend_rules = [
   { mime = "application/javascript",  use = "edit" },
   { mime = "application/x-sh",        use = "edit" },
   { mime = "inode/x-empty",           use = "edit" },
+  { mime = "application/{*zip,tar,bzip2,7z*,rar,xz,zstd,java-archive}", use = [ "open", "extract" ] },
   { mime = "*", use = "open" },
 ]
 
 [preview]
 wrap = "yes"
+
+[[plugin.prepend_previewers]]
+mime = "application/{*zip,tar,bzip2,7z*,rar,xz,zstd,java-archive}"
+run  = "ouch"
+

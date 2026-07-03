@@ -5,8 +5,8 @@ text_fg = "#E2D8D0"
 dimmed_text_fg = "#716E75"
 
 # Input
-input_text_fg = "#ED6D42"
-result_count_fg = "#ED6D42"
+input_text_fg = "#96E050"
+result_count_fg = "#96E050"
 
 # Results
 result_name_fg = "#E2D8D0"
@@ -14,14 +14,14 @@ result_line_number_fg = "#DA9E8A"
 result_value_fg = "#E2D8D0"
 selection_fg = "#E2D8D0"
 selection_bg = "#000000"
-match_fg = "#ED6D42"
+match_fg = "#96E050"
 
 # Preview
 preview_title_fg = "#DA9E8A"
 
 # Modes
 channel_mode_fg = "#6E3840"
-channel_mode_bg = "#ED6D42"
+channel_mode_bg = "#96E050"
 remote_control_mode_fg = "#6E3840"
-remote_control_mode_bg = "#ED6D42"
-send_to_channel_mode_fg = "#ED6D42"
+remote_control_mode_bg = "#96E050"
+send_to_channel_mode_fg = "#96E050"

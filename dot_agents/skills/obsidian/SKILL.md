@@ -31,22 +31,21 @@ When creating or editing a note, follow these core conventions:
    ```bash
    git -C ~/Dropbox/Sam-Obsidian-Vault add -A && git -C ~/Dropbox/Sam-Obsidian-Vault commit -m "pre-edit snapshot" --allow-empty
    ```
-2. Apply changes respecting heading numbering (do not use formatting in headings):
-   - `H1` (`#`) -> `# 1 First Section Title`, `# 2 Second Section Title`, etc
-   - `H2` (`##`) -> `## 1.1 First Subsection Title`, `## 1.2 Second Subsection Title`, etc
-   - `H3` (`###`) -> `### 1.1.1 First Subsubsection Title`, `### 1.1.2 Second Subsubsection Title`, etc
-   - The `#` is the markdown heading marker; the number is the heading text.
-   - Sub-sections reset under each parent: H1 `1` → H2 `1.1`, `1.2` → H2 `2` → H2 `2.1`, `2.2`.
+2. Apply changes using plain heading names (do not use formatting in headings):
+   - **Never** prefix headings with numbers, letters, or outline markers (e.g. `1`, `1.1`, `A.`). The Number Headings plugin handles numbering automatically.
    - Replace placeholder titles with relevant titles.
 3. **After editing**, commit and push the changes:
    ```bash
    git -C ~/Dropbox/Sam-Obsidian-Vault add -A && git -C ~/Dropbox/Sam-Obsidian-Vault commit -m "brief description of edit" && git -C ~/Dropbox/Sam-Obsidian-Vault push
    ```
 4. Use color syntax for formatting, avoiding `**bold**`:
-   - `~={green}text=~` (mid-sentence highlight, e.g. definitions or emphasis)
-   - `~={orange}text=~` (organizational highlight, e.g. mid-body headings or repeated structure---not formal headings like #.)
-   - `~={magenta}text=~` (warning or danger, e.g. critical emphasis about a command breaking something on your computer)
+   - `~={green}text=~` (all emphasis — definitions, key terms, inline highlights, organizational labels)
+   - `~={magenta}text=~` (warnings and dangers only — e.g. a command that can break something)
    Note the trailing `=~`. When possible it is better to highlight connected segments of sentences rather than whole sentences or paragraphs.
+5. Lists:
+   - Prefer bullets (`-`) unless order or sequence is meaningful — use numbered lists only when numbering matters.
+   - For nested lists, indent with a tab.
+   - When nesting, alternate list type (bullet → numbered or numbered → bullet) to visually distinguish levels.
 
 ### 3. Adding Links, Embeds, and Callouts
 - **Internal:** `[[wikilink]]` or `[[wikilink|alias]]`

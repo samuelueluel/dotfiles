@@ -8,5 +8,10 @@ use = "yazi-rs/plugins:toggle-pane"
 rev = "598cdb6"
 hash = "9c7987da2d2a2120dac33abb64132004"
 
+[[plugin.deps]]
+use = "ndtoan96/ouch"
+rev = "406ce6c"
+hash = "f5afc904d5106ee368c8aa2ded43bd74"
+
 [flavor]
 deps = []

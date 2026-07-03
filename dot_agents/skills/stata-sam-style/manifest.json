@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "invocation_type": "context-skill",
+  "allowed_tools": [],
+  "supported_agents": [
+    "claude",
+    "codex",
+    "gemini",
+    "cursor",
+    "windsurf",
+    "vscode"
+  ],
+  "trigger_text": "Beautify the layout of a Stata do-file to a fixed house style without changing any code. Purely cosmetic: normalizes section banners ('* [N] SECTION TITLE' boxed in '='), subsection banners ('* [N.M] Title' boxed in '-'), an optional titled '* Notes:' block with two bullet tiers ('-' then '--'), placed under a banner or floating inline, plain '* ' step comments, end-of-line '//' comments, blank-line spacing, and indentation, all within a 64-column right margin so nothing overflows a half-screen editor pane. Preserves multi-line '/* */' blocks verbatim (disabled code or prose) and never explodes them into per-line '*' comments. Never edits, reorders, wraps, or deletes any command or any commented-out code, and verifies an active-code invariant afterward. Use to make a do-file conform to consistent project conventions. It is NOT stata-sam-refactor (which restructures code and may delete commented code) and NOT stata-modernize (which accepts behavior risk).",
+  "references": [],
+  "display_name": "Stata Style",
+  "short_description": "Beautify a Stata do-file to a fixed 64-column house style (file header/preamble, setup-block layout, section banners, Notes blocks, step/end-of-line comments, spacing, indentation) without changing any code or touching commented-out code.",
+  "default_prompt": "Use the stata-sam-style skill to beautify a Stata do-file to the house style (64-column banners, Notes blocks, step comments, spacing) without altering any code or commented-out code."
+}

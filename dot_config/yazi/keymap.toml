@@ -66,7 +66,7 @@ prepend_keymap = [
 	{ on = "<A-o>", run = "tasks:show", desc = "Open task manager" },
 	{ on = "w", run = "noop" },
 	{ on = "o", run = "noop" },
-	{ on = "O", run = "noop" },
+	{ on = "O", run = "open --interactive", desc = "Open with..." },
 	{ on = "P", run = "noop" },
 	{ on = "h", run = "leave", desc = "Go to parent directory" },
 	{ on = "j", run = "arrow 1", desc = "Move cursor down" },
@@ -103,6 +103,8 @@ prepend_keymap = [
 	{ on = [ "y", "y" ], run = "yank", desc = "Yank (copy)" },
 	{ on = [ "y", "p" ], run = "copy path", desc = "Copy path" },
 	{ on = "x", run = "yank --cut", desc = "Yank (cut)" },
+	{ on = "C", run = "plugin ouch", desc = "Compress with ouch" },
+	{ on = "E", run = "plugin extract-to", desc = "Extract to specific directory" },
 ]
 
 [input]

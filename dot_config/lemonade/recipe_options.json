@@ -1,0 +1,22 @@
+{
+    "user.Qwen3.6-MoE-35B-Q4": {
+        "ctx_size": 262144,
+        "llamacpp_backend": "vulkan",
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 512 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja"
+    },
+    "user.Qwen3.6-MoE-35B-Q8": {
+        "ctx_size": 262144,
+        "llamacpp_backend": "vulkan",
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 512 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja"
+    },
+    "user.Qwen3.6-Dense-27B-Q4": {
+        "ctx_size": 262144,
+        "llamacpp_backend": "vulkan",
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 512 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja"
+    },
+    "user.Qwen3.6-Dense-27B-Q8": {
+        "ctx_size": 262144,
+        "llamacpp_backend": "vulkan",
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 512 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja"
+    }
+}

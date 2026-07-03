@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "invocation_type": "context-skill",
+  "allowed_tools": [],
+  "supported_agents": [
+    "claude",
+    "codex",
+    "gemini",
+    "cursor",
+    "windsurf",
+    "vscode"
+  ],
+  "trigger_text": "Refactor Stata do-files while preserving every final output exactly — datasets (datasignature + schema identical), parameter estimates (bit-identical e(b)/e(V)/scalars via %21x), graphs (content-equivalent: plotted data + command string), and tables (text-normalized, timestamps stripped). Use when restructuring, reorganizing, modularizing, or cleaning up a do-file and the results must not change at all — the output-preserving counterpart to stata-modernize, which optimizes and accepts behavior risk. Mandates a golden-master snapshot/compare harness and forbids touching estimation commands, their options, the estimation sample, or analysis-variable construction.",
+  "references": [
+    "references/nondeterminism.md",
+    "references/refactor-catalog.md"
+  ],
+  "display_name": "Stata Refactor",
+  "short_description": "Restructure Stata do-files while preserving every final output exactly; mandates a golden-master harness and forbids touching estimation commands/options.",
+  "default_prompt": "Use the stata-sam-refactor skill to restructure a Stata do-file while guaranteeing identical final datasets, estimates, graphs, and tables via a golden-master snapshot/compare harness."
+}
