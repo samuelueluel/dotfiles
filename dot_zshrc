@@ -405,6 +405,7 @@ model-check() {
         *deepseek-v4-pro)   _short="dsv4pro" ;;
         *deepseek-v4-flash) _short="dsv4fl"  ;;
         *claude-opus-4*)    _short="opus"    ;;
+        *claude-sonnet-5)   _short="sonnet5" ;;
         *glm-5.2*)          _short="glm52"   ;;
         *)                  _short="$_m"     ;;
       esac
@@ -891,6 +892,7 @@ print("slots (loaded/max): " + "  ".join(
         *deepseek-v4-pro)   _short="dsv4pro" ;;
         *deepseek-v4-flash) _short="dsv4fl"  ;;
         *claude-opus-4*)    _short="opus"    ;;
+        *claude-sonnet-5)   _short="sonnet5" ;;
         *glm-5.2*)          _short="glm52"   ;;
         *)                  _short="$_m"     ;;
       esac
@@ -1008,6 +1010,7 @@ pihat() {
     "dsv4pro   DeepSeek V4 Pro" \
     "dsv4fl    DeepSeek V4 Flash" \
     "opus      Claude Opus 4.8" \
+    "sonnet5   Claude Sonnet 5" \
     "glm52     GLM 5.2") || return 1
   [[ -z "$model_choice" ]] && return 1
 
@@ -1029,6 +1032,12 @@ pihat() {
       model_flag="openrouter/anthropic/claude-opus-4.8"
       default_thinking="high"
       thinking_opts=("low" "medium" "high")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    sonnet5)
+      model_flag="openrouter/anthropic/claude-sonnet-5"
+      default_thinking="xhigh"
+      thinking_opts=("low" "medium" "high" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
       ;;
     glm52)
@@ -1114,6 +1123,7 @@ betahat() {
     "dsv4pro   DeepSeek V4 Pro" \
     "dsv4fl    DeepSeek V4 Flash" \
     "opus      Claude Opus 4.8" \
+    "sonnet5   Claude Sonnet 5" \
     "glm52     GLM 5.2") || return 1
   [[ -z "$model_choice" ]] && return 1
 
@@ -1135,6 +1145,12 @@ betahat() {
       model_flag="openrouter/anthropic/claude-opus-4.8"
       default_thinking="high"
       thinking_opts=("low" "medium" "high")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    sonnet5)
+      model_flag="openrouter/anthropic/claude-sonnet-5"
+      default_thinking="xhigh"
+      thinking_opts=("low" "medium" "high" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
       ;;
     glm52)
