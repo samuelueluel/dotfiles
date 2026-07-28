@@ -245,6 +245,7 @@ spawn-at-startup "sh" "-c" "rm -f ~/.local/share/cclip/db.sqlite3* && cclipd -s 
 spawn-at-startup "kanshi"
 
 // ── Apps ──────────────────────────────────────────────────────────────────
+spawn-at-startup "blueman-applet"
 spawn-at-startup "sh" "-c" "sleep 5 && dropbox start -i"
 spawn-at-startup "sh" "-c" "sleep 5 && flatpak run com.github.wwmm.easyeffects --gapplication-service"
 spawn-at-startup "/usr/bin/niriusd"
@@ -430,7 +431,7 @@ window-rule {
 window-rule {
     match is-active=false
     //exclude is-floating=true
-    opacity 0.5
+    // opacity 0.5 // Disabled for multi-monitor setup
     draw-border-with-background false
 }
 
@@ -438,6 +439,7 @@ window-rule {
 window-rule {
     match app-id="obsidian"
     match app-id="com.stremio.stremio"
+    match app-id="stremio-enhanced"
     match app-id="ZenNotes"
     opacity 1.0
 }
@@ -735,5 +737,6 @@ window-rule {
     match app-id="zen-utility"
     match app-id="rmpc"
     match app-id="Stremio"
+    match app-id="stremio-enhanced"
     opacity 1.0
 }

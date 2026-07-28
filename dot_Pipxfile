@@ -3,4 +3,3 @@
 # Install/Sync with: sjust pipx
 
 calcure                        # Modern TUI calendar and task manager
-git+https://github.com/kyuz0/llama-toolboxes-cockpit.git

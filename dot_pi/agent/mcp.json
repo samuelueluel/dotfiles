@@ -6,8 +6,8 @@
     },
     "stata": {
       "command": "uvx",
-      "args": ["mcp-stata"],
-      "lifecycle": "eager",
+      "args": ["--with", "mcp<2.0.0", "mcp-stata"],
+      "lifecycle": "lazy",
       "env": {
         "STATA_PATH": "/usr/local/stata19/stata-mp",
         "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"

@@ -8,9 +8,6 @@ let currentMode: "plan" | "manual" | "auto" =
   process.env.PI_DEFAULT_MODE === "plan" ? "plan" :
   (process.argv.includes("-a") || process.argv.includes("--approve")) ? "auto" : "manual";
 
-// Store original file contents for Auto mode diffing
-const autoModeOriginalContents = new Map<string, string | null>();
-
 // ──────────────────────────────────────────────
 // Shared read-only tool set
 // Plan mode: strict whitelist (adds bash for shell exploration)
@@ -420,9 +417,8 @@ export default function (pi: any) {
     description: "Switch to Auto Mode (Fully autonomous execution)",
     handler: async (args: any, ctx: any) => {
       currentMode = "auto";
-      autoModeOriginalContents.clear(); // Reset tracking when switching to auto
       ctx.ui.notify(
-        "Workflow Mode set to AUTO. Full autonomy enabled. A final diff will be shown at completion.",
+        "Workflow Mode set to AUTO. Full autonomy enabled.",
         "info",
       );
     },
@@ -464,32 +460,6 @@ export default function (pi: any) {
       }
 
       return {};
-    }
-
-    // ── 3. AUTO MODE TRACKING ──
-    if (currentMode === "auto") {
-      if (event.toolName === "write" || event.toolName === "edit") {
-        const filePath = event.input.path || event.input.targetFile;
-        if (filePath && !autoModeOriginalContents.has(filePath)) {
-          if (fs.existsSync(filePath)) {
-            autoModeOriginalContents.set(filePath, fs.readFileSync(filePath, "utf8"));
-          } else {
-            autoModeOriginalContents.set(filePath, null);
-          }
-        }
-      } else if (event.toolName === "bash") {
-        const command = event.input.command || "";
-        const modifiedFiles = extractModifiedFiles(command);
-        for (const filePath of modifiedFiles) {
-          if (!autoModeOriginalContents.has(filePath)) {
-            if (fs.existsSync(filePath)) {
-              autoModeOriginalContents.set(filePath, fs.readFileSync(filePath, "utf8"));
-            } else {
-              autoModeOriginalContents.set(filePath, null);
-            }
-          }
-        }
-      }
     }
 
     // ── 2. MANUAL MODE ──
@@ -627,39 +597,4 @@ export default function (pi: any) {
     return {};
   });
 
-  // ── Session-end hook (auto mode only) ──
-  pi.on("agent_end", async (event: any, ctx: any) => {
-    if (currentMode === "auto") {
-      console.log(`\n\x1b[32m=== Auto Mode Run Finished. Displaying final diffs ===\x1b[0m`);
-      let hasDiffs = false;
-
-      for (const [filePath, oldContent] of autoModeOriginalContents.entries()) {
-        const fileExists = fs.existsSync(filePath);
-        const newContent = fileExists ? fs.readFileSync(filePath, "utf8") : null;
-        
-        // Skip if there are no changes
-        if (oldContent === newContent) continue;
-        
-        hasDiffs = true;
-        const isNewFile = oldContent === null;
-        const label = isNewFile ? `${filePath}  \x1b[32m(new file)\x1b[0m` : filePath;
-        console.log(`\n\x1b[1;36m╔══ ${label} ══╗\x1b[0m\n`);
-
-        const diffOutput = getDiff(
-          filePath,
-          oldContent || "",
-          newContent || "",
-          true // colorize
-        );
-        console.log(diffOutput);
-      }
-
-      if (!hasDiffs) {
-        console.log("No file changes detected during this run.");
-      }
-
-      // Reset for next run
-      autoModeOriginalContents.clear();
-    }
-  });
 }

@@ -264,10 +264,12 @@ def lookup_icon_name(app_id, icon_theme):
     return "application-x-executable"
 
 
-def parse_state(workspaces_raw, windows_raw):
+def parse_state(workspaces_raw, windows_raw, focused_output=None):
     """Build structured workspace model from raw JSON data."""
     ws_by_id = {}
     for ws in workspaces_raw:
+        if focused_output and ws.get("output") != focused_output:
+            continue
         ws_by_id[ws["id"]] = {
             "id": ws["id"],
             "idx": ws["idx"],
@@ -410,6 +412,34 @@ class MinimapWindow(Gtk.Window):
 
         # Click handlers are attached per-tile in rebuild(); no outer-level
         # click handler — clicks in the gaps between tiles must do nothing.
+
+    def set_target_monitor(self, output_name):
+        display = Gdk.Display.get_default()
+        monitors = display.get_monitors()
+        target_monitor = None
+        for i in range(monitors.get_n_items()):
+            m = monitors.get_item(i)
+            if m.get_connector() == output_name:
+                target_monitor = m
+                break
+        if not target_monitor and monitors.get_n_items() > 0:
+            target_monitor = monitors.get_item(0)
+            
+        if target_monitor and target_monitor != getattr(self, "_current_monitor", None):
+            # Wayland layer-shell does not support changing the monitor of a mapped window.
+            was_visible = self.get_visible()
+            if was_visible:
+                self.set_visible(False)
+
+            Gtk4LayerShell.set_monitor(self, target_monitor)
+            self._current_monitor = target_monitor
+
+            geometry = target_monitor.get_geometry()
+            min_width = int(geometry.width * MINIMAP_WIDTH)
+            self.outer.set_size_request(min_width, -1)
+
+            if was_visible:
+                self.present()
 
     def rebuild(self, workspaces):
         """Tear down and rebuild all widgets from fresh state."""
@@ -1020,9 +1050,20 @@ class MinimapApp(Gtk.Application):
 
     def _do_rebuild(self):
         self._rebuild_pending = False
+
+        focused_output = None
+        for ws in self._workspaces.values():
+            if ws.get("is_focused"):
+                focused_output = ws.get("output")
+                break
+                
+        if focused_output:
+            self._win.set_target_monitor(focused_output)
+
         ws_list = parse_state(
             list(self._workspaces.values()),
             list(self._windows.values()),
+            focused_output,
         )
         self._win.rebuild(ws_list)
         if self._is_first_show:
