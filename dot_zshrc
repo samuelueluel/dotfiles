@@ -270,7 +270,7 @@ serve-local() {
 
   case "$model_key" in
     qwen-moe)   quant_opts=("Q4" "Q8") ;;
-    qwen-dense) quant_opts=("Q4" "Q8") ;;
+    qwen-dense) quant_opts=("Q4" "Q6" "Q8") ;;
   esac
 
   if [[ ${#quant_opts[@]} -gt 1 ]]; then
@@ -287,6 +287,7 @@ serve-local() {
     qwen-moe-Q4)    uri="hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL" ;;
     qwen-moe-Q8)    uri="hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL" ;;
     qwen-dense-Q4)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL"     ;;
+    qwen-dense-Q6)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL"     ;;
     qwen-dense-Q8)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL"     ;;
   esac
 
@@ -405,8 +406,10 @@ model-check() {
         *deepseek-v4-pro)   _short="dsv4pro" ;;
         *deepseek-v4-flash) _short="dsv4fl"  ;;
         *claude-opus-4*)    _short="opus"    ;;
+        *claude-opus-5*)    _short="opus5"   ;;
         *claude-sonnet-5)   _short="sonnet5" ;;
         *glm-5.2*)          _short="glm52"   ;;
+        *kimi-k3*)          _short="kimik3"  ;;
         *)                  _short="$_m"     ;;
       esac
       printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
@@ -747,8 +750,10 @@ print("slots (loaded/max): " + "  ".join(
         *deepseek-v4-pro)   _short="dsv4pro" ;;
         *deepseek-v4-flash) _short="dsv4fl"  ;;
         *claude-opus-4*)    _short="opus"    ;;
+        *claude-opus-5*)    _short="opus5"   ;;
         *claude-sonnet-5)   _short="sonnet5" ;;
         *glm-5.2*)          _short="glm52"   ;;
+        *kimi-k3*)          _short="kimik3"  ;;
         *)                  _short="$_m"     ;;
       esac
       printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
@@ -773,11 +778,13 @@ _pi_pick_local_model() {
     "moe-q4     Qwen3.6 MoE 35B    Q4" \
     "moe-q8     Qwen3.6 MoE 35B    Q8" \
     "dense-q4   Qwen3.6 Dense 27B  Q4" \
+    "dense-q6   Qwen3.6 Dense 27B  Q6" \
     "dense-q8   Qwen3.6 Dense 27B  Q8") || return 1
   case "${choice%%[ ]*}" in
     moe-q4)   print -r -- "Qwen3.6-MoE-35B-Q4" ;;
     moe-q8)   print -r -- "Qwen3.6-MoE-35B-Q8" ;;
     dense-q4) print -r -- "Qwen3.6-Dense-27B-Q4" ;;
+    dense-q6) print -r -- "Qwen3.6-Dense-27B-Q6" ;;
     dense-q8) print -r -- "Qwen3.6-Dense-27B-Q8" ;;
     *) return 1 ;;
   esac
@@ -865,8 +872,10 @@ pihat() {
     "dsv4pro   DeepSeek V4 Pro" \
     "dsv4fl    DeepSeek V4 Flash" \
     "opus      Claude Opus 4.8" \
+    "opus5     Claude Opus 5" \
     "sonnet5   Claude Sonnet 5" \
-    "glm52     GLM 5.2") || return 1
+    "glm52     GLM 5.2" \
+    "kimik3    Kimi K3") || return 1
   [[ -z "$model_choice" ]] && return 1
 
   model_key="${model_choice%%[ ]*}"
@@ -886,7 +895,13 @@ pihat() {
     opus)
       model_flag="openrouter/anthropic/claude-opus-4.8"
       default_thinking="high"
-      thinking_opts=("low" "medium" "high" "xhigh")
+      thinking_opts=("low" "medium" "high" "max" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    opus5)
+      model_flag="openrouter/anthropic/claude-opus-5"
+      default_thinking="xhigh"
+      thinking_opts=("low" "medium" "high" "max" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
       ;;
     sonnet5)
@@ -899,6 +914,12 @@ pihat() {
       model_flag="openrouter/z-ai/glm-5.2"
       default_thinking="xhigh"
       thinking_opts=("high" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    kimik3)
+      model_flag="openrouter/moonshotai/kimi-k3"
+      default_thinking="xhigh"
+      thinking_opts=("low" "medium" "high" "max" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
       ;;
     *)       return 1 ;;
@@ -978,8 +999,10 @@ betahat() {
     "dsv4pro   DeepSeek V4 Pro" \
     "dsv4fl    DeepSeek V4 Flash" \
     "opus      Claude Opus 4.8" \
+    "opus5     Claude Opus 5" \
     "sonnet5   Claude Sonnet 5" \
-    "glm52     GLM 5.2") || return 1
+    "glm52     GLM 5.2" \
+    "kimik3    Kimi K3") || return 1
   [[ -z "$model_choice" ]] && return 1
 
   model_key="${model_choice%%[ ]*}"
@@ -999,7 +1022,13 @@ betahat() {
     opus)
       model_flag="openrouter/anthropic/claude-opus-4.8"
       default_thinking="high"
-      thinking_opts=("low" "medium" "high" "xhigh")
+      thinking_opts=("low" "medium" "high" "max" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    opus5)
+      model_flag="openrouter/anthropic/claude-opus-5"
+      default_thinking="xhigh"
+      thinking_opts=("low" "medium" "high" "max" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
       ;;
     sonnet5)
@@ -1012,6 +1041,12 @@ betahat() {
       model_flag="openrouter/z-ai/glm-5.2"
       default_thinking="xhigh"
       thinking_opts=("high" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    kimik3)
+      model_flag="openrouter/moonshotai/kimi-k3"
+      default_thinking="xhigh"
+      thinking_opts=("low" "medium" "high" "max" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
       ;;
     *)       return 1 ;;

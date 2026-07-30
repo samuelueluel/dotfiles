@@ -10,9 +10,10 @@ Wants=network-online.target
 ContainerName=open-webui
 Image=ghcr.io/open-webui/open-webui:main
 Network=host
+EnvironmentFile=%h/.zshenv.local
 Environment=PORT=3000
-Environment=OPENAI_API_BASE_URL=http://localhost:8080/v1
-Environment=OPENAI_API_KEY=dummy
+Environment=OPENAI_API_BASE_URLS=http://127.0.0.1:13305/api/v1;https://openrouter.ai/api/v1
+Environment=OPENAI_API_KEYS=dummy;${OPENROUTER_API_KEY_US}
 Environment=ENABLE_OLLAMA_API=False
 Environment=WEBUI_AUTH=True
 Environment=WEBUI_NAME=ZBook Local AI

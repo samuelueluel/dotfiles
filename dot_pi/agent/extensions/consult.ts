@@ -12,6 +12,8 @@ const MODELS = {
   dsv4pro:   { flag: "openrouter/deepseek/deepseek-v4-pro",   thinking: "xhigh", label: "DeepSeek V4 Pro", provider: "pi" },
   dsv4fl:    { flag: "openrouter/deepseek/deepseek-v4-flash", thinking: "xhigh", label: "DeepSeek V4 Flash", provider: "pi" },
   opus:      { flag: "openrouter/anthropic/claude-opus-4.8",  thinking: "high",  label: "Claude Opus 4.8", provider: "pi" },
+  opus5:     { flag: "openrouter/anthropic/claude-opus-5",    thinking: "xhigh", label: "Claude Opus 5", provider: "pi" },
+  kimik3:    { flag: "openrouter/moonshotai/kimi-k3",        thinking: "xhigh", label: "Kimi K3", provider: "pi" },
   gemini35f: { flag: "Gemini 3.5 Flash (High)",             thinking: "high",  label: "Gemini 3.5 Flash (High)", provider: "agy" },
   gemini31p: { flag: "Gemini 3.1 Pro (High)",               thinking: "high",  label: "Gemini 3.1 Pro (High)", provider: "agy" },
 } as const;
@@ -22,6 +24,8 @@ const MODEL_MENU_OPTIONS = [
   "dsv4pro   — DeepSeek V4 Pro (xhigh thinking, default)",
   "dsv4fl    — DeepSeek V4 Flash (xhigh thinking, cheaper)",
   "opus      — Claude Opus 4.8 (high thinking)",
+  "opus5     — Claude Opus 5 (xhigh thinking)",
+  "kimik3    — Kimi K3 (xhigh thinking)",
   "gemini35f — Gemini 3.5 Flash (High, Google AI Pro)",
   "gemini31p — Gemini 3.1 Pro (High, Google AI Pro)",
 ];
