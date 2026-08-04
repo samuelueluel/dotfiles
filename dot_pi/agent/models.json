@@ -5,7 +5,7 @@
       "api": "openai-completions",
       "models": [
         {
-          "id": "deepseek/deepseek-v4-flash",
+          "id": "deepseek/deepseek-v4-flash-0731",
           "name": "DeepSeek: DeepSeek V4 Flash",
           "reasoning": true,
           "contextWindow": 1048576,
@@ -128,6 +128,24 @@
             "max": "max",
             "xhigh": "xhigh"
           }
+        },
+        {
+          "id": "openai/gpt-5.6-luna-pro",
+          "name": "OpenAI: GPT-5.6 Luna Pro",
+          "reasoning": true,
+          "contextWindow": 1050000,
+          "maxTokens": 128000,
+          "compat": {
+            "supportsDeveloperRole": true,
+            "thinkingFormat": "openrouter"
+          },
+          "thinkingLevelMap": {
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": "max",
+            "xhigh": "xhigh"
+          }
         }
       ]
     },
@@ -171,6 +189,20 @@
         {
           "id": "Qwen3.6-Dense-27B-Q8",
           "name": "Qwen3.6 Dense 27B Q8 (Lemonade)",
+          "reasoning": true,
+          "contextWindow": 262144,
+          "maxTokens": 16384
+        },
+        {
+          "id": "DeepSeek-V4-Flash-Q2",
+          "name": "DeepSeek V4 Flash Q2 (MoE 90GB)",
+          "reasoning": true,
+          "contextWindow": 262144,
+          "maxTokens": 16384
+        },
+        {
+          "id": "DeepSeek-V4-Flash-Q3",
+          "name": "DeepSeek V4 Flash Q3 (MoE 104GB)",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 16384

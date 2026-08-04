@@ -41,8 +41,13 @@ output=$(
 
 [ -z "$output" ] && exit 0
 
-key=$(echo "$output" | head -n 1)
-selected=$(echo "$output" | tail -n +2)
+if [ $(echo "$output" | wc -l) -gt 1 ]; then
+    key=$(echo "$output" | head -n 1)
+    selected=$(echo "$output" | tail -n 1)
+else
+    key="enter"
+    selected="$output"
+fi
 
 if [ "$key" = "ctrl-p" ]; then
     printf "%s/%s" "$VAULT_DIR" "$selected" | wl-copy

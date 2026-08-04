@@ -2,21 +2,36 @@
     "user.Qwen3.6-MoE-35B-Q4": {
         "ctx_size": 262144,
         "llamacpp_backend": "vulkan",
-        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 4096 -b 4096 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
     },
     "user.Qwen3.6-MoE-35B-Q8": {
         "ctx_size": 262144,
         "llamacpp_backend": "vulkan",
-        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 4096 -b 4096 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
     },
     "user.Qwen3.6-Dense-27B-Q4": {
         "ctx_size": 262144,
         "llamacpp_backend": "vulkan",
-        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 512 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 4096 -b 4096 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
+    },
+    "user.Qwen3.6-Dense-27B-Q6": {
+        "ctx_size": 262144,
+        "llamacpp_backend": "vulkan",
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 4096 -b 4096 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
     },
     "user.Qwen3.6-Dense-27B-Q8": {
         "ctx_size": 262144,
         "llamacpp_backend": "vulkan",
-        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 512 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
+        "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 4096 -b 4096 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0.5 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
+    },
+    "user.DeepSeek-V4-Flash-Q2": {
+        "ctx_size": 131072,
+        "llamacpp_backend": "vulkan",
+        "llamacpp_args": "--spec-type draft-dspark --spec-draft-n-max 7 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --presence-penalty 0.5 --reasoning on --reasoning-budget 50000 --slot-prompt-similarity 0.8 --temp 0.6 --top-k 20 --top-p 0.95 -b 2048 -ctk q8_0 -ctv q8_0 -fa on -t 16 -ub 1024"
+    },
+    "user.DeepSeek-V4-Flash-Q3": {
+        "ctx_size": 131072,
+        "llamacpp_backend": "vulkan",
+        "llamacpp_args": "--spec-type draft-dspark --spec-draft-n-max 7 --spec-draft-p-min 0.75 --cache-ram 61440 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --presence-penalty 0.5 --reasoning on --reasoning-budget 50000 --slot-prompt-similarity 0.8 --temp 0.6 --top-k 20 --top-p 0.95 -b 2048 -ctk q8_0 -ctv q8_0 -fa on -t 16 -ub 1024"
     }
 }

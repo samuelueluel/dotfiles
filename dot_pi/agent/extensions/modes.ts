@@ -464,6 +464,24 @@ export default function (pi: any) {
 
     // ── 2. MANUAL MODE ──
     if (currentMode === "manual") {
+      // ── MCP tool handling: auto-approve read-only MCP operations, gate mutations ──
+      if (event.toolName === "mcp") {
+        const fullToolName = String(event.input?.tool || event.input?.name || event.input?.subcommand || event.input?.command || "");
+        const isWriteOp = /delete|write|edit|move|rollback|create|update|remove|batch_execute/i.test(fullToolName);
+        if (!isWriteOp) {
+          ctx.ui.notify(`MCP approved (read-only): ${fullToolName || 'mcp'}`, "success");
+          return {};
+        }
+        const details = `MCP Tool Call: ${fullToolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
+        const approved = await askUser(`Approve MCP mutation '${fullToolName}'? [Y/n] `, ctx, details);
+        if (!approved) {
+          ctx.ui.notify(`MCP mutation blocked: ${fullToolName}`, "error");
+          return { block: true, reason: `User rejected MCP mutation: ${fullToolName}` };
+        }
+        ctx.ui.notify(`MCP mutation approved`, "success");
+        return {};
+      }
+
       // Common read-only tools pass through without approval
       if (COMMON_READ_ONLY.has(event.toolName)) {
         return {};

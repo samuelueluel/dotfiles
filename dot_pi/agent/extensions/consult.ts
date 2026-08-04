@@ -10,7 +10,7 @@ const execAsync = promisify(exec);
 
 const MODELS = {
   dsv4pro:   { flag: "openrouter/deepseek/deepseek-v4-pro",   thinking: "xhigh", label: "DeepSeek V4 Pro", provider: "pi" },
-  dsv4fl:    { flag: "openrouter/deepseek/deepseek-v4-flash", thinking: "xhigh", label: "DeepSeek V4 Flash", provider: "pi" },
+  dsv4fl:    { flag: "openrouter/deepseek/deepseek-v4-flash-0731", thinking: "xhigh", label: "DeepSeek V4 Flash", provider: "pi" },
   opus:      { flag: "openrouter/anthropic/claude-opus-4.8",  thinking: "high",  label: "Claude Opus 4.8", provider: "pi" },
   opus5:     { flag: "openrouter/anthropic/claude-opus-5",    thinking: "xhigh", label: "Claude Opus 5", provider: "pi" },
   kimik3:    { flag: "openrouter/moonshotai/kimi-k3",        thinking: "xhigh", label: "Kimi K3", provider: "pi" },

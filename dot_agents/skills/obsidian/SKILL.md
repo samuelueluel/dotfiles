@@ -63,6 +63,15 @@ When creating or editing a note, follow these core conventions:
   ```
   - Common types: note, info, warning, success, question, example, quote. Add `-` to collapse by default.
 
+### 4. TurboVault MCP Tools (Mandatory Vault Substrate)
+You MUST ALWAYS connect to and use the `turbovault` MCP server for all vault operations. **DO NOT** execute raw shell commands (`find`, `grep`, `cat`, `ls`, `sed`, `awk`) against `~/Dropbox/Sam-Obsidian-Vault/`.
+
+- **Mandatory Connection:** At the start of any vault task, connect to `turbovault` (`mcp connect turbovault` or invoke `turbovault` tools).
+- **Context & Inspection:** Use `get_vault_context`, `list_vaults`, and `quick_health_check`.
+- **Search & Links:** Use `search`, `get_backlinks`, and `get_broken_links`.
+- **Reading & Edits:** Use `read_note` and `edit_note` (or `batch_execute` for multi-note changes).
+- **Git Sync:** TurboVault creates local atomic Git commits on note mutation, but you must still execute the post-edit `git push` workflow in step 2.3 when required.
+
 ## Advanced features
 
 - **Folder Structure Reference:**

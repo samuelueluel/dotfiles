@@ -410,6 +410,7 @@ model-check() {
         *claude-sonnet-5)   _short="sonnet5" ;;
         *glm-5.2*)          _short="glm52"   ;;
         *kimi-k3*)          _short="kimik3"  ;;
+        *gpt-5.6-luna-pro*|*luna-pro*) _short="lunapro" ;;
         *)                  _short="$_m"     ;;
       esac
       printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
@@ -457,6 +458,7 @@ pi-safe-1() {
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
+    -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
     -v "$HOME":"$HOME":ro \
@@ -503,6 +505,7 @@ pi-safe-2() {
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
+    -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
@@ -551,6 +554,7 @@ pi-safe-3() {
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
+    -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_file":"$abs_file" \
     -v "$HOME/.pi":"$HOME/.pi" \
@@ -602,6 +606,7 @@ pi-safe-stata-1() {
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
+    -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
@@ -655,6 +660,7 @@ pi-safe-stata-2() {
     -e COLORTERM \
     -e LANG \
     -e OPENROUTER_API_KEY \
+    -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
@@ -754,6 +760,7 @@ print("slots (loaded/max): " + "  ".join(
         *claude-sonnet-5)   _short="sonnet5" ;;
         *glm-5.2*)          _short="glm52"   ;;
         *kimi-k3*)          _short="kimik3"  ;;
+        *gpt-5.6-luna-pro*|*luna-pro*) _short="lunapro" ;;
         *)                  _short="$_m"     ;;
       esac
       printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
@@ -779,18 +786,22 @@ _pi_pick_local_model() {
     "moe-q8     Qwen3.6 MoE 35B    Q8" \
     "dense-q4   Qwen3.6 Dense 27B  Q4" \
     "dense-q6   Qwen3.6 Dense 27B  Q6" \
-    "dense-q8   Qwen3.6 Dense 27B  Q8") || return 1
+    "dense-q8   Qwen3.6 Dense 27B  Q8" \
+    "dsv4fl-q2  DeepSeek V4 Flash Q2 (90GB MoE)" \
+    "dsv4fl-q3  DeepSeek V4 Flash Q3 (104GB MoE)") || return 1
   case "${choice%%[ ]*}" in
-    moe-q4)   print -r -- "Qwen3.6-MoE-35B-Q4" ;;
-    moe-q8)   print -r -- "Qwen3.6-MoE-35B-Q8" ;;
-    dense-q4) print -r -- "Qwen3.6-Dense-27B-Q4" ;;
-    dense-q6) print -r -- "Qwen3.6-Dense-27B-Q6" ;;
-    dense-q8) print -r -- "Qwen3.6-Dense-27B-Q8" ;;
+    moe-q4)    print -r -- "Qwen3.6-MoE-35B-Q4" ;;
+    moe-q8)    print -r -- "Qwen3.6-MoE-35B-Q8" ;;
+    dense-q4)  print -r -- "Qwen3.6-Dense-27B-Q4" ;;
+    dense-q6)  print -r -- "Qwen3.6-Dense-27B-Q6" ;;
+    dense-q8)  print -r -- "Qwen3.6-Dense-27B-Q8" ;;
+    dsv4fl-q2) print -r -- "DeepSeek-V4-Flash-Q2" ;;
+    dsv4fl-q3) print -r -- "DeepSeek-V4-Flash-Q3" ;;
     *) return 1 ;;
   esac
 }
 
-# _lem_preload <model_id>: pick MTP (Qwen only) + parallel, then load the model
+# _lem_preload <model_id>: pick MTP (Qwen/DeepSeek) + parallel, then load the model
 # with those as a flag-level override merged over its saved recipe, so the agent
 # connects to exactly the config chosen here.
 _lem_preload() {
@@ -800,7 +811,7 @@ _lem_preload() {
     print -r -- "Lemonade not reachable on $LEM_API (container up? try 'podman start lemonade')"
     return 1
   fi
-  if [[ "$id" == Qwen* ]]; then
+  if [[ "$id" == Qwen* || "$id" == DeepSeek* ]]; then
     mtp=$(gum choose --header "MTP speculative decoding" --selected "on" "on" "off") || return 1
     [[ "$mtp" == "off" ]] && args+=" --spec-type none"
     args+=" $QWEN_SAMPLING"
@@ -824,6 +835,7 @@ _lem_preload() {
 }
 
 pi() {
+  export PI_SUBAGENTS_MAX_CONCURRENT=1
   _pi_nonstata_skills
 
   local model_id
@@ -864,6 +876,7 @@ pi() {
 }
 
 pihat() {
+  export PI_SUBAGENTS_MAX_CONCURRENT=4
   local model_choice model_key model_flag default_thinking thinking_choice
   local -a thinking_opts
 
@@ -875,7 +888,8 @@ pihat() {
     "opus5     Claude Opus 5" \
     "sonnet5   Claude Sonnet 5" \
     "glm52     GLM 5.2" \
-    "kimik3    Kimi K3") || return 1
+    "kimik3    Kimi K3" \
+    "lunapro   OpenAI Luna Pro") || return 1
   [[ -z "$model_choice" ]] && return 1
 
   model_key="${model_choice%%[ ]*}"
@@ -887,7 +901,7 @@ pihat() {
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
       ;;
     dsv4fl)  
-      model_flag="openrouter/deepseek/deepseek-v4-flash"
+      model_flag="openrouter/deepseek/deepseek-v4-flash-0731"
       default_thinking="xhigh"
       thinking_opts=("high" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
@@ -918,6 +932,12 @@ pihat() {
       ;;
     kimik3)
       model_flag="openrouter/moonshotai/kimi-k3"
+      default_thinking="xhigh"
+      thinking_opts=("low" "medium" "high" "max" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    lunapro)
+      model_flag="openrouter/openai/gpt-5.6-luna-pro"
       default_thinking="xhigh"
       thinking_opts=("low" "medium" "high" "max" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
@@ -971,6 +991,7 @@ pihat() {
 }
 
 beta() {
+  export PI_SUBAGENTS_MAX_CONCURRENT=1
   local target="${1:-$PWD}" abs_target
   abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
   [[ -d "$abs_target" ]] || { echo "Error: '$target' is not a directory."; return 1; }
@@ -991,6 +1012,7 @@ beta() {
 }
 
 betahat() {
+  export PI_SUBAGENTS_MAX_CONCURRENT=4
   local model_choice model_key model_flag default_thinking thinking_choice
   local -a thinking_opts
 
@@ -1002,7 +1024,8 @@ betahat() {
     "opus5     Claude Opus 5" \
     "sonnet5   Claude Sonnet 5" \
     "glm52     GLM 5.2" \
-    "kimik3    Kimi K3") || return 1
+    "kimik3    Kimi K3" \
+    "lunapro   OpenAI Luna Pro") || return 1
   [[ -z "$model_choice" ]] && return 1
 
   model_key="${model_choice%%[ ]*}"
@@ -1014,7 +1037,7 @@ betahat() {
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
       ;;
     dsv4fl)  
-      model_flag="openrouter/deepseek/deepseek-v4-flash"
+      model_flag="openrouter/deepseek/deepseek-v4-flash-0731"
       default_thinking="xhigh"
       thinking_opts=("high" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
@@ -1045,6 +1068,12 @@ betahat() {
       ;;
     kimik3)
       model_flag="openrouter/moonshotai/kimi-k3"
+      default_thinking="xhigh"
+      thinking_opts=("low" "medium" "high" "max" "xhigh")
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
+      ;;
+    lunapro)
+      model_flag="openrouter/openai/gpt-5.6-luna-pro"
       default_thinking="xhigh"
       thinking_opts=("low" "medium" "high" "max" "xhigh")
       export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"

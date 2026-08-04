@@ -9,6 +9,17 @@
         "STATA_PATH": "/usr/local/stata19/stata-mp",
         "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"
       }
+    },
+    "turbovault": {
+      "command": "turbovault",
+      "args": [
+        "--vault",
+        "/var/home/samuel/Dropbox/Sam-Obsidian-Vault",
+        "--config",
+        "/var/home/samuel/.config/turbovault/config.yaml",
+        "--profile",
+        "production"
+      ]
     }
   }
 }

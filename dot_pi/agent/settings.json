@@ -1,6 +1,6 @@
 {
   "defaultProvider": "local",
-  "defaultModel": "Qwen3.6-Dense-27B-Q4",
+  "defaultModel": "Qwen3.6-Dense-27B-Q8",
   "theme": "noctalia",
   "skills": [
     "/var/home/samuel/.agents/skills"
@@ -36,12 +36,14 @@
     {
       "source": "npm:pi-web-access"
     },
-    "extensions/pi-tool-display"
+    "extensions/pi-tool-display",
+    "npm:@tintinweb/pi-subagents",
+    "extensions/pi-advisor"
   ],
   "extensions": [
     "extensions/modes.ts",
     "extensions/powerline-footer.ts"
   ],
-  "lastChangelogVersion": "0.79.8",
-  "hideThinkingBlock": false
+  "lastChangelogVersion": "0.83.0",
+  "hideThinkingBlock": true
 }

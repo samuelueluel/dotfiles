@@ -1091,23 +1091,19 @@ class MinimapApp(Gtk.Application):
 
     def _on_event(self, event):
         if "WindowsChanged" in event:
-            if self._got_initial_windows:
-                return
             self._windows = {w["id"]: w for w in event["WindowsChanged"]["windows"]}
             self._sync_focus_from_windows()
             self._got_initial_windows = True
             self._prune_stale_tags()
-            self._try_initial_build()
+            self._full_rebuild()
 
         elif "WorkspacesChanged" in event:
-            if self._got_initial_workspaces:
-                return
             self._workspaces = {
                 ws["id"]: ws for ws in event["WorkspacesChanged"]["workspaces"]
             }
             self._sync_ws_focus()
             self._got_initial_workspaces = True
-            self._try_initial_build()
+            self._full_rebuild()
 
         elif "WindowFocusChanged" in event:
             new_id = event["WindowFocusChanged"].get("id")
@@ -1140,6 +1136,14 @@ class MinimapApp(Gtk.Application):
                         w["is_focused"] = False
                 self._focused_window_id = win["id"]
                 self._focused_ws_id = win.get("workspace_id")
+            ws_id = win.get("workspace_id")
+            if ws_id and ws_id not in self._workspaces:
+                try:
+                    workspaces_raw = json.loads(subprocess.check_output(["niri", "msg", "--json", "workspaces"]))
+                    self._workspaces = {ws["id"]: ws for ws in workspaces_raw}
+                    self._sync_ws_focus()
+                except Exception:
+                    pass
             self._full_rebuild()
 
         elif "WindowClosed" in event:
@@ -1158,6 +1162,13 @@ class MinimapApp(Gtk.Application):
             # circles). Without this, switching workspaces leaves the old workspace
             # styled as focused until the next full state refresh.
             target = self._workspaces.get(ws_id)
+            if target is None:
+                try:
+                    workspaces_raw = json.loads(subprocess.check_output(["niri", "msg", "--json", "workspaces"]))
+                    self._workspaces = {ws["id"]: ws for ws in workspaces_raw}
+                    target = self._workspaces.get(ws_id)
+                except Exception:
+                    pass
             if target is not None:
                 same_output = target.get("output")
                 for ws in self._workspaces.values():
