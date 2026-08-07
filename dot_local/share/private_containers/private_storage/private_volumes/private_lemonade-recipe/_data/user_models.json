@@ -1,0 +1,113 @@
+{
+  "DeepSeek-V4-Flash-Q2": {
+    "checkpoints": {
+      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-IQ2_XXS"
+    },
+    "labels": [
+      "custom",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 0.005,
+    "suggested": true
+  },
+  "DeepSeek-V4-Flash-Q2K": {
+    "checkpoints": {
+      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-Q2_K_XL"
+    },
+    "labels": [
+      "custom",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 0.005,
+    "suggested": true
+  },
+  "DeepSeek-V4-Flash-Q3": {
+    "checkpoints": {
+      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-IQ3_XXS"
+    },
+    "labels": [
+      "custom",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 0.005,
+    "suggested": true
+  },
+  "Qwen3.6-Dense-27B-Q4": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL",
+      "mmproj": "unsloth/Qwen3.6-27B-MTP-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 17.5,
+    "suggested": true
+  },
+  "Qwen3.6-Dense-27B-Q6": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL",
+      "mmproj": "unsloth/Qwen3.6-27B-MTP-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 25.1,
+    "suggested": true
+  },
+  "Qwen3.6-Dense-27B-Q8": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL",
+      "mmproj": "unsloth/Qwen3.6-27B-MTP-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 34.2,
+    "suggested": true
+  },
+  "Qwen3.6-MoE-35B-Q4": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL",
+      "mmproj": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 22.1,
+    "suggested": true
+  },
+  "Qwen3.6-MoE-35B-Q8": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL",
+      "mmproj": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 37.3,
+    "suggested": true
+  }
+}

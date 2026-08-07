@@ -141,7 +141,7 @@ layout {
         length total-proportion=1.0
 
         active-color "#ED6D42" // globe_mallow
-        inactive-color "#00000090"   // black at ~50% opacity
+        inactive-color "#000000"   // black fully opaque
     }
 }
 
@@ -575,14 +575,17 @@ binds {
     // FOCUS NAVIGATION
     // -----------------------------------
 
-    Mod+W { spawn "niri-nav" "focus-window-or-workspace-up"; }
+    Mod+W { spawn "niri-nav" "focus-workspace-up"; }
     Mod+A { spawn "niri-nav" "focus-column-left"; }
-    Mod+S { spawn "niri-nav" "focus-window-or-workspace-down"; }
+    Mod+S { spawn "niri-nav" "focus-workspace-down"; }
     Mod+D { spawn "niri-nav" "focus-column-right"; }
 
-    Mod+Up    { focus-window-or-workspace-up; }
+    Mod+Alt+W { spawn "niri-nav" "focus-window-up-or-bottom"; }
+    Mod+Alt+S { spawn "niri-nav" "focus-window-down-or-top"; }
+
+    Mod+Up    { focus-workspace-up; }
     Mod+Left  { focus-column-left; }
-    Mod+Down  { focus-window-or-workspace-down; }
+    Mod+Down  { focus-workspace-down; }
     Mod+Right { focus-column-right; }
 
     //Mod+I hotkey-overlay-title="Toggle focus mode (wallpaper + centering + opacity)" repeat=false { spawn "niri-mode-toggle"; }

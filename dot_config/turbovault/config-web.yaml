@@ -1,3 +1,8 @@
+# Web-facing TurboVault base profile (Open WebUI / less-trusted clients).
+# This file is the SHARED base for both web instances:
+#   - read-only instance (default): launch with --allowed-tools <read-only list>
+#   - full instance (opt-in): launch with no restriction flags
+# The pi CLI profile uses config.yaml and is intentionally separate.
 vaults:
   - name: personal
     path: /var/home/samuel/Dropbox/Sam-Obsidian-Vault

@@ -26,26 +26,16 @@ When creating or editing a note, follow these core conventions:
 3. Subfolders use hyphens and Title Case (e.g., `30_Personal/20_Personal-Interests`). Acronyms uppercase: `Local-LLMs`.
 4. **Never** create new top-level folders without asking.
 
-### 2. Editing an Existing Note
-1. **Before editing**, commit the current vault state as a pre-edit snapshot:
-   ```bash
-   git -C ~/Dropbox/Sam-Obsidian-Vault add -A && git -C ~/Dropbox/Sam-Obsidian-Vault commit -m "pre-edit snapshot" --allow-empty
-   ```
-2. Apply changes using plain heading names (do not use formatting in headings):
-   - **Never** prefix headings with numbers, letters, or outline markers (e.g. `1`, `1.1`, `A.`). The Number Headings plugin handles numbering automatically.
-   - Replace placeholder titles with relevant titles.
-3. **After editing**, commit and push the changes:
-   ```bash
-   git -C ~/Dropbox/Sam-Obsidian-Vault add -A && git -C ~/Dropbox/Sam-Obsidian-Vault commit -m "brief description of edit" && git -C ~/Dropbox/Sam-Obsidian-Vault push
-   ```
-4. Use color syntax for formatting, avoiding `**bold**`:
-   - `~={green}text=~` (all emphasis — definitions, key terms, inline highlights, organizational labels)
-   - `~={magenta}text=~` (warnings and dangers only — e.g. a command that can break something)
-   Note the trailing `=~`. When possible it is better to highlight connected segments of sentences rather than whole sentences or paragraphs.
-5. Lists:
-   - Prefer bullets (`-`) unless order or sequence is meaningful — use numbered lists only when numbering matters.
-   - For nested lists, indent with a tab.
-   - When nesting, alternate list type (bullet → numbered or numbered → bullet) to visually distinguish levels.
+### 2. Note Conventions
+- **Headings:** Use plain heading names — do not use formatting in headings. **Never** prefix headings with numbers, letters, or outline markers (e.g. `1`, `1.1`, `A.`). The Number Headings plugin handles numbering automatically. Replace placeholder titles with relevant titles.
+- **Color syntax** for formatting, avoiding `**bold**`:
+  - `~={green}text=~` (all emphasis — definitions, key terms, inline highlights, organizational labels)
+  - `~={magenta}text=~` (warnings and dangers only — e.g. a command that can break something)
+  Note the trailing `=~`. When possible it is better to highlight connected segments of sentences rather than whole sentences or paragraphs.
+- **Lists:**
+  - Prefer bullets (`-`) unless order or sequence is meaningful — use numbered lists only when numbering matters.
+  - For nested lists, indent with a tab.
+  - When nesting, alternate list type (bullet → numbered or numbered → bullet) to visually distinguish levels.
 
 ### 3. Adding Links, Embeds, and Callouts
 - **Internal:** `[[wikilink]]` or `[[wikilink|alias]]`
@@ -66,11 +56,20 @@ When creating or editing a note, follow these core conventions:
 ### 4. TurboVault MCP Tools (Mandatory Vault Substrate)
 You MUST ALWAYS connect to and use the `turbovault` MCP server for all vault operations. **DO NOT** execute raw shell commands (`find`, `grep`, `cat`, `ls`, `sed`, `awk`) against `~/Dropbox/Sam-Obsidian-Vault/`.
 
-- **Mandatory Connection:** At the start of any vault task, connect to `turbovault` (`mcp connect turbovault` or invoke `turbovault` tools).
-- **Context & Inspection:** Use `get_vault_context`, `list_vaults`, and `quick_health_check`.
-- **Search & Links:** Use `search`, `get_backlinks`, and `get_broken_links`.
-- **Reading & Edits:** Use `read_note` and `edit_note` (or `batch_execute` for multi-note changes).
-- **Git Sync:** TurboVault creates local atomic Git commits on note mutation, but you must still execute the post-edit `git push` workflow in step 2.3 when required.
+- **Calling turbovault tools:** every tool is exposed with a `turbovault_` prefix — call `turbovault_search`, `turbovault_read_note`, `turbovault_write_note`, etc. (bare names like `search` return "Tool not found"). Every write operation (`turbovault_write_note`, `turbovault_edit_note`, `turbovault_delete_note`, `turbovault_move_note`, `turbovault_update_frontmatter`, `turbovault_batch_execute`) requires a non-empty `commit_message` — always pass one. Overwriting an existing note requires `expected_hash` from a prior read, or `force: true`. `turbovault_edit_note` takes `edits` as diff-style SEARCH/REPLACE blocks, not JSON: `<<<<<<< SEARCH` + old text + `=======` + new text + `>>>>>>> REPLACE` (one block per change).
+
+- **Lazy loading:** `turbovault` is lazy-loaded — its server starts on first use. A direct `mcp call` to any turbovault tool (or an explicit `mcp connect turbovault`) auto-spawns the server and activates the full toolset for the session. Whenever the user's request concerns the vault (reading, searching, writing, organizing, linking, tags, templates), start with a turbovault `mcp call` — no separate connect step is required.
+- **Task → tool routing (use the `turbovault_` prefixed names):**
+  - Read a note → `turbovault_read_note`
+  - Search notes → `turbovault_search` (full-text) or `turbovault_advanced_search` (tags/frontmatter)
+  - Write/update → `turbovault_write_note` (overwrite/append/prepend) or `turbovault_edit_note` (targeted SEARCH/REPLACE)
+  - Multiple notes at once → `turbovault_batch_execute`
+  - Move/rename → `turbovault_move_note`
+  - Templates → `turbovault_list_templates`, `turbovault_create_from_template`
+  - Frontmatter/tags → `turbovault_update_frontmatter`, `turbovault_manage_tags`
+  - Links/graph → `turbovault_get_backlinks`, `turbovault_get_broken_links`, `turbovault_get_related_notes`
+  - Vault overview → `turbovault_get_vault_context`, `turbovault_quick_health_check`
+- **Fallback:** If `turbovault` cannot be connected or is unavailable, stop and tell the user rather than editing vault files directly.
 
 ## Advanced features
 

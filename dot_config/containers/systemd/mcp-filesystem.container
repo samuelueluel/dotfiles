@@ -1,0 +1,34 @@
+# MCP filesystem server for Open WebUI — lets chat models read/edit files.
+#
+# Security model (same as pi-safe): the container has the WHOLE of $HOME
+# mounted read-only, except the one writable folder below. The server itself
+# is allowed to "see" all of $HOME, but the OS refuses writes anywhere except
+# the writable folder. Published on 127.0.0.1 only — nothing on the LAN can
+# reach it.
+#
+# Endpoint for Open WebUI (Admin Settings -> External Tools):
+#   Type: MCP (Streamable HTTP)
+#   URL:  http://127.0.0.1:8000/mcp
+#   Auth: None
+[Unit]
+Description=MCP filesystem server (Streamable HTTP for Open WebUI)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=mcp-filesystem
+Image=docker.io/supercorp/supergateway:latest
+PublishPort=127.0.0.1:8000:8000
+Volume=%h:%h:ro
+Volume=/var/home/samuel/Dropbox/OpenWebUI-Writable:/var/home/samuel/Dropbox/OpenWebUI-Writable
+SecurityLabelDisable=true
+Entrypoint=/bin/sh
+Exec=-c 'cd /usr/local/lib/node_modules/supergateway && npm install @modelcontextprotocol/sdk@latest --no-audit --no-fund --loglevel=error >/dev/null 2>&1; exec supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /var/home/samuel" --outputTransport streamableHttp --port 8000 --streamableHttpPath /mcp'
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target
