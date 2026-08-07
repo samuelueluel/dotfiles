@@ -27,6 +27,10 @@
 - System: Power off | systemctl poweroff
 - System: Clean unused flatpaks | flatpak uninstall --unused
 - System: RTK token savings | rtk gain
+- System: TuneD - Set LLM sustained profile | sudo tuned-adm profile llm-sustained
+- System: TuneD - Set throughput performance profile | sudo tuned-adm profile throughput-performance
+- System: TuneD - Set balanced profile | sudo tuned-adm profile balanced
+- System: TuneD - Check active profile | tuned-adm active
 - System: Sunset (Santa Fe) | night-on
 - System: Sunset off | night-off
 - System: Chezmoi | chezmoi
