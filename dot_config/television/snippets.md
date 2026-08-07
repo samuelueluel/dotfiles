@@ -27,7 +27,8 @@
 - System: Power off | systemctl poweroff
 - System: Clean unused flatpaks | flatpak uninstall --unused
 - System: RTK token savings | rtk gain
-- System: TuneD - Set LLM sustained profile | sudo tuned-adm profile llm-sustained
+- System: TuneD - Set GPU/LLM sustained profile | sudo tuned-adm profile gpu-sustained
+- System: TuneD - Set CPU/Stata sustained profile | sudo tuned-adm profile cpu-sustained
 - System: TuneD - Set throughput performance profile | sudo tuned-adm profile throughput-performance
 - System: TuneD - Set balanced profile | sudo tuned-adm profile balanced
 - System: TuneD - Check active profile | tuned-adm active
