@@ -1,9 +1,9 @@
 {
   "enabled": true,
   "provider": "openrouter",
-  "model": "deepseek/deepseek-v4-flash-0731",
-  "reasoning": "xhigh",
+  "model": "anthropic/claude-sonnet-5",
+  "maxUsesPerRun": 4,
   "maxTokens": 16384,
-  "maxContextMessages": 20,
-  "maxUsesPerRun": 4
+  "reasoning": "xhigh",
+  "maxContextMessages": 20
 }
