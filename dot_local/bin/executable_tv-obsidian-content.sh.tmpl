@@ -8,7 +8,7 @@ read -r query
 [ -z "$query" ] && exit 0
 
 output=$(
-    $RG -l --glob "*.md" "$query" "$VAULT_DIR" |
+    $RG -l -S --glob "*.md" "$query" "$VAULT_DIR" |
     awk -v vault_dir="$VAULT_DIR/" '{
       path = $0;
       sub(vault_dir, "", path); # Remove absolute path prefix
@@ -27,8 +27,7 @@ output=$(
         printf "\033[0m%s\n", path;
       }
     }' |
-    tv --source-command="cat" \
-       --ansi \
+    tv --ansi \
        --source-output="{strip_ansi}" \
        --preview-command="$RG --color=always -C2 '$query' \"$VAULT_DIR/{strip_ansi}\"" \
        --preview-size=60 \

@@ -3,7 +3,7 @@ name = "Files"
 description = "Browse and open files"
 
 [source]
-command = "fd -H -t f . /var/home/samuel/ | awk '{ gsub(\"/var/home/samuel/\", \"~/\"); match($0, /.*\\//); dir = substr($0, 1, RLENGTH); file = substr($0, RLENGTH+1); printf \"\\033[36m%s\\033[0m%s\\n\", dir, file }'"
+command = "fd -H -t f -E 'Sam-Obsidian-Vault' . /var/home/samuel/ | awk '{ gsub(\"/var/home/samuel/\", \"~/\"); match($0, /.*\\//); dir = substr($0, 1, RLENGTH); file = substr($0, RLENGTH+1); printf \"\\033[36m%s\\033[0m%s\\n\", dir, file }'"
 ansi = true
 output = "{strip_ansi}"
 

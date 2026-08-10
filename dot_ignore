@@ -1,0 +1,52 @@
+# System, Flatpak & Runtime Caches
+.cache/
+.local/share/containers/
+.local/share/flatpak/
+.local/share/Trash/
+.local/state/
+.var/
+
+# Browser Caches & Storage (configs in ~/.config still searched)
+.zen/
+.mozilla/
+.dropbox/
+.dropbox-dist/
+.zotero/
+
+# Heavy Environments, Models & Packages
+mineru-venv/
+vllm-benchmarks/
+magic-pdf-models/
+.venv/
+__pycache__/
+.pytest_cache/
+.cargo/
+.rustup/
+.npm/
+
+# Media & Large Libraries
+Music/
+
+# Agent Session Logs & Transcripts ONLY (Configs/Rules like GEMINI.md, CLAUDE.md stay searchable)
+.gemini/antigravity-cli/brain/
+.gemini/antigravity-cli/conversations/
+.gemini/antigravity-cli/log/
+.gemini/antigravity-cli/crashes/
+.gemini/antigravity-cli/presence/
+.gemini/antigravity-cli/cache/
+.claude/file-history/
+.claude/paste-cache/
+.claude/session-env/
+.claude/sessions/
+.claude/telemetry/
+.claude/backups/
+.claude/history.jsonl
+.claude/cache/
+.pi/consult-logs/
+.pi/cache/
+
+# Whitelist Protection (Never ignore skills or LLM / Lemonade / RamaLama / Ollama configs)
+!*skills*
+!*lemonade*
+!*ramalama*
+!*ollama*

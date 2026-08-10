@@ -310,7 +310,7 @@ serve-autocomplete() {
 alias stop-autocomplete='ramalama stop coder'
 
 # Serve an embedder model on the iGPU alongside the main model and autocomplete
-EMBED_MODEL="hf://Qwen/Qwen3-Embedding-8B-GGUF:Q4_K_M"
+EMBED_MODEL="hf://Qwen/Qwen3-Embedding-8B-GGUF:Q8_0"  # Q8_0 (lossless) since 2026-08-08; Q4_K_M hurt embedding quality
 serve-embedder() {
   echo "Pulling latest $RAMA_IMG …"
   podman pull "$RAMA_IMG"
@@ -726,6 +726,14 @@ for m in loaded:
 print("slots (loaded/max): " + "  ".join(
     "%s=%d/%s" % (k, counts.get(k, 0), v) for k, v in mm.items()))
 '
+  # Ramalama embedder status (port 8082)
+  local _embedder_id
+  _embedder_id=$(curl -sf -m 2 "http://localhost:8082/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  if [[ -n "$_embedder_id" ]]; then
+    printf '  %-10s  %-8s  active on :8082 (%s)\n' "embedder" "ramalama" "${_embedder_id##*/}"
+  else
+    printf '  %-10s  %-8s  off (:8082 inactive)\n' "embedder" "ramalama"
+  fi
 
   # Cloud agents (pihat / betahat) — state files written at launch, removed on exit
   echo ""
@@ -756,13 +764,19 @@ print("slots (loaded/max): " + "  ".join(
   (( _found_pi )) || printf '  cloud     —\n'
 }
 
-# lem-unload: drop ALL models from RAM (server stays up, weights stay on disk)
+# lem-unload: drop ALL models from RAM and force-kill lingering engine processes
 lem-unload() {
   local out
   out=$(curl -s -m 10 -X POST "$LEM_API/unload" -H 'Content-Type: application/json' -d '{}' 2>/dev/null) \
-    || { echo "Lemonade not reachable on $LEM_API"; return 1; }
-  print -r -- "$out" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("message", "(no response)"))' 2>/dev/null \
-    || print -r -- "$out"
+    || { echo "Lemonade not reachable on $LEM_API"; }
+  if [[ -n "$out" ]]; then
+    print -r -- "$out" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("message", "(no response)"))' 2>/dev/null \
+      || print -r -- "$out"
+  fi
+  # Hardened: Force-kill any lingering orphan llama-server processes (inside container & host)
+  podman exec lemonade pkill -9 llama-server 2>/dev/null || true
+  pkill -9 llama-server 2>/dev/null || true
+  echo "RAM cleared & orphan engine processes terminated."
 }
 
 _pi_pick_local_model() {
@@ -954,7 +968,7 @@ pihat() {
   case "${go%%[ ]*}" in
     no)
       { command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "$@" } \
-        always { rm -f "$_state_file"; printf '\a' }
+        always { rm -f "$_state_file"; printf '\a' > /dev/tty }
       ;;
     yes)
       local target="${1:-$PWD}" abs_target is_file=0
@@ -973,7 +987,7 @@ pihat() {
       fi
 
       { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
-        always { rm -f "$_state_file"; printf '\a' }
+        always { rm -f "$_state_file"; printf '\a' > /dev/tty }
       ;;
   esac
 }
@@ -996,7 +1010,7 @@ beta() {
   level="${level%%[ ]*}"
 
   pi-safe-stata-${level} "${abs_target}" --model "$model_flag" "${@:2}"
-  printf '\a'
+  printf '\a' > /dev/tty
 }
 
 betahat() {
@@ -1090,7 +1104,27 @@ betahat() {
   local _state_file="$_state_dir/$$.state"
   printf 'type=betahat\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
   { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
-    always { rm -f "$_state_file"; printf '\a' }
+    always { rm -f "$_state_file"; printf '\a' > /dev/tty }
+}
+
+# --- LLM CODING BENCHMARK ---
+# Compare two local models on the same coding tasks: each model writes the code
+# (loaded with Lemonade recipe defaults — no flag changes), then a frontier judge
+# on OpenRouter scores it (1-10 + rubric). See ~/llm-bench/bench.py.
+coder-bench() {
+  local m1 m2
+  m1=$(_pi_pick_local_model) || return 1
+  m2=$(_pi_pick_local_model) || return 1
+  python3 "$HOME/llm-bench/bench.py" --models "$m1,$m2" --tasks "$HOME/llm-bench/tasks.jsonl" --outdir "$HOME/llm-bench/out" "$@"
+}
+
+# --- AGY WRAPPER WITH MINIMAP NOTIFICATION ---
+agy() {
+  command agy "$@"
+  local ret=$?
+  # One ding path only: terminal BEL; niri-minimap supplies the visual badge.
+  printf '\a'
+  return $ret
 }
 
 # --- STATA TMUX HELPERS ---
@@ -1100,4 +1134,5 @@ betahat() {
 stata-start() { tmux new-session -s stata -c "$PWD" '/usr/local/stata19/stata-mp'; }
 alias stata-attach="tmux attach -t stata"
 alias stata-kill="tmux kill-session -t stata 2>/dev/null && echo 'stata session killed' || echo 'no stata session running'"
+
 

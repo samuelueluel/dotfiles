@@ -7,7 +7,7 @@ read -r query
 
 while true; do
     output=$(
-        $RG -l "$query" "$PWD" |
+        $RG -l -S -g "!**/Sam-Obsidian-Vault/**" "$query" "$PWD" |
         awk '{
           gsub("/var/home/samuel/", "~/");
           match($0, /.*\//);
@@ -15,8 +15,7 @@ while true; do
           file = substr($0, RLENGTH+1);
           printf "\033[36m%s\033[0m%s\n", dir, file;
         }' |
-        tv --source-command="cat" \
-           --ansi \
+        tv --ansi \
            --source-output="{strip_ansi}" \
            --preview-command="/var/home/samuel/.local/bin/tv-ripgrep-preview.sh '$query' '{strip_ansi}'" \
            --preview-size=60 \

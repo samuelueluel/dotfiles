@@ -15,6 +15,7 @@ Must pkill -f niri-minimap for changes to take hold.
 """
 
 import ctypes.util
+import glob
 import json
 import os
 import signal
@@ -38,7 +39,7 @@ def _is_minimap_pid(pid):
 
 
 def check_toggle():
-    """If another instance is running, signal it based on args and exit. Otherwise write our PID."""
+    """If another instance is running, signal it based on args and exit."""
     if os.path.exists(PID_FILE):
         try:
             with open(PID_FILE) as f:
@@ -59,11 +60,11 @@ def check_toggle():
 
             os.kill(old_pid, sig)
             sys.exit(0)
-        except (ProcessLookupError, ValueError):
-            pass
-        except PermissionError:
+        except (ProcessLookupError, ValueError, PermissionError):
             pass
 
+
+def write_pid():
     with open(PID_FILE, "w") as f:
         f.write(str(os.getpid()))
 
@@ -105,6 +106,8 @@ if _LAYER_SO and _LAYER_SO not in os.environ.get("LD_PRELOAD", ""):
     check_toggle()
     os.environ["LD_PRELOAD"] = _LAYER_SO
     os.execvp(sys.executable, [sys.executable] + sys.argv)
+
+write_pid()
 
 signal.signal(signal.SIGTERM, lambda *_: (cleanup_pid(), sys.exit(0)))
 
@@ -196,7 +199,7 @@ FOCUS_RING_CIRCLE = (
 )
 
 # Colors: ("#RRGGBB", alpha) — alpha is 0.0 (transparent) to 1.0 (opaque)
-FOCUS_RING_COLOR = ("#1AAAD4", 1.00)  # focused window border ring (theme gold)
+FOCUS_RING_COLOR = ("#1AAAD4", 1.00)  # focused window border ring (turquoise)
 FOCUS_FILL_COLOR = ("#DA9E8A", 1.00)  # focused window background fill (turquoise)
 INACTIVE_FILL_COLOR = ("#6E3840", 1.00)  # non-focused window fill (chimayo red)
 NORMAL_COLOR = ("#595966", 1.00)  # reserved / unused
@@ -264,6 +267,70 @@ def lookup_icon_name(app_id, icon_theme):
     return "application-x-executable"
 
 
+def check_active_pi_types():
+    """Check ~/.pi/running/*.state for active pihat/betahat sessions."""
+    types = set()
+    for sfile in glob.glob("/var/home/samuel/.pi/running/*.state"):
+        try:
+            with open(sfile) as f:
+                for line in f:
+                    if line.startswith("type="):
+                        types.add(line.strip().split("=", 1)[1].lower())
+        except Exception:
+            pass
+    return types
+
+
+def detect_agent_info(
+    app_id, title, is_urgent=False, is_focused=False, is_acknowledged=False
+):
+    """Detect if a terminal window is running a CLI agent (agy, pi, pihat, beta, betahat).
+    Returns (label_text, badge_color_hex, is_urgent_alert, has_widehat) or None.
+    """
+    if not app_id or "ghostty" not in app_id.lower():
+        return None
+    t = (title or "").strip()
+
+    # Bell alert is active only if unacknowledged and unfocused
+    has_bell = ("🔔" in t or is_urgent) and not is_focused and not is_acknowledged
+
+    t_clean = t.replace("🔔", "").strip()
+    t_lower = t_clean.lower()
+
+    agent_type = None
+    default_label = ""
+    default_color = "#DA9E8A"  # Pink Sandstone
+    has_hat = False
+
+    active_pi_types = check_active_pi_types()
+
+    if t_lower == "agy" or t_lower.startswith("agy ") or t_lower.startswith("agy:"):
+        agent_type = "agy"
+        default_label = "a"
+    elif "pihat" in t_lower or ("pihat" in active_pi_types and ("pi" in t_lower or "π" in t)):
+        agent_type = "pihat"
+        default_label = "π"
+        has_hat = True
+    elif "pi" in t_lower or "π" in t:
+        agent_type = "pi"
+        default_label = "π"
+    elif "betahat" in t_lower or ("betahat" in active_pi_types and ("beta" in t_lower or "β" in t)):
+        agent_type = "betahat"
+        default_label = "β"
+        has_hat = True
+    elif "beta" in t_lower or "β" in t:
+        agent_type = "beta"
+        default_label = "β"
+
+    if not agent_type:
+        return None
+
+    if has_bell:
+        return (default_label, "#FF5555", True, has_hat)
+
+    return (default_label, default_color, False, has_hat)
+
+
 def parse_state(workspaces_raw, windows_raw, focused_output=None):
     """Build structured workspace model from raw JSON data."""
     ws_by_id = {}
@@ -297,6 +364,7 @@ def parse_state(workspaces_raw, windows_raw, focused_output=None):
                 "app_id": win.get("app_id", ""),
                 "title": win.get("title", ""),
                 "is_focused": win["is_focused"],
+                "is_urgent": win.get("is_urgent", False),
                 "col_idx": col_idx,
                 "tile_idx": tile_idx,
             }
@@ -353,6 +421,7 @@ class MinimapWindow(Gtk.Window):
         self.tile_widgets = {}  # win_id -> Gtk.Box
         self._hovered_win_id = None
         self._designated_win_ids = set()
+        self._acknowledged_bell_win_ids = set()
         self._request_rebuild = None  # set by app after construction
         self._fade_timer_id = None
         self._hover_pending_id = None
@@ -549,9 +618,30 @@ class MinimapWindow(Gtk.Window):
                     tile_icon_size = max(12, int(ICON_SIZE * 0.46))
 
                 for tile in tiles:
-                    designated = tile["id"] in self._designated_win_ids
-                    num_tag = numbered_tags_map.get(tile["id"])
-                    has_overlay = designated or num_tag is not None
+                    win_id = tile["id"]
+                    title = tile.get("title", "")
+                    is_focused = tile.get("is_focused", False)
+                    has_title_bell = "🔔" in title or tile.get("is_urgent", False)
+
+                    if is_focused and has_title_bell:
+                        self._acknowledged_bell_win_ids.add(win_id)
+                    elif not has_title_bell:
+                        self._acknowledged_bell_win_ids.discard(win_id)
+
+                    # Bell audio comes from the terminal BEL emitted by the shell
+                    # wrappers; the minimap only supplies the visual alert badge.
+                    is_acknowledged = win_id in self._acknowledged_bell_win_ids
+
+                    designated = win_id in self._designated_win_ids
+                    num_tag = numbered_tags_map.get(win_id)
+                    agent_info = detect_agent_info(
+                        tile["app_id"],
+                        title,
+                        tile.get("is_urgent", False),
+                        is_focused,
+                        is_acknowledged,
+                    )
+                    has_overlay = designated or num_tag is not None or agent_info is not None
 
                     # Use Overlay as tile container when we need to layer indicators
                     # on top; plain Box otherwise.
@@ -581,7 +671,10 @@ class MinimapWindow(Gtk.Window):
                         icon.set_hexpand(True)
 
                     in_spine = start_col + i == spine_index
-                    if tile["is_focused"]:
+                    is_bell_alert = agent_info[2] if agent_info else False
+                    if tile.get("is_urgent") or is_bell_alert:
+                        tile_box.add_css_class("minimap-tile-urgent")
+                    elif tile["is_focused"]:
                         tile_box.add_css_class("minimap-tile-focused")
                     else:
                         if ws["is_focused"]:
@@ -593,57 +686,108 @@ class MinimapWindow(Gtk.Window):
 
                     if has_overlay:
                         tile_box.set_child(icon)
-                        tri = Gtk.DrawingArea()
-                        dot_size = max(16, ICON_SIZE // 2) if num_tag else max(10, ICON_SIZE // 3)
-                        tri.set_size_request(dot_size, dot_size)
-                        tri.set_halign(Gtk.Align.END)
-                        tri.set_valign(Gtk.Align.CENTER)
-                        tri.set_margin_end(-(dot_size // 2 + 9))
-                        tri.set_can_target(False)
-                        _r = dot_size / 2
 
-                        def _draw_tag(da, cr, w, h, r=_r, txt=num_tag):
-                            # Inset the circle so the 1.5px stroke stays inside the
-                            # widget allocation and doesn't get clipped.
-                            radius = r - 1
-                            cr.arc(w / 2, h / 2, radius, 0, 6.283185)
-                            hex_str, _ = TAG_DOT_COLOR
-                            h_str = hex_str.lstrip("#")
-                            r_c = int(h_str[0:2], 16) / 255.0
-                            g_c = int(h_str[2:4], 16) / 255.0
-                            b_c = int(h_str[4:6], 16) / 255.0
-                            cr.set_source_rgb(r_c, g_c, b_c)
-                            cr.fill_preserve()
-                            cr.set_source_rgb(0, 0, 0)
-                            cr.set_line_width(1.5)
-                            cr.stroke()
-                            if txt:
-                                # JetBrains Mono: monospace digits all share the same
-                                # advance and bearing, so "1" and "2" center identically.
+                        if agent_info is not None:
+                            agent_lbl, agent_color, _is_alert, is_widehat = agent_info
+                            # Focused ghostty agent window: tint the badge with the
+                            # focus ring color so it matches the tile highlight.
+                            if tile["is_focused"] and not _is_alert:
+                                agent_color = FOCUS_RING_COLOR[0]
+                            agent_area = Gtk.DrawingArea()
+                            badge_size = max(16, ICON_SIZE // 2)
+                            agent_area.set_size_request(badge_size, badge_size)
+                            agent_area.set_halign(Gtk.Align.START)
+                            agent_area.set_valign(Gtk.Align.CENTER)
+                            agent_area.set_margin_start(-(badge_size // 2 + 9))
+                            agent_area.set_can_target(False)
+
+                            def _draw_agent_badge(
+                                da, cr, w, h, lbl=agent_lbl, hex_color=agent_color, hat=is_widehat
+                            ):
+                                radius = min(w, h) / 2 - 1
+                                cr.arc(w / 2, h / 2, radius, 0, 6.283185)
+                                h_str = hex_color.lstrip("#")
+                                r_c = int(h_str[0:2], 16) / 255.0
+                                g_c = int(h_str[2:4], 16) / 255.0
+                                b_c = int(h_str[4:6], 16) / 255.0
+                                cr.set_source_rgb(r_c, g_c, b_c)
+                                cr.fill_preserve()
+                                cr.set_source_rgb(0, 0, 0)
+                                cr.set_line_width(1.5)
+                                cr.stroke()
+
                                 layout = PangoCairo.create_layout(cr)
-                                layout.set_text(txt, -1)
-                                font_px = int(r * 1.3)
+                                layout.set_text(lbl, -1)
+                                font_px = int(radius * (1.1 if hat else 1.3))
                                 desc = Pango.FontDescription.from_string(
                                     f"JetBrainsMono Nerd Font Bold {font_px}px"
                                 )
                                 layout.set_font_description(desc)
                                 ink, logical = layout.get_pixel_extents()
                                 cr.set_source_rgb(0, 0, 0)
-                                # x: center via the LOGICAL (advance) box so that
-                                # monospace digits all land on the same x — ink
-                                # centering would push "1" off because its visible
-                                # glyph is narrower than "2"/"3".
-                                # y: center via the INK box so the digit sits
-                                # vertically on its visual midline (not the font's
-                                # full ascender+descender).
+                                y_offset = 2.0 if hat else 0
                                 cr.move_to(
                                     w / 2 - logical.x - logical.width / 2,
-                                    h / 2 - ink.y - ink.height / 2,
+                                    h / 2 - ink.y - ink.height / 2 + y_offset,
                                 )
                                 PangoCairo.show_layout(cr, layout)
 
-                        tri.set_draw_func(_draw_tag)
-                        tile_box.add_overlay(tri)
+                                if hat:
+                                    cr.set_source_rgb(0, 0, 0)
+                                    cr.set_line_width(1.8)
+                                    hat_w = radius * 0.95
+                                    hat_h = radius * 0.32
+                                    cx = w / 2
+                                    cy = h / 2 - radius * 0.54
+                                    cr.move_to(cx - hat_w / 2, cy + hat_h)
+                                    cr.line_to(cx, cy)
+                                    cr.line_to(cx + hat_w / 2, cy + hat_h)
+                                    cr.stroke()
+
+                            agent_area.set_draw_func(_draw_agent_badge)
+                            tile_box.add_overlay(agent_area)
+
+                        if designated or num_tag is not None:
+                            tri = Gtk.DrawingArea()
+                            dot_size = max(16, ICON_SIZE // 2) if num_tag else max(10, ICON_SIZE // 3)
+                            tri.set_size_request(dot_size, dot_size)
+                            tri.set_halign(Gtk.Align.END)
+                            tri.set_valign(Gtk.Align.CENTER)
+                            tri.set_margin_end(-(dot_size // 2 + 9))
+                            tri.set_can_target(False)
+                            _r = dot_size / 2
+
+                            def _draw_tag(da, cr, w, h, r=_r, txt=num_tag):
+                                radius = r - 1
+                                cr.arc(w / 2, h / 2, radius, 0, 6.283185)
+                                hex_str, _ = TAG_DOT_COLOR
+                                h_str = hex_str.lstrip("#")
+                                r_c = int(h_str[0:2], 16) / 255.0
+                                g_c = int(h_str[2:4], 16) / 255.0
+                                b_c = int(h_str[4:6], 16) / 255.0
+                                cr.set_source_rgb(r_c, g_c, b_c)
+                                cr.fill_preserve()
+                                cr.set_source_rgb(0, 0, 0)
+                                cr.set_line_width(1.5)
+                                cr.stroke()
+                                if txt:
+                                    layout = PangoCairo.create_layout(cr)
+                                    layout.set_text(txt, -1)
+                                    font_px = int(r * 1.3)
+                                    desc = Pango.FontDescription.from_string(
+                                        f"JetBrainsMono Nerd Font Bold {font_px}px"
+                                    )
+                                    layout.set_font_description(desc)
+                                    ink, logical = layout.get_pixel_extents()
+                                    cr.set_source_rgb(0, 0, 0)
+                                    cr.move_to(
+                                        w / 2 - logical.x - logical.width / 2,
+                                        h / 2 - ink.y - ink.height / 2,
+                                    )
+                                    PangoCairo.show_layout(cr, layout)
+
+                            tri.set_draw_func(_draw_tag)
+                            tile_box.add_overlay(tri)
                     else:
                         tile_box.append(icon)
 
@@ -1308,6 +1452,14 @@ window {{
     padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
     box-shadow: inset 0 0 0 {BORDER_WIDTH}px {_c(FOCUS_RING_COLOR)}, 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
+}}
+
+.minimap-tile-urgent {{
+    border: none;
+    border-radius: {"24px" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
+    padding: {TILE_PAD + BORDER_WIDTH}px;
+    background-color: {_c(INACTIVE_FILL_COLOR)};
+    box-shadow: inset 0 0 0 {BORDER_WIDTH}px #FF5555, 0 0 0 2px rgb(0, 0, 0), 0 4px 14px rgba(255, 85, 85, 0.95);
 }}
 
 .minimap-empty {{

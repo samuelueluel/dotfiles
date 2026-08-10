@@ -1,0 +1,31 @@
+{
+  "semantic_search": {
+    "embedding_model": "openai",
+    "embedding_config": {
+      "model_name": "Qwen/Qwen3-Embedding-8B-GGUF",
+      "base_url": "http://127.0.0.1:8082/v1",
+      "api_key": "dummy"
+    },
+    "include_fulltext": true,
+    "chunking": {
+      "enabled": true,
+      "chunk_size": 1500,
+      "overlap": 200,
+      "max_chunks_per_item": 50
+    },
+    "reranker": {
+      "enabled": false
+    },
+    "index_schema_version": 3,
+    "update_config": {
+      "auto_update": false,
+      "update_frequency": "manual",
+      "last_update": "2026-08-09T00:44:56.199598",
+      "update_days": 7
+    },
+    "last_sync_versions": {
+      "0": 1455
+    },
+    "last_sync_version": 1455
+  }
+}
