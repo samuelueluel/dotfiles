@@ -46,7 +46,8 @@ description: Manage Samuel's Zotero library via the zotero MCP server — add pa
 - ~={green}MinerU auto-parse:=~ during the update, every item being (re)embedded that has a PDF and no cached sidecar is parsed by MinerU (magic-pdf, ROCm GPU) BEFORE embedding — equations become LaTeX, tables HTML, scans OCR'd. No separate OCR step. Sidecars cache at `~/.config/zotero-mcp/mineru-sidecars/<item_key>.md`; per-item parse logs at `~/.cache/zotero-mcp/mineru-work/<item_key>/run.log`.
 - ~={green}Before an update, ensure the embedder is up=~: check `model-check`; if :8082 is down, ~={green}auto-start it with `serve-embedder` (do NOT ask the user)=~ and wait until it responds, then run the update. If the start fails or the update still reports the embedder unreachable, include the actionable warning in your reply ("start `serve-embedder`, then re-run"). MinerU parses complete even with the embedder down and sidecars are saved, so a re-run never re-parses. Expect a new paper to take ~1-2 min (text-layer) to ~30 min (scanned book) before it becomes searchable.
 - Previously-failed items (PDF extraction failed at some point) are auto-retried by MinerU — re-running the update rescues them.
-- Query with `zotero_zotero_semantic_search(query)` — covers MinerU'd and plain-embedded content alike.
+- Query with `zotero_zotero_semantic_search(query)` — covers MinerU'd and plain-embedded content alike. ~={green}Collection scoping:=~ pass `collection=<8-char KEY>` to restrict to one collection (subcollections included, resolved from the local DB); find keys with `zotero_search_collections`. Use it whenever the user names a collection/project/workspace to search within. Out of scope: results only from that collection, and the relevance score correctly drops if the match is weak (built 2026-08-10, `[scoped patch]`).
+- ~={green}Hybrid search (BM25 + RRF) is on by default=~ (config `semantic_search.hybrid.enabled`): dense + keyword results are fused by rank before the reranker, so exact-match terms that dense embeddings miss (variable names, model acronyms, formula fragments, author names) can still surface. No per-query step; the sparse index rebuilds automatically on `zotero_update_search_database`. If the index is missing, search falls back to dense-only with a log warning (built 2026-08-11, `[sparse patch]`).
 - ~={green}Verify MinerU treatment of an item:=~ (a) the sidecar file exists for its key; (b) retrieved passages contain real LaTeX (`$$\frac{...}$$`) rather than garbled Unicode (`𝜆i,t = e x,ti𝛽`). If neither, the item is plain text-layer embedded.
 - Backfill: `semantic_search.mineru.backfill` in `~/.config/zotero-mcp/config.json` gates re-parsing of already-indexed items (one-time library-wide parse ~2-4 h parse + ~1-3 h embedding — run when GPU idle; `enabled: true` by default).
 
@@ -66,6 +67,18 @@ description: Manage Samuel's Zotero library via the zotero MCP server — add pa
 - ~={orange}CPU rescue for GPU-poison PDFs=~ `~/.local/bin/zotero-cpu-rescue.py [item_key ...]`: PDFs that deterministically balloon GTT on the ROCm path parse cleanly on CPU (same `run_mineru()` code path → byte-identical sidecars). Run under a CPU-tuned profile (`tuned-adm`, e.g. `cpu-sustained`). Log: `~/.cache/zotero-mcp/logs/cpu-rescue.log`.
 - ~={green}Cap-raise / truncation fix=~ `~/.local/bin/zotero-cap-raise.sh`: raises `chunking.max_chunks_per_item` (1000 → 3000), chezmoi-adds the config, deletes the truncated items' docs, and re-embeds them — fixes books silently cut at the old cap.
 - Config state (2026-08-10): `semantic_search.mineru.backfill: false`, `chunking.max_chunks_per_item: 3000`, index complete (~9,735 docs / 92 items). Full failure-mode history: `10_Projects/Local-LLMs/Memories/New-RAG-Setup.md` (GPU GTT balloon bug, Slow-crawl variant, Invisible gaps sections).
+
+## 7. Reranker (cross-encoder precision stage, built 2026-08-10)
+
+Semantic search optionally reranks candidates with a cross-encoder before returning them. ~={green}Automatic once the container is up:=~ `zotero_zotero_semantic_search` includes the reranker on every query when it's running — no per-query step, no tool arg.
+
+- ~={green}Samuel's default: reranker ON for almost every search.=~ Before running `zotero_zotero_semantic_search`, check :8083 (`curl -s -m 2 http://127.0.0.1:8083/health` or `model-check`); if down, ~={green}auto-start it with `serve-reranker` (do NOT ask the user)=~ and wait until it responds, then search. If it still won't start, search anyway (dense-only fallback is fine) and mention it in the reply.
+
+- ~={green}Turn on:=~ `serve-reranker` (ramalama `reranker` container, :8083, bge-reranker-v2-m3 Q8_0, llama.cpp `/v1/rerank`). Adds ~1 s per search and demotes dense false positives (verified 2026-08-10: a references-list chunk that ranked #1 on dense-only dropped to #5).
+- ~={green}Turn off / reranker down:=~ search still works — falls back to dense-only ordering and logs `HTTP reranker error ... returning unreranked order` in `journalctl --user -u zotero-mcp.service` (harmless, graceful).
+- ~={green}Config toggles apply live=~ (re-read per request, no service restart): `semantic_search.reranker.{enabled,url,model,candidate_multiplier,batch_size,timeout}` in `~/.config/zotero-mcp/config.json`. Only the code patch needs a restart, and `sjust update` re-applies it after `uv tool upgrade`.
+- Verify active: results reorder vs dense-only and no `HTTP reranker error` lines in the service log.
+- Details (model choice evidence, `-ub 2048` physical-batch gotcha, client batching): Zotero-MCP §5 and `10_Projects/Local-LLMs/Memories/New-RAG-Setup.md` "Reranker: BUILT".
 
 ## Known quirks
 

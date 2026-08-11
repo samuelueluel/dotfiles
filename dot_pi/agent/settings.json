@@ -11,7 +11,14 @@
       "source": "npm:pi-mcp-adapter",
       "extensions": [
         "index.ts"
-      ]
+      ],
+      "settings": {
+        "outputGuard": {
+          "detailsMaxBytes": 1048576,
+          "maxBytes": 1048576,
+          "maxLines": 50000
+        }
+      }
     },
     {
       "source": "npm:pi-agent-extensions",
@@ -44,6 +51,6 @@
     "extensions/modes.ts",
     "extensions/powerline-footer.ts"
   ],
-  "lastChangelogVersion": "0.83.0",
+  "lastChangelogVersion": "0.84.1",
   "hideThinkingBlock": true
 }

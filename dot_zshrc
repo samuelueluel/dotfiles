@@ -322,12 +322,31 @@ serve-embedder() {
 }
 alias stop-embedder="ramalama stop embedder"
 
+# Cross-encoder reranker for zotero semantic search (bge-reranker-v2-m3, Q8_0).
+# llama-server --reranking exposes the OpenAI-compatible /v1/rerank endpoint; the
+# zotero-mcp HTTP reranker patch calls it (semantic_search.reranker.url in
+# ~/.config/zotero-mcp/config.json). Query-time only — no interaction with the
+# embedder or Lemonade. -ub 2048 is the PHYSICAL batch size: query+doc pairs over
+# 512 tokens (formula/LaTeX-heavy MinerU chunks) otherwise 500 with "increase the
+# physical batch size". Served id: gpustack/bge-reranker-v2-m3-GGUF
+RERANK_MODEL="hf://gpustack/bge-reranker-v2-m3-GGUF:Q8_0"
+serve-reranker() {
+  echo "Pulling latest $RAMA_IMG …"
+  podman pull "$RAMA_IMG"
+  ramalama stop reranker 2>/dev/null
+  local i=0
+  while ss -tln 2>/dev/null | grep -q ':8083 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
+  ramalama serve -d -n reranker -p 8083 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--reranking -ub 2048 -b 2048 --parallel 1" "$RERANK_MODEL" \
+    && echo "▶ serving reranker (bge-reranker-v2-m3 Q8_0) at http://localhost:8083/v1/rerank"
+}
+alias stop-reranker='ramalama stop reranker'
+
 
 # Show exactly which model file and settings are loaded on each port.
 # Parses both the /v1/models API and the host process list for the exact .gguf name and MTP status.
 model-check() {
   local p name id tag full_cmd exact_file mtp_status p_status
-  for entry in "8080:main" "8081:autocomplete" "8082:embedder"; do
+  for entry in "8080:main" "8081:autocomplete" "8082:embedder" "8083:reranker"; do
     p="${entry%%:*}"; name="${entry##*:}"
     
     # Get the base ID from the API to confirm it is actually responding

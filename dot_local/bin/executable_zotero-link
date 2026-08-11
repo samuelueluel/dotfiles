@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# zotero-link <item_key> <pdf_path> [title]
+# Attach a LOCAL pdf to an existing Zotero item as a LINKED attachment.
+# Linked attachments are path references — NO bytes are uploaded to Zotero cloud.
+# Uses the same API key as the zotero-mcp systemd service (read at runtime, never printed).
+set -euo pipefail
+ITEM_KEY="${1:?usage: zotero-link <item_key> <pdf_path> [title]}"
+PDF_PATH="${2:?usage: zotero-link <item_key> <pdf_path> [title]}"
+TITLE="${3:-$(basename "$PDF_PATH")}"
+[ -f "$PDF_PATH" ] || { echo "error: file not found: $PDF_PATH" >&2; exit 1; }
+
+UNIT="$HOME/.config/systemd/user/zotero-mcp.service"
+KEY=$(grep -oP 'ZOTERO_API_KEY=\K[^" ]+' "$UNIT" 2>/dev/null | head -1)
+LIB=$(grep -oP 'ZOTERO_LIBRARY_ID=\K[^" ]+' "$UNIT" 2>/dev/null | head -1)
+[ -n "$KEY" ] && [ -n "$LIB" ] || { echo "error: could not read API key from $UNIT" >&2; exit 1; }
+
+export ZK="$KEY" ZL="$LIB"
+export PYTHONPATH="$HOME/.local/share/uv/tools/zotero-mcp-server/lib/python3.11/site-packages"
+python3 - "$ITEM_KEY" "$PDF_PATH" "$TITLE" <<'EOF'
+import os, sys, json
+from pyzotero import zotero
+item_key, pdf, title = sys.argv[1], sys.argv[2], sys.argv[3]
+z = zotero.Zotero(os.environ['ZL'], 'user', os.environ['ZK'])
+att = [{"itemType": "attachment", "linkMode": "linked_file",
+        "path": "file://" + pdf, "title": title}]
+try:
+    r = z.create_items(att, parentid=item_key)
+    keys = [v.get("key") for v in (r.get("successful") or {}).values()]
+    if keys:
+        print(f"linked {keys[0]} -> {item_key}  ({pdf})")
+    else:
+        print("no successful keys:", json.dumps(r)[:300])
+        sys.exit(1)
+except Exception as e:
+    print("error:", str(e)[:300])
+    sys.exit(1)
+EOF

@@ -30,6 +30,23 @@ const COMMON_READ_ONLY = new Set([
   "get_search_content",
   // Export (renders to PDF/HTML/PNG without modifying project files)
   "preview_export",
+  // turbovault direct-exposed vault tools — read-only subset
+  "turbovault_read_note",
+  "turbovault_get_notes_info",
+  "turbovault_search",
+  "turbovault_advanced_search",
+  "turbovault_search_by_frontmatter",
+  "turbovault_semantic_search",
+  "turbovault_query_frontmatter_sql",
+  "turbovault_inspect_frontmatter",
+  "turbovault_get_backlinks",
+  "turbovault_get_forward_links",
+  "turbovault_get_broken_links",
+  "turbovault_get_related_notes",
+  "turbovault_get_hub_notes",
+  "turbovault_suggest_links",
+  "turbovault_list_templates",
+  "turbovault_quick_health_check",
   // Todo (metadata operations, not project file modifications)
   "todo",
   // Control flow
@@ -479,6 +496,19 @@ export default function (pi: any) {
           return { block: true, reason: `User rejected MCP mutation: ${fullToolName}` };
         }
         ctx.ui.notify(`MCP mutation approved`, "success");
+        return {};
+      }
+
+      // ── turbovault direct tools (exposed via directTools, not routed through `mcp`):
+      //    reads pass via COMMON_READ_ONLY; gate the remaining mutations ──
+      if (event.toolName.startsWith("turbovault_") && !COMMON_READ_ONLY.has(event.toolName)) {
+        const details = `turbovault tool call: ${event.toolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
+        const approved = await askUser(`Approve turbovault mutation '${event.toolName}'? [Y/n] `, ctx, details);
+        if (!approved) {
+          ctx.ui.notify(`turbovault mutation blocked: ${event.toolName}`, "error");
+          return { block: true, reason: `User rejected turbovault mutation: ${event.toolName}` };
+        }
+        ctx.ui.notify(`turbovault mutation approved`, "success");
         return {};
       }
 

@@ -11,21 +11,42 @@
       "enabled": true,
       "chunk_size": 1500,
       "overlap": 200,
-      "max_chunks_per_item": 50
+      "max_chunks_per_item": 3000
     },
     "reranker": {
-      "enabled": false
+      "enabled": true,
+      "model": "bge-reranker-v2-m3",
+      "url": "http://127.0.0.1:8083/v1/rerank",
+      "candidate_multiplier": 3,
+      "timeout": 60,
+      "batch_size": 12
     },
     "index_schema_version": 3,
     "update_config": {
       "auto_update": false,
       "update_frequency": "manual",
-      "last_update": "2026-08-09T00:44:56.199598",
+      "last_update": "2026-08-11T00:30:42.476175",
       "update_days": 7
     },
     "last_sync_versions": {
-      "0": 1455
+      "0": 1460
     },
-    "last_sync_version": 1455
+    "last_sync_version": 1460,
+    "mineru": {
+      "enabled": true,
+      "bin": "/var/home/samuel/mineru-rocm-venv/bin/magic-pdf",
+      "config_json": "/var/home/samuel/magic-pdf-gpu.json",
+      "sidecar_dir": "/var/home/samuel/.config/zotero-mcp/mineru-sidecars",
+      "work_dir": "/var/home/samuel/.cache/zotero-mcp/mineru-work",
+      "timeout_seconds": 3600,
+      "backfill": false
+    },
+    "hybrid": {
+      "enabled": true,
+      "bm25_k1": 1.5,
+      "bm25_b": 0.75,
+      "rrf_k": 60,
+      "index_path": ""
+    }
   }
 }
