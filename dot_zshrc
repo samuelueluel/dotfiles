@@ -903,8 +903,8 @@ pihat() {
 
   model_choice=$(gum choose \
     --header "pihat · select model" \
-    "dsv4pro   DeepSeek V4 Pro" \
     "dsv4fl    DeepSeek V4 Flash" \
+    "dsv4pro   DeepSeek V4 Pro" \
     "opus      Claude Opus 4.8" \
     "opus5     Claude Opus 5" \
     "sonnet5   Claude Sonnet 5" \
@@ -1039,8 +1039,8 @@ betahat() {
 
   model_choice=$(gum choose \
     --header "betahat · select model" \
-    "dsv4pro   DeepSeek V4 Pro" \
     "dsv4fl    DeepSeek V4 Flash" \
+    "dsv4pro   DeepSeek V4 Pro" \
     "opus      Claude Opus 4.8" \
     "opus5     Claude Opus 5" \
     "sonnet5   Claude Sonnet 5" \
