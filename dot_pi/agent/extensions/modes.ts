@@ -47,6 +47,7 @@ const COMMON_READ_ONLY = new Set([
   "turbovault_suggest_links",
   "turbovault_list_templates",
   "turbovault_quick_health_check",
+  "turbovault_get_vault_context",
   // Todo (metadata operations, not project file modifications)
   "todo",
   // Control flow

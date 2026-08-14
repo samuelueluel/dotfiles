@@ -54,10 +54,6 @@
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
 
-- AI: Pi agent - local model, sandboxed (model/MTP/parallel picker) | pi
-- AI: Beta agent - local model, Stata-mounted | beta
-- AI: Pi cloud agent (OpenRouter picker) | pihat
-- AI: Beta cloud agent (OpenRouter picker) | betahat
 - AI: Rebuild Pi container image | pi-rebuild
 
 - AI: Lemonade status (loaded models + slots) | lem-status
@@ -66,9 +62,11 @@
 - AI: Restart Lemonade (reload recipe/registry) | podman restart lemonade
 
 - AI: Serve autocomplete model (background) | serve-autocomplete
-- AI: Serve vector embedder (background) | serve-embedder
 - AI: Stop autocomplete model | stop-autocomplete
+- AI: Serve vector embedder (background) | serve-embedder
 - AI: Stop vector embedder | stop-embedder
+- AI: Serve reranker (background) | serve-reranker
+- AI: Stop reranker | stop-reranker
 - AI: Stop all ramalama models | ramalama stop --all
 - AI: Check which models are loaded | model-check
 

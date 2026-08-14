@@ -26,13 +26,11 @@
         "extensions/answer/index.ts",
         "extensions/ask-user/index.ts",
         "extensions/btw/index.ts",
-        "extensions/context/index.ts",
         "extensions/cwd-history/index.ts",
         "extensions/files/index.ts",
         "extensions/handoff/index.ts",
         "extensions/loop/index.ts",
         "extensions/notify/index.ts",
-        "extensions/session-breakdown/index.ts",
         "extensions/sessions/index.ts",
         "extensions/todos/index.ts"
       ]
@@ -52,5 +50,10 @@
     "extensions/powerline-footer.ts"
   ],
   "lastChangelogVersion": "0.84.1",
-  "hideThinkingBlock": true
+  "hideThinkingBlock": true,
+  "compaction": {
+    "enabled": false,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 40000
+  }
 }

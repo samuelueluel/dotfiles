@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Sync Open WebUI Markdown skills from ~/.config/open-webui/skills/ into webui.db"""
+
+import os
+import glob
+import sqlite3
+import uuid
+import time
+import subprocess
+import sys
+
+DB_PATH = "/var/home/samuel/.local/share/containers/storage/volumes/open-webui/_data/webui.db"
+SKILLS_DIR = os.path.expanduser("~/.config/open-webui/skills")
+ADMIN_ID = "ac7a12d2-fddb-409f-a408-25717ba76a5c"
+
+
+def parse_markdown_skill(filepath: str):
+    with open(filepath, "r", encoding="utf-8") as f:
+        text = f.read()
+
+    name = os.path.splitext(os.path.basename(filepath))[0]
+    description = f"Open WebUI Skill for {name}"
+    body = text
+
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            fm_text = parts[1]
+            body = parts[2].strip()
+            for line in fm_text.splitlines():
+                if ":" in line:
+                    key, val = line.split(":", 1)
+                    key = key.strip().lower()
+                    val = val.strip().strip("\"'")
+                    if key == "name":
+                        name = val
+                    elif key == "description":
+                        description = val
+
+    return name, description, body
+
+
+def sync():
+    if not os.path.exists(DB_PATH):
+        print(f"Error: Open WebUI database not found at {DB_PATH}", file=sys.stderr)
+        sys.exit(1)
+
+    skill_files = glob.glob(os.path.join(SKILLS_DIR, "*.md"))
+    if not skill_files:
+        print(f"No skill files found in {SKILLS_DIR}")
+        return
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    now = int(time.time())
+    updated_count = 0
+
+    for filepath in skill_files:
+        name, description, body = parse_markdown_skill(filepath)
+        cursor.execute("SELECT id, content FROM skill WHERE name = ?", (name,))
+        row = cursor.fetchone()
+
+        if row:
+            skill_id, existing_content = row
+            if existing_content == body:
+                print(f"[SKIP] Skill '{name}' is up to date.")
+                continue
+        else:
+            skill_id = str(uuid.uuid4())
+
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO skill (id, user_id, name, description, content, meta, is_active, updated_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+        """,
+            (skill_id, ADMIN_ID, name, description, body, "{}", now, now),
+        )
+        updated_count += 1
+        print(f"[SYNC] Updated skill '{name}' (ID: {skill_id})")
+
+    conn.commit()
+    conn.close()
+
+    if updated_count > 0:
+        print("Restarting Open WebUI service to apply changes...")
+        subprocess.run(["systemctl", "--user", "restart", "open-webui"], check=True)
+        print("Open WebUI restarted successfully.")
+    else:
+        print("All skills up to date. No restart needed.")
+
+
+if __name__ == "__main__":
+    sync()

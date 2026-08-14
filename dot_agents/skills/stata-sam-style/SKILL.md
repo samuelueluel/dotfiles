@@ -57,10 +57,41 @@ You will output your decisions into a JSON file (e.g., `/tmp/style_recipe.json`)
   - `level`: 1 for major sections (uses `=` box), 2 for subsections (uses `-` box).
   - `number`: The section number (e.g. "1" or "1.1"). Leave empty if no number.
   - `title`: The title WITHOUT the number.
-- **`prose_blocks`**: Identify lines containing English prose that should be wrapped to 64 columns and enclosed in `/* ... */`. 
-  - *Crucial Rule 1:* You MUST flag every single prose comment, even if it is only a single line long (e.g., `* Load in from Data`). Do not ignore single-line comments.
-  - *Crucial Rule 2:* You CAN and SHOULD flag prose comments even if they live inside a larger `/* ... */` disabled code block. The script fully supports nested `/* */` blocks.
-  - *Crucial Rule 3:* Only flag lines as prose if you are 100% sure they are not disabled Stata code. If a line contains Stata syntax (`using`, `=`, `merge`, `, options`), leave it alone. 
+  - ***HARD RULE — do not skip this***: A banner is ONLY valid if, in the *original* file, the comment is already a multi-line box: a border line of repeated `*` characters (e.g. `/******************************************************************************/`), then a title line, then another border line — **3 physical lines minimum**. `original_start_line`/`original_end_line` must span all 3 (or however many) of those lines, so `original_end_line - original_start_line >= 2`.
+  - The Builder script **enforces this mechanically and will refuse to run** if you submit a banner whose source range is only 1 line. This is intentional — do not try to work around it.
+  - **NEVER promote a plain one-line comment into a banner**, no matter how "section-like" its text sounds. This includes things like `/* Preamble */`, `/* Date */`, `/* Path and directory */`, `/* Log file */`, `/* Dropping */`, `/* For merging */`, `/* Export as csv */`, `/* Load original dbf from Data */`, `/* Name some parcel ID variables */`. All of these are idiomatic short inline labels in this codebase and must be **left completely untouched** — do not add them to `banners`, `prose_blocks`, or any other array. Simply omit them from the recipe entirely.
+- **`prose_blocks`**: Identify lines containing genuine English *prose/explanation* (full sentences or multi-clause reasoning — not short noun-phrase labels) that should be wrapped to 64 columns and enclosed in `/* ... */`.
+  - *Crucial Rule 1:* Flag every prose comment that is explanatory reasoning, even if only one line long (e.g., `* This step censors obs with no reliable TYPE code because...`). Do not ignore single-line prose.
+  - *Crucial Rule 2:* Do **NOT** flag short inline label comments as prose. A label is a terse tag naming what follows ("Preamble", "Date", "Dropping", "For merging", "Export as csv", "Load original dbf from Data") — these read as a title, not a sentence, and have no explanatory content. If removing the comment would lose no reasoning (just a name), it's a label — leave it alone, do not touch it.
+  - *Crucial Rule 3:* You CAN and SHOULD flag prose comments even if they live inside a larger `/* ... */` disabled code block. The script fully supports nested `/* */` blocks.
+  - *Crucial Rule 4:* Only flag lines as prose if you are 100% sure they are not disabled Stata code. If a line contains Stata syntax (`using`, `=`, `merge`, `, options`), leave it alone.
+
+### Worked Example: Banner vs. Label (read this before writing a recipe)
+Original file:
+```
+/******************************************************************************/
+/*************  Import                                 ************************/
+/******************************************************************************/
+import delimited "$path/Temp/foo.csv"
+
+/* Load original dbf from Data  */
+import dbase using "$path/Data/foo.dbf", clear
+```
+**Correct recipe:** only the 3-line box becomes a banner. The 1-line `/* Load original dbf from Data */` comment is omitted from the recipe entirely — it stays exactly as-is in the output.
+```json
+{ "banners": [ { "original_start_line": 1, "original_end_line": 3, "level": 1, "number": "1", "title": "IMPORT" } ] }
+```
+**Incorrect (this is the bug that shipped before):** targeting the 1-line label and boxing it —
+```json
+{ "banners": [ { "original_start_line": 6, "original_end_line": 6, "level": 2, "title": "Load original dbf from Data" } ] }
+```
+This produces the unwanted result:
+```
+* --------------------------------------------------------------
+* [Load original dbf from Data]
+* --------------------------------------------------------------
+```
+Do not do this. If you find yourself writing a `banners` entry where `original_start_line == original_end_line`, stop — it is not a banner, it's a label, and it should not appear in the recipe at all.
 
 ### Example: Targeting Nested Comments
 LLMs often incorrectly skip targeting `*` comments if they reside inside disabled code blocks (`/* ... */`). You MUST target them individually!

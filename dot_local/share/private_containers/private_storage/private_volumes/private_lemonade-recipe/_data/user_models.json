@@ -8,7 +8,7 @@
       "tool-calling"
     ],
     "recipe": "llamacpp",
-    "size": 0.005,
+    "size": 84.6,
     "suggested": true
   },
   "DeepSeek-V4-Flash-Q2K": {
@@ -20,7 +20,7 @@
       "tool-calling"
     ],
     "recipe": "llamacpp",
-    "size": 0.005,
+    "size": 90.2,
     "suggested": true
   },
   "DeepSeek-V4-Flash-Q3": {
@@ -32,7 +32,7 @@
       "tool-calling"
     ],
     "recipe": "llamacpp",
-    "size": 0.005,
+    "size": 97.1,
     "suggested": true
   },
   "Qwen3.6-Dense-27B-Q4": {
@@ -108,6 +108,21 @@
     ],
     "recipe": "llamacpp",
     "size": 37.3,
+    "suggested": true
+  },
+  "Qwen3.8-27B-Q6": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.8-27B-GGUF:UD-Q6_K_XL",
+      "mmproj": "unsloth/Qwen3.8-27B-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 24.1,
     "suggested": true
   }
 }

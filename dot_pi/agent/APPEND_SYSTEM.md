@@ -29,9 +29,15 @@
 
 **Skills:** `zotero` and `obsidian` load automatically — when a task matches their domain, read the skill first (in `~/.agents/skills/<name>/SKILL.md`) and follow it. All other skills (checkpoint, grill-me, handoff, small-talk, write-a-skill) are manual: invoke via `/skill:<name>`; never auto-load them.
 
-**Obsidian vault integrity (`turbovault` MCP):** All operations on `~/Dropbox/Sam-Obsidian-Vault/` MUST use the `turbovault_*` MCP tools and adhere to the `obsidian` skill. NEVER use raw bash commands (`cat`, `grep`, `sed`) or direct file tools on vault notes.
+**Obsidian vault integrity (`turbovault` MCP):** All operations on `~/Dropbox/Sam-Obsidian-Vault/` MUST use the `turbovault_*` MCP tools and adhere to the `obsidian` skill (`~/.agents/skills/obsidian/SKILL.md`). NEVER use raw bash tools (`cat`, `grep`, `sed`, `find`) on vault notes.
 
-**Subagent delegation:** Delegate heavy multi-step exploration instead of doing it all inline — `agent: "Explore"` for multi-file code searches and pattern grepping, `agent: "Executor"` for isolated multi-step research, data cleaning, or deep note synthesis. Keep quick 1-step reads/searches in the main session.
+**Subagent Delegation Rules (Context Hygiene):**
+- **Vault Queries (discovery):** ALWAYS delegate operations whose output is a result set (`turbovault_search`, `turbovault_advanced_search`, `turbovault_semantic_search`, backlinks, graph traversal, SQL queries, broken-link reports) to `Agent({ subagent_type: "Explore", prompt: "..." })`. Never run these inline; result-set output pollutes the main KV cache.
+- **Vault Reads (working set):** `turbovault_read_note` on known paths stays inline when the content is the session's working set: to be discussed, quoted, edited, or retained for follow-up (e.g. a summary note plus the nodes it cites). Subagents are an anti-pattern for retention: they return a synthesized rendition and the main session loses the exact text. Guard volume with progressive disclosure, not delegation. Full rule: see the `obsidian` skill.
+- **Multi-File Script & Config Exploration:** Delegate multi-file searches, variable grepping, and pattern matching across research scripts (Stata `.do`, Python, R) or system configs (`turquoise`, `dotfiles`) to `Agent({ subagent_type: "Explore", prompt: "..." })`.
+- **Executor (user-invoked only):** never spawn `Executor` autonomously. It is a full-privilege worker the user calls deliberately; autonomous delegation uses `Explore`, and interactive/execution work stays in the main session.
+- **Stata & Data Work (Interactive):** Stata statistical programming, variable construction, dataset merges, and empirical regressions stay **interactive in the main session** by default so intermediate outputs (`_merge`, obs counts, summary stats) remain directly visible to guard against silent errors.
+- **Literature & Paper Reading:** Literature reviews and PDF paper reading stay **in the main session** by default for interactive synthesis, unless Samuel explicitly requests a background batch document scan.
 
 **External grounding:** When asked about external documentation, software/library updates, API schemas, or current facts — or when local files and vault notes don't answer — call `web_search` before answering. Do not guess from training memory when external verification is available.
 

@@ -9,7 +9,7 @@
     "include_fulltext": true,
     "chunking": {
       "enabled": true,
-      "chunk_size": 1500,
+      "chunk_size": 2000,
       "overlap": 200,
       "max_chunks_per_item": 3000
     },
@@ -25,7 +25,7 @@
     "update_config": {
       "auto_update": false,
       "update_frequency": "manual",
-      "last_update": "2026-08-11T00:30:42.476175",
+      "last_update": "2026-08-12T00:19:34.747731",
       "update_days": 7
     },
     "last_sync_versions": {
@@ -38,7 +38,7 @@
       "config_json": "/var/home/samuel/magic-pdf-gpu.json",
       "sidecar_dir": "/var/home/samuel/.config/zotero-mcp/mineru-sidecars",
       "work_dir": "/var/home/samuel/.cache/zotero-mcp/mineru-work",
-      "timeout_seconds": 3600,
+      "timeout_seconds": 14400,
       "backfill": false
     },
     "hybrid": {

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/var/home/samuel/.local/bin/turbovault-http --vault /var/home/samuel/Dropbox/Sam-Obsidian-Vault --config /var/home/samuel/.config/turbovault/config-web.yaml --profile production -t http --host 127.0.0.1 --disabled-tools advanced_search --port 13306 --require-read-only-tools
+ExecStart=/var/home/samuel/.local/bin/turbovault-http --vault /var/home/samuel/Dropbox/Sam-Obsidian-Vault --config /var/home/samuel/.config/turbovault/config-web.yaml --profile production -t http --host 127.0.0.1 --port 13306 --require-read-only-tools
 Restart=always
 RestartSec=3
 

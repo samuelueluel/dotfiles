@@ -21,7 +21,19 @@ import os, sys, json
 from pyzotero import zotero
 item_key, pdf, title = sys.argv[1], sys.argv[2], sys.argv[3]
 z = zotero.Zotero(os.environ['ZL'], 'user', os.environ['ZK'])
+# contentType set explicitly (was omitted -> empty, breaking PDF-typed tools;
+# see Zotero-MCP.md 11 "zotero-link omits contentType"). Infer from extension.
+ext = os.path.splitext(pdf)[1].lower()
+ctype = {
+    ".pdf": "application/pdf",
+    ".epub": "application/epub+zip",
+    ".html": "text/html", ".htm": "text/html",
+    ".txt": "text/plain", ".md": "text/markdown",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}.get(ext, "application/octet-stream")
 att = [{"itemType": "attachment", "linkMode": "linked_file",
+        "contentType": ctype,
         "path": "file://" + pdf, "title": title}]
 try:
     r = z.create_items(att, parentid=item_key)

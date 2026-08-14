@@ -27,11 +27,14 @@ When creating or editing a note, follow these core conventions:
 4. **Never** create new top-level folders without asking.
 
 ### 2. Note Conventions
-- **Headings:** Use plain heading names — do not use formatting in headings. **Never** prefix headings with numbers, letters, or outline markers (e.g. `1`, `1.1`, `A.`). The Number Headings plugin handles numbering automatically. Replace placeholder titles with relevant titles.
-- **Color syntax** for formatting, avoiding `**bold**`:
-  - `~={green}text=~` (all emphasis — definitions, key terms, inline highlights, organizational labels)
-  - `~={magenta}text=~` (warnings and dangers only — e.g. a command that can break something)
-  Note the trailing `=~`. When possible it is better to highlight connected segments of sentences rather than whole sentences or paragraphs.
+- **Headings:** Use plain heading names — do not use markdown inline formatting in headings. Existing heading numbers (e.g., `# 1.`, `## 2.1.`) are automatically written into markdown files by Obsidian's **Number Headings** plugin — **do NOT remove, strip, or alter existing heading numbers** when editing existing notes. When creating brand new headings, write plain titles and allow the plugin to manage numbering. Replace placeholder titles with relevant titles.
+- **Color syntax** for formatting, avoiding `**bold**`. Exactly two colors, fixed meanings:
+  - `~={green}text=~` — emphasis: definitions, key terms, organizational labels.
+  - `~={magenta}text=~` — warnings and dangers only: things that can break or silently mislead (e.g. a command that can break something, a config key that is silently ignored).
+  - The palette is closed: green and magenta are the only allowed colors. Never use `orange`, `red`, `blue`, `pink`, etc., even though fast-text-color can render them.
+  - Highlight the key phrase, never a whole sentence or paragraph; at most one or two spans per paragraph. Tables stay plain.
+  - When editing an existing note with legacy colors, normalize in place: `orange` -> `green` (labels/emphasis); status flags (off/unconfirmed/retired/excluded) -> plain text or green; keep magenta only for true warnings.
+  Note the trailing `=~`.
 - **Lists:**
   - Prefer bullets (`-`) unless order or sequence is meaningful — use numbered lists only when numbering matters.
   - For nested lists, indent with a tab.
@@ -56,20 +59,31 @@ When creating or editing a note, follow these core conventions:
 ### 4. TurboVault MCP Tools (Mandatory Vault Substrate)
 You MUST ALWAYS connect to and use the `turbovault` MCP server for all vault operations. **DO NOT** execute raw shell commands (`find`, `grep`, `cat`, `ls`, `sed`, `awk`) against `~/Dropbox/Sam-Obsidian-Vault/`.
 
-- **Calling turbovault tools:** every tool is exposed with a `turbovault_` prefix — call `turbovault_search`, `turbovault_read_note`, `turbovault_write_note`, etc. (bare names like `search` return "Tool not found"). Every write operation (`turbovault_write_note`, `turbovault_edit_note`, `turbovault_delete_note`, `turbovault_move_note`, `turbovault_update_frontmatter`, `turbovault_batch_execute`) requires a non-empty `commit_message` — always pass one. Overwriting an existing note requires `expected_hash` from a prior read, or `force: true`. `turbovault_edit_note` takes `edits` as diff-style SEARCH/REPLACE blocks, not JSON: `<<<<<<< SEARCH` + old text + `=======` + new text + `>>>>>>> REPLACE` (one block per change).
+- **Calling turbovault tools:** every tool is exposed with a `turbovault_` prefix — call `turbovault_search`, `turbovault_read_note`, `turbovault_write_note`, etc. (bare names like `search` return "Tool not found"). Every write operation (`turbovault_write_note`, `turbovault_edit_note`, `turbovault_delete_note`, `turbovault_move_note`, `turbovault_update_frontmatter`, `turbovault_batch_execute`) requires a non-empty `commit_message` — always pass one; `turbovault_delete_note` also requires `confirm_path`. Overwriting an existing note requires `expected_hash` from a prior read, or `force: true`. `turbovault_edit_note` takes `edits` as diff-style SEARCH/REPLACE blocks, not JSON: `<<<<<<< SEARCH` + old text + `=======` + new text + `>>>>>>> REPLACE` (one block per change). `turbovault_batch_execute` runs multiple operations (`CreateNote`, `WriteNote`, `DeleteNote`, `MoveNote`, `EditNote`, `UpdateLinks`, `UpdateFrontmatter`, `ManageTags`, `CreateFromTemplate`) as ONE atomic git commit (all-or-nothing); at most ONE operation per path per batch (same-path ops are refused with `intra-batch path collision`, and a create→modify chain on one path fails since later ops see the working tree, not staged state). Use it for independent multi-file batches, not pipelines.
+
+**Git-substrate divergence guard:** the git backend refuses any mutation whose working-tree file differs from HEAD (`working-tree path '<path>' differs from HEAD; commit, restore, or move the local change before retrying`). `expected_hash` does NOT bypass this check. Obsidian's `frontmatter-date-manager` used to trigger this on every body edit (auto-bumping `updated`); since 2026-08-13 `enableAutoUpdate: false` (with it off, FDM performs zero automatic writes — verified 2026-08-13: bare-note create, body edit, pre-stamped create all leave the tree clean; `enableCreateTime: true` so the manual button also adds `created`) and the AGENT owns timestamps instead — always set `created` (on create) and refresh `updated` (on every edit) frontmatter yourself, in exactly the plugin's format — `date +"%Y-%m-%dT%H:%M:%S"` (zero-padded local time, no milliseconds or timezone suffix; byte-identical to FDM's `dateFormat` output, so its parse→reformat is a no-op) — via `turbovault_update_frontmatter` or in the written content. Samuel can still bump manually: command palette or a hotkey bound to `frontmatter-date-manager:update-timestamps-current-file` (Obsidian Settings → Hotkeys). If the guard fires anyway (any external writer), commit or restore the change, then retry.
 
 - **Lazy loading:** `turbovault` is lazy-loaded — its server starts on first use. A direct `mcp call` to any turbovault tool (or an explicit `mcp connect turbovault`) auto-spawns the server and activates the full toolset for the session. Whenever the user's request concerns the vault (reading, searching, writing, organizing, linking, tags, templates), start with a turbovault `mcp call` — no separate connect step is required.
 - **Task → tool routing (use the `turbovault_` prefixed names):**
   - Read a note → `turbovault_read_note`
   - Search notes → `turbovault_search` (full-text) or `turbovault_advanced_search` (tags/frontmatter)
   - Write/update → `turbovault_write_note` (overwrite/append/prepend) or `turbovault_edit_note` (targeted SEARCH/REPLACE)
-  - Multiple notes at once → `turbovault_batch_execute`
+  - Multiple notes at once → sequential `turbovault_write_note` calls (each with its own `commit_message` / `expected_hash`) or `mcpScript` for batched MCP calls
   - Move/rename → `turbovault_move_note`
   - Templates → `turbovault_list_templates`, `turbovault_create_from_template`
   - Frontmatter/tags → `turbovault_update_frontmatter`, `turbovault_manage_tags`
   - Links/graph → `turbovault_get_backlinks`, `turbovault_get_broken_links`, `turbovault_get_related_notes`
-  - Vault overview → `turbovault_get_vault_context`, `turbovault_quick_health_check`
+  - Vault overview / first-call orientation → `turbovault_get_vault_context` (active vault, health stats, OFM dialect), `turbovault_quick_health_check`
 - **Fallback:** If `turbovault` cannot be connected or is unavailable, stop and tell the user rather than editing vault files directly.
+
+#### Reads vs. Delegation (Context Hygiene)
+
+Vault operations split by purpose, not by tool identity:
+
+- **Discovery (result sets):** operations whose output is a ranked list or match context (`turbovault_search`, `turbovault_advanced_search`, `turbovault_semantic_search`, `turbovault_get_backlinks`, `turbovault_get_related_notes`, `turbovault_query_frontmatter_sql`, `turbovault_get_broken_links`) MUST be delegated by the main session to `Agent({ subagent_type: "Explore", prompt: "..." })`. Raw result-set output pollutes the main KV cache.
+- **Working-set reads:** `turbovault_read_note` on known paths stays INLINE when the content itself is the session's working set: to be discussed, quoted, edited, or retained for follow-up (e.g., a summary note plus the nodes it cites). Subagents are an anti-pattern here: they run in an isolated context and return a synthesized rendition, so the orchestrator loses the exact text it needs to reason over.
+- **Volume guard:** working-set reads are legitimate, but disclose progressively: read what the current task needs, in order, rather than slurping whole trees. Read the summary or index note before the notes it points to.
+- **Role note for Explore agents:** Explore is the target of discovery delegation. When acting as the Explore subagent, do not re-delegate and do not use mutating tools (whitelist enforced).
 
 ## Advanced features
 

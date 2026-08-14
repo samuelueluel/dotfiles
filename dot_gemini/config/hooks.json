@@ -1,0 +1,10 @@
+{
+  "agy-turn-alert": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "printf '\\a' > /dev/tty"
+      }
+    ]
+  }
+}

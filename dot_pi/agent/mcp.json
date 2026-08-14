@@ -55,6 +55,8 @@
         "turbovault_list_templates",
         "turbovault_create_from_template",
         "turbovault_generate_index",
+        "turbovault_batch_execute",
+        "turbovault_get_vault_context",
         "turbovault_quick_health_check"
       ]
     },

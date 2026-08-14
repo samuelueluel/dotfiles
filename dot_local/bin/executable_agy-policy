@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""
+CLI helper to query and switch Antigravity CLI's toolExecutionPolicy.
+Directly updates ~/.gemini/antigravity-cli/settings.json.
+"""
+import sys
+import json
+from pathlib import Path
+
+SETTINGS_FILE = Path.home() / ".gemini" / "antigravity-cli" / "settings.json"
+
+POLICIES = {
+    "always-proceed": "always-proceed",
+    "auto": "always-proceed",
+    "yolo": "always-proceed",
+    "request-review": "request-review",
+    "manual": "request-review",
+    "review": "request-review",
+    "strict": "strict",
+}
+
+def load_settings() -> dict:
+    if not SETTINGS_FILE.exists():
+        return {}
+    try:
+        with open(SETTINGS_FILE, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error reading settings: {e}", file=sys.stderr)
+        return {}
+
+def save_settings(settings: dict):
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(settings, f, indent=2)
+        f.write("\n")
+
+def get_policy():
+    settings = load_settings()
+    policy = settings.get("toolExecutionPolicy", "request-review")
+    print(f"Active Tool Execution Policy: {policy}")
+    return policy
+
+def set_policy(target: str):
+    key = target.lower().strip()
+    if key not in POLICIES:
+        print(f"Invalid policy: '{target}'. Valid options: always-proceed (auto), request-review (manual), strict", file=sys.stderr)
+        sys.exit(1)
+    
+    canonical = POLICIES[key]
+    settings = load_settings()
+    settings["toolExecutionPolicy"] = canonical
+    save_settings(settings)
+    
+    descriptions = {
+        "always-proceed": "always-proceed (Full autonomy: all tools and commands execute without prompts)",
+        "request-review": "request-review (Gated review: safe commands auto-run, mutating commands prompt)",
+        "strict": "strict (High security: all actions prompt)"
+    }
+    print(f"Tool Execution Policy set to: {descriptions[canonical]}")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] in {"status", "get", "show"}:
+        get_policy()
+    else:
+        set_policy(sys.argv[1])
