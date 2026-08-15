@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI helper to query and switch Antigravity CLI's toolExecutionPolicy.
+CLI helper to query and switch Antigravity CLI's tool permissions / execution policy.
 Directly updates ~/.gemini/antigravity-cli/settings.json.
 """
 import sys
@@ -19,6 +19,148 @@ POLICIES = {
     "strict": "strict",
 }
 
+SAFE_ALLOW_LIST = [
+    "command(rg *)",
+    "command(rg)",
+    "command(fd *)",
+    "command(fd)",
+    "command(grep *)",
+    "command(grep)",
+    "command(ag *)",
+    "command(ag)",
+    "command(pt *)",
+    "command(pt)",
+    "command(ripgrep *)",
+    "command(ripgrep)",
+    "command(git status*)",
+    "command(git diff*)",
+    "command(git log*)",
+    "command(git show*)",
+    "command(git branch*)",
+    "command(git blame*)",
+    "command(git rev-parse*)",
+    "command(git tag*)",
+    "command(git cat-file*)",
+    "command(git describe*)",
+    "command(git shortlog*)",
+    "command(git check-ignore*)",
+    "command(git whatchanged*)",
+    "command(ls *)",
+    "command(ls)",
+    "command(tree *)",
+    "command(tree)",
+    "command(cat *)",
+    "command(cat)",
+    "command(head *)",
+    "command(head)",
+    "command(tail *)",
+    "command(tail)",
+    "command(less *)",
+    "command(less)",
+    "command(more *)",
+    "command(more)",
+    "command(zcat *)",
+    "command(zless *)",
+    "command(nl *)",
+    "command(tac *)",
+    "command(rev *)",
+    "command(find *)",
+    "command(find)",
+    "command(stat *)",
+    "command(stat)",
+    "command(file *)",
+    "command(file)",
+    "command(du *)",
+    "command(du)",
+    "command(df *)",
+    "command(df)",
+    "command(pwd)",
+    "command(which *)",
+    "command(which)",
+    "command(type *)",
+    "command(type)",
+    "command(sort *)",
+    "command(sort)",
+    "command(uniq *)",
+    "command(uniq)",
+    "command(wc *)",
+    "command(wc)",
+    "command(cut *)",
+    "command(cut)",
+    "command(tr *)",
+    "command(tr)",
+    "command(diff *)",
+    "command(diff)",
+    "command(comm *)",
+    "command(join *)",
+    "command(jq *)",
+    "command(jq)",
+    "command(column *)",
+    "command(column)",
+    "command(fmt *)",
+    "command(fmt)",
+    "command(expand *)",
+    "command(unexpand *)",
+    "command(fold *)",
+    "command(paste *)",
+    "command(pr *)",
+    "command(sha256sum *)",
+    "command(sha256sum)",
+    "command(sha1sum *)",
+    "command(md5sum *)",
+    "command(cksum *)",
+    "command(base64 *)",
+    "command(xxd *)",
+    "command(hexdump *)",
+    "command(od *)",
+    "command(strings *)",
+    "command(nm *)",
+    "command(objdump *)",
+    "command(readelf *)",
+    "command(bc *)",
+    "command(time *)",
+    "command(man *)",
+    "command(info *)",
+    "command(apropos *)",
+    "command(whatis *)",
+    "command(echo *)",
+    "command(echo)",
+    "command(true)",
+    "command(false)",
+    "command(whoami)",
+    "command(id)",
+    "command(uptime)",
+    "command(free *)",
+    "command(free)",
+    "command(ps *)",
+    "command(ps)",
+    "command(cal *)",
+    "command(cal)",
+    "command(lsof *)",
+    "command(ss *)",
+    "command(netstat *)",
+    "command(lspci *)",
+    "command(lsusb *)",
+    "command(lscpu *)",
+    "command(dmidecode *)",
+    "command(lsblk *)",
+    "command(env)",
+    "command(printenv *)",
+    "command(printenv)",
+    "command(chezmoi status*)",
+    "command(chezmoi diff*)",
+    "command(niri *)",
+    "command(niri)"
+]
+
+STANDARD_DENY_LIST = [
+    "command(rm -rf /)",
+    "command(rm -rf /*)",
+    "command(sudo *)",
+    "command(sudo)"
+]
+
+
 def load_settings() -> dict:
     if not SETTINGS_FILE.exists():
         return {}
@@ -29,35 +171,68 @@ def load_settings() -> dict:
         print(f"Error reading settings: {e}", file=sys.stderr)
         return {}
 
+
 def save_settings(settings: dict):
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
         json.dump(settings, f, indent=2)
         f.write("\n")
 
-def get_policy():
+
+def get_policy() -> str:
     settings = load_settings()
-    policy = settings.get("toolExecutionPolicy", "request-review")
-    print(f"Active Tool Execution Policy: {policy}")
-    return policy
+    perms = settings.get("permissions", {})
+    allow = perms.get("allow", [])
+
+    if "command(*)" in allow:
+        canonical = "always-proceed"
+    elif not allow:
+        canonical = "strict"
+    else:
+        canonical = "request-review"
+
+    descriptions = {
+        "always-proceed": "always-proceed (auto / yolo — full autonomy: all commands and tools execute without prompts)",
+        "request-review": "request-review (manual — safe read-only commands auto-run, mutating commands prompt)",
+        "strict": "strict (all commands prompt for review)",
+    }
+    print(f"Active Tool Execution Policy: {descriptions[canonical]}")
+    return canonical
+
 
 def set_policy(target: str):
     key = target.lower().strip()
     if key not in POLICIES:
-        print(f"Invalid policy: '{target}'. Valid options: always-proceed (auto), request-review (manual), strict", file=sys.stderr)
+        print(
+            f"Invalid policy: '{target}'. Valid options: always-proceed (auto), request-review (manual), strict",
+            file=sys.stderr,
+        )
         sys.exit(1)
-    
+
     canonical = POLICIES[key]
     settings = load_settings()
+
+    perms = settings.setdefault("permissions", {})
+    perms.setdefault("deny", STANDARD_DENY_LIST)
+    perms.setdefault("ask", [])
+
+    if canonical == "always-proceed":
+        perms["allow"] = ["command(*)", "mcp(*)"]
+    elif canonical == "request-review":
+        perms["allow"] = list(SAFE_ALLOW_LIST)
+    elif canonical == "strict":
+        perms["allow"] = []
+
     settings["toolExecutionPolicy"] = canonical
     save_settings(settings)
-    
+
     descriptions = {
-        "always-proceed": "always-proceed (Full autonomy: all tools and commands execute without prompts)",
-        "request-review": "request-review (Gated review: safe commands auto-run, mutating commands prompt)",
-        "strict": "strict (High security: all actions prompt)"
+        "always-proceed": "always-proceed (auto — full autonomy: all commands and tools execute without prompts)",
+        "request-review": "request-review (manual — safe read-only commands auto-run, mutating commands prompt)",
+        "strict": "strict (all actions prompt)",
     }
     print(f"Tool Execution Policy set to: {descriptions[canonical]}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] in {"status", "get", "show"}:

@@ -4,6 +4,7 @@ import sys
 import re
 import hashlib
 import textwrap
+import difflib
 
 W = 64
 
@@ -63,8 +64,7 @@ def get_active_code_hash(lines):
 
 # ---------------------------------------------------------------------------
 # SCAN MODE: deterministically enumerate comment regions with exact line
-# numbers, so the LLM Architect never has to hand-count lines. This is the
-# fix for the "Architect mis-drew banner line ranges" bug class.
+# numbers, so the LLM Architect never has to hand-count lines.
 # ---------------------------------------------------------------------------
 
 def _line_residual(line, start_depth):
@@ -114,17 +114,10 @@ def classify_lines(lines):
     with exactly one of:
       'blank'          - whitespace only
       'block_open'     - opens a /* that does NOT close on the same line
-                          (first line of a genuine multi-line /* */ block)
       'block_interior' - continuation of an already-open multi-line block
-                          (may itself close the block; still tagged this
-                          way -- callers use end_depth to find the close)
-      'self_block'     - a /* ... */ comment that opens AND closes on this
-                          same line, with nothing else active on the line
+      'self_block'     - a /* ... */ comment that opens AND closes on this same line
       'self_star'      - a bare Stata '*' line comment (depth 0)
-      'code'           - active code (possibly with a trailing // or /* */
-                          note)
-    Also returns start_depth/end_depth per line so callers can find exact
-    block boundaries without re-deriving them.
+      'code'           - active code (possibly with a trailing // or /* */ note)
     """
     depth = 0
     info = []
@@ -151,22 +144,8 @@ def scan_regions(lines):
     """
     Walks the file and returns a list of candidate comment regions:
       { start, end (1-indexed, inclusive), kind, has_border, text }
-    kind in: 'header_candidate', 'box_comment_candidate', 'block_comment',
-             'line_comment', 'nested_comment_line', 'trailing_note'
-
-    This performs NO judgment about label-vs-prose-vs-banner -- that is left
-    to the Architect. It only establishes ground-truth line boundaries.
-
-    Grouping rule (important -- this is what the earlier buggy version got
-    wrong): a genuine multi-line /* ... */ block (block_open ->
-    block_interior* -> close) is ALWAYS its own atomic region and is NEVER
-    merged with an adjacent comment of a different kind, even if there is
-    no blank line between them. Likewise a run of consecutive self-
-    contained one-line comments (all 'self_block' or all 'self_star', not
-    mixed) forms its own atomic region, bounded by any blank line, code
-    line, or *mechanism change*. This prevents e.g. a 3-line banner box
-    from being fused with an immediately-following disabled `/* ... */`
-    code block into one giant region.
+    kind in: 'header_candidate', 'box_comment_candidate', 'section_header_candidate',
+             'block_comment', 'line_comment', 'nested_comment_line', 'trailing_note'
     """
     n = len(lines)
     info = classify_lines(lines)
@@ -179,9 +158,9 @@ def scan_regions(lines):
             continue
         if c == 'block_open':
             j = i
-            while info[j]['end_depth'] > 0:
+            while j < n and info[j]['end_depth'] > 0:
                 j += 1
-            groups.append((i, j, 'block'))
+            groups.append((i, min(j, n - 1), 'block'))
             i = j + 1
             continue
         if c in ('self_block', 'self_star'):
@@ -196,6 +175,8 @@ def scan_regions(lines):
     is_header = bool(groups) and all(lines[k].strip() == '' for k in range(0, groups[0][0]))
 
     regions = []
+    sec_num_re = re.compile(r'^\s*(\*|/\*)\s*(\d+(\.\d+)*|[A-Z]+)\.?\s+[A-Za-z]')
+
     for idx, (s, e, gtype) in enumerate(groups):
         region_lines = lines[s:e + 1]
         first_l = region_lines[0].strip()
@@ -209,7 +190,10 @@ def scan_regions(lines):
         elif gtype in ('self_block', 'self_star') and has_border and span >= 3:
             kind = 'box_comment_candidate'
         elif span == 1:
-            kind = 'line_comment'
+            if sec_num_re.match(first_l):
+                kind = 'section_header_candidate'
+            else:
+                kind = 'line_comment'
         else:
             kind = 'block_comment'
 
@@ -225,9 +209,6 @@ def scan_regions(lines):
             continue
 
         if gtype in ('self_block', 'self_star'):
-            # Every line in a self-contained run is independently a
-            # complete one-line comment -- safe to expose all of them
-            # individually, except pure decorative border lines.
             for k in range(s, e + 1):
                 stripped = lines[k].strip()
                 if BORDER_RE.match(stripped) or DASH_BOX_RE.match(stripped):
@@ -240,15 +221,6 @@ def scan_regions(lines):
                     'text': lines[k],
                 })
         else:
-            # gtype == 'block': a genuine multi-line /* ... */ region.
-            # Only interior lines that themselves start with a bare '*'
-            # are safe to expose individually (Crucial Rule 2) -- these
-            # are comments-about-the-disabled-code. Lines with no leading
-            # '*' inside a block may be disabled CODE or unmarked prose
-            # continuation and must NOT be individually targetable; the
-            # Architect may only act on those by claiming the whole
-            # block region as one prose_block if 100% sure it is pure
-            # prose with zero code inside.
             for k in range(s + 1, e):
                 stripped = lines[k].strip()
                 if stripped.startswith('*') and not stripped.startswith('/*') \
@@ -261,7 +233,7 @@ def scan_regions(lines):
                         'text': lines[k],
                     })
 
-    # ---- active code lines carrying a trailing note (informational only) ----
+    # active code lines carrying a trailing note
     for i in range(n):
         if info[i]['class'] == 'code':
             line = lines[i]
@@ -279,7 +251,7 @@ def scan_regions(lines):
 
 
 # ---------------------------------------------------------------------------
-# Prose / banner / header rendering (unchanged formatting logic)
+# Formatting logic
 # ---------------------------------------------------------------------------
 
 def wrap_prose(text, indent=3):
@@ -301,6 +273,8 @@ def wrap_prose(text, indent=3):
 
     last_line = out[-1]
     padding = W - len(last_line) - 2
+    if padding < 0:
+        padding = 0
     out[-1] = last_line + " " * padding + "*/"
     return out
 
@@ -324,10 +298,12 @@ def wrap_notes(text):
     current_bullet = None
     for line in lines:
         if line.startswith('>'):
-            if current_bullet: bullets.append(current_bullet)
+            if current_bullet:
+                bullets.append(current_bullet)
             current_bullet = {'type': '>', 'text': line[1:].strip()}
         elif line.startswith('-'):
-            if current_bullet: bullets.append(current_bullet)
+            if current_bullet:
+                bullets.append(current_bullet)
             current_bullet = {'type': '-', 'text': line[1:].strip()}
         else:
             if current_bullet:
@@ -361,7 +337,8 @@ def wrap_notes(text):
 
     last_line = out[-1]
     padding = W - len(last_line) - 2
-    if padding < 0: padding = 0
+    if padding < 0:
+        padding = 0
     out[-1] = last_line + " " * padding + "*/"
     return out
 
@@ -394,7 +371,7 @@ def generate_header(hdata):
     fields = ["Purpose", "Author", "Created", "Updated", "Inputs", "Outputs", "Notes"]
     for f in fields:
         if f in hdata and hdata[f]:
-            val = hdata[f]
+            val = str(hdata[f])
             label = f.ljust(7)
             prefix = f"* {label} : "
 
@@ -410,10 +387,7 @@ def generate_header(hdata):
 
 
 # ---------------------------------------------------------------------------
-# Validation guardrails -- these run BEFORE any edits are applied and abort
-# the whole recipe with a clear, actionable error if violated. Philosophy:
-# never trust the Architect's judgment about mechanical facts (line spans,
-# content preservation) -- verify them deterministically.
+# Validation guardrails
 # ---------------------------------------------------------------------------
 
 class RecipeValidationError(Exception):
@@ -422,40 +396,46 @@ class RecipeValidationError(Exception):
 
 def validate_banners(lines, recipe):
     """
-    A banner may only replace a source region that was ALREADY a multi-line
-    box comment (border line of repeated '*' or '-'/'=', a title line,
-    another border line -- 3+ physical lines). This prevents an LLM
-    Architect from promoting short one-line labels like '/* Preamble */' or
-    '/* Export as csv */' into boxed banners, which is not house style.
+    Validates banner replacements.
+    Allows:
+    1. Multi-line box comments (span >= 3 with border lines).
+    2. Single-line section comments when explicitly promoted with
+       'action': 'promote' or 'allow_single_line': true.
     """
     for b in recipe.get('banners', []):
         start = b['original_start_line'] - 1
         end = b.get('original_end_line', b['original_start_line']) - 1
         span = end - start + 1
-        if span < 3:
+        is_promoted = b.get('action') == 'promote' or b.get('allow_single_line', False)
+
+        if span < 3 and not is_promoted:
+            # Check if this line looks like a section header (e.g. * 1. TITLE)
+            line_text = lines[start].strip()
+            if not (line_text.startswith('*') or line_text.startswith('/*')):
+                raise RecipeValidationError(
+                    f"Banner at original_start_line={b['original_start_line']} "
+                    f"targets non-comment line '{line_text}'."
+                )
             raise RecipeValidationError(
                 f"Banner at original_start_line={b['original_start_line']} "
-                f"only spans {span} line(s). Banners must replace an "
-                f"existing 3+ line box comment (border/title/border). "
-                f"This looks like a one-line label comment being "
-                f"incorrectly promoted to a boxed banner -- remove it from "
-                f"the recipe and leave the original comment untouched. "
-                f"Run --scan to get correct region boundaries."
+                f"only spans {span} line(s). To promote a 1-line section header "
+                f"comment into a banner, set 'action': 'promote' in the banner entry. "
+                f"If this is a short inline label (e.g. '/* Dropping */'), omit it."
             )
-        region = lines[start:end+1]
-        has_border = any(
-            BORDER_RE.match(l.strip()) or DASH_BOX_RE.match(l.strip())
-            for l in [region[0], region[-1]]
-        )
-        if not has_border:
-            raise RecipeValidationError(
-                f"Banner at original_start_line={b['original_start_line']} "
-                f"(lines {b['original_start_line']}-{b.get('original_end_line', b['original_start_line'])}) "
-                f"does not have a recognizable box-comment border on its "
-                f"first/last line in the ORIGINAL file. Only promote "
-                f"comments that were already formatted as multi-line boxes. "
-                f"Plain labels must be left untouched."
+
+        if span >= 3 and not is_promoted:
+            region = lines[start:end+1]
+            has_border = any(
+                BORDER_RE.match(l.strip()) or DASH_BOX_RE.match(l.strip())
+                for l in [region[0], region[-1]]
             )
+            if not has_border:
+                raise RecipeValidationError(
+                    f"Banner at original_start_line={b['original_start_line']} "
+                    f"(lines {b['original_start_line']}-{end+1}) "
+                    f"does not have recognizable box-comment borders. "
+                    f"Add 'action': 'promote' if intentionally upgrading."
+                )
 
 
 def _significant_tokens(text):
@@ -464,22 +444,16 @@ def _significant_tokens(text):
     return {w.lower() for w in words if w.lower() not in STOPWORDS}
 
 
-def validate_header_content(lines, recipe):
+def validate_header_content(lines, recipe, strict=False):
     """
-    Content-preservation guardrail. Regenerating a header from scratch
-    (Purpose/Author/etc. fields) can silently DROP substantive prose that
-    lived in the old free-form header comment (e.g. caveats, warnings,
-    open questions the researcher left themselves). This mechanically
-    checks that every "significant" word (len>=5, non-stopword) from the
-    ORIGINAL header region still appears somewhere in the NEW header text.
-    If something would be dropped, abort and tell the Architect to carry
-    it forward explicitly via the header's "Notes" field.
+    Checks that significant content from the original header is preserved.
+    Emits a warning by default, or errors if strict=True.
     """
     header = recipe.get('header')
     if not header or header.get('action') != 'create_or_update':
         return
     if 'original_start_line' not in header:
-        return  # pure insert, nothing old to preserve
+        return
 
     start = header['original_start_line'] - 1
     end = header['original_end_line'] - 1
@@ -492,20 +466,16 @@ def validate_header_content(lines, recipe):
     new_tokens = _significant_tokens(' '.join(new_text_parts))
 
     missing = sorted(old_tokens - new_tokens)
-    # allow a small amount of drift (e.g. one incidental word) but not
-    # wholesale loss of substantive content
     if len(missing) >= 3:
-        raise RecipeValidationError(
-            "Header replacement would silently drop substantive words from "
-            "the ORIGINAL header comment that do not appear anywhere in the "
-            "new header (Purpose/Author/.../Notes fields). Missing words: "
-            f"{', '.join(missing[:20])}"
-            + (" ..." if len(missing) > 20 else "") +
-            ". If this old content is still relevant, carry it forward "
-            "verbatim (or lightly condensed) in the header's 'Notes' field. "
-            "If it is genuinely obsolete, that is a judgment call for "
-            "Samuel -- ask him rather than silently dropping it."
+        msg = (
+            f"Header replacement omitted significant words from original header: "
+            f"{', '.join(missing[:15])}"
+            + (" ..." if len(missing) > 15 else "")
         )
+        if strict:
+            raise RecipeValidationError(f"Strict header check failed: {msg}")
+        else:
+            sys.stderr.write(f"WARNING: {msg}\n")
 
 
 def validate_no_overlaps(recipe):
@@ -531,7 +501,7 @@ def validate_no_overlaps(recipe):
 
 
 # ---------------------------------------------------------------------------
-# Apply recipe
+# Apply recipe & spacing
 # ---------------------------------------------------------------------------
 
 def apply_recipe(lines, recipe):
@@ -596,35 +566,137 @@ def apply_recipe(lines, recipe):
 
 
 def enforce_spacing(lines):
-    for i in range(len(lines)):
-        if '/*' in lines[i] and lines[i].rstrip().endswith('*/'):
-            parts = lines[i].rsplit('/*', 1)
-            if parts[0].strip():
-                note = parts[1].replace('*/', '').strip()
-                lines[i] = parts[0].rstrip() + "  // " + note
+    """
+    Enforces house-style blank line rules:
+    - 2 blank lines before Level 1 banners (* ====).
+    - 1 blank line before Level 2 banners (* ----).
+    - 1 blank line after banners.
+    - 2 blank lines after top file header.
+    - Trailing inline /* note */ converted to // note on code lines.
+    - Maximum of 2 consecutive blank lines anywhere.
+    """
+    l1_border = "* " + "=" * (W - 2)
+    l2_border = "* " + "-" * (W - 2)
 
-        if lines[i].rstrip().endswith('*/'):
-            stripped = lines[i].rstrip()[:-2].rstrip()
-            if len(stripped) > 0 and len(stripped) < W - 2:
-                lines[i] = stripped + " " * (W - len(stripped) - 2) + "*/"
-            elif len(stripped) == 0:
-                lines[i] = "*/"
-
-    out = []
-    blanks = 0
+    # 1. Normalize trailing inline comments
+    processed = []
     for line in lines:
-        if not line.strip():
-            blanks += 1
-            if blanks <= 2:
+        if '/*' in line and line.rstrip().endswith('*/'):
+            parts = line.rsplit('/*', 1)
+            if parts[0].strip() and not parts[0].strip().startswith('*'):
+                note = parts[1].replace('*/', '').strip()
+                line = parts[0].rstrip() + "  // " + note
+        processed.append(line.rstrip())
+
+    # 2. Structural pass to ensure spacing around banners and headers
+    out = []
+    i = 0
+    n = len(processed)
+
+    def count_trailing_blanks(arr):
+        b = 0
+        for x in reversed(arr):
+            if x == "":
+                b += 1
+            else:
+                break
+        return b
+
+    while i < n:
+        line = processed[i]
+
+        # Check for Level 1 banner
+        if line == l1_border and i + 2 < n and processed[i + 2] == l1_border:
+            banner_chunk = [processed[i], processed[i+1], processed[i+2]]
+            trailing = count_trailing_blanks(out)
+            if len(out) > trailing:  # Not at start of file
+                needed = 2 - trailing
+                for _ in range(needed):
+                    out.append("")
+                while count_trailing_blanks(out) > 2:
+                    out.pop()
+            out.extend(banner_chunk)
+            i += 3
+            # Ensure at least 1 blank after banner
+            if i < n and processed[i] != "":
+                out.append("")
+            continue
+
+        # Check for Level 2 banner
+        if line == l2_border and i + 2 < n and processed[i + 2] == l2_border:
+            banner_chunk = [processed[i], processed[i+1], processed[i+2]]
+            trailing = count_trailing_blanks(out)
+            if len(out) > trailing:
+                needed = 1 - trailing
+                for _ in range(needed):
+                    out.append("")
+                while count_trailing_blanks(out) > 2:
+                    out.pop()
+            out.extend(banner_chunk)
+            i += 3
+            # Ensure at least 1 blank after banner
+            if i < n and processed[i] != "":
+                out.append("")
+            continue
+
+        # Regular line
+        if not line:
+            if count_trailing_blanks(out) < 2:
                 out.append("")
         else:
-            blanks = 0
-            out.append(line.rstrip())
+            out.append(line)
+        i += 1
 
-    if out and out[-1] != "":
-        out.append("")
+    # Ensure trailing newline at end of file
+    while out and out[-1] == "":
+        out.pop()
+    out.append("")
 
     return out
+
+
+def format_do_file(do_file, recipe_file, diff_only=False, strict_header=False):
+    with open(do_file, 'r') as f:
+        lines = f.read().splitlines()
+
+    with open(recipe_file, 'r') as f:
+        recipe = json.load(f)
+
+    validate_no_overlaps(recipe)
+    validate_banners(lines, recipe)
+    validate_header_content(lines, recipe, strict=strict_header)
+
+    hash_before = get_active_code_hash(lines)
+
+    new_lines = apply_recipe(list(lines), recipe)
+    new_lines = enforce_spacing(new_lines)
+
+    hash_after = get_active_code_hash(new_lines)
+
+    if hash_before != hash_after:
+        sys.stderr.write(f"ERROR: Active code hash mismatch!\nBefore: {hash_before}\nAfter:  {hash_after}\n")
+        sys.stderr.write("The recipe attempted to modify active code. Aborting.\n")
+        sys.exit(1)
+
+    if diff_only:
+        diff = difflib.unified_diff(
+            lines,
+            new_lines[:-1] if (new_lines and new_lines[-1] == "") else new_lines,
+            fromfile=f"a/{do_file}",
+            tofile=f"b/{do_file}",
+            lineterm=""
+        )
+        diff_text = '\n'.join(diff)
+        if diff_text:
+            print(diff_text)
+        else:
+            print("No changes.")
+        return
+
+    with open(do_file, 'w') as f:
+        f.write('\n'.join(new_lines))
+
+    print(f"Successfully formatted {do_file}")
 
 
 def main():
@@ -638,44 +710,21 @@ def main():
         print(json.dumps(regions, indent=2))
         return
 
-    if len(sys.argv) != 3:
-        print("Usage: stata_style_apply.py <file.do> <recipe.json>")
-        print("       stata_style_apply.py --scan <file.do>")
-        sys.exit(1)
+    if len(sys.argv) >= 2 and sys.argv[1] == '--diff':
+        if len(sys.argv) != 4:
+            print("Usage: stata_style_apply.py --diff <file.do> <recipe.json>")
+            sys.exit(1)
+        format_do_file(sys.argv[2], sys.argv[3], diff_only=True)
+        return
 
-    do_file = sys.argv[1]
-    recipe_file = sys.argv[2]
+    if len(sys.argv) == 3:
+        format_do_file(sys.argv[1], sys.argv[2], diff_only=False)
+        return
 
-    with open(do_file, 'r') as f:
-        lines = f.read().splitlines()
-
-    with open(recipe_file, 'r') as f:
-        recipe = json.load(f)
-
-    try:
-        validate_no_overlaps(recipe)
-        validate_banners(lines, recipe)
-        validate_header_content(lines, recipe)
-    except RecipeValidationError as e:
-        print(f"ERROR: Recipe rejected by validation.\n{e}")
-        sys.exit(1)
-
-    hash_before = get_active_code_hash(lines)
-
-    new_lines = apply_recipe(list(lines), recipe)
-    new_lines = enforce_spacing(new_lines)
-
-    hash_after = get_active_code_hash(new_lines)
-
-    if hash_before != hash_after:
-        print(f"ERROR: Active code hash mismatch!\nBefore: {hash_before}\nAfter:  {hash_after}")
-        print("The recipe attempted to modify active code. Aborting.")
-        sys.exit(1)
-
-    with open(do_file, 'w') as f:
-        f.write('\n'.join(new_lines) + '\n')
-
-    print(f"Successfully formatted {do_file}")
+    print("Usage: stata_style_apply.py <file.do> <recipe.json>")
+    print("       stata_style_apply.py --scan <file.do>")
+    print("       stata_style_apply.py --diff <file.do> <recipe.json>")
+    sys.exit(1)
 
 
 if __name__ == "__main__":

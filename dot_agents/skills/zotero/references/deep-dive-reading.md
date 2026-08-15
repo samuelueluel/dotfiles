@@ -33,6 +33,19 @@ Every MinerU-parsed item gets a sidecar at `~/.config/zotero-mcp/mineru-sidecars
 
   Reading becomes surgical instead of whole-paper.
 
+- **Textbook / method extraction** (equations, theorems, definitions in big books): locate by **section heading**, then read the range around the hit — never chase a vague concept phrase. `grep -i "asymptotic variance"` on Hayashi hits ch. 7 OLS noise when the answer sits under "13.8 EFFICIENT GMM".
+
+  ```bash
+  # 1. pick the best source across ALL sidecars in one pass
+  grep -l "EFFICIENT GMM" ~/.config/zotero-mcp/mineru-sidecars/*.md
+  # 2. locate the heading
+  grep -n "EFFICIENT GMM" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
+  # 3. read the range around the hit immediately — stop grepping
+  sed -n '16055,16130p' ~/.config/zotero-mcp/mineru-sidecars/<key>.md
+  ```
+
+  Heading hit at line N → read roughly `N-5` to `N+70`. A broad grep after a heading hit wastes turns; the content is ~50 lines below the heading you already found.
+
 - **Holistic** ("write a literature-review paragraph on this paper", "synthesize across these papers", big-picture understanding): a full read is the RIGHT choice — `zotero_zotero_get_item_fulltext` (desktop must be up) or read the sidecar in chunks. Never substitute grep for a read when the question is what the paper says overall — grep is a cost-aware default for targeted extraction, not a gate on full reading.
 
 ## Do not use read_pdf_pages as a middle path
@@ -45,7 +58,7 @@ Every MinerU-parsed item gets a sidecar at `~/.config/zotero-mcp/mineru-sidecars
 
 — for pages MinerU parsed perfectly well. That is the dangerous failure class: the call succeeds, returns clean-looking output, and the content is simply absent. **Prefer the sidecar.** Reach for `read_pdf_pages` only to confirm pagination or to read a page you already know carries a text layer, and never conclude a paper lacks content because this tool came back empty.
 
-Relatedly, `get_pdf_outline` and `get_page_layout` are non-functional on this install (missing `[pdf]` extra) — see `library-ops.md`. There is no coordinate-level PDF inspection available, so table and figure work goes through the sidecar's HTML tables.
+The `[pdf]` extra is installed, so `get_pdf_outline` (bookmark TOC for long PDFs) and `get_page_layout` (figure/table coordinates) are live — see `library-ops.md` for details. Content still comes from the sidecar; `get_page_layout` adds the geometry, it doesn't replace the sidecar.
 
 ## Practical notes
 

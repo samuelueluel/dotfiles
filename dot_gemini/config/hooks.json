@@ -3,7 +3,18 @@
     "Stop": [
       {
         "type": "command",
-        "command": "printf '\\a' > /dev/tty"
+        "command": "/var/home/samuel/.gemini/hooks/agy-notify.sh"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ask_question",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/var/home/samuel/.gemini/hooks/agy-notify.sh"
+          }
+        ]
       }
     ]
   }

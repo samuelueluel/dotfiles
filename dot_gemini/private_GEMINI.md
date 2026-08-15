@@ -2,7 +2,7 @@
 - **OS:** Turquoise-halo — custom atomic Fedora 44 (immutable, BlueBuild). No native package installs on host.
 - **HW:** HP ZBook Ultra G1a 14" · AMD Ryzen AI MAX+ PRO 395 (32 threads) @ 5.19 GHz · AMD Radeon 8060S iGPU · 125 GiB unified RAM
 - **WM/Shell/Term:** Niri (Wayland) · zsh · Ghostty (primary), Kitty (yazi previews)
-- **Key Software:** Zen Browser · Zed (editor) · Yazi (files) · Obsidian (notes, flatpak) · Dropbox · Stata (data analysis) · rmpc+mpd (music) · Bitwarden · television (launcher)
+- **Key Software:** Zen Browser · Zed (editor) · Yazi (files) · Obsidian (notes, flatpak) · Dropbox · Stata (data analysis) · Zotero (references) · rmpc+mpd (music) · Bitwarden · television (launcher)
 - **Samuel:** PhD economist — applied empirical economics (urban, environmental, public policy). USA.
 - **Config Repos:**
   - `turquoise` (`~/turquoise`) — BlueBuild image recipe, build scripts, `sjust` justfile commands.

@@ -9,7 +9,7 @@ description: Manage Samuel's Zotero library via the zotero MCP server — add pa
 
 - Library: Zotero 9, data dir `~/Zotero`. PDFs are **local-only** (file sync off). **Never upload PDF bytes to Zotero cloud** — metadata sync is fine.
 - MCP server: `zotero` — endpoint already configured in `~/.pi/agent/mcp.json`; don't hardcode an address. All MCP tools are named `zotero_zotero_*`.
-- Gateway quirk (lazy-load race): `mcp({connect:"zotero"})` can report "configured but not connected" even while the server is up — direct calls with `server:"zotero"` ALWAYS work, so prefer them; `connect` typically succeeds on retry. Don't waste time re-diagnosing.
+- Gateway quirk (lazy-load race): `mcp({connect:"zotero"})` can report "configured but not connected" even while the server is up — direct calls with `server:"zotero"` ALWAYS work, so prefer them; `connect` typically succeeds on retry. Don't waste time re-diagnosing, and don't probe `connect` first — go straight to the direct call.
 - **Never attach PDFs via the MCP** (`zotero_zotero_attach_file` / `add_item` with a file source / `attach_mode: auto` upload bytes). Attach with the shell helper `~/.local/bin/zotero-link <item_key> <pdf_path> [title]` — linked attachment, zero bytes.
 - Create items with `zotero_zotero_add_item` by DOI/ISBN, `attach_mode: "none"` (metadata only), then `zotero-link` the PDF.
 - Tools: the `[pdf]` extra (PyMuPDF) is installed — `get_pdf_outline`, `get_page_layout`, `create_annotation` are live. Better BibTeX is installed too — `search_by_citation_key` works. Check `references/library-ops.md` before using an unfamiliar tool — don't burn turns on a dependency error.
@@ -23,15 +23,19 @@ Three services gate different capabilities. Probe before acting; policy differs 
 | Embedder :8082 | Indexing AND every search (the query is embedded too) | `curl -sf -m 2 http://127.0.0.1:8082/v1/models` | **ASK Samuel** to run `serve-embedder`; never auto-start |
 | Reranker :8083 | Search precision only (graceful fallback) | `curl -s -m 2 http://127.0.0.1:8083/health` | **Auto-start** `serve-reranker`, don't ask |
 | Zotero desktop :23119 | Result enrichment (title/creators/page), fulltext, all writes | `pgrep -i zotero` / `ss -tln \| grep 23119` | Ask Samuel to open Zotero, or use the read-only DB fallback |
+| VLM :8084 | Figure-schema enrichment only (offline batch, never a search/index dependency) | `curl -sf -m 2 http://127.0.0.1:8084/v1/models` | Samuel runs `serve-vlm` (~58 GB load, never auto-start); `stop-vlm` after the batch |
 
 - Embedder is never auto-started: it loads a multi-GB model into unified RAM and has crashed the machine. This is an explicit standing rule, not a default to reason around.
+- VLM (:8084, Qwen2.5-VL-72B Q6_K, ~58 GB) serves only offline figure enrichment (`zotero-vlm-enrich.py`); it is never on the search or index path. Samuel starts it; run `stop-vlm` as soon as a batch ends to release RAM.
+- ~={magenta}Never host-wide `pkill llama-server`=~ — every llama-server is inside a container (rootless podman host processes), and a host pkill kills the ramalama engines too: the embedder/reranker containers then self-remove (`--rm`) and the vlm container restarts and reloads its ~58 GB model. `lem-unload` was fixed 2026-08-15 to scope its kill to the lemonade container only.
 - `Semantic search error: Connection error.` = **embedder down**, not a desktop problem. `Error enriching result for item <key>: Connection refused` = **desktop down**, non-fatal.
 - Sandbox gate: run `command -v ramalama`; if empty you are in a pi-safe container and CANNOT run `serve-*` — report which service is down and ask Samuel to start it on the host, then wait for the port.
 - Rationale, wedge diagnosis, and the desktop-down DB fallback: `references/service-ops.md`.
 
 ## Choosing a tool
 
-- **Topic / concept discovery** → `zotero_zotero_semantic_search`. Scope with `collection=<8-char KEY>` whenever the user names a collection or project (`zotero_zotero_search_collections` finds keys). Hybrid BM25+RRF is on by default, so exact strings (variable names, author names, formula fragments) surface too.
+- **Topic / concept discovery** → `zotero_zotero_semantic_search`. Scope with `collection=<8-char KEY>` whenever the user names a collection or project — known keys: `references/collections.md` (fast path); refresh with `zotero_read_zotero_collections` (resource tool, no params); unknown names via `zotero_zotero_search_collections`, then record in `references/collections.md`. Hybrid BM25+RRF is on by default, so exact strings (variable names, author names, formula fragments) surface too.
+- **Section-targeted queries** benefit from DCR: every chunk carries a `[Paper: <title> | Section: <breadcrumb>]` prefix in the index, so a query naming a section or heading (e.g. "identification strategy") matches the deep chunk instead of only the abstract. Deep chunks keep their paper/section identity in both the dense and BM25 legs.
 - **Known string** (title/author substring) → `search_items`. **Tag** → `search_by_tag`. **Structured filter** (itemType, date ranges, "added since X") → `advanced_search`.
 - **Extract numbers, SEs, table values, method details from a paper** → grep the MinerU sidecar, not fulltext. `references/deep-dive-reading.md`.
 - **Read a paper whole** (synthesis, lit-review prose) → `get_item_fulltext` (desktop must be up).
@@ -41,6 +45,31 @@ Three services gate different capabilities. Probe before acting; policy differs 
 - **Find an item from a `\citep{key}` citekey** → `search_by_citation_key` (Better BibTeX installed; keys follow BBT's author+year scheme, e.g. `atuaheneTaxedOutIllegal2018`).
 - **Cite / export for a manuscript** → `export_bibliography` (APA/Chicago/BibTeX/in-text; scope it — see `references/library-ops.md`).
 - Bulk tag/Extra edits, collection ops, library switching, and the unavailable-tool list: `references/library-ops.md`.
+
+## Core tool signatures
+
+Stable — call `mcp describe` only for unfamiliar tools, or when a call errors on a param after a server upgrade (then describe once, don't guess).
+
+| Tool | Params you'll pass |
+|---|---|
+| `zotero_zotero_semantic_search` | `query`; `collection` (8-char KEY; scopes to collection **+ subcollections**); `limit` (10); `filters` (dict or JSON); `library_id` (0 = personal, or group ID) |
+| `zotero_zotero_search_items` | `query`; `qmode` (`titleCreatorYear` or `everything`); `item_type`; `limit`; `tag`; `collection_key` |
+| `zotero_zotero_advanced_search` | `conditions` (list of `{field, operation, value}`); `join_mode` (`all`/`any`); `sort_by`; `sort_direction`; `limit` |
+| `zotero_zotero_search_by_tag` | `tag` (list, `OR` joins, `-exclude`); `item_type` (`-attachment`); `limit`; `collection_key` |
+| `zotero_zotero_get_item_metadata` | `item_key`; `include_abstract` (True); `format` (`markdown`/`json`/`bibtex`) |
+| `zotero_zotero_get_item_fulltext` | `item_key` |
+| `zotero_zotero_get_pdf_outline` | `item_key` (parent; bookmarks only) |
+| `zotero_zotero_get_page_layout` | `attachment_key`; `page` (1-indexed) |
+| `zotero_zotero_create_annotation` | `attachment_key`; `page`; `text` **or** `rect` (0–1), not both; `comment`; `color`; `tags` |
+| `zotero_zotero_get_attachment_path` | `item_key` (parent) |
+| `zotero_zotero_add_item` | `source` (DOI/ISBN/URL/BibTeX); `source_type` (`doi`/`isbn`/...); `collections`; `attach_mode` (`none`); `if_exists` (`file`/`duplicate`/`skip`); `title` |
+| `zotero_zotero_get_item_children` | `item_key` (single or list) |
+| `zotero_zotero_get_collection_items` | `collection_key`; `detail` (`keys_only`/`summary`/`full`); `limit` |
+| `zotero_zotero_update_search_database` | `force_rebuild`; `limit` |
+| `zotero_zotero_get_search_database_status` | — (no args) |
+| `zotero_zotero_search_by_citation_key` | `citekey` |
+| `zotero_zotero_export_bibliography` | `item_keys` or `collection_key`; `style` (CSL short name); `export_format` (`bib`/`citation`/`bibtex`) |
+| `zotero_read_zotero_collections` | — (no args; live name → key → count map) |
 
 ## Workflows
 
@@ -75,6 +104,7 @@ Three services gate different capabilities. Probe before acting; policy differs 
 - Embedder must be up first (preconditions table). Expect a text-layer paper to be searchable in ~1-2 min, a scanned book far longer — MinerU parses before embedding, no separate OCR step.
 - Check readiness/stats any time with `zotero_zotero_get_search_database_status` (doc count, model, last update, whether an update is due).
 - Force rebuilds go through the CLI under `setsid`, never the MCP tool. That and all failure modes: `references/index-maintenance.md`.
+- During a run: `[ 11%] 1/9`-style progress lines print at dispatch and ChromaDB's doc count stays flat until the end (single bulk upsert) — a `[100%]` bar with a flat count is normal, not a stall. Anatomy + live-progress tricks: `references/index-maintenance.md` § Update run anatomy.
 
 ### 5. Verification checklist after any ingest/cleanup
 
@@ -84,6 +114,40 @@ Three services gate different capabilities. Probe before acting; policy differs 
 - [ ] Fulltext works on a linked item — if `get_item_fulltext` says "File download failed", the fulltext patch was lost (run `sjust update`)
 - [ ] New items indexed (`update_search_database` run; `get_search_database_status` reflects it)
 - SQL for these checks (including the read-only-with-desktop-open trick): `references/service-ops.md`.
+
+### 6. Figure-schema enrichment & DCR re-embed
+
+The index carries two augmentations over plain fulltext:
+
+- **DCR prefixes** (`[contextual patch]`): every chunk is embedded with a lean `[Paper: <title> | Section: <breadcrumb>]` prefix IN MEMORY (sidecar .md files stay clean). Config `semantic_search.contextual.enabled` (on since 2026-08-15). Only affects chunks re-embedded after enabling.
+- **Figure schemas** (`zotero-vlm-enrich.py`): an offline pass runs the 72B VLM over MinerU figure crops and injects a `[Figure Schema]` YAML block below each image line, making visual evidence discoverable by search. Purely an index beacon — numbers still come from tables/text.
+
+Enrichment batch (VLM must be up — `serve-vlm`; ~58 GB, Samuel starts it):
+
+```bash
+zotero-vlm-enrich.py --dry-run          # report only, no API calls
+zotero-vlm-enrich.py --all              # backfill every sidecar (~18 s/figure; idempotent, resumable)
+zotero-vlm-enrich.py --key <ITEMKEY>    # single item
+stop-vlm                                # release ~58 GB as soon as the batch ends
+```
+
+Re-embed trigger — ~={magenta}incremental `update-db` does NOT detect sidecar edits=~ (it judges by Zotero item metadata: date_modified, attachment set, attachment priority). Enriched/prefixed chunks only land after:
+
+- `update-db --fulltext --force-rebuild` (whole library, ~2 h; sidecars are never re-parsed), or
+- deleting the target items' chunks then an incremental `update-db` (scoped and fast):
+
+```bash
+~/.local/share/uv/tools/zotero-mcp-server/bin/python - <<'EOF'
+from pathlib import Path
+from zotero_mcp.chroma_client import create_chroma_client
+cc = create_chroma_client(str(Path.home()/'.config'/'zotero-mcp'/'config.json'))
+for k in ('KEY1','KEY2'):
+    cc.delete_item_chunks(k)
+EOF
+zotero-mcp-server update-db --fulltext
+```
+
+After any CLI `update-db` that changed the index, restart the service if a collection-scoped search errors (`references/index-maintenance.md` § Sparse-index process cache).
 
 ## Known quirks
 

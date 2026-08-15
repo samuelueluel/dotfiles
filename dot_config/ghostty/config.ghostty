@@ -38,7 +38,9 @@ desktop-notifications = false
 confirm-close-surface = false
 gtk-single-instance = true
 quit-after-last-window-closed = false
-scrollback-limit = 10000000
+# Scrollback buffer size in BYTES (not lines) — 200 MB; ~20x the 10 MB default
+# Memory is lazy-allocated; 200 MB of terminal output is far beyond typical use on 125 GiB RAM.
+scrollback-limit = 200000000
 
 # Window
 background-opacity = 0.9

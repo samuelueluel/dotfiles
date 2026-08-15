@@ -18,6 +18,7 @@ import ctypes.util
 import glob
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -304,7 +305,7 @@ def detect_agent_info(
 
     active_pi_types = check_active_pi_types()
 
-    if t_lower == "agy" or t_lower.startswith("agy ") or t_lower.startswith("agy:"):
+    if re.search(r"\b(agy|antigravity)\b", t_lower):
         agent_type = "agy"
         default_label = "a"
     elif "pihat" in t_lower or ("pihat" in active_pi_types and ("pi" in t_lower or "π" in t)):

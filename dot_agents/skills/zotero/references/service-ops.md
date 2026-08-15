@@ -13,6 +13,7 @@ The reranker (:8083) is different in kind, not just degree: it is small, it only
 - **Embedder :8082 — both legs of search.** At index time it embeds each chunk; at query time it embeds the query string before the ChromaDB lookup. Corpus vectors are persisted, so a query does NOT re-embed the corpus — but it always embeds the query. Therefore: embedder down = no searching at all, not merely no indexing.
 - **Reranker :8083 — precision only.** A cross-encoder over the dense+sparse candidate set. Adds roughly a second per search. When absent, the service log records `HTTP reranker error ... returning unreranked order` and results come back in fused order. Harmless.
 - **Zotero desktop :23119 — enrichment and writes.** Retrieval works without it, but results lose title/creators/page/citation, `get_item_fulltext` fails, and every write path (add/update/delete/attach) is unavailable.
+- **VLM :8084 — offline figure enrichment only.** Serves Qwen2.5-VL-72B (Q6_K, ~58 GB) for `zotero-vlm-enrich.py`; never consulted during search or index runs. Samuel starts it (`serve-vlm` — never auto-start; it pulls a multi-GB model into unified RAM), and it should be stopped (`stop-vlm`) as soon as a batch ends.
 
 ## Error-to-cause map
 
@@ -40,6 +41,11 @@ time curl -s http://127.0.0.1:8082/v1/embeddings \
 ```
 
 Fix: `podman restart embedder` (may need SIGKILL). **Always re-probe after a restart, before launching a long job** — a fresh container can come up wedged again.
+
+## Service interaction gotchas
+
+- ~={magenta}Host-wide `pkill -9 llama-server` kills every engine, including the ones inside the ramalama containers=~ — under rootless podman the container processes ARE host processes. Observed 2026-08-15: `lem-unload`'s old host pkill destroyed the embedder, reranker and VLM engines at once; the embedder/reranker containers then self-removed (`--rm`) and the vlm container restarted and reloaded its ~58 GB model. `lem-unload` now scopes its kill to the lemonade container (`podman exec lemonade pkill -9 llama-server`) — never reintroduce a host-wide pkill.
+- Ramalama containers do not survive engine death: killing their llama-server removes (embedder/reranker) or restarts (vlm) the container. Recovery is always re-serve (`serve-embedder` / `serve-reranker`; the vlm container restarts itself), never `podman start`.
 
 ## Sandbox gate
 

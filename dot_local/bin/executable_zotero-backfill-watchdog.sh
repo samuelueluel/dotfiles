@@ -30,8 +30,15 @@ LIMIT="${1:-}"
 
 BIN="$HOME/.local/share/uv/tools/zotero-mcp-server/bin/zotero-mcp-server"
 export ZOTERO_LOCAL=true
-export ZOTERO_API_KEY="HKGPC0FHpSMlCwYgStcl7lPr"
-export ZOTERO_LIBRARY_ID="3934708"
+# API key read at runtime from the systemd unit (never hardcoded/committed).
+# Same pattern as zotero-link; the unit is NOT chezmoi-tracked and stays chmod 600.
+UNIT="$HOME/.config/systemd/user/zotero-mcp.service"
+export ZOTERO_API_KEY=$(grep -oP 'ZOTERO_API_KEY=\K[^" ]+' "$UNIT" 2>/dev/null | head -1)
+export ZOTERO_LIBRARY_ID=$(grep -oP 'ZOTERO_LIBRARY_ID=\K[^" ]+' "$UNIT" 2>/dev/null | head -1)
+if [ -z "$ZOTERO_API_KEY" ] || [ -z "$ZOTERO_LIBRARY_ID" ]; then
+  echo "error: could not read Zotero API creds from $UNIT" >&2
+  exit 1
+fi
 
 mkdir -p "$LOG_DIR"
 log() { echo "$(date '+%F %T') $*" >> "$WATCH_LOG"; }
@@ -77,7 +84,7 @@ start_run() {
 log "=== watchdog session start (gtt_threshold=${GTT_THRESHOLD_MB}MB, item_timeout=${ITEM_TIMEOUT_SEC}s) ==="
 
 start_run
-LAST_ITEM=""; LAST_ITEM_SINCE=$(date +%s); BAD_GTT=0; HB=0; LAST_FAILED_CNT=0
+LAST_ITEM=""; LAST_ITEM_SINCE=$(date +%s); BAD_GTT=0; HB=0; LAST_FAILED_CNT=0; STUCK_EMB=0; LAST_EMB_TASK=""
 POISON=()
 
 last_run_log_write=$(date +%s)
@@ -103,20 +110,36 @@ while true; do
   MD_PID=$(pgrep -f "bin/magic-pdf" | tail -1)
   EMB_CPU=$(cpu_now "$EMB_PID")
   MD_CPU=$(cpu_now "$MD_PID")
-  # Embedding-phase hang: run log stale AND embedder idle AND no ACTIVE parse
-  # work (no magic-pdf, or one that is itself idle). A legit big batch keeps
-  # the log stale for 10-25 min but llama-server CPU stays high — the hang
-  # signature is a stale log with everything at ~0%.
+  # Ground-truth liveness: llama-server's own task counter advances per
+  # embedded chunk. A single 4s CPU sample is NOT sufficient — llama-server
+  # is bursty (0% between HTTP requests) and the run log is legitimately
+  # silent during the embedding phase of an embed-only run, so one 0% sample
+  # false-killed healthy runs three times on 2026-08-14/15 (21:43, 23:13, 00:07).
+  EMB_TASK=$(podman logs --tail 1 embedder 2>/dev/null | grep -o 'task [0-9]*' | grep -o '[0-9]*' | tail -1)
+  EMB_TASK_MOVED=0
+  [ "$EMB_TASK" != "$LAST_EMB_TASK" ] && EMB_TASK_MOVED=1
+  # Embedding-phase hang: run log stale AND embedder idle AND task counter
+  # not moved this iteration, for 3+ consecutive iterations (~60s+). The
+  # 600s post-restart grace (last_run_log_write reset) gives a freshly
+  # restarted embedder time to reload before this can re-fire.
   if kill -0 "$RUN_PID" 2>/dev/null \
      && [ $((NOW_S - RUN_LOG_MTIME)) -gt 600 ] \
      && [ $((NOW_S - last_run_log_write)) -gt 600 ] \
      && [ "$EMB_CPU" -lt 5 ] \
+     && [ "$EMB_TASK_MOVED" -eq 0 ] \
      && { [ -z "$MD_PID" ] || [ "$MD_CPU" -lt 5 ]; }; then
-    log "EMBED-HANG: run log stale $((NOW_S - RUN_LOG_MTIME))s, embedder cpu=${EMB_CPU}%, magic-pdf=${MD_PID:-none} cpu=${MD_CPU}% — restarting embedder + update-db"
+    STUCK_EMB=$((STUCK_EMB + 1))
+  else
+    STUCK_EMB=0
+  fi
+  LAST_EMB_TASK="$EMB_TASK"
+  if [ "$STUCK_EMB" -ge 3 ]; then
+    log "EMBED-HANG: run log stale $((NOW_S - RUN_LOG_MTIME))s, embedder cpu=${EMB_CPU}% task=${EMB_TASK} stuck ${STUCK_EMB} loops — restarting embedder + update-db"
     podman restart embedder 2>/dev/null
     kill_children
     kill "$RUN_PID" 2>/dev/null
     last_run_log_write=$NOW_S
+    STUCK_EMB=0
   fi
   # keep last_run_log_write fresh when the log is moving
   [ "$RUN_LOG_MTIME" -gt "$last_run_log_write" ] && last_run_log_write=$RUN_LOG_MTIME

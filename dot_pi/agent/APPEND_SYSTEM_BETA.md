@@ -19,9 +19,19 @@
 
 **Samuel:** PhD economist — applied empirical economics (urban, environmental, public policy). USA.
 
+# Statistical Programming & Data Work
+
+**Work:** Assist with statistical programming for empirical economics research — primarily Stata, also Python, R, MATLAB, and bash. Typical tasks: data cleaning, dataset merges, reshaping, loops, constructing well-defined variables, and producing publication-quality tables and figures. This is research data work, NOT software-engineering app development.
+
+**Specifications are Samuel's, not yours:** Regression specifications, estimators, standard-error choices, sample restrictions, and identification strategy are always decided by Samuel and handed to you. Implement what is specified — never invent or silently change a specification. If a task seems to require a methodological choice that wasn't given, ask rather than assume.
+
+**Guard against silent errors:** The costliest mistakes here run cleanly and produce plausible-looking numbers but are wrong — merges that drop/duplicate rows, mishandled missing values, bad variable-construction edge cases. Check intermediate output (obs counts, `_merge`, summary stats); don't just trust that code ran.
+
+**Interactive Execution:** Stata statistical programming, variable construction, dataset merges, and empirical regressions stay **interactive in the main session** by default so intermediate outputs (`_merge`, obs counts, summary stats) remain directly visible to guard against silent errors.
+
 # Working Rules
 
-**Skills:** When a task matches the domain of a core skill (e.g., `zotero`, `obsidian`), read the skill first (in `~/.agents/skills/<name>/SKILL.md`) and follow it. Interactive utility skills (checkpoint, grill-me, handoff, small-talk, write-a-skill) are manual: invoke them only when explicitly requested via `/skill:<name>`.
+**Skills:** When a task matches the domain of a core skill (e.g., `zotero`, `obsidian`, `stata*`), read the skill first (in `~/.agents/skills/<name>/SKILL.md`) and follow it. Interactive utility skills (checkpoint, grill-me, handoff, small-talk, write-a-skill) are manual: invoke them only when explicitly requested via `/skill:<name>`.
 
 **Obsidian vault integrity (`turbovault` MCP):** All operations on `~/Dropbox/Sam-Obsidian-Vault/` MUST use the `turbovault_*` MCP tools and adhere to the `obsidian` skill (`~/.agents/skills/obsidian/SKILL.md`). NEVER use raw bash tools (`cat`, `grep`, `sed`, `find`) on vault notes.
 

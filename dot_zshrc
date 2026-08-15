@@ -181,7 +181,7 @@ fi
 [[ -S "$SSH_AUTH_SOCK" ]] && { ssh-add -l &>/dev/null || SSH_ASKPASS_REQUIRE=never ssh-add ~/.ssh/id_ed25519 &>/dev/null; }
 
 
-# Local LLM (Ramalama / OpenCode / Aider) — §2.B, §2.D, §2.F
+# Local LLM (Ramalama) — §2.B, §2.D, §2.F
 # OPENAI_API_KEY is set in ~/.zshenv.local (placeholder for local llama.cpp compat)
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
 MTP_OPTS="-ngl 999 --no-mmap --direct-io --kv-unified -fa 1 -ub 2048 -b 8192 --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75 -t 16 --slot-prompt-similarity 0.8 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048 --context-shift --cache-ram 0"
@@ -204,12 +204,12 @@ QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0
 # Qwen3.8 official recommended sampling (thinking mode: temp 1.0, top-p 0.95, top-k 20, min-p 0, pres-pen 0)
 QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 MTP_OPTS="$MTP_OPTS $REASONING_OPTS"
-CTX=262144  # context window for the server (applies to ALL clients: WebUI, OpenCode, etc.)
+CTX=262144  # context window for the server (applies to ALL clients: WebUI, etc.)
 
 # Stop the MAIN-model container (only) AND wait for :8080 to release before re-serving.
 # Stops just 'llm' (not --all) so the :8081 autocomplete model survives a main-model swap.
 # Without the wait, ramalama serve races the old socket, finds 8080 "busy", and
-# silently auto-assigns a random port — breaking every client (WebUI/OpenCode/aider).
+# silently auto-assigns a random port — breaking every client (WebUI, etc.).
 _llm_reset() {
   echo "Pulling latest $RAMA_IMG …"
   podman pull "$RAMA_IMG"
@@ -343,12 +343,30 @@ serve-reranker() {
 }
 alias stop-reranker='ramalama stop reranker'
 
+# 72B vision model for figure schema extraction (zotero-vlm-enrich.py → :8084).
+# Qwen2.5-VL-72B-Instruct Q6_K (~58 GB GGUF, 2 shards — ramalama walks split parts);
+# ramalama auto-attaches the mmproj-F16 vision projector. NOTE: the official
+# Qwen org repo does NOT exist (404) — use the unsloth repo like the rest of the stack.
+# Offline batch only: serve-vlm → run zotero-vlm-enrich.py → stop-vlm (releases ~58 GB RAM).
+# Served id: unsloth/Qwen2.5-VL-72B-Instruct-GGUF
+VLM_MODEL="hf://unsloth/Qwen2.5-VL-72B-Instruct-GGUF:Q6_K"
+serve-vlm() {
+  echo "Pulling latest $RAMA_IMG …"
+  podman pull "$RAMA_IMG"
+  ramalama stop vlm 2>/dev/null
+  local i=0
+  while ss -tln 2>/dev/null | grep -q ':8084 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
+  ramalama serve -d -n vlm -p 8084 --image "$RAMA_IMG" --ctx-size 8192 "$VLM_MODEL" \
+    && echo "▶ serving VLM (Qwen2.5-VL-72B Q6_K) at http://localhost:8084/v1"
+}
+alias stop-vlm='ramalama stop vlm'
+
 
 # Show exactly which model file and settings are loaded on each port.
 # Parses both the /v1/models API and the host process list for the exact .gguf name and MTP status.
 model-check() {
   local p name id tag full_cmd exact_file mtp_status p_status
-  for entry in "8080:main" "8081:autocomplete" "8082:embedder" "8083:reranker"; do
+  for entry in "8080:main" "8081:autocomplete" "8082:embedder" "8083:reranker" "8084:vlm"; do
     p="${entry%%:*}"; name="${entry##*:}"
     
     # Get the base ID from the API to confirm it is actually responding
@@ -806,9 +824,12 @@ lem-unload() {
     print -r -- "$out" | python3 -c 'import sys, json; print(json.load(sys.stdin).get("message", "(no response)"))' 2>/dev/null \
       || print -r -- "$out"
   fi
-  # Hardened: Force-kill any lingering orphan llama-server processes (inside container & host)
+  # Hardened: kill lemonade's engine inside its own container only.
+  # DO NOT pkill llama-server host-wide: ramalama support models (embedder :8082,
+  # reranker :8083, vlm :8084) also run llama-server inside their containers, and
+  # a host-wide pkill nukes them (2026-08-15: lem-unload killed all three; the
+  # embedder/reranker containers self-removed via --rm).
   podman exec lemonade pkill -9 llama-server 2>/dev/null || true
-  pkill -9 llama-server 2>/dev/null || true
   echo "RAM cleared & orphan engine processes terminated."
 }
 
@@ -857,18 +878,25 @@ _lem_preload() {
       "medium  balanced reasoning" \
       "low     fast / concise reasoning" \
       "off     instruct mode (no thinking)") || return 1
+    # NB: JSON cannot travel inside llamacpp_args — Lemonade's arg tokenizer eats
+    # the quotes (github.com/lemonade-sdk/lemonade issue #1939; still broken in
+    # 10.8.0). Reasoning effort is baked into per-effort jinja variants instead:
+    #   xhigh   = base template default (no override needed)
+    #   medium/low/off = qwen3.8-froggeric-v22-{medium,low,off}.jinja
+    # --chat-template-file (a plain path) survives tokenization and overrides the
+    # recipe's template at load time.
     case "${effort%%[ ]*}" in
       xhigh)
-        args+=" $QWEN38_SAMPLING --chat-template-kwargs {\"reasoning_effort\":\"xhigh\"}"
+        args+=" $QWEN38_SAMPLING"
         ;;
       medium)
-        args+=" $QWEN38_SAMPLING --chat-template-kwargs {\"reasoning_effort\":\"medium\"}"
+        args+=" $QWEN38_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-medium.jinja"
         ;;
       low)
-        args+=" $QWEN38_SAMPLING --chat-template-kwargs {\"reasoning_effort\":\"low\"}"
+        args+=" $QWEN38_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-low.jinja"
         ;;
       off)
-        args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-kwargs {\"enable_thinking\":false}"
+        args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
         ;;
     esac
   elif [[ "$id" == Qwen* || "$id" == DeepSeek* ]]; then
@@ -1076,7 +1104,7 @@ beta() {
     "2   write to dir  +  no read elsewhere   +  Stata binary mounted") || return 1
   level="${level%%[ ]*}"
 
-  pi-safe-stata-${level} "${abs_target}" --model "$model_flag" "${@:2}"
+  pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}"
   printf '\a' > /dev/tty
 }
 
@@ -1177,7 +1205,7 @@ betahat() {
   mkdir -p "$_state_dir"
   local _state_file="$_state_dir/$$.state"
   printf 'type=betahat\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
-  { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
+  { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --thinking "$thinking_choice" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; printf '\a' > /dev/tty }
 }
 

@@ -50,7 +50,7 @@ BibTeX entries include a `file =` field pointing at the linked PDF path, which i
 
 `advanced_search` takes `conditions: [{field, operation, value}]` joined by `join_mode: "all"|"any"`. Fields include title, creator, date, dateAdded, dateModified, tag, itemType, publicationTitle, abstractNote, collection. Operations (exhaustive): `is`, `isNot`, `contains`, `doesNotContain`, `beginsWith`, `endsWith`, `isGreaterThan`, `isLessThan`, `isBefore`, `isAfter`. For "added in the last N days" use `dateAdded` + `isAfter` + an ISO date. Sort with `sort_by`/`sort_direction`; `limit` defaults to 50, max 500.
 
-Semantic-search scoping notes: `collection` takes an 8-character collection KEY and includes subcollections, resolved DB-side. Find keys with `search_collections` or `get_collections`. A weak match inside a scoped search correctly returns a low or negative relevance score — treat that as an honest "not in this collection" signal rather than a result.
+Semantic-search scoping notes: `collection` takes an 8-character collection KEY and includes subcollections, resolved DB-side. Known keys live in `references/collections.md`; `zotero_read_zotero_collections` refreshes them (no params); `search_collections` / `get_collections` find unknown names. A weak match inside a scoped search correctly returns a low or negative relevance score — treat that as an honest "not in this collection" signal rather than a result.
 
 ## Resolving attachment paths
 
