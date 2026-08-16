@@ -3,6 +3,8 @@
     "mcp-stata": {
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp<2",
         "mcp-stata"
       ],
       "env": {
