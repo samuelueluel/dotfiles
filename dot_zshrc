@@ -87,10 +87,6 @@ bindkey '^F' autosuggest-accept
 source /home/linuxbrew/.linuxbrew/opt/fzf-tab/share/fzf-tab/fzf-tab.zsh
 [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
-# Recommended options
-unsetopt BEEP
-setopt NOMATCH
-setopt EXTENDED_GLOB
 
 # Starship prompt
 if command -v starship >/dev/null; then
@@ -181,121 +177,17 @@ fi
 [[ -S "$SSH_AUTH_SOCK" ]] && { ssh-add -l &>/dev/null || SSH_ASKPASS_REQUIRE=never ssh-add ~/.ssh/id_ed25519 &>/dev/null; }
 
 
-# Local LLM (Ramalama) — §2.B, §2.D, §2.F
+# Local LLM Support Models (Ramalama) & Shared Sampling Profiles
 # OPENAI_API_KEY is set in ~/.zshenv.local (placeholder for local llama.cpp compat)
 RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
-MTP_OPTS="-ngl 999 --no-mmap --direct-io --kv-unified -fa 1 -ub 2048 -b 8192 --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75 -t 16 --slot-prompt-similarity 0.8 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048 --context-shift --cache-ram 0"
-# Cap thinking tokens to prevent infinite reasoning loops (post-Apr-10 llama.cpp bug: default budget = -1/unrestricted).
-# 50000 is a loop-breaker, not a target: clears even very long legitimate reasoning, still well below a true (unbounded) runaway.
-REASONING_OPTS="--reasoning on --reasoning-budget 50000"
-# Injected verbatim BEFORE the </think> tag when the budget is hit — the model reads it as its own thought, then answers.
-# So it must be natural first-person prose (the "Wait," cue redirects thinking models well), NOT a bracketed token.
-# Passed via --env, not --runtime-args, so it can keep its spaces: ramalama word-splits --runtime-args. (llama.cpp: LLAMA_ARG_THINK_BUDGET_MESSAGE)
-THINK_BUDGET_MSG="Wait, I've used my full reasoning budget and I'm starting to loop. I already have enough to answer well, so I'll stop thinking now and write my final response."
-# Qwen3.6 reasoning-model sampling (coding-tuned). Set SERVER-SIDE because these are llama.cpp DEFAULTS that
-# only apply when a client omits the field — so GUI clients (Open WebUI etc.) that send their own values still win,
-# and this effectively only reaches clients that send nothing (e.g. Pi, which has no sampling config — feature req #1837).
-# Values per Qwen thinking-mode guidance (temp 0.6 / top_p 0.95 / top_k 20 / min_p 0).
-# Presence penalty 0 per 2026 guidance — penalties hurt code (punish legit repetition of
-# identifiers/brackets/boilerplate); loop control comes from temp 0.6 (non-greedy) + the
-# reasoning budget. Do NOT lower temp toward 0 — greedy decoding makes Qwen reasoning models loop.
-# Applied to Qwen3.6 local models (guarded in _lem_preload / serve fns).
+
+# Shared reasoning-model sampling parameters (used in _lem_preload)
+# Qwen3.6 thinking-mode guidance (temp 0.6 / top_p 0.95 / top_k 20 / min_p 0 / pres-pen 0)
 QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
-# Qwen3.8 official recommended sampling (thinking mode: temp 1.0, top-p 0.95, top-k 20, min-p 0, pres-pen 0)
+# Qwen3.8 official recommended sampling (thinking mode: temp 1.0 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
 QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
-# DeepSeek-V4-Flash official recommended agentic/thinking sampling (temp 1.0, top-p 0.95, top-k 20, min-p 0, pres-pen 0)
+# DeepSeek-V4-Flash official recommended agentic/thinking sampling (temp 1.0 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
 DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
-MTP_OPTS="$MTP_OPTS $REASONING_OPTS"
-CTX=262144  # context window for the server (applies to ALL clients: WebUI, etc.)
-
-# Stop the MAIN-model container (only) AND wait for :8080 to release before re-serving.
-# Stops just 'llm' (not --all) so the :8081 autocomplete model survives a main-model swap.
-# Without the wait, ramalama serve races the old socket, finds 8080 "busy", and
-# silently auto-assigns a random port — breaking every client (WebUI, etc.).
-_llm_reset() {
-  echo "Pulling latest $RAMA_IMG …"
-  podman pull "$RAMA_IMG"
-  ramalama stop llm 2>/dev/null
-  local i=0
-  while ss -tln 2>/dev/null | grep -q ':8080 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-}
-
-# NOTE: The Qwen3.6 chat-template fix (froggeric) is applied by overwriting the
-# chat_template_extracted blob in ramalama's store, NOT here. ramalama already mounts
-# that blob into the container and auto-passes --chat-template-file, so a custom flag
-# pointing at a host path would fail (host path isn't mounted in the container).
-# Re-apply after a model re-pull: see ~/.local/share/ramalama/README-qwen-template.md
-serve-llm() {
-  _llm_reset
-  local samp=""; [[ "$1" == *Qwen3.6* ]] && samp=" $QWEN_SAMPLING"  # Qwen3.6 only (MoE + Dense, MTP path)
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --env "LLAMA_ARG_THINK_BUDGET_MESSAGE=$THINK_BUDGET_MSG" --runtime-args="$MTP_OPTS$samp" "$1" \
-    && echo "▶ serving $1 (MTP, ctx $CTX) at http://localhost:8080/v1"
-}
-serve-llm-nospec() {  # same model, MTP off — for quality A/B vs the MTP-on alias
-  _llm_reset
-  local p_opts="${PARALLEL_OPTS:---parallel 1}"
-  local samp=""; [[ "$1" == *Qwen3.6* ]] && samp=" $QWEN_SAMPLING"  # Qwen3.6 only (MoE + Dense, no-MTP path)
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --env "LLAMA_ARG_THINK_BUDGET_MESSAGE=$THINK_BUDGET_MSG" --runtime-args="$p_opts $REASONING_OPTS$samp" "$1" \
-    && echo "▶ serving $1 (no MTP, ctx $CTX, $p_opts) at http://localhost:8080/v1"
-}
-serve-llm-draft() {  # speculative decoding with a separate draft model
-  echo "Ensuring draft model $2 is pulled..."
-  ramalama pull "$2"
-  _llm_reset
-  local samp=""; [[ "$1" == *Qwen3.6* ]] && samp=" $QWEN_SAMPLING"  # Qwen3.6 guard
-  ramalama serve -d -n llm -p 8080 --image "$RAMA_IMG" --ctx-size "$CTX" --env "LLAMA_ARG_THINK_BUDGET_MESSAGE=$THINK_BUDGET_MSG" --runtime-args="$MTP_OPTS $3$samp" --model-draft "$2" "$1" \
-    && echo "▶ serving $1 with draft $2 (MTP, ctx $CTX) at http://localhost:8080/v1"
-}
-# Interactive main-model picker — gum menus for model / quant / MTP / parallel slots.
-# Replaces the 20 individual serve-* aliases. Usage: serve-local
-serve-local() {
-  local model_key quant mtp parallel uri draft_uri mtp_opts_local
-  local -a quant_opts
-
-  model_key=$(gum choose \
-    --header "serve · model" \
-    "qwen-moe    Qwen3.6 MoE 35B-A3B" \
-    "qwen-dense  Qwen3.6 Dense 27B") || return 1
-  model_key="${model_key%%[ ]*}"
-
-  case "$model_key" in
-    qwen-moe)   quant_opts=("Q4" "Q8") ;;
-    qwen-dense) quant_opts=("Q4" "Q6" "Q8") ;;
-  esac
-
-  if [[ ${#quant_opts[@]} -gt 1 ]]; then
-    quant=$(gum choose --header "serve · quantization" "${quant_opts[@]}") || return 1
-  else
-    quant="${quant_opts[1]}"
-  fi
-
-  mtp=$(gum choose --header "serve · MTP (multi-token prediction)" "on" "off") || return 1
-  parallel=$(gum choose --header "serve · parallel slots" "1" "2") || return 1
-
-  # Resolve URIs
-  case "$model_key-$quant" in
-    qwen-moe-Q4)    uri="hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL" ;;
-    qwen-moe-Q8)    uri="hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL" ;;
-    qwen-dense-Q4)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL"     ;;
-    qwen-dense-Q6)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL"     ;;
-    qwen-dense-Q8)  uri="hf://unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL"     ;;
-  esac
-
-  if [[ "$mtp" == "on" ]]; then
-    # Qwen MoE Q8: cap spec-draft-n-max at 2 — n=3 benchmarked slower on Vulkan
-    # (extra draft token compute overhead outweighs acceptance gain vs ROCm)
-    if [[ "$model_key-$quant" == "qwen-moe-Q8" ]]; then
-      mtp_opts_local="${MTP_OPTS/--spec-draft-n-max 3/--spec-draft-n-max 2} --parallel $parallel"
-    else
-      mtp_opts_local="$MTP_OPTS --parallel $parallel"
-    fi
-    MTP_OPTS="$mtp_opts_local" serve-llm "$uri"
-  else
-    PARALLEL_OPTS="--parallel $parallel" serve-llm-nospec "$uri"
-  fi
-}
-
-alias stop-main='ramalama stop llm'  # stops whichever main model (:8080) is loaded
 
 # Small FIM autocomplete model for Zed (Continue → :8081). Runs on the iGPU ALONGSIDE
 # the main model, on its own name/port so a main-model swap doesn't evict it. No MTP (not an
@@ -367,8 +259,8 @@ alias stop-vlm='ramalama stop vlm'
 # Show exactly which model file and settings are loaded on each port.
 # Parses both the /v1/models API and the host process list for the exact .gguf name and MTP status.
 model-check() {
-  local p name id tag full_cmd exact_file mtp_status p_status
-  for entry in "8080:main" "8081:autocomplete" "8082:embedder" "8083:reranker" "8084:vlm"; do
+  local p name id full_cmd exact_file
+  for entry in "8081:autocomplete" "8082:embedder" "8083:reranker" "8084:vlm"; do
     p="${entry%%:*}"; name="${entry##*:}"
     
     # Get the base ID from the API to confirm it is actually responding
@@ -380,37 +272,13 @@ model-check() {
       continue
     fi
     
-    # Grab the running command to find the true filename and MTP status
+    # Grab the running command to find the true filename
     full_cmd=$(ps -eo args | grep "[l]lama-server" | grep -- "--port $p" | head -1)
     
     if [[ -n "$full_cmd" ]]; then
       exact_file=$(echo "$full_cmd" | grep -o -- '--model [^ ]*' | cut -d' ' -f2 | xargs basename 2>/dev/null)
       [[ -z "$exact_file" ]] && exact_file="$id"
-      
-      if echo "$full_cmd" | grep -q "draft-mtp"; then
-        mtp_status=" [MTP: ON]"
-      else
-        [[ "$p" == 8080 ]] && mtp_status=" [MTP: OFF]" || mtp_status=""
-      fi
-      
-      tag=""
-      [[ "$p" == 8080 ]] && { [[ "$id" == *A[0-9]*B* ]] && tag=" (MoE)" || tag=" (dense)"; }
-      
-      p_status=""
-      if [[ "$p" == 8080 ]]; then
-        local parallel_slots="1"
-        if echo "$full_cmd" | grep -q -- "--parallel"; then
-          parallel_slots=$(echo "$full_cmd" | grep -o -- '--parallel [0-9]*' | cut -d' ' -f2)
-        fi
-        local actual_ctx=$(curl -sf "http://localhost:$p/props" 2>/dev/null | jq -r '.default_generation_settings.n_ctx' 2>/dev/null)
-        if [[ -n "$actual_ctx" && "$actual_ctx" != "null" ]]; then
-          p_status=" [p${parallel_slots} | $(( actual_ctx / 1000 ))k ctx]"
-        else
-          p_status=" [p${parallel_slots}]"
-        fi
-      fi
-      
-      printf '  :%s  %-13s %s%s%s%s\n' "$p" "$name" "$exact_file" "$tag" "$mtp_status" "$p_status"
+      printf '  :%s  %-13s %s\n' "$p" "$name" "$exact_file"
     else
       # Fallback if parsing fails but API responded
       printf '  :%s  %-13s %s\n' "$p" "$name" "$id"
