@@ -66,3 +66,4 @@ All subfolders created by agents must use clean, semantic **`Title-Case-With-Hyp
 * **Location:** `~/Dropbox/Sam-Obsidian-Vault/02_Memories/`
 * **Filename:** `Topic-Slug.md` or `YYYY-MM-DD-slug.md`.
 * **Append Rule:** If a note on that topic already exists, append the new information to the existing note rather than creating a duplicate.
+* **Epistemic Status:** Notes in `02_Memories/` are historical scratchwork and captures; verify against current system state and do not treat as immutable ground truth.

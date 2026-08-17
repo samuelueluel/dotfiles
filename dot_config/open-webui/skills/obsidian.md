@@ -11,12 +11,14 @@ description: Manage Samuel's Obsidian vault notes in Open WebUI — searching, r
 - **Filename:** `Title-Case-With-Hyphens.md` (e.g., `Local-LLMs.md`). Academic pattern: `Author-Year.md` or `Author-Year-Slug.md` (e.g., `Baker-2025-DiD.md`). Brief — folder provides context. No spaces or special characters.
 - **Title:** The filename acts as the title. **Do not** repeat it as a heading. Start the note body directly at `H1` (`#`).
 
+---
+
 ## Folder Architecture
 
 Use top-level folders appropriately:
 - `00_Inbox/`: Fleeting / unprocessed notes
-- `01_Todo/`: Active tasks
-- `02_Memories/`: Domain-agnostic persistent memory store for LLM agents and system discoveries
+- `01_Todo/`: Active tasks (`Todo.md`, `Buy.md`, `Remember.md`)
+- `02_Memories/`: Domain-agnostic persistent memory store for LLM agents, system discoveries, and benchmarks
 - `10_Projects/`: Active projects (one subfolder per project) — moves to `90_Archive/` upon completion
 - `20_Library/`: Reference, academic literature (`Modern-DiD-Lit`, `New-Econometric-Lit`), topic notes
 - `30_Personal/`: Personal notes (`Personal-Admin`, `Personal-Interests`, `Family`)
@@ -25,6 +27,14 @@ Use top-level folders appropriately:
 
 Subfolders use clean semantic `Title-Case-With-Hyphens` by default. Samuel personally manages numeric/alphanumeric prefixes (`00_`, `01_`, `z_`) for pinning—never strip, alter, or rename user prefixes.
 **Never** create new top-level folders without asking Samuel.
+
+---
+
+## Agent Memories Protocol (`02_Memories/`)
+
+When Samuel says *"remember this"* or *"save this"*, write to `02_Memories/<Topic-Slug>.md`. If a note on that topic already exists, append the new information to the existing note rather than creating a duplicate.
+
+---
 
 ## Formatting & Styling Rules
 
@@ -44,14 +54,17 @@ Subfolders use clean semantic `Title-Case-With-Hyphens` by default. Samuel perso
   - External links must use `http://` or `https://` explicitly
   - Callouts: `> [!note] Label` (types: note, info, warning, success, question, example, quote; add `-` to collapse by default)
 
+---
+
 ## Obsidian MCP Tools (`obsidian_*`)
 
 All vault operations route through the `obsidian_*` MCP tools (the turbovault pair: `obsidian-ro` read-only, `obsidian-full` for writes). **Never** use shell commands (`find`, `grep`, `cat`, `sed`, `ls`) against the vault.
 
-- **Search Notes:** `obsidian_search` (full-text) or `obsidian_search_by_frontmatter`
+- **Search Notes:** `obsidian_search` (full-text), `obsidian_search_by_frontmatter`, or `obsidian_query_frontmatter_sql`
 - **Read Note:** `obsidian_read_note`
 - **Write / Create Note:** `obsidian_write_note` — requires a non-empty `commit_message`; overwriting an existing note requires `expected_hash` from a prior read, or `force: true`
 - **Edit Note:** `obsidian_edit_note` — SEARCH/REPLACE diff blocks, not JSON: `<<<<<<< SEARCH` + old text + `=======` + new text + `>>>>>>> REPLACE` (one block per change)
+- **Batch Operations:** `obsidian_batch_execute` — multi-file atomic operations (e.g. project transitions to archive)
 - **Delete / Move:** `obsidian_delete_note` (requires `confirm_path`), `obsidian_move_note` — write ops, available on `obsidian-full`
 - **Frontmatter & Tags:** `obsidian_update_frontmatter`, `obsidian_manage_tags`
 - **Backlinks & Health:** `obsidian_get_backlinks`, `obsidian_quick_health_check`
@@ -61,6 +74,8 @@ Operational rules:
 - **Tags:** assign frontmatter `tags:` exclusively from canonical flat baseline: `pin`, `to-read`, `to-do`, `moc`, `python`, `stata`, `latex`, `linux`, `probability`, `econometrics`, `economics`, `math`. All `00_` notes require `moc`. Never use inline `#tags` in prose.
 - **Git divergence guard:** a write can fail with "working-tree path differs from HEAD" (e.g. an external writer touched the note). Don't fight it — tell the user; commit or restore the change, then retry.
 - If the `obsidian_*` tools are unavailable, stop and tell the user rather than touching vault files by other means.
+
+---
 
 ## LLM Tone & Aesthetics
 - Avoid generic LLM markers: no emdashes (`—`), no negative parallelisms ("not only X but Y"), no emojis.

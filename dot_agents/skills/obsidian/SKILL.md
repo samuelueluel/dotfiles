@@ -11,6 +11,7 @@ When creating or updating notes in `~/Dropbox/Sam-Obsidian-Vault/`:
 * **Tooling:** Always use `turbovault_*` MCP tools with descriptive `commit_message` parameters.
 * **Naming:** `Title-Case-With-Hyphens.md` (no spaces/symbols). Literature: `Author-Year-Slug.md`. Memories/Logs: `Topic-Slug.md` or `YYYY-MM-DD-slug.md`.
 * **Title:** Filename serves as note title. Start note body directly at `H1` (`#`).
+* **Description:** 1–2 sentence frontmatter `description:` for `10_Projects/`, `20_Library/`, and `02_Memories/` (omit for `00_`, `01_`, `30_`).
 * **Emphasis:** No standard bolding (`**bold**`). Use `~={green}active/labels=~` and `~={magenta}warnings=~`.
 
 ---
@@ -34,12 +35,14 @@ When creating or updating notes in `~/Dropbox/Sam-Obsidian-Vault/`:
 - [ ] Determine correct folder bucket before creating note.
 - [ ] Use `turbovault_write_note` (or `turbovault_batch_execute`) with non-empty `commit_message`.
 - [ ] Set frontmatter `created` timestamp on create; refresh `updated` timestamp on edit (`YYYY-MM-DDTHH:MM:SS`).
-- [ ] Assign frontmatter `tags:` exclusively from canonical flat baseline (`pin`, `to-read`, `to-do`, `moc`, `python`, `stata`, `latex`, `linux`, `probability`, `econometrics`, `economics`, `math`). All `00_` notes require `moc`. No inline `#tags`.
+- [ ] Add 1–2 sentence `description:` for `10_Projects/`, `20_Library/`, and `02_Memories/` (omit for `00_`, `01_`, `30_`).
+- [ ] Assign relevant frontmatter `tags:` from canonical baseline when appropriate (`pin`, `to-read`, `to-do`, `moc`, `python`, `stata`, `latex`, `linux`, `probability`, `econometrics`, `economics`, `math`). All `00_` notes require `moc`. Tags are optional if none apply cleanly. No inline `#tags`.
 - [ ] Keep headings plain text for compatibility with the Obsidian Number Headings plugin; never alter existing heading numbers.
 - [ ] Strictly use closed color palette: `~={green}text=~` (labels/emphasis) and `~={magenta}text=~` (hazards). No standard bolding (`**bold**`).
 
 ### 3. Agent Memories Protocol
-When Samuel says *"remember this"* or *"save this"*, write to `02_Memories/<Topic-Slug>.md`. If a note on that topic exists, append to it rather than creating a duplicate.
+* **Capture:** When Samuel says *"remember this"* or *"save this"*, write to `02_Memories/<Topic-Slug>.md`. If a note on that topic exists, append to it rather than creating a duplicate.
+* **Epistemic Status:** Notes in `02_Memories/` are historical scratchwork and captures; verify against current system state and do not treat as immutable ground truth.
 
 ---
 

@@ -72,6 +72,7 @@ All metadata and tags must reside exclusively in the YAML frontmatter block at t
 ---
 created: 2026-08-16T17:35:00
 updated: 2026-08-16T17:35:00
+description: "Concise 1–2 sentence summary of core takeaway, model, or discovery."
 tags:
   - econometrics
   - stata
@@ -80,9 +81,26 @@ tags:
 ```
 
 * **`created` / `updated`:** Formatted as `YYYY-MM-DDTHH:MM:SS` (zero-padded local time, no timezone or milliseconds). Agent owned.
-* **`tags`:** A YAML list of clean, flat, lowercase strings selected from the canonical baseline below.
+* **`description`:** Concise 1–2 sentence plain-text summary (scoped to specific folders; see below).
+* **`tags`:** A YAML list of clean, flat, lowercase strings selected from the canonical baseline below (optional when no tag cleanly applies).
 
-### B. Canonical Baseline Tag Vocabulary
+### B. Description Field Policy
+
+* **Required Scope:** `10_Projects/`, `20_Library/`, and `02_Memories/` (creates high-signal catalogs for fast token-efficient `turbovault_query_frontmatter_sql` scans and research subagents).
+* **Omitted Scope:** `00_Inbox/`, `01_Todo/`, `30_Personal/` (keep personal and transient notes frictionless).
+* **Formatting Rules:**
+  * Strict length: 1–2 plain text sentences maximum.
+  * Always wrap in double quotes (`"..."`).
+  * Plain text only: **no wikilinks, inline formatting, or markdown** inside the description string to prevent SQLite/Dataview parsing issues.
+* **Domain Guidelines & Examples:**
+  * `20_Library/`: Core takeaway, estimator, theorem, or identification strategy.
+    * *Example:* `description: "Derives bounds on unobservable selection (delta) using R-squared movements and coefficient stability under proportional selection."`
+  * `10_Projects/`: Research question, data sources, empirical specification, or deliverable status.
+    * *Example:* `description: "Working paper evaluating Detroit land-value tax reform using parcel microdata and spatial difference-in-differences."`
+  * `02_Memories/`: High-level summary of configuration, workflow discovery, hardware tweak, or system benchmark.
+    * *Example:* `description: "Resolves ALSA/PipeWire audio crackling on AMD Ryzen AI MAX+ by tuning buffer quantum and headroom settings."`
+
+### C. Canonical Baseline Tag Vocabulary
 
 | Category | Tag | Definition & Scope |
 | :--- | :--- | :--- |
@@ -99,9 +117,10 @@ tags:
 | | `economics` | Notes related to non-data econ theory like microeconomics, urban economics, etc. |
 | | `math` | Catchall for math notes, can include probability theory notes. |
 
-### C. Tagging Rules
+### D. Tagging Rules
 * **Flat Lowercase Format:** Use simple flat strings without prefixes or slashes (e.g., `econometrics`, `pin`, `to-read`).
 * **Frontmatter Only:** Always declare tags in YAML frontmatter; never embed inline `#tag` tokens in markdown prose.
+* **Optional by Default:** Apply tags when they cleanly describe the note. Notes may omit `tags:` if no canonical tag applies cleanly (except `00_` MOC notes where `moc` is mandatory).
 * **MOC Requirement:** All `00_` Map of Content / Hub notes must include the `moc` tag.
 * **Prefer the Baseline:** Always prefer existing tags from the canonical baseline before creating new domain tags.
 

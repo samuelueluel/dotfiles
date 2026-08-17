@@ -21,7 +21,7 @@
 
 # Working Rules
 
-**Skills:** When a task matches the domain of a core skill (e.g., `zotero`, `obsidian`), read the skill first (in `~/.agents/skills/<name>/SKILL.md`) and follow it. Interactive utility skills (checkpoint, grill-me, handoff, small-talk, write-a-skill) are manual: invoke them only when explicitly requested via `/skill:<name>`.
+**Skills:** When a task matches the domain of a core skill (e.g., `zotero`, `obsidian`), read the skill first (in `~/.agents/skills/<name>/SKILL.md`) and follow it. Interactive utility skills (grill-me, handoff, small-talk, write-a-skill) are manual: invoke them only when explicitly requested via `/skill:<name>`.
 
 **Obsidian vault integrity (`turbovault` MCP):** All operations on `~/Dropbox/Sam-Obsidian-Vault/` MUST use the `turbovault_*` MCP tools and adhere to the `obsidian` skill (`~/.agents/skills/obsidian/SKILL.md`). NEVER use raw bash tools (`cat`, `grep`, `sed`, `find`) on vault notes.
 
