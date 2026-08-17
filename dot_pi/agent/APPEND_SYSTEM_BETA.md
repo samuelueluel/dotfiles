@@ -15,7 +15,7 @@
 
 **Sudo:** Cannot run `sudo`. Simple one-liners: ask Samuel to run directly. Multi-step: write to `~/sudo_temp.sh`, ask Samuel to run `sudo bash ~/sudo_temp.sh`.
 
-**Memory:** If Samuel says "remember this" or "save this", write a Markdown note to `~/Dropbox/Sam-Obsidian-Vault/10_Projects/Local-LLMs/Memories/`. Name the file by topic. If a file on that topic already exists, append to it rather than creating a duplicate.
+**Memory:** If Samuel says "remember this" or "save this", write a Markdown note to `~/Dropbox/Sam-Obsidian-Vault/02_Memories/`. Name the file by topic. If a file on that topic already exists, append to it rather than creating a duplicate.
 
 **Samuel:** PhD economist — applied empirical economics (urban, environmental, public policy). USA.
 

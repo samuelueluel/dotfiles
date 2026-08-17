@@ -1,95 +1,50 @@
 ---
 name: obsidian
-description: Manages reading, writing, creating, editing, listing, and modifying files and directories in Samuel&apos;s Obsidian vault at `~/Dropbox/Sam-Obsidian-Vault/`. Use when working with Obsidian, markdown vault notes, creating new notes, filing documents, or following vault formatting and naming conventions.
+description: Manage notes, documents, and folder organization in Samuel's Obsidian vault at ~/Dropbox/Sam-Obsidian-Vault/ using TurboVault MCP and the Hybrid Johnny.Decimal / PARA framework. Use when creating, reading, editing, moving, or organizing vault notes, filing literature, capturing memories, or structuring directories.
 ---
 
 # Obsidian Vault
 
 ## Quick start
 
-When creating or editing a note, follow these core conventions:
-- **Location:** `~/Dropbox/Sam-Obsidian-Vault/`
-- **Filename:** Title-Case-With-Hyphens.md (e.g., `Local-LLMs.md`). Brief — folder provides context. No spaces or special characters.
-  - Academic pattern: `Author-Year.md` or `Author-Year-Slug.md` (e.g., `Baker-2025-DiD.md`)
-- **Title:** The filename acts as the title. **Do not** repeat it as a heading. Start the note body directly at `H1` (`#`).
+When creating or updating notes in `~/Dropbox/Sam-Obsidian-Vault/`:
+* **Tooling:** Always use `turbovault_*` MCP tools with descriptive `commit_message` parameters.
+* **Naming:** `Title-Case-With-Hyphens.md` (no spaces/symbols). Literature: `Author-Year-Slug.md`. Memories/Logs: `Topic-Slug.md` or `YYYY-MM-DD-slug.md`.
+* **Title:** Filename serves as note title. Start note body directly at `H1` (`#`).
+* **Emphasis:** No standard bolding (`**bold**`). Use `~={green}active/labels=~` and `~={magenta}warnings=~`.
+
+---
 
 ## Workflows
 
-### 1. Determining Target Folder
-1. Infer appropriate folder by conversation context.
-2. If it is not clear, use top-level folders: 
-   - `00_Inbox/`: Fleeting / unprocessed notes
-   - `01_Todo/`: Active tasks
-   - `10_Projects/`: Projects (one subfolder per project)
-   - `20_Library/`: Reference, literature, topic notes
-   - `30_Personal/`: Personal notes (family, interests, etc.)
-3. Subfolders use hyphens and Title Case (e.g., `30_Personal/20_Personal-Interests`). Acronyms uppercase: `Local-LLMs`.
-4. **Never** create new top-level folders without asking.
+### 1. Determining Target Folder (Hybrid PARA)
+1. **Identify note purpose:**
+   * `00_Inbox/`: Transient / raw captures to triage later.
+   * `01_Todo/`: Short-term actionable tasks (`Todo.md`, `Buy.md`, `Remember.md`).
+   * `02_Memories/`: Agnostic agent memories, system setups, benchmarks, and workflows.
+   * `10_Projects/<Project-Name>/`: Active, deadline-driven work (`Paper-Detroit`, `Custom-Image`). Moves to `90_Archive/` on completion.
+   * `20_Library/<Topic>/`: Permanent reference material, academic literature (`Modern-DiD-Lit`, `New-Econometric-Lit`), theory.
+   * `30_Personal/<Area>/`: Indefinite life domains (`Personal-Admin`, `Personal-Interests`, `Family`).
+   * `90_Archive/`: Completed projects, retired configs, past applications.
+   * `98_Bases/` & `99_System/`: Dataview bases, templates, binary attachments (`Z_Attachments/`).
+2. **Subfolder Naming:** Use clean semantic `Title-Case-With-Hyphens` for agent-created subfolders.
+3. **Manual Prefix Exception:** Samuel personally manages prefixes (e.g., `00_`, `01_`, `z_`) to force sorting. Never strip, rename, or alter user-applied prefixes.
 
-### 2. Note Conventions
-- **Headings:** Use plain heading names — do not use markdown inline formatting in headings. Existing heading numbers (e.g., `# 1.`, `## 2.1.`) are automatically written into markdown files by Obsidian's **Number Headings** plugin — **do NOT remove, strip, or alter existing heading numbers** when editing existing notes. When creating brand new headings, write plain titles and allow the plugin to manage numbering. Replace placeholder titles with relevant titles.
-- **Color syntax** for formatting, avoiding `**bold**`. Exactly two colors, fixed meanings:
-  - `~={green}text=~` — emphasis: definitions, key terms, organizational labels.
-  - `~={magenta}text=~` — warnings and dangers only: things that can break or silently mislead (e.g. a command that can break something, a config key that is silently ignored).
-  - The palette is closed: green and magenta are the only allowed colors. Never use `orange`, `red`, `blue`, `pink`, etc., even though fast-text-color can render them.
-  - Highlight the key phrase, never a whole sentence or paragraph; at most one or two spans per paragraph. Tables stay plain.
-  - When editing an existing note with legacy colors, normalize in place: `orange` -> `green` (labels/emphasis); status flags (off/unconfirmed/retired/excluded) -> plain text or green; keep magenta only for true warnings.
-  Note the trailing `=~`.
-- **Lists:**
-  - Prefer bullets (`-`) unless order or sequence is meaningful — use numbered lists only when numbering matters.
-  - For nested lists, indent with a tab.
-  - When nesting, alternate list type (bullet → numbered or numbered → bullet) to visually distinguish levels.
+### 2. Note Creation & Mutation Checklist
+- [ ] Determine correct folder bucket before creating note.
+- [ ] Use `turbovault_write_note` (or `turbovault_batch_execute`) with non-empty `commit_message`.
+- [ ] Set frontmatter `created` timestamp on create; refresh `updated` timestamp on edit (`YYYY-MM-DDTHH:MM:SS`).
+- [ ] Assign frontmatter `tags:` exclusively from canonical flat baseline (`pin`, `to-read`, `to-do`, `moc`, `python`, `stata`, `latex`, `linux`, `probability`, `econometrics`, `economics`, `math`). All `00_` notes require `moc`. No inline `#tags`.
+- [ ] Keep headings plain text for compatibility with the Obsidian Number Headings plugin; never alter existing heading numbers.
+- [ ] Strictly use closed color palette: `~={green}text=~` (labels/emphasis) and `~={magenta}text=~` (hazards). No standard bolding (`**bold**`).
 
-### 3. Adding Links, Embeds, and Callouts
-- **Internal:** `[[wikilink]]` or `[[wikilink|alias]]`
-- **Embeds:** `![[filename.pdf]]`
-  - Collapsed embed: 
-    ```markdown
-    > [!info]- Title
-    > ![[file.pdf]]
-    ```
-- **External:** Must use `http://` or `https://` explicitly.
-- **Callouts:** 
-  ```markdown
-  > [!note] Label
-  > Content
-  ```
-  - Common types: note, info, warning, success, question, example, quote. Add `-` to collapse by default.
+### 3. Agent Memories Protocol
+When Samuel says *"remember this"* or *"save this"*, write to `02_Memories/<Topic-Slug>.md`. If a note on that topic exists, append to it rather than creating a duplicate.
 
-### 4. TurboVault MCP Tools (Mandatory Vault Substrate)
-You MUST ALWAYS connect to and use the `turbovault` MCP server for all vault operations. **DO NOT** execute raw shell commands (`find`, `grep`, `cat`, `ls`, `sed`, `awk`) against `~/Dropbox/Sam-Obsidian-Vault/`.
-
-- **Calling turbovault tools:** every tool is exposed with a `turbovault_` prefix — call `turbovault_search`, `turbovault_read_note`, `turbovault_write_note`, etc. (bare names like `search` return "Tool not found"). Every write operation (`turbovault_write_note`, `turbovault_edit_note`, `turbovault_delete_note`, `turbovault_move_note`, `turbovault_update_frontmatter`, `turbovault_batch_execute`) requires a non-empty `commit_message` — always pass one; `turbovault_delete_note` also requires `confirm_path`. Overwriting an existing note requires `expected_hash` from a prior read, or `force: true`. `turbovault_edit_note` takes `edits` as diff-style SEARCH/REPLACE blocks, not JSON: `<<<<<<< SEARCH` + old text + `=======` + new text + `>>>>>>> REPLACE` (one block per change). `turbovault_batch_execute` runs multiple operations (`CreateNote`, `WriteNote`, `DeleteNote`, `MoveNote`, `EditNote`, `UpdateLinks`, `UpdateFrontmatter`, `ManageTags`, `CreateFromTemplate`) as ONE atomic git commit (all-or-nothing); at most ONE operation per path per batch (same-path ops are refused with `intra-batch path collision`, and a create→modify chain on one path fails since later ops see the working tree, not staged state). Use it for independent multi-file batches, not pipelines.
-
-**Git-substrate divergence guard:** the git backend refuses any mutation whose working-tree file differs from HEAD (`working-tree path '<path>' differs from HEAD; commit, restore, or move the local change before retrying`). `expected_hash` does NOT bypass this check. Obsidian's `frontmatter-date-manager` used to trigger this on every body edit (auto-bumping `updated`); since 2026-08-13 `enableAutoUpdate: false` (with it off, FDM performs zero automatic writes — verified 2026-08-13: bare-note create, body edit, pre-stamped create all leave the tree clean; `enableCreateTime: true` so the manual button also adds `created`) and the AGENT owns timestamps instead — always set `created` (on create) and refresh `updated` (on every edit) frontmatter yourself, in exactly the plugin's format — `date +"%Y-%m-%dT%H:%M:%S"` (zero-padded local time, no milliseconds or timezone suffix; byte-identical to FDM's `dateFormat` output, so its parse→reformat is a no-op) — via `turbovault_update_frontmatter` or in the written content. Samuel can still bump manually: command palette or a hotkey bound to `frontmatter-date-manager:update-timestamps-current-file` (Obsidian Settings → Hotkeys). If the guard fires anyway (any external writer), commit or restore the change, then retry.
-
-- **Lazy loading:** `turbovault` is lazy-loaded — its server starts on first use. A direct `mcp call` to any turbovault tool (or an explicit `mcp connect turbovault`) auto-spawns the server and activates the full toolset for the session. Whenever the user's request concerns the vault (reading, searching, writing, organizing, linking, tags, templates), start with a turbovault `mcp call` — no separate connect step is required.
-- **Task → tool routing (use the `turbovault_` prefixed names):**
-  - Read a note → `turbovault_read_note`
-  - Search notes → `turbovault_search` (full-text) or `turbovault_advanced_search` (tags/frontmatter)
-  - Write/update → `turbovault_write_note` (overwrite/append/prepend) or `turbovault_edit_note` (targeted SEARCH/REPLACE)
-  - Multiple notes at once → sequential `turbovault_write_note` calls (each with its own `commit_message` / `expected_hash`) or `mcpScript` for batched MCP calls
-  - Move/rename → `turbovault_move_note`
-  - Templates → `turbovault_list_templates`, `turbovault_create_from_template`
-  - Frontmatter/tags → `turbovault_update_frontmatter`, `turbovault_manage_tags`
-  - Links/graph → `turbovault_get_backlinks`, `turbovault_get_broken_links`, `turbovault_get_related_notes`
-  - Vault overview / first-call orientation → `turbovault_get_vault_context` (active vault, health stats, OFM dialect), `turbovault_quick_health_check`
-- **Fallback:** If `turbovault` cannot be connected or is unavailable, stop and tell the user rather than editing vault files directly.
-
-#### Reads vs. Delegation (Context Hygiene)
-
-Vault operations split by purpose, not by tool identity:
-
-- **Discovery (result sets):** operations whose output is a ranked list or match context (`turbovault_search`, `turbovault_advanced_search`, `turbovault_semantic_search`, `turbovault_get_backlinks`, `turbovault_get_related_notes`, `turbovault_query_frontmatter_sql`, `turbovault_get_broken_links`) MUST be delegated by the main session to `Agent({ subagent_type: "Explore", prompt: "..." })`. Raw result-set output pollutes the main KV cache.
-- **Working-set reads:** `turbovault_read_note` on known paths stays INLINE when the content itself is the session's working set: to be discussed, quoted, edited, or retained for follow-up (e.g., a summary note plus the nodes it cites). Subagents are an anti-pattern here: they run in an isolated context and return a synthesized rendition, so the orchestrator loses the exact text it needs to reason over.
-- **Volume guard:** working-set reads are legitimate, but disclose progressively: read what the current task needs, in order, rather than slurping whole trees. Read the summary or index note before the notes it points to.
-- **Role note for Explore agents:** Explore is the target of discovery delegation. When acting as the Explore subagent, do not re-delegate and do not use mutating tools (whitelist enforced).
+---
 
 ## Advanced features
 
-- **Folder Structure Reference:**
-  - `98_Bases/`: Dataview bases
-  - `99_System/`: Templates, system config, attachments
-  - `.trash/`: Deleted notes — do not recreate files here
-- **LLM Tone & Aesthetics:** Avoid LLM indicators: no emdashes, no negative parallelisms, no emojis.
-- **Plugins:** obsidian-git, obsidian-icon-folder, obsidian-latex-suite, obsidian-minimal-settings, obsidian-style-settings, obsidian-vimrc-support, fast-text-color.
+* **Taxonomy, Lifecycle & Folder Matrix:** If you need detailed folder placement rules, project-to-archive transition workflows, or naming rules, see [references/hybrid-para-structure.md](references/hybrid-para-structure.md).
+* **Formatting, Headings & Syntax:** If writing complex content, configuring callouts, nesting lists, or styling note bodies, see [references/formatting-and-syntax.md](references/formatting-and-syntax.md).
+* **TurboVault MCP Tools & Context Hygiene:** For tool routing, git-substrate divergence recovery, or subagent discovery delegation rules, see [references/turbovault-guide.md](references/turbovault-guide.md).

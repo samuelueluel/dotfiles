@@ -199,10 +199,12 @@ THINK_BUDGET_MSG="Wait, I've used my full reasoning budget and I'm starting to l
 # Presence penalty 0 per 2026 guidance — penalties hurt code (punish legit repetition of
 # identifiers/brackets/boilerplate); loop control comes from temp 0.6 (non-greedy) + the
 # reasoning budget. Do NOT lower temp toward 0 — greedy decoding makes Qwen reasoning models loop.
-# Applied to Qwen3.6 + DeepSeek local models (guarded in _lem_preload / serve fns).
+# Applied to Qwen3.6 local models (guarded in _lem_preload / serve fns).
 QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 # Qwen3.8 official recommended sampling (thinking mode: temp 1.0, top-p 0.95, top-k 20, min-p 0, pres-pen 0)
 QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+# DeepSeek-V4-Flash official recommended agentic/thinking sampling (temp 1.0, top-p 0.95, top-k 20, min-p 0, pres-pen 0)
+DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 MTP_OPTS="$MTP_OPTS $REASONING_OPTS"
 CTX=262144  # context window for the server (applies to ALL clients: WebUI, etc.)
 
@@ -722,18 +724,22 @@ pi-safe-stata-2() {
 #
 # pihat / betahat write a state file to ~/.pi/running/ for status monitoring.
 
-# Helper: populate global _PI_SKILL_ARGS with --no-skills + --skill for all skills except stata*
+# Helper: populate global _PI_SKILL_ARGS with --no-skills + --skill for all skills except stata*.
+# Also skips agy-only skills (auto, mode, manual) so they never load into pi.
 _pi_nonstata_skills() {
   typeset -ga _PI_SKILL_ARGS
   _PI_SKILL_ARGS=("--no-skills")
+  local -a _pi_skip=(auto mode manual)
   local s
   for s in ~/.agents/skills/*; do
     [[ -d "$s" ]] || continue
     [[ "${s:t}" == stata* ]] && continue
+    (( ${_pi_skip[(Ie)${s:t}]} )) && continue
     _PI_SKILL_ARGS+=("--skill" "$s")
   done
   for s in ~/.pi/agent/skills/*(N); do
     [[ -d "$s" ]] || continue
+    (( ${_pi_skip[(Ie)${s:t}]} )) && continue
     _PI_SKILL_ARGS+=("--skill" "$s")
   done
 }
@@ -899,7 +905,11 @@ _lem_preload() {
         args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
         ;;
     esac
-  elif [[ "$id" == Qwen* || "$id" == DeepSeek* ]]; then
+  elif [[ "$id" == DeepSeek* ]]; then
+    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
+    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    args+=" $DS4FLASH_SAMPLING"
+  elif [[ "$id" == Qwen* ]]; then
     mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
     [[ "$mtp" == "off" ]] && args+=" --spec-type none"
     args+=" $QWEN_SAMPLING"

@@ -71,6 +71,14 @@ kill_children() {
 start_run() {
   local args="--fulltext"
   [ -n "$LIMIT" ] && args="$args --limit $LIMIT"
+  # Optional scoping: WATCHDOG_CONFIG=<path to scoped config> restricts the
+  # update-db pool to semantic_search.collection_keys from that config file,
+  # so pipeline runs never touch items outside their collection (added 2026-08-15
+  # for the Detroit-Paper driver; harmless when unset).
+  if [ -n "${WATCHDOG_CONFIG:-}" ]; then
+    args="$args --config-path $WATCHDOG_CONFIG"
+    log "scoped config: $WATCHDOG_CONFIG"
+  fi
   log "starting: zotero-mcp-server update-db $args"
   # faulthandler: print a native traceback if a C-level crash kills update-db
   PYTHONFAULTHANDLER=1 setsid nohup "$BIN" update-db $args >> "$RUN_LOG" 2>&1 < /dev/null &
@@ -84,7 +92,7 @@ start_run() {
 log "=== watchdog session start (gtt_threshold=${GTT_THRESHOLD_MB}MB, item_timeout=${ITEM_TIMEOUT_SEC}s) ==="
 
 start_run
-LAST_ITEM=""; LAST_ITEM_SINCE=$(date +%s); BAD_GTT=0; HB=0; LAST_FAILED_CNT=0; STUCK_EMB=0; LAST_EMB_TASK=""
+LAST_ITEM=""; LAST_ITEM_SINCE=$(date +%s); BAD_GTT=0; HB=0; LAST_FAILED_CNT=0; STUCK_EMB=0; LAST_EMB_TASK=""; HB_TASK_LAST=""
 POISON=()
 
 last_run_log_write=$(date +%s)
@@ -115,7 +123,8 @@ while true; do
   # is bursty (0% between HTTP requests) and the run log is legitimately
   # silent during the embedding phase of an embed-only run, so one 0% sample
   # false-killed healthy runs three times on 2026-08-14/15 (21:43, 23:13, 00:07).
-  EMB_TASK=$(podman logs --tail 1 embedder 2>/dev/null | grep -o 'task [0-9]*' | grep -o '[0-9]*' | tail -1)
+  # llama-server logs to STDERR only — 2>&1 is required or the counter is always empty
+  EMB_TASK=$(podman logs --tail 1 embedder 2>&1 | grep -o 'task [0-9]*' | grep -o '[0-9]*' | tail -1)
   EMB_TASK_MOVED=0
   [ "$EMB_TASK" != "$LAST_EMB_TASK" ] && EMB_TASK_MOVED=1
   # Embedding-phase hang: run log stale AND embedder idle AND task counter
@@ -163,7 +172,11 @@ while true; do
   # Heartbeat (~every 10th iteration ≈ 5 min) for post-mortem diagnosis
   HB=$((HB + 1))
   if [ $((HB % 10)) -eq 0 ]; then
-    log "hb: alive_md=${ALIVE_MD} emb_cpu=${EMB_CPU}% md_cpu=${MD_CPU}% upsert_fails=${FAILED_CNT} gtt=${G}MB item=[$ITEM]"
+    # [2026-08-16] live signals: the embedder task counter advances per chunk
+    # (item=[...] is a stale capture during the embed phase — read task_delta).
+    TASK_DELTA=$(( ${EMB_TASK:-0} - ${HB_TASK_LAST:-${EMB_TASK:-0}} ))
+    HB_TASK_LAST="${EMB_TASK}"
+    log "hb: alive_md=${ALIVE_MD} emb_cpu=${EMB_CPU}% md_cpu=${MD_CPU}% upsert_fails=${FAILED_CNT} gtt=${G}MB task=${EMB_TASK:-?} task_delta=${TASK_DELTA} runlog_age=$((NOW_S - RUN_LOG_MTIME))s item=[$ITEM]"
   fi
 
 

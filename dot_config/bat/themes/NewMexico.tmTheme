@@ -155,7 +155,7 @@
       </dict>
     </dict>
 
-    <!-- Markup headings: turquoise bold — primary navigation/structure in Goose output -->
+    <!-- Markup headings: turquoise bold — primary navigation/structure -->
     <dict>
       <key>name</key><string>Markup Heading</string>
       <key>scope</key><string>markup.heading, entity.name.section</string>

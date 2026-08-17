@@ -16,12 +16,14 @@ description: Manage Samuel's Obsidian vault notes in Open WebUI — searching, r
 Use top-level folders appropriately:
 - `00_Inbox/`: Fleeting / unprocessed notes
 - `01_Todo/`: Active tasks
-- `10_Projects/`: Projects (one subfolder per project)
-- `20_Library/`: Reference, literature, topic notes
-- `30_Personal/`: Personal notes (family, interests, etc.)
-- `98_Bases/`: Dataview bases · `99_System/`: Templates, system config, attachments · `.trash/`: deleted notes — **never** recreate files here
+- `02_Memories/`: Domain-agnostic persistent memory store for LLM agents and system discoveries
+- `10_Projects/`: Active projects (one subfolder per project) — moves to `90_Archive/` upon completion
+- `20_Library/`: Reference, academic literature (`Modern-DiD-Lit`, `New-Econometric-Lit`), topic notes
+- `30_Personal/`: Personal notes (`Personal-Admin`, `Personal-Interests`, `Family`)
+- `90_Archive/`: Completed projects, retired configs, past applications
+- `98_Bases/`: Dataview bases · `99_System/`: Templates, system config, attachments (`Z_Attachments/`) · `.trash/`: deleted notes — **never** recreate files here
 
-Subfolders use hyphens and Title Case (e.g., `30_Personal/20_Personal-Interests`). Acronyms uppercase (`Local-LLMs`).
+Subfolders use clean semantic `Title-Case-With-Hyphens` by default. Samuel personally manages numeric/alphanumeric prefixes (`00_`, `01_`, `z_`) for pinning—never strip, alter, or rename user prefixes.
 **Never** create new top-level folders without asking Samuel.
 
 ## Formatting & Styling Rules
@@ -56,6 +58,7 @@ All vault operations route through the `obsidian_*` MCP tools (the turbovault pa
 
 Operational rules:
 - **Timestamps:** set `created` on create and refresh `updated` on every edit, in exactly `%Y-%m-%dT%H:%M:%S` (zero-padded local time, no milliseconds or timezone) via frontmatter.
+- **Tags:** assign frontmatter `tags:` exclusively from canonical flat baseline: `pin`, `to-read`, `to-do`, `moc`, `python`, `stata`, `latex`, `linux`, `probability`, `econometrics`, `economics`, `math`. All `00_` notes require `moc`. Never use inline `#tags` in prose.
 - **Git divergence guard:** a write can fail with "working-tree path differs from HEAD" (e.g. an external writer touched the note). Don't fight it — tell the user; commit or restore the change, then retry.
 - If the `obsidian_*` tools are unavailable, stop and tell the user rather than touching vault files by other means.
 

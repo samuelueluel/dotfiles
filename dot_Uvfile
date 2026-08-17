@@ -1,0 +1,9 @@
+# ~/.Uvfile
+# Declarative list of Python-based CLI and MCP tools managed via uv.
+# Install/Sync with: sjust uv (or sjust update)
+
+# Stata MCP server (pinned to mcp<2 for FastMCP compatibility)
+mcp-stata --with "mcp<2"
+
+# Zotero MCP server with semantic search (chromadb/embeddings) and PyMuPDF extras
+zotero-mcp-server[semantic,pdf]

@@ -44,7 +44,7 @@ Fix: `podman restart embedder` (may need SIGKILL). **Always re-probe after a res
 
 ## Service interaction gotchas
 
-- ~={magenta}Host-wide `pkill -9 llama-server` kills every engine, including the ones inside the ramalama containers=~ — under rootless podman the container processes ARE host processes. Observed 2026-08-15: `lem-unload`'s old host pkill destroyed the embedder, reranker and VLM engines at once; the embedder/reranker containers then self-removed (`--rm`) and the vlm container restarted and reloaded its ~58 GB model. `lem-unload` now scopes its kill to the lemonade container (`podman exec lemonade pkill -9 llama-server`) — never reintroduce a host-wide pkill.
+- Host-wide `pkill -9 llama-server` kills every engine, including the ones inside the ramalama containers — under rootless podman the container processes ARE host processes. Observed 2026-08-15: `lem-unload`'s old host pkill destroyed the embedder, reranker and VLM engines at once; the embedder/reranker containers then self-removed (`--rm`) and the vlm container restarted and reloaded its ~58 GB model. `lem-unload` now scopes its kill to the lemonade container (`podman exec lemonade pkill -9 llama-server`) — never reintroduce a host-wide pkill.
 - Ramalama containers do not survive engine death: killing their llama-server removes (embedder/reranker) or restarts (vlm) the container. Recovery is always re-serve (`serve-embedder` / `serve-reranker`; the vlm container restarts itself), never `podman start`.
 
 ## Sandbox gate
@@ -124,4 +124,4 @@ Never assert counts from memory. Get current state from:
 - `zotero_zotero_list_libraries` — library IDs and item counts.
 - The SQL above — live item/attachment composition.
 
-Historical narrative (which failure happened when, and the evidence behind each design choice) lives in the vault: `10_Projects/Local-LLMs/Memories/New-RAG-Setup.md` and `10_Projects/Local-LLMs/MCP-Servers/Zotero-MCP.md`. Those are provenance, not operating procedure — read them for context, not for commands.
+Historical narrative (which failure happened when, and the evidence behind each design choice) lives in the vault: `02_Memories/New-RAG-Setup.md` and `10_Projects/Local-LLMs/MCP-Servers/Zotero-MCP.md`. Those are provenance, not operating procedure — read them for context, not for commands.

@@ -26,7 +26,7 @@ Use these authoritative paths directly instead of blind top-level searching:
 - **Obsidian Vault:** `~/Dropbox/Sam-Obsidian-Vault/`
   - Local LLM Architecture & Notes: `~/Dropbox/Sam-Obsidian-Vault/10_Projects/Local-LLMs/`
   - Agent Summaries: `~/Dropbox/Sam-Obsidian-Vault/10_Projects/Local-LLMs/Summaries-for-Agents/`
-  - Project Memories: `~/Dropbox/Sam-Obsidian-Vault/10_Projects/Local-LLMs/Memories/`
+  - System & Agent Memories: `~/Dropbox/Sam-Obsidian-Vault/02_Memories/`
 - **System Config & Dotfiles Repositories:**
   - `turquoise` (BlueBuild Fedora Atomic image recipe & scripts): `/var/home/samuel/turquoise/`
   - `dotfiles` (Chezmoi user dotfiles): `/var/home/samuel/dotfiles/`

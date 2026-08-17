@@ -27,7 +27,7 @@ Three services gate different capabilities. Probe before acting; policy differs 
 
 - Embedder is never auto-started: it loads a multi-GB model into unified RAM and has crashed the machine. This is an explicit standing rule, not a default to reason around.
 - VLM (:8084, Qwen2.5-VL-72B Q6_K, ~58 GB) serves only offline figure enrichment (`zotero-vlm-enrich.py`); it is never on the search or index path. Samuel starts it; run `stop-vlm` as soon as a batch ends to release RAM.
-- ~={magenta}Never host-wide `pkill llama-server`=~ — every llama-server is inside a container (rootless podman host processes), and a host pkill kills the ramalama engines too: the embedder/reranker containers then self-remove (`--rm`) and the vlm container restarts and reloads its ~58 GB model. `lem-unload` was fixed 2026-08-15 to scope its kill to the lemonade container only.
+- Never host-wide `pkill llama-server` — every llama-server is inside a container (rootless podman host processes), and a host pkill kills the ramalama engines too: the embedder/reranker containers then self-remove (`--rm`) and the vlm container restarts and reloads its ~58 GB model. `lem-unload` now scopes its kill to the lemonade container only.
 - `Semantic search error: Connection error.` = **embedder down**, not a desktop problem. `Error enriching result for item <key>: Connection refused` = **desktop down**, non-fatal.
 - Sandbox gate: run `command -v ramalama`; if empty you are in a pi-safe container and CANNOT run `serve-*` — report which service is down and ask Samuel to start it on the host, then wait for the port.
 - Rationale, wedge diagnosis, and the desktop-down DB fallback: `references/service-ops.md`.
@@ -119,7 +119,7 @@ Stable — call `mcp describe` only for unfamiliar tools, or when a call errors 
 
 The index carries two augmentations over plain fulltext:
 
-- **DCR prefixes** (`[contextual patch]`): every chunk is embedded with a lean `[Paper: <title> | Section: <breadcrumb>]` prefix IN MEMORY (sidecar .md files stay clean). Config `semantic_search.contextual.enabled` (on since 2026-08-15). Only affects chunks re-embedded after enabling.
+- **DCR prefixes** (`[contextual patch]`): every chunk is embedded with a lean `[Paper: <title> | Section: <breadcrumb>]` prefix IN MEMORY (sidecar .md files stay clean). Config `semantic_search.contextual.enabled` (enabled; every chunk carries the prefix since the 2026-08-16 full-library rebuild).
 - **Figure schemas** (`zotero-vlm-enrich.py`): an offline pass runs the 72B VLM over MinerU figure crops and injects a `[Figure Schema]` YAML block below each image line, making visual evidence discoverable by search. Purely an index beacon — numbers still come from tables/text.
 
 Enrichment batch (VLM must be up — `serve-vlm`; ~58 GB, Samuel starts it):
@@ -131,7 +131,7 @@ zotero-vlm-enrich.py --key <ITEMKEY>    # single item
 stop-vlm                                # release ~58 GB as soon as the batch ends
 ```
 
-Re-embed trigger — ~={magenta}incremental `update-db` does NOT detect sidecar edits=~ (it judges by Zotero item metadata: date_modified, attachment set, attachment priority). Enriched/prefixed chunks only land after:
+Re-embed trigger — incremental `update-db` does NOT detect sidecar edits (it judges by Zotero item metadata: date_modified, attachment set, attachment priority). Enriched/prefixed chunks only land after:
 
 - `update-db --fulltext --force-rebuild` (whole library, ~2 h; sidecars are never re-parsed), or
 - deleting the target items' chunks then an incremental `update-db` (scoped and fast):
@@ -148,6 +148,12 @@ zotero-mcp-server update-db --fulltext
 ```
 
 After any CLI `update-db` that changed the index, restart the service if a collection-scoped search errors (`references/index-maintenance.md` § Sparse-index process cache).
+
+**Live status during a run:** pipeline drivers auto-launch `~/.local/bin/zotero-run-status.sh <keys>` at the embed phase — read `~/.cache/zotero-mcp/logs/run-status.txt` (committed counts per key, in-flight items, embedder task counter, process liveness) before deciding to pause; commit flushes can cover several items at once. Heartbeat/progress-signal details: `references/index-maintenance.md` § Live run status + § Watchdog.
+
+**Scope pipeline runs to the target collection** — unscoped `update-db` scans the WHOLE library and will also process never-indexed items (an unscoped run once tripped on the Stata-19 manual and started an unguarded MinerU parse). Set `semantic_search.collection_keys` in a scoped config copy and pass it via `--config-path` (or the watchdog's `WATCHDOG_CONFIG` env). The sparse convergence step after a re-embed is a direct chroma→BM25 rebuild (~2s, no `update-db` at all). Details + snippets: `references/index-maintenance.md` § Scoping update-db runs to a collection. Store corruption (segfaults on every chroma access) has a full recovery procedure: `references/index-maintenance.md` § Store corruption recovery (temp-collection scoped rebuild via `rebuild-pipeline.sh`, preserving schemas — sidecars are the durable artifact).
+
+**Retrieval-hygiene filters (`[hybrid filter patch]`, v5)** — bibliography chunks are excluded from the BM25 lexical leg (breadcrumb signal only — the audited high-precision one), suppressed from the DENSE leg on ordinary queries (gated: citation-shaped queries keep them), and tagged `[REF]` when they do surface, so a citation-list hit is never mistaken for source content. Plus: figure-style queries inject `[Figure Schema]` chunks via a BM25 probe and boost them; an optional rerank-score floor drops weak matches; BM25-rescue chunks display real cosine similarities; the raw rerank score is exposed as `Rerank`. Config: `semantic_search.hybrid.{exclude_reference_chunks (true), reference_chunk_signal ("breadcrumb" | "either"), suppress_reference_chunks_dense (true), annotate_reference_chunks (true), figure_boost (2.5), rerank_floor (−4.0)}`. Verified behavior, config semantics, and the classifier audit (596/596 breadcrumb-flagged chunks = genuine bibliographies; density-only = prose, deliberately not suppressed): `references/index-maintenance.md` § Retrieval hygiene.
 
 ## Known quirks
 
