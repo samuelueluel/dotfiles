@@ -37,8 +37,9 @@ if [ -n "$SELECTED_LINES" ]; then
         ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')
         ESCAPED_ALBUM=$(echo "$ALBUM" | sed 's/"/\\"/g')
 
-        # Add the album to the queue
-        echo "searchadd artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 > /dev/null
+        # Add the album to the queue (findadd = exact match, so "Post" doesn't
+        # also pull in "Post Live" via substring matching)
+        echo "findadd artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 > /dev/null
     done <<< "$SELECTED_LINES"
 
     # 4. If nothing was playing, start playback

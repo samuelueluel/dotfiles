@@ -35,7 +35,16 @@ if [ -n "$SELECTED_LINES" ]; then
         ESCAPED_ARTIST=$(echo "$ARTIST" | sed 's/"/\\"/g')
         ESCAPED_ALBUM=$(echo "$ALBUM" | sed 's/"/\\"/g')
 
-        echo "searchadd artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 > /dev/null
+        # Prefer exact add (findadd) so "Post" doesn't also pull in "Post Live";
+        # fall back to substring add (searchadd) for beets names that don't
+        # exactly match MPD tags (e.g. Iced Earth's "Night of the Stormrider"
+        # is tagged in MPD as "Night Of The Stormrider [USA, ...]").
+        SONGS=$(echo "count artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 | grep -o "songs: [0-9]*" | awk '{print $2}')
+        if [ "${SONGS:-0}" -gt 0 ]; then
+            echo "findadd artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 > /dev/null
+        else
+            echo "searchadd artist \"$ESCAPED_ARTIST\" album \"$ESCAPED_ALBUM\"" | nc -N 127.0.0.1 6600 > /dev/null
+        fi
     done <<< "$SELECTED_LINES"
 
     if [ "$STATE" == "stop" ]; then

@@ -90,6 +90,7 @@
             "<C-R>":        AddRandom,
             "<C-g>":        ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-newest-art.sh"]),
             "<C-f>":        ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-art.sh"]),
+            "<C-A-f>":      ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-song.sh"]),
             "<C-h>":        ExternalCommand(command: ["kitty", "--title", "Kitty Float Art", "-e", "rmpc-fzf-priority.sh"]),
             "<C-P>":        ExternalCommand(command: ["rmpc-copy-album-path.sh"]),
         },
