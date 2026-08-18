@@ -52,6 +52,10 @@ Signature: CLI force-rebuild embeds steadily (task counter climbing) but never c
 
 Speed caveat: batch=16 showed ~2.7× in isolation but the end-to-end pipeline rate was unchanged (batching fixed reliability, not throughput) — the iGPU appears memory-bandwidth-bound for Qwen3-8B Q5_K_M. To check current throughput, sample the embedder task counter over a minute before planning a large run.
 
+### Index gate: text-based duplication check
+
+The gate (`~/.local/bin/zotero-index-gate.py`) flags chunk duplication by shared TEXT, not span overlap: span overlap alone is not corruption (the chunker's oversized-block split can leave a pending heading whose later flush has a span wrapping an already-emitted region — text stays correct). A >1,000-char shared-text run between two chunks of an item = FAIL; span overlap without shared text = WARN. The >4,000-char failsafe remains a FAIL (a packed atomic+prose chunk can breach it when a <`min_chunk_size` prose block rides onto a near-`max_atomic_size` atomic block; fixed in the chunker, so future rebuilds are clean).
+
 ### Watchdog (self-healing runner)
 
 `~/.local/bin/zotero-backfill-watchdog.sh` manages long `update-db` runs and guards against:
@@ -89,6 +93,16 @@ Logs:
      cc.delete_item_chunks('<IN_FLIGHT_KEY>')
      ```
    - Relaunch the watchdog with the target scoped config.
+
+### Item-scoped re-embed (no full rebuild)
+
+To re-chunk + re-embed ONE item with the current chunker (e.g. after a chunker fix, without a 4 h force-rebuild): delete its chunks, then run an incremental `update-db`. The item then looks new to the local-mode indexer. Note the local-mode per-item decision is Chroma-state based (existing chunks + `has_fulltext` + `attachment_keys` + priority tag + MinerU backfill target) — a Zotero metadata `version` bump alone does NOT trigger a re-embed (the version watermark only drives web/API-mode sync). Procedure:
+
+```bash
+PYTHONUNBUFFERED=1 zotero-mcp-server update-db --fulltext --config-path <scoped-config>  # after deleting the item's chunks
+```
+
+A 1,200-chunk book takes ~18 min; verified 2026-08-18 clearing the grandfathered 4,255-char QWSXSH6I chunk (gate PASS afterwards).
 
 | Step | Atomic Unit | In-Flight Loss on Kill | Resume Action |
 |---|---|---|---|
@@ -200,3 +214,14 @@ systemctl --user restart zotero-mcp.service
 - Configured under `semantic_search.reranker.*` in `~/.config/zotero-mcp/config.json`. Toggles take effect live per request without service restart.
 - Model: `bge-reranker-v2-m3` on :8083 via `serve-reranker` (physical batch `-ub 2048`).
 - Hybrid retrieval (BM25 + RRF) fuses lexical and dense candidate sets prior to cross-encoder reranking.
+
+### Figure-schema maintenance (`zotero-vlm-enrich.py`)
+
+The VLM enrichment script (`~/.local/bin/zotero-vlm-enrich.py`, chezmoi'd) has three modes:
+
+- Default (no flag): full VLM enrichment of figures lacking a schema (needs :8084). The patched version inserts each schema **directly below its image** (per-image re-resolution) and stamps `- Caption: …` from the adjacent caption text — the caption is extracted locally, never from the VLM (keeps the "no guessing" discipline).
+- `--captions-only`: no VLM — stamps missing captions onto existing schema blocks that sit within 9 lines below their image.
+- `--relocate`: no VLM — one-time repair for sidecars enriched by the pre-fix script (whose stale-line bug drifted later figures' schemas progressively backward). Moves each schema below its image and stamps the adjacent caption, producing the same layout the patched VLM path would. Only runs when the schema count matches the reproducible expected count (resolvable + dimension-filter-passing images); mismatched files fall back to adjacent-only stamping and are reported — never guesses an association.
+
+All modes are idempotent. After any mode changes sidecars, re-embed the affected items (sidecar edits do NOT trigger re-indexing by themselves):
+`cc.delete_item_chunks('<key>')` for each changed item, then one incremental `update-db` run re-chunks + re-embeds them all.
