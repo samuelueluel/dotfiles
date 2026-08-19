@@ -62,7 +62,15 @@ def main() -> int:
         for did, doc, meta in zip(ids, docs, metas):
             if not doc:
                 continue
-            lens.append(len(doc))
+            # The failsafe ceiling governs chunk CONTENT; the pipeline prepends
+            # a DCR prefix ([Paper: ... | Section: ...], ~80 chars) after
+            # chunking, so strip it before measuring length.
+            content = doc
+            if content.startswith("[Paper:") or content.startswith("[Section:"):
+                nl = content.find("\n")
+                if nl != -1:
+                    content = content[nl + 1:]
+            lens.append(len(content))
             k = (meta or {}).get("item_key", "?")
             chunk_item_keys.add(k)
             try:

@@ -16,7 +16,7 @@
 ## Update run anatomy
 
 - **Batch Dispatch:** Per-item progress lines (`[ 11%] 1/9 — Title`) print at dispatch before `_process_item_batch` runs. A run displaying `[100%]` may still have in-flight embedding.
-- **Bulk Flushes:** ChromaDB doc counts remain flat during embedding and commit via `upsert_documents` at the conclusion of each item batch (batch size 25), followed by BM25 sparse index rebuilding (~1 s).
+- **Bulk Flushes:** ChromaDB doc counts grow via durable `upsert_documents` sub-batches capped at 512 chunks (embedding runs ahead; writes land every ~3–4 min), followed by BM25 sparse index rebuilding (~1 s).
 - **Progress Tracking:** Run logs stay quiet during embedding. Track live progress via the llama-server task counter:
   ```bash
   podman logs --tail 1 embedder
@@ -54,7 +54,7 @@ Speed caveat: batch=16 showed ~2.7× in isolation but the end-to-end pipeline ra
 
 ### Index gate: text-based duplication check
 
-The gate (`~/.local/bin/zotero-index-gate.py`) flags chunk duplication by shared TEXT, not span overlap: span overlap alone is not corruption (the chunker's oversized-block split can leave a pending heading whose later flush has a span wrapping an already-emitted region — text stays correct). A >1,000-char shared-text run between two chunks of an item = FAIL; span overlap without shared text = WARN. The >4,000-char failsafe remains a FAIL (a packed atomic+prose chunk can breach it when a <`min_chunk_size` prose block rides onto a near-`max_atomic_size` atomic block; fixed in the chunker, so future rebuilds are clean).
+The gate (`~/.local/bin/zotero-index-gate.py`) flags chunk duplication by shared TEXT, not span overlap: span overlap alone is not corruption (the chunker's oversized-block split can leave a pending heading whose later flush has a span wrapping an already-emitted region — text stays correct). A >1,000-char shared-text run between two chunks of an item = FAIL; span overlap without shared text = WARN. The >4,000-char failsafe remains a FAIL, measured on chunk CONTENT with the DCR prefix (`[Paper: … | Section: …]`, prepended post-chunking by the pipeline) stripped — stored text runs prefix+content, so a content-just-under-4,000 chunk legitimately stores at 4,00x.
 
 ### Watchdog (self-healing runner)
 
@@ -102,7 +102,7 @@ To re-chunk + re-embed ONE item with the current chunker (e.g. after a chunker f
 PYTHONUNBUFFERED=1 zotero-mcp-server update-db --fulltext --config-path <scoped-config>  # after deleting the item's chunks
 ```
 
-A 1,200-chunk book takes ~18 min; verified 2026-08-18 clearing the grandfathered 4,255-char QWSXSH6I chunk (gate PASS afterwards).
+A 1,200-chunk book takes ~18 min end-to-end; the procedure cleared the last oversized chunk and left the gate PASS.
 
 | Step | Atomic Unit | In-Flight Loss on Kill | Resume Action |
 |---|---|---|---|
@@ -200,7 +200,7 @@ Replaces naive character-count slicing with a Bounded AST-Aware Markdown Chunker
 3. **Sibling Paragraph Packing:** Small paragraphs merge up to `min_chunk_size = 600` chars, eliminating vector starvation on short list items.
 4. **Prose Token Ceilings:** Prose splits on sentence and newline boundaries with an upper bound of `chunk_size = 2400` chars (~600 tokens) and 200-char overlap.
 5. **Bibliography & Index Safety:** Unpunctuated reference lists and A–Z subject indices split on single newlines (`\n`) with recursive slicing fallback, strictly bounding all chunks $\le 2600$ chars.
-6. **ChromaDB Sub-Batching:** embedding requests are batched at `batch=16` (chromadb `openai_embedding_function.py`) — llama-server embeds per-input sequences, so a request's total token count is NOT bounded by ctx (verified: 8 × 3.4K-tok inputs OK at ctx 4096). Each request carries a `timeout=120` so a wedged request raises instead of hanging the batch forever. The `[batch size patch]` also caps `upsert_documents` write sub-batches at `min(get_max_batch_size(), 512)` — ChromaDB's native ~5,461 sub-batch silently wedged mid-write at scale (see Zotero-MCP.md §11.7) — and sets the update-db item batch to 2. `DEFAULT_REQUEST_BATCH_SIZE` in `chroma_client.py` is 16.
+6. **Embedding/Write Tuning:** embedding requests batched at 16 with a 120 s timeout; `upsert_documents` write sub-batches capped at 512; update-db item batch 2 — see the wedge section above (and Zotero-MCP.md §11.7).
 
 ## Sparse-index process cache
 

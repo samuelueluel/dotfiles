@@ -21,9 +21,9 @@ description: Manage Samuel's Zotero library via the zotero MCP server — add pa
 1. Ingest metadata: `zotero_zotero_add_item(source=<DOI or ISBN>, source_type="doi"|"isbn", attach_mode="none", if_exists="file")`.
 2. Attach PDF locally: `~/.local/bin/zotero-link <new_key> <path_to_pdf>`.
 3. Verify attachment: `zotero_zotero_get_item_children(<new_key>)`.
-4. Index item: verify :8082 embedder is up, then call `zotero_zotero_update_search_database()`. MinerU automatically parses PDF before embedding.
+4. Index item: verify :8082 embedder is up, then call `zotero_zotero_update_search_database()`. New PDFs are parsed by MinerU before embedding only when `semantic_search.mineru.enabled` is `true` (currently `false` — all indexed items already have sidecars; without a sidecar, a new item is skipped). If it's off, enable it (or run the VLM/sidecar pipeline) before expecting new items to index.
 
-   ~={green}Incremental guarantee:=~ existing items are NEVER reprocessed — two gates: (1) an existing MinerU sidecar (`~/.config/zotero-mcp/mineru-sidecars/<key>.md`) is read directly, no re-parse; (2) items with existing chunks + `has_fulltext` + unchanged attachments are skipped as "up to date". Only new items get parsed (MinerU → VLM enrichment → chunk → embed → BM25). To force a re-embed of ONE item, see the item-scoped procedure in `references/index-maintenance.md`.
+   **Incremental guarantee:** existing items are NEVER reprocessed — two gates: (1) an existing MinerU sidecar (`~/.config/zotero-mcp/mineru-sidecars/<key>.md`) is read directly, no re-parse; (2) items with existing chunks + `has_fulltext` + unchanged attachments are skipped as "up to date". Only new items get parsed (MinerU → VLM enrichment → chunk → embed → BM25). To force a re-embed of ONE item, see the item-scoped procedure in `references/index-maintenance.md`.
 
 ### 2. Item Types & Duplicates (Zotero 9)
 - **Item Types:** Use `preprint` for working papers (NBER, FEDS, JMPs); record series info in `Extra` or `repository`. Use `journalArticle` for published papers, `report` for institutional reports, `bookSection` for chapters.

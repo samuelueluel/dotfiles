@@ -186,8 +186,17 @@ RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
 QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 # Qwen3.8 official recommended sampling (thinking mode: temp 1.0 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
 QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+# Qwen3.8 nudge mode: progressive thinking-budget nudges (intro at start, soft pushes at
+# 50%/75%, hard cutoff at 12k with closing tag). Messages are single-quoted — Lemonade's
+# arg tokenizer keeps single-quoted values intact (double quotes are eaten, see issue #1939).
+QWEN38_NUDGE_ARGS="--reasoning-budget-enable --reasoning-budget 12288 --reasoning-budget-grace-tokens 256 --reasoning-budget-intro-mode once --reasoning-budget-intro-message 'I have a thinking budget of {budget} tokens for this turn. I will reason efficiently, focus on the key points, and aim to finalize my answer well before the budget runs out.' --reasoning-budget-soft-ratio 0.5 --reasoning-budget-soft-message 'I have used about half of my thinking budget. Let me focus on the main line of reasoning and stop exploring side branches.' --reasoning-budget-soft2-ratio 0.75 --reasoning-budget-soft2-message 'I have spent most of my thinking budget. I should stop exploring new approaches and converge on the final answer now.' --reasoning-budget-message 'Considering the limited time by the user, I have to give the solution based on the thinking directly now.\n</think>'"
 # DeepSeek-V4-Flash official recommended agentic/thinking sampling (temp 1.0 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
 DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+
+# Qwen3.8 DFlash2 draft (block-diffusion drafter, used with --spec-type draft-dflash)
+# Q8_0 draft + --spec-draft-n-max 4 (Nathan's config): +26% over MTP on this box;
+# Q4_K_M + n-max 7 measured as a wash (acceptance 0.22 vs 0.65).
+QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q8_0.gguf"
 
 # Small FIM autocomplete model for Zed (Continue → :8081). Runs on the iGPU ALONGSIDE
 # the main model, on its own name/port so a main-model swap doesn't evict it. No MTP (not an
@@ -744,8 +753,14 @@ _lem_preload() {
     return 1
   fi
   if [[ "$id" == Qwen3.8* ]]; then
-    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
-    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    mtp=$(gum choose --header "speculative decoding" --selected "on" \
+      "on       MTP (built-in draft, no extra model)" \
+      "dflash2  block-diffusion drafter (needs draft GGUF, ~1.5x MTP)" \
+      "off") || return 1
+    case "${mtp%%[ ]*}" in
+      dflash2) args+=" --spec-type draft-dflash --spec-draft-model $QWEN38_DFLASH2_DRAFT --spec-draft-n-max 4" ;;
+      off) args+=" --spec-type none" ;;
+    esac
 
     effort=$(gum choose --header "thinking / reasoning effort" \
       "xhigh   deep reasoning (default)" \
@@ -773,6 +788,11 @@ _lem_preload() {
         args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
         ;;
     esac
+
+    nudge=$(gum choose --header "thinking nudges" --selected "nudge" \
+      "nudge  budget nudges: 12k cap, gentle pushes (recommended)" \
+      "plain  no nudges: uncapped thinking") || return 1
+    [[ "$nudge" == plain* ]] || args+=" $QWEN38_NUDGE_ARGS"
   elif [[ "$id" == DeepSeek* ]]; then
     mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
     [[ "$mtp" == "off" ]] && args+=" --spec-type none"
