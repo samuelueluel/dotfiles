@@ -1,6 +1,6 @@
 # Known Zotero Collections (name → key)
 
-Fast path for scoping searches. When the user names a collection or project, use its key from this table directly — no discovery call needed.
+**Load this file when** scoping searches to specific collections or looking up collection keys without discovery calls.
 
 | Collection | Key | Parent |
 |---|---|---|
@@ -9,15 +9,13 @@ Fast path for scoping searches. When the user names a collection or project, use
 | Programming | `YKQ7724G` | — |
 | Test-collection | `7UU8LJJ5` | — |
 
-No subcollections as of last refresh.
-
 ## Refreshing this table
 
-- `zotero_read_zotero_collections` (resource tool, **no params**) returns the live map — name, key, item count — in one call. Use it to verify or rebuild this file.
-- After creating/renaming/deleting collections in Zotero: refresh, then update this file in the same session.
-- Collection keys are stable per library until a collection is deleted and recreated — a stale key silently returns wrong/empty scopes, so re-verify after any reorganization.
+- `zotero_read_zotero_collections` (resource tool, **no params**) returns the live map — name, key, item count — in one call. Use it to verify or rebuild this table.
+- After creating, renaming, or deleting collections in Zotero: refresh and update this table.
+- Collection keys are stable per library until deleted and recreated.
 
 ## Scope semantics
 
-- `collection=<KEY>` on `zotero_zotero_semantic_search` scopes to the collection **and its subcollections** — "Scope to Methods" includes `Methods/<anything>`.
-- `zotero_zotero_search_collections(query)` matches case-insensitive substring, ANDs multi-word queries, and checks only the collection's own name — fallible for nested or shared names. Prefer this table over it for known names; use it only for names not listed here.
+- `collection=<KEY>` on `zotero_zotero_semantic_search` scopes to the collection **and its subcollections** DB-side in ChromaDB.
+- `zotero_zotero_search_collections(query)` matches case-insensitive substring on collection names. Use for unlisted names.

@@ -247,10 +247,9 @@ serve-reranker() {
 alias stop-reranker='ramalama stop reranker'
 
 # Qwen3-VL-30B-A3B-Instruct UD-Q8_K_XL (unsloth dynamic quant, ~36 GB, MoE 3B active) for
-# figure schema extraction (zotero-vlm-enrich.py → :8084). ~10× faster than the old
-# Qwen2.5-VL-72B (~2-4 s/figure), better OCR/chart benchmarks; single-file GGUF;
-# ramalama auto-attaches the mmproj-F16 vision projector. Swap back to Qwen2.5-VL-72B
-# (still in the store) by setting VLM_MODEL="hf://unsloth/Qwen2.5-VL-72B-Instruct-GGUF:Q6_K".
+# figure schema extraction (zotero-vlm-enrich.py → :8084). MoE ~3B active → ~2× faster per
+# figure than the previous model, better OCR/chart benchmarks; single-file GGUF;
+# ramalama auto-attaches the mmproj-F16 vision projector.
 # Offline batch only: serve-vlm → run zotero-vlm-enrich.py → stop-vlm (releases ~36 GB RAM).
 # Served id: unsloth/Qwen3-VL-30B-A3B-Instruct-GGUF
 VLM_MODEL="hf://unsloth/Qwen3-VL-30B-A3B-Instruct-GGUF:UD-Q8_K_XL"

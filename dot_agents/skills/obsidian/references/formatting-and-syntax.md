@@ -8,9 +8,9 @@ Load this reference when writing note content, formatting headings, applying col
 
 * **Title Rule:** The filename acts as the note's title. **Do not** repeat it as an `H1` (`#`) at the top of the note. Start the note body directly at `H1` (`#`).
 * **Number Headings Plugin Compatibility:** 
-  * Headings are automatically numbered by Obsidian's **Number Headings** plugin.
-  * **When editing existing notes:** **Do NOT remove, strip, or alter existing heading numbers** (e.g., `# 1.`, `## 2.1.`).
-  * **When creating brand new headings:** Write plain titles (e.g., `## Methodology`) and allow the plugin to manage numbering automatically.
+    * Headings are automatically numbered by Obsidian's **Number Headings** plugin.
+    * **When editing existing notes:** **Do NOT remove, strip, or alter existing heading numbers** (e.g., `# 1.`, `## 2.1.`).
+    * **When creating brand new headings:** Write plain titles (e.g., `## Methodology`) and allow the plugin to manage numbering automatically.
 * **No Formatting in Headings:** Keep headings plain text without bolding, italics, or inline color tags.
 
 ---
@@ -32,7 +32,7 @@ Never use standard Markdown `**bold**`. Instead, use Obsidian's `fast-text-color
 ## 3. Lists
 
 * **Bullets vs. Numbers:** Prefer bullets (`-`) unless order or sequence is meaningful. Use numbered lists only when sequential execution matters.
-* **Indentation:** For nested lists, indent with a tab.
+* **Indentation:** For nested (child) bullet/numbered lists, use a **double indent** (4 spaces / two tab-widths) rather than a single indent — children must sit clearly under their parent. A single 2-space indent can fail to nest reliably in Obsidian.
 * **Nesting Distinction:** When nesting, alternate list type (bullet -> numbered or numbered -> bullet) to visually distinguish hierarchy levels.
 
 ---
@@ -48,18 +48,18 @@ Wikilinks create explicit graph connections between knowledge assets.
 
 ### B. Embeds & Callouts
 * **File Embeds:** `![[filename.pdf]]`
-  * Collapsed embed pattern:
-    ```markdown
-    > [!info]- Title
-    > ![[file.pdf]]
-    ```
+    * Collapsed embed pattern:
+        ```markdown
+        > [!info]- Title
+        > ![[file.pdf]]
+        ```
 * **Callouts:**
   ```markdown
   > [!note] Label
   > Content
   ```
-  * Supported types: `note`, `info`, `warning`, `success`, `question`, `example`, `quote`.
-  * Add `-` immediately after the type identifier to make the callout collapsed by default (e.g., `> [!info]-`).
+    * Supported types: `note`, `info`, `warning`, `success`, `question`, `example`, `quote`.
+    * Add `-` immediately after the type identifier to make the callout collapsed by default (e.g., `> [!info]-`).
 
 ---
 
@@ -89,16 +89,16 @@ tags:
 * **Required Scope:** `10_Projects/`, `20_Library/`, and `02_Memories/` (creates high-signal catalogs for fast token-efficient `turbovault_query_frontmatter_sql` scans and research subagents).
 * **Omitted Scope:** `00_Inbox/`, `01_Todo/`, `30_Personal/` (keep personal and transient notes frictionless).
 * **Formatting Rules:**
-  * Strict length: 1–2 plain text sentences maximum.
-  * Always wrap in double quotes (`"..."`).
-  * Plain text only: **no wikilinks, inline formatting, or markdown** inside the description string to prevent SQLite/Dataview parsing issues.
+    * Strict length: 1–2 plain text sentences maximum.
+    * Always wrap in double quotes (`"..."`).
+    * Plain text only: **no wikilinks, inline formatting, or markdown** inside the description string to prevent SQLite/Dataview parsing issues.
 * **Domain Guidelines & Examples:**
-  * `20_Library/`: Core takeaway, estimator, theorem, or identification strategy.
-    * *Example:* `description: "Derives bounds on unobservable selection (delta) using R-squared movements and coefficient stability under proportional selection."`
-  * `10_Projects/`: Research question, data sources, empirical specification, or deliverable status.
-    * *Example:* `description: "Working paper evaluating Detroit land-value tax reform using parcel microdata and spatial difference-in-differences."`
-  * `02_Memories/`: High-level summary of configuration, workflow discovery, hardware tweak, or system benchmark.
-    * *Example:* `description: "Resolves ALSA/PipeWire audio crackling on AMD Ryzen AI MAX+ by tuning buffer quantum and headroom settings."`
+    * `20_Library/`: Core takeaway, estimator, theorem, or identification strategy.
+        * *Example:* `description: "Derives bounds on unobservable selection (delta) using R-squared movements and coefficient stability under proportional selection."`
+    * `10_Projects/`: Research question, data sources, empirical specification, or deliverable status.
+        * *Example:* `description: "Working paper evaluating Detroit land-value tax reform using parcel microdata and spatial difference-in-differences."`
+    * `02_Memories/`: High-level summary of configuration, workflow discovery, hardware tweak, or system benchmark.
+        * *Example:* `description: "Resolves ALSA/PipeWire audio crackling on AMD Ryzen AI MAX+ by tuning buffer quantum and headroom settings."`
 
 ### C. Canonical Baseline Tag Vocabulary
 

@@ -43,7 +43,7 @@ import requests
 SIDECAR_DIR = Path.home() / ".config" / "zotero-mcp" / "mineru-sidecars"
 WORK_DIR = Path.home() / ".cache" / "zotero-mcp" / "mineru-work"
 VLM_URL = "http://127.0.0.1:8084/v1/chat/completions"
-VLM_MODEL = "Qwen3-VL-30B-A3B-Instruct"  # 2026-08-19: swapped from Qwen2.5-VL-72B (UD-Q8_K_XL, ~36 GB, ~10× faster, better OCR/chart benchmarks)
+VLM_MODEL = "Qwen3-VL-30B-A3B-Instruct"  # unsloth UD-Q8_K_XL (~36 GB, MoE ~3B active)
 TIMEOUT_S = 180  # ~2-4 s/figure typical with the MoE; generous headroom for cold first call
 
 IMG_RE = re.compile(r"!\[[^\]]*\]\((images/[^)\s]+)\)")
