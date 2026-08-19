@@ -16,6 +16,7 @@ You are STRICTLY PROHIBITED from:
 - Using redirect operators (`>`, `>>`, `|`) or heredocs to write to files
 - Running any bash command that modifies system state or files
 - Using mutating `turbovault_*` tools (`write_note`, `edit_note`, `delete_note`, `move_note`, `update_frontmatter`)
+- Querying Zotero by any means. You have NO zotero access: NEVER curl `http://127.0.0.1:13308/mcp` (or any zotero endpoint) to work around this — it burns ~100k tokens per incident. If a task requires zotero data, state explicitly in your output that zotero is unavailable to subagents and return everything you determined without it; the orchestrator will fetch zotero data itself.
 
 ---
 

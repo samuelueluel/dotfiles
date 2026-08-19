@@ -166,26 +166,7 @@
           }
         },
         {
-          "name": "DeepSeek V4 Pro (cod, t0.6)",
-          "reasoning": true,
-          "contextWindow": 1048576,
-          "maxTokens": 384000,
-          "compat": {
-            "supportsDeveloperRole": false,
-            "thinkingFormat": "openrouter",
-            "requiresReasoningContentOnAssistantMessages": true
-          },
-          "thinkingLevelMap": {
-            "minimal": null,
-            "low": null,
-            "medium": null,
-            "high": "high",
-            "xhigh": "xhigh"
-          },
-          "id": "@preset/dsv4pro-cod"
-        },
-        {
-          "name": "DeepSeek V4 Flash (cod, t0.6)",
+          "name": "DeepSeek V4 Flash (cod, t1.0)",
           "reasoning": true,
           "contextWindow": 1048576,
           "maxTokens": 131072,
@@ -268,6 +249,13 @@
           "name": "DeepSeek V4 Flash Q2_K_XL (MoE 97GB)",
           "reasoning": true,
           "contextWindow": 131072,
+          "maxTokens": 131072
+        },
+        {
+          "id": "Qwen3.8-27B-Q4",
+          "name": "Qwen3.8 Dense 27B Q4 (Lemonade ROCm)",
+          "reasoning": true,
+          "contextWindow": 262144,
           "maxTokens": 131072
         },
         {

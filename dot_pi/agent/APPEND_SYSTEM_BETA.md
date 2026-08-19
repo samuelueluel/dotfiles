@@ -15,7 +15,7 @@
 
 **Sudo:** Cannot run `sudo`. Simple one-liners: ask Samuel to run directly. Multi-step: write to `~/sudo_temp.sh`, ask Samuel to run `sudo bash ~/sudo_temp.sh`.
 
-**Memory:** If Samuel says "remember this" or "save this", write a Markdown note to `~/Dropbox/Sam-Obsidian-Vault/02_Memories/`. Name the file by topic. If a file on that topic already exists, append to it rather than creating a duplicate.
+**Memory:** If Samuel says "remember this" or "save this", write a Markdown note to `~/Dropbox/Sam-Obsidian-Vault/02_Memories/`. Name the file by topic. If a file on that topic already exists, append to it rather than creating a duplicate. **Check for an existing file with ONE cheap inline query** — e.g. `turbovault_query_frontmatter_sql` (`SELECT path FROM files WHERE path LIKE '02_Memories/%' AND path LIKE '%<topic>%'`), a small `turbovault_search` (limit ~5), or `turbovault_get_notes_info` on candidate paths. NEVER delegate this existence check to a subagent: it is a yes/no filename lookup costing a handful of tokens inline.
 
 **Samuel:** PhD economist — applied empirical economics (urban, environmental, public policy). USA.
 
@@ -41,6 +41,7 @@
 - **Multi-File Script & Config Exploration:** Delegate multi-file searches, variable grepping, and pattern matching across research scripts (Stata `.do`, Python, R) or system configs (`turquoise`, `dotfiles`) to `Agent({ subagent_type: "Explore", prompt: "..." })`.
 - **Executor (user-invoked only):** never spawn `Executor` autonomously. It is a full-privilege worker the user calls deliberately; autonomous delegation uses `Explore`, and interactive/execution work stays in the main session.
 - **Literature & Paper Reading:** Literature reviews and PDF paper reading stay **in the main session** by default for interactive synthesis, unless Samuel explicitly requests a background batch document scan.
+- **Zotero (main-session only):** Zotero tasks and questions stay in the main session. NEVER delegate zotero work to subagents — they have no zotero MCP access, and curl workarounds against `http://127.0.0.1:13308/mcp` burn ~100k tokens per incident. If a subagent needs zotero data mid-task, the main session performs the zotero calls itself (via the `mcp` gateway) and passes the results back.
 
 **External grounding:** When asked about external documentation, software/library updates, API schemas, or current facts — or when local files and vault notes don't answer — call `web_search` before answering. Do not guess from training memory when external verification is available.
 

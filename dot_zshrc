@@ -179,7 +179,7 @@ fi
 
 # Local LLM Support Models (Ramalama) & Shared Sampling Profiles
 # OPENAI_API_KEY is set in ~/.zshenv.local (placeholder for local llama.cpp compat)
-RAMA_IMG=docker.io/kyuz0/amd-strix-halo-toolboxes:vulkan-radv
+RAMA_IMG=ghcr.io/nathanw1014/strix-halo-llamacpp:vulkan
 
 # Shared reasoning-model sampling parameters (used in _lem_preload)
 # Qwen3.6 thinking-mode guidance (temp 0.6 / top_p 0.95 / top_k 20 / min_p 0 / pres-pen 0)
@@ -209,8 +209,8 @@ serve-autocomplete() {
   ramalama stop coder 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8081 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--parallel 1" "$AUTOCOMPLETE_MODEL" \
-    && echo "▶ serving autocomplete (FIM, parallel 1) at http://localhost:8081/v1"
+  ramalama serve -d -n coder -p 8081 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--parallel 1 -fa on" "$AUTOCOMPLETE_MODEL" \
+    && echo "▶ serving autocomplete (FIM, parallel 1, FA on) at http://localhost:8081/v1"
 }
 alias stop-autocomplete='ramalama stop coder'
 
@@ -222,8 +222,8 @@ serve-embedder() {
   ramalama stop embedder 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8082 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n embedder -p 8082 --image "$RAMA_IMG" --ctx-size 4096 --runtime-args="--embedding --parallel 1 -ctk q8_0 -ctv q8_0 -fa on -b 2048 -ub 2048" "$EMBED_MODEL" \
-    && echo "▶ serving embedder (parallel 1) at http://localhost:8082/v1"
+  ramalama serve -d -n embedder -p 8082 --image "$RAMA_IMG" --ctx-size 4096 --runtime-args="--embedding --parallel 1 -fa on -b 2048 -ub 2048 --no-mmap --direct-io" "$EMBED_MODEL" \
+    && echo "▶ serving embedder (parallel 1, FA on) at http://localhost:8082/v1"
 }
 alias stop-embedder="ramalama stop embedder"
 
@@ -241,26 +241,27 @@ serve-reranker() {
   ramalama stop reranker 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8083 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n reranker -p 8083 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--reranking -ub 2048 -b 2048 --parallel 1" "$RERANK_MODEL" \
-    && echo "▶ serving reranker (bge-reranker-v2-m3 Q8_0) at http://localhost:8083/v1/rerank"
+  ramalama serve -d -n reranker -p 8083 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--reranking --parallel 1 -fa on -ub 2048 -b 2048 --no-mmap --direct-io" "$RERANK_MODEL" \
+    && echo "▶ serving reranker (FA on, bge-reranker-v2-m3 Q8_0) at http://localhost:8083/v1/rerank"
 }
 alias stop-reranker='ramalama stop reranker'
 
-# 72B vision model for figure schema extraction (zotero-vlm-enrich.py → :8084).
-# Qwen2.5-VL-72B-Instruct Q6_K (~58 GB GGUF, 2 shards — ramalama walks split parts);
-# ramalama auto-attaches the mmproj-F16 vision projector. NOTE: the official
-# Qwen org repo does NOT exist (404) — use the unsloth repo like the rest of the stack.
-# Offline batch only: serve-vlm → run zotero-vlm-enrich.py → stop-vlm (releases ~58 GB RAM).
-# Served id: unsloth/Qwen2.5-VL-72B-Instruct-GGUF
-VLM_MODEL="hf://unsloth/Qwen2.5-VL-72B-Instruct-GGUF:Q6_K"
+# Qwen3-VL-30B-A3B-Instruct UD-Q8_K_XL (unsloth dynamic quant, ~36 GB, MoE 3B active) for
+# figure schema extraction (zotero-vlm-enrich.py → :8084). ~10× faster than the old
+# Qwen2.5-VL-72B (~2-4 s/figure), better OCR/chart benchmarks; single-file GGUF;
+# ramalama auto-attaches the mmproj-F16 vision projector. Swap back to Qwen2.5-VL-72B
+# (still in the store) by setting VLM_MODEL="hf://unsloth/Qwen2.5-VL-72B-Instruct-GGUF:Q6_K".
+# Offline batch only: serve-vlm → run zotero-vlm-enrich.py → stop-vlm (releases ~36 GB RAM).
+# Served id: unsloth/Qwen3-VL-30B-A3B-Instruct-GGUF
+VLM_MODEL="hf://unsloth/Qwen3-VL-30B-A3B-Instruct-GGUF:UD-Q8_K_XL"
 serve-vlm() {
   echo "Pulling latest $RAMA_IMG …"
   podman pull "$RAMA_IMG"
   ramalama stop vlm 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8084 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n vlm -p 8084 --image "$RAMA_IMG" --ctx-size 8192 "$VLM_MODEL" \
-    && echo "▶ serving VLM (Qwen2.5-VL-72B Q6_K) at http://localhost:8084/v1"
+  ramalama serve -d -n vlm -p 8084 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="-fa on -b 2048 -ub 2048 -ctk q8_0 -ctv q8_0 --no-mmap" "$VLM_MODEL" \
+    && echo "▶ serving VLM (Qwen3-VL-30B-A3B UD-Q8_K_XL, FA on) at http://localhost:8084/v1"
 }
 alias stop-vlm='ramalama stop vlm'
 
@@ -668,6 +669,15 @@ print("slots (loaded/max): " + "  ".join(
     printf '  %-10s  %-8s  off (:8083 inactive)\n' "reranker" "ramalama"
   fi
 
+  # Ramalama VLM status (port 8084)
+  local _vlm_id
+  _vlm_id=$(curl -sf -m 2 "http://localhost:8084/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  if [[ -n "$_vlm_id" ]]; then
+    printf '  %-10s  %-8s  active on :8084 (%s)\n' "vlm" "ramalama" "${_vlm_id##*/}"
+  else
+    printf '  %-10s  %-8s  off (:8084 inactive)\n' "vlm" "ramalama"
+  fi
+
   # Cloud agents (pihat / betahat) — state files written at launch, removed on exit
   echo ""
   local _state_dir="$HOME/.pi/running"
@@ -719,6 +729,7 @@ lem-unload() {
 _pi_pick_local_model() {
   local choice
   choice=$(gum choose --header "select model  (Lemonade · one loads at a time)" \
+    "dense38-q4 Qwen3.8 Dense 27B  Q4" \
     "dense38-q6 Qwen3.8 Dense 27B  Q6" \
     "moe-q4     Qwen3.6 MoE 35B    Q4" \
     "moe-q8     Qwen3.6 MoE 35B    Q8" \
@@ -729,6 +740,7 @@ _pi_pick_local_model() {
     "dsv4fl-q2k DeepSeek V4 Flash Q2_K_XL (90GB MoE)" \
     "dsv4fl-q3  DeepSeek V4 Flash Q3 (97GB MoE)") || return 1
   case "${choice%%[ ]*}" in
+    dense38-q4) print -r -- "Qwen3.8-27B-Q4" ;;
     dense38-q6) print -r -- "Qwen3.8-27B-Q6" ;;
     moe-q4)    print -r -- "Qwen3.6-MoE-35B-Q4" ;;
     moe-q8)    print -r -- "Qwen3.6-MoE-35B-Q8" ;;
@@ -870,26 +882,26 @@ pihat() {
 
   model_choice=$(gum choose \
     --header "pihat · select model" \
-    "dsv4fl    DeepSeek V4 Flash" \
-    "dsv4pro   DeepSeek V4 Pro" \
-    "opus      Claude Opus 4.8" \
-    "opus5     Claude Opus 5" \
-    "sonnet5   Claude Sonnet 5" \
-    "glm52     GLM 5.2" \
-    "kimik3    Kimi K3" \
-    "lunapro   OpenAI Luna Pro" \
-    "gem37     Gemini 3.7 Flash") || return 1
+    "dsv4fl      DeepSeek V4 Flash (US)" \
+    "dsv4fl-cn   DeepSeek V4 Flash (China)" \
+    "opus        Claude Opus 4.8" \
+    "opus5       Claude Opus 5" \
+    "sonnet5     Claude Sonnet 5" \
+    "glm52       GLM 5.2" \
+    "kimik3      Kimi K3" \
+    "lunapro     OpenAI Luna Pro" \
+    "gem37       Gemini 3.7 Flash") || return 1
   [[ -z "$model_choice" ]] && return 1
 
   model_key="${model_choice%%[ ]*}"
   case "$model_key" in
-    dsv4pro) 
-      model_flag="openrouter/@preset/dsv4pro-cod"
+    dsv4fl|dsv4fl-us)  
+      model_flag="openrouter/@preset/dsv4flash-cod"
       default_thinking="xhigh"
       thinking_opts=("high" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
       ;;
-    dsv4fl)  
+    dsv4fl-cn)  
       model_flag="openrouter/@preset/dsv4flash-cod"
       default_thinking="xhigh"
       thinking_opts=("high" "xhigh")
@@ -1013,26 +1025,26 @@ betahat() {
 
   model_choice=$(gum choose \
     --header "betahat · select model" \
-    "dsv4fl    DeepSeek V4 Flash" \
-    "dsv4pro   DeepSeek V4 Pro" \
-    "opus      Claude Opus 4.8" \
-    "opus5     Claude Opus 5" \
-    "sonnet5   Claude Sonnet 5" \
-    "glm52     GLM 5.2" \
-    "kimik3    Kimi K3" \
-    "lunapro   OpenAI Luna Pro" \
-    "gem37     Gemini 3.7 Flash") || return 1
+    "dsv4fl      DeepSeek V4 Flash (US)" \
+    "dsv4fl-cn   DeepSeek V4 Flash (China)" \
+    "opus        Claude Opus 4.8" \
+    "opus5       Claude Opus 5" \
+    "sonnet5     Claude Sonnet 5" \
+    "glm52       GLM 5.2" \
+    "kimik3      Kimi K3" \
+    "lunapro     OpenAI Luna Pro" \
+    "gem37       Gemini 3.7 Flash") || return 1
   [[ -z "$model_choice" ]] && return 1
 
   model_key="${model_choice%%[ ]*}"
   case "$model_key" in
-    dsv4pro) 
-      model_flag="openrouter/@preset/dsv4pro-cod"
+    dsv4fl|dsv4fl-us)  
+      model_flag="openrouter/@preset/dsv4flash-cod"
       default_thinking="xhigh"
       thinking_opts=("high" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
+      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
       ;;
-    dsv4fl)  
+    dsv4fl-cn)  
       model_flag="openrouter/@preset/dsv4flash-cod"
       default_thinking="xhigh"
       thinking_opts=("high" "xhigh")

@@ -43,8 +43,8 @@ import requests
 SIDECAR_DIR = Path.home() / ".config" / "zotero-mcp" / "mineru-sidecars"
 WORK_DIR = Path.home() / ".cache" / "zotero-mcp" / "mineru-work"
 VLM_URL = "http://127.0.0.1:8084/v1/chat/completions"
-VLM_MODEL = "Qwen2.5-VL-72B-Instruct"
-TIMEOUT_S = 180  # ~18 s/figure typical; generous headroom for cold first call
+VLM_MODEL = "Qwen3-VL-30B-A3B-Instruct"  # 2026-08-19: swapped from Qwen2.5-VL-72B (UD-Q8_K_XL, ~36 GB, ~10× faster, better OCR/chart benchmarks)
+TIMEOUT_S = 180  # ~2-4 s/figure typical with the MoE; generous headroom for cold first call
 
 IMG_RE = re.compile(r"!\[[^\]]*\]\((images/[^)\s]+)\)")
 
@@ -617,7 +617,7 @@ def main() -> int:
             requests.get("http://127.0.0.1:8084/v1/models", timeout=5)
         except requests.RequestException:
             print("VLM endpoint not reachable on :8084 — run `serve-vlm` first "
-                  "(first serve downloads ~58 GB).", file=sys.stderr)
+                  "(first serve downloads ~36 GB).", file=sys.stderr)
             return 1
 
     keys = [args.key] if args.key else sorted(p.stem for p in SIDECAR_DIR.glob("*.md"))

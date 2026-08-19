@@ -45,12 +45,43 @@ def log(msg: str) -> None:
         f.write(line + "\n")
 
 
+def ensure_ocr_flag_patch(bin_path: str) -> str:
+    """Same fix as zotero-sidecar-create.py: MinerU 1.3.12 hardcodes ocr=True in
+    BatchAnalyze.__call__ (magic_pdf/model/batch_analyze.py), forcing OCR-det on
+    every parse even with -m txt / ocr-config.enable: false. On CPU the wasted
+    OCR pass costs ~4-9 s/page. Patch threads the parse-method flag through
+    (txt -> ocr=False). Idempotent; backs up before applying.
+    """
+    venv = Path(bin_path).resolve().parent.parent
+    for site in venv.glob("lib/python*/site-packages"):
+        target = site / "magic_pdf" / "model" / "batch_analyze.py"
+        if not target.exists():
+            continue
+        src = target.read_text(encoding="utf-8")
+        if "images_with_extra_info[0][1] if images_with_extra_info" in src:
+            return "already-patched"
+        old = "            ocr=True,"
+        new = (
+            "            ocr=images_with_extra_info[0][1] if images_with_extra_info else True,"
+            "  # [ocr-flag patch]"
+        )
+        if old not in src:
+            return f"pattern-not-found ({target})"
+        backup = target.with_name(f"batch_analyze.py.bak-{time.strftime('%Y%m%d')}")
+        if not backup.exists():
+            backup.write_text(src, encoding="utf-8")
+        target.write_text(src.replace(old, new), encoding="utf-8")
+        return "patched"
+    return "no-batch_analyze.py"
+
+
 def main() -> None:
     keys = sys.argv[1:] or POISON
     cfg = mineru.load_mineru_config()
     cfg["bin"] = str(HOME / "mineru-venv/bin/magic-pdf")
     cfg["config_json"] = str(HOME / "magic-pdf.json")
     cfg["timeout_seconds"] = TIMEOUT
+    log(f"ocr-flag patch: {ensure_ocr_flag_patch(cfg['bin'])}")
     raw = json.loads(CFG_PATH.read_text(encoding="utf-8"))
     db_path = raw.get("semantic_search", {}).get("zotero_db_path")
 

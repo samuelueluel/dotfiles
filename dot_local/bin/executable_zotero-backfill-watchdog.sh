@@ -22,7 +22,14 @@ RUN_LOG="$LOG_DIR/backfill-run.log"
 WATCH_LOG="$LOG_DIR/backfill-watchdog.log"
 SIDECAR_DIR="$HOME/.config/zotero-mcp/mineru-sidecars"
 GTT="/sys/class/drm/card1/device/mem_info_gtt_used"
-GTT_THRESHOLD_MB=$((50 * 1024))        # balloon jumps to 100+ GB; legit peak ~13-30 GB
+# Real amdgpu GTT balloon jumps GTT toward ~all free RAM (Gregory PDF → 124 GB
+# from a ~10 GB baseline). 2026-08-19: with the VLM (Qwen3-VL-30B-A3B, ~36 GB) + reranker + embedder
+# loaded in unified memory, baseline GTT is ~73 GB — the old fixed 50 GB
+# threshold falsely SIGKILLed every magic-pdf parse. Now env-configurable;
+# default 105 GB sits above legit usage in both states (~30 GB no-VLM, ~103 GB
+# with VLM) and below a genuine balloon (~114-124 GB). Override per-run with
+# WATCHDOG_GTT_THRESHOLD_MB=<MB> (e.g. when other GTT-heavy workloads run).
+GTT_THRESHOLD_MB=${WATCHDOG_GTT_THRESHOLD_MB:-$((105 * 1024))}
 GTT_BAD_SAMPLES=3                      # ~60s of confirmed balloon before killing
 ITEM_TIMEOUT_SEC=2700                  # 45 min per item (Dixit-class scans ~30 min legit)
 SLEEP_SEC=20
