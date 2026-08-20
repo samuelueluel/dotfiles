@@ -231,9 +231,9 @@ alias stop-embedder="ramalama stop embedder"
 # llama-server --reranking exposes the OpenAI-compatible /v1/rerank endpoint; the
 # zotero-mcp HTTP reranker patch calls it (semantic_search.reranker.url in
 # ~/.config/zotero-mcp/config.json). Query-time only — no interaction with the
-# embedder or Lemonade. -ub 2048 is the PHYSICAL batch size: query+doc pairs over
-# 512 tokens (formula/LaTeX-heavy MinerU chunks) otherwise 500 with "increase the
-# physical batch size". Served id: gpustack/bge-reranker-v2-m3-GGUF
+# embedder or Lemonade. -ub 8192 -b 8192 is the PHYSICAL batch size matching
+# --ctx-size 8192: query+doc pairs up to full context (large tables / MinerU chunks)
+# without 500 "increase the physical batch size". Served id: gpustack/bge-reranker-v2-m3-GGUF
 RERANK_MODEL="hf://gpustack/bge-reranker-v2-m3-GGUF:Q8_0"
 serve-reranker() {
   echo "Pulling latest $RAMA_IMG …"
@@ -241,7 +241,7 @@ serve-reranker() {
   ramalama stop reranker 2>/dev/null
   local i=0
   while ss -tln 2>/dev/null | grep -q ':8083 ' && (( i < 30 )); do sleep 0.5; (( i++ )); done
-  ramalama serve -d -n reranker -p 8083 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--reranking --parallel 1 -fa on -ub 2048 -b 2048 --no-mmap --direct-io" "$RERANK_MODEL" \
+  ramalama serve -d -n reranker -p 8083 --image "$RAMA_IMG" --ctx-size 8192 --runtime-args="--reranking --parallel 1 -fa on -ub 8192 -b 8192 --no-mmap --direct-io" "$RERANK_MODEL" \
     && echo "▶ serving reranker (FA on, bge-reranker-v2-m3 Q8_0) at http://localhost:8083/v1/rerank"
 }
 alias stop-reranker='ramalama stop reranker'

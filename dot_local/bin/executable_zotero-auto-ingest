@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" "$HOME/.local/bin/zotero-auto-ingest.py" "$@"

@@ -14,7 +14,7 @@ image). The caption is ground-truth text, so it is never delegated to the VLM
 (the VLM prompt remains strictly structural; the script owns the Caption field).
 
 Usage:
-  zotero-vlm-enrich.py [--key KEY | --all] [--dry-run] [--captions-only | --relocate]
+  zotero-vlm-enrich.py [--key KEY | --all] [--dry-run] [--captions-only | --relocate] [--force]
 
   --captions-only   No VLM calls at all: only stamp missing captions onto
                     existing [Figure Schema] blocks (local text scan). Use for
@@ -518,11 +518,15 @@ def relocate_schemas(key: str, dry_run: bool) -> dict:
 
 
 
-def process_sidecar(key: str, dry_run: bool, captions_only: bool) -> dict:
-    """Enrich one sidecar. Returns per-item counters."""
+def process_sidecar(key: str, dry_run: bool, captions_only: bool, force: bool = False) -> dict:
+    """Enrich one sidecar. Returns per-item counters.
+
+    ``force`` re-stamps: removes an existing [Figure Schema] block before
+    re-running the VLM (used after a model upgrade to refresh all schemas).
+    """
     st = {"figures": 0, "schema": 0, "dim_filter": 0, "missing_img": 0,
-          "already": 0, "vlm_err": 0, "caption": 0, "caption_skip": 0,
-          "caption_none": 0}
+          "already": 0, "restamp": 0, "vlm_err": 0, "caption": 0,
+          "caption_skip": 0, "caption_none": 0}
     sp = SIDECAR_DIR / f"{key}.md"
     if not sp.exists():
         st["missing_img"] += 1
@@ -546,17 +550,25 @@ def process_sidecar(key: str, dry_run: bool, captions_only: bool) -> dict:
             continue
         span = find_schema_block(lines, line_no)
         if span is not None:
-            st["already"] += 1
-            block = "".join(lines[span[0]:span[1]])
-            if "- Caption:" not in block:
-                caption = extract_caption(lines, line_no)
-                if caption is not None:
-                    new_block = insert_caption(block, caption)
-                    lines[span[0]:span[1]] = [new_block]
-                    sp.write_text("".join(lines), encoding="utf-8")
-                    st["caption"] += 1
-                    print(f"  {key} {img_path}: caption stamped (self-heal)")
-            continue
+            if force:
+                # Restamp: drop the old block (caption lives in the document
+                # text, so it is re-extracted fresh on the new block).
+                del lines[span[0]:span[1]]
+                sp.write_text("".join(lines), encoding="utf-8")
+                st["restamp"] += 1
+                # fall through to the VLM path below (it re-reads the file)
+            else:
+                st["already"] += 1
+                block = "".join(lines[span[0]:span[1]])
+                if "- Caption:" not in block:
+                    caption = extract_caption(lines, line_no)
+                    if caption is not None:
+                        new_block = insert_caption(block, caption)
+                        lines[span[0]:span[1]] = [new_block]
+                        sp.write_text("".join(lines), encoding="utf-8")
+                        st["caption"] += 1
+                        print(f"  {key} {img_path}: caption stamped (self-heal)")
+                continue
         img = resolve_image(key, img_path)
         if img is None:
             st["missing_img"] += 1
@@ -609,6 +621,9 @@ def main() -> int:
     m.add_argument("--relocate", action="store_true",
                     help="one-time repair: move drifted schema blocks below their images "
                          "and stamp adjacent captions (no VLM calls)")
+    ap.add_argument("--force", action="store_true",
+                    help="restamp: drop existing [Figure Schema] blocks and re-run the VLM "
+                         "(use after a VLM model upgrade)")
     ap.add_argument("--dry-run", action="store_true", help="report only, no writes/API calls")
     args = ap.parse_args()
 
@@ -622,24 +637,32 @@ def main() -> int:
 
     keys = [args.key] if args.key else sorted(p.stem for p in SIDECAR_DIR.glob("*.md"))
     total = {"sidecars": 0, "figures": 0, "schema": 0, "dim_filter": 0,
-             "missing_img": 0, "already": 0, "vlm_err": 0, "caption": 0,
-             "caption_skip": 0, "caption_none": 0, "moved": 0}
+             "missing_img": 0, "already": 0, "restamp": 0, "vlm_err": 0,
+             "caption": 0, "caption_skip": 0, "caption_none": 0, "moved": 0}
     for key in keys:
-        if args.relocate:
-            st = relocate_schemas(key, args.dry_run)
-        else:
-            st = process_sidecar(key, args.dry_run, args.captions_only)
+        try:
+            if args.relocate:
+                st = relocate_schemas(key, args.dry_run)
+            else:
+                st = process_sidecar(key, args.dry_run, args.captions_only, args.force)
+        except Exception as e:  # binary/undecodable sidecar must not kill the batch
+            print(f"[{key}] ERROR: {e}", file=sys.stderr)
+            st = {"figures": 0, "schema": 0, "dim_filter": 0, "missing_img": 0,
+                  "already": 0, "restamp": 0, "vlm_err": 0, "caption": 0,
+                  "caption_skip": 0, "caption_none": 0, "moved": 0}
         total["sidecars"] += 1
         for k in ("figures", "schema", "dim_filter", "missing_img", "already",
-                  "vlm_err", "caption", "caption_skip", "caption_none", "moved"):
+                  "restamp", "vlm_err", "caption", "caption_skip", "caption_none",
+                  "moved"):
             total[k] += st.get(k, 0)
         if args.relocate and st.get("verdict") and st["verdict"] != "RELOCATE":
             print(f"[{key}] {st['verdict']}")
         elif not args.relocate:
             print(f"[{key}] figures={st['figures']} schema={st['schema']} "
-                  f"already={st['already']} dim_filter={st['dim_filter']} "
-                  f"missing={st['missing_img']} vlm_err={st['vlm_err']} "
-                  f"caption={st['caption']} cap_skip={st['caption_skip']} cap_none={st['caption_none']}")
+                  f"already={st['already']} restamp={st['restamp']} "
+                  f"dim_filter={st['dim_filter']} missing={st['missing_img']} "
+                  f"vlm_err={st['vlm_err']} caption={st['caption']} "
+                  f"cap_skip={st['caption_skip']} cap_none={st['caption_none']}")
 
     print("\n=== SUMMARY ===")
     for k, v in total.items():

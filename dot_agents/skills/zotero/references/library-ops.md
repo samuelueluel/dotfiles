@@ -47,7 +47,7 @@ Always scope exports: whole-collection BibTeX dumps of large libraries can excee
 
 ### advanced_search date filters
 
-Date range ops (`isAfter`/`isBefore`/`isGreaterThan`/`isLessThan`) compare parsed dates numerically (`[date patch]`, see Zotero-MCP.md §11.6) — Zotero's month-first display (`"5/2018"`, `"08/2024"`), year-only (`"2023"`), ISO (`"2019-09-01"`), and month-name dates all sort correctly against any bound. Unknown month/day resolve inclusively: Dec 31 for isAfter/isGreaterThan, Jan 1 for isBefore/isLessThan — so `date isAfter "2023-01-01"` includes a 2023-dated item and `date isBefore "2023-01-01"` excludes it. Items with no date never match a range (pre-patch they vacuously matched every isBefore). The `year` field filters by the parsed year. Older builds compared display strings lexicographically and mis-sorted month-first dates in both directions — re-run `sjust update` if a build regresses.
+Date range operations (`isAfter`, `isBefore`, `isGreaterThan`, `isLessThan`) compare parsed dates numerically. Month-first display (`"5/2018"`, `"08/2024"`), year-only (`"2023"`), ISO (`"2019-09-01"`), and month-name dates sort correctly against any bound. Unknown month/day resolve inclusively (e.g. `date isAfter "2023-01-01"` includes 2023-dated items). Items with no date never match a date-range filter. The `year` field filters specifically by the 4-digit year.
 
 ## Resolving attachment paths
 
@@ -69,3 +69,34 @@ Date range ops (`isAfter`/`isBefore`/`isGreaterThan`/`isLessThan`) compare parse
 - `set_item_collections` updates collection memberships. `add_item(collections=[...], create_missing_collections=True)` assigns membership at ingestion.
 - Collection movements sync to semantic search during subsequent `update_search_database` runs.
 - `list_libraries` displays accessible libraries; `switch_library` switches active library context for subsequent calls.
+
+## Metadata Operations: Ingestion, Audit, Correction & Lifecycle
+
+`~/.local/bin/zotero-auto-ingest` provides a unified, deterministic pipeline to get, audit, correct, and replace publication-grade metadata for local PDFs:
+
+### 1. Ingesting New Bare PDFs (Zero-Friction Ingest)
+- **Single PDF:** `zotero-auto-ingest <path_to_pdf> [--collection <KEY>]`
+- **Batch Directory:** `zotero-auto-ingest ~/Downloads/papers/*.pdf [--collection <KEY>]`
+- **Workflow:**
+  1. PyMuPDF extracts Page-1 DOI (`10.xxxx/...`), arXiv, or ISBN.
+  2. Queries **Crossref REST API** for official publisher metadata (authors, journal, volume, issue, pages).
+  3. If no DOI is printed, queries **OpenAlex API** with title candidate (Levenshtein match >0.85).
+  4. Creates clean Zotero record (`preprint` for working papers, `journalArticle` for published papers).
+  5. Better BibTeX auto-assigns citation key (e.g. `\citep{baumsnow2020}`).
+  6. Automatically executes `zotero-link` to attach the local PDF as a `linked_file` (zero cloud bytes).
+
+### 2. Auditing & Backfilling Existing Library Metadata
+- **Dry-run Preview:** `zotero-auto-ingest --enrich-existing --dry-run`
+- **Live Library Backfill:** `zotero-auto-ingest --enrich-existing [--collection <KEY>]`
+- **Behavior:** Scans existing items for missing DOIs, filename-only titles (`draft_v4.pdf`), or missing author lists. Resolves canonical records via OpenAlex/Crossref and updates the Zotero database in place.
+
+### 3. Correcting Wrong / Incomplete Metadata on Specific Items
+- **Direct DOI Update:** Call `zotero_zotero_update_item(item_key, {"DOI": "<correct_doi>", "publicationTitle": "..."})` or use `batch_update(item_keys=[KEY], set_keys={"DOI": "..."})`.
+- **Replacing Broken Record:** If metadata is completely corrupt, delete item (`delete_item` + delete child attachment) and re-ingest the PDF with `zotero-auto-ingest <pdf_path>`.
+
+### 4. Working Paper $\to$ Published Journal Article Lifecycle
+- When an NBER/SSRN preprint is published in a journal:
+  1. Update `itemType` from `preprint` to `journalArticle`.
+  2. Update `DOI` to the journal DOI; add `publicationTitle`, `volume`, `issue`, and `pages`.
+  3. Linked PDF attachment and BBT citekey are preserved automatically.
+  4. If the title changed, run `zotero-sidecar.sh reembed <COLLECTION>` so DCR vector prefixes (`[Paper: Title (Author Year) | Section: Breadcrumb]`) re-index cleanly.

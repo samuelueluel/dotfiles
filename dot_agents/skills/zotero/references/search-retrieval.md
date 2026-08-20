@@ -63,7 +63,7 @@ Pick the retrieval tool matching the question's structure:
 
 - **Metadata staleness:** a title change needs a re-embed (the old title is baked into every chunk's DCR prefix). Result display is live (enriched from the Zotero API at query time), but semantic/BM25 matching is stale until re-embed.
 - **Reference-chunk suppression:** bibliography chunks are dropped from dense/sparse retrieval on general queries (`[REF]` annotation on surviving citations). Citation-shaped lookups still retain them.
-- **No-date items** no longer match date-range filters in `advanced_search` (see the `[date patch]`).
+- **No-date items:** Items lacking a date do not match date-range filters in `advanced_search`.
 - **Result enrichment** (title/creators/page/citation) requires the Zotero desktop/API up; otherwise `semantic_search` returns passages with a `Connection refused` enrich error — read the passage directly from the sidecar instead.
 
 ## Interpreting results

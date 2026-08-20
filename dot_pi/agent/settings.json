@@ -1,9 +1,12 @@
 {
   "defaultProvider": "local",
-  "defaultModel": "Qwen3.6-Dense-27B-Q8",
+  "defaultModel": "Qwen3.6-MoE-35B-Q8",
   "theme": "noctalia",
   "skills": [
-    "/var/home/samuel/.agents/skills"
+    "/var/home/samuel/.agents/skills",
+    "-/var/home/samuel/.agents/skills/auto",
+    "-/var/home/samuel/.agents/skills/mode",
+    "-/var/home/samuel/.agents/skills/manual"
   ],
   "enableSkillCommands": true,
   "packages": [
@@ -49,10 +52,10 @@
     "extensions/modes.ts",
     "extensions/powerline-footer.ts"
   ],
-  "lastChangelogVersion": "0.84.1",
+  "lastChangelogVersion": "0.84.2",
   "hideThinkingBlock": true,
   "compaction": {
-    "enabled": false,
+    "enabled": true,
     "reserveTokens": 16384,
     "keepRecentTokens": 40000
   }
