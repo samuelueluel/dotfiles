@@ -267,21 +267,6 @@ def lookup_icon_name(app_id, icon_theme):
 
     return "application-x-executable"
 
-
-def check_active_pi_types():
-    """Check ~/.pi/running/*.state for active pihat/betahat sessions."""
-    types = set()
-    for sfile in glob.glob("/var/home/samuel/.pi/running/*.state"):
-        try:
-            with open(sfile) as f:
-                for line in f:
-                    if line.startswith("type="):
-                        types.add(line.strip().split("=", 1)[1].lower())
-        except Exception:
-            pass
-    return types
-
-
 def detect_agent_info(
     app_id, title, is_urgent=False, is_focused=False, is_acknowledged=False
 ):
@@ -303,25 +288,23 @@ def detect_agent_info(
     default_color = "#DA9E8A"  # Pink Sandstone
     has_hat = False
 
-    active_pi_types = check_active_pi_types()
-
     if re.search(r"\b(agy|antigravity)\b", t_lower):
         agent_type = "agy"
         default_label = "a"
-    elif "pihat" in t_lower or ("pihat" in active_pi_types and ("pi" in t_lower or "π" in t)):
-        agent_type = "pihat"
-        default_label = "π"
-        has_hat = True
-    elif "pi" in t_lower or "π" in t:
-        agent_type = "pi"
-        default_label = "π"
-    elif "betahat" in t_lower or ("betahat" in active_pi_types and ("beta" in t_lower or "β" in t)):
+    elif "betahat" in t_lower or "β̂" in t or "\u03b2\u0302" in t or "β^" in t:
         agent_type = "betahat"
         default_label = "β"
         has_hat = True
     elif "beta" in t_lower or "β" in t:
         agent_type = "beta"
         default_label = "β"
+    elif "pihat" in t_lower or "π̂" in t or "\u03c0\u0302" in t or "π^" in t:
+        agent_type = "pihat"
+        default_label = "π"
+        has_hat = True
+    elif "pi" in t_lower or "π" in t:
+        agent_type = "pi"
+        default_label = "π"
 
     if not agent_type:
         return None

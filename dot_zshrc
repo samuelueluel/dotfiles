@@ -192,6 +192,8 @@ QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty
 QWEN38_NUDGE_ARGS="--reasoning-budget-enable --reasoning-budget 12288 --reasoning-budget-grace-tokens 256 --reasoning-budget-intro-mode once --reasoning-budget-intro-message 'I have a thinking budget of {budget} tokens for this turn. I will reason efficiently, focus on the key points, and aim to finalize my answer well before the budget runs out.' --reasoning-budget-soft-ratio 0.5 --reasoning-budget-soft-message 'I have used about half of my thinking budget. Let me focus on the main line of reasoning and stop exploring side branches.' --reasoning-budget-soft2-ratio 0.75 --reasoning-budget-soft2-message 'I have spent most of my thinking budget. I should stop exploring new approaches and converge on the final answer now.' --reasoning-budget-message 'Considering the limited time by the user, I have to give the solution based on the thinking directly now.\n</think>'"
 # DeepSeek-V4-Flash official recommended agentic/thinking sampling (temp 1.0 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
 DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+# Ling-3.0-Flash official recommended agentic/thinking sampling (temp 0.6 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
+LING3FLASH_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 
 # Qwen3.8 DFlash2 draft (block-diffusion drafter, used with --spec-type draft-dflash)
 # Q8_0 draft + --spec-draft-n-max 4 (Nathan's config): +26% over MTP on this box;
@@ -728,27 +730,23 @@ lem-unload() {
 _pi_pick_local_model() {
   local choice
   choice=$(gum choose --header "select model  (Lemonade · one loads at a time)" \
-    "dense38-q4 Qwen3.8 Dense 27B  Q4" \
-    "dense38-q6 Qwen3.8 Dense 27B  Q6" \
-    "moe-q4     Qwen3.6 MoE 35B    Q4" \
-    "moe-q8     Qwen3.6 MoE 35B    Q8" \
-    "dense-q4   Qwen3.6 Dense 27B  Q4" \
-    "dense-q6   Qwen3.6 Dense 27B  Q6" \
-    "dense-q8   Qwen3.6 Dense 27B  Q8" \
-    "dsv4fl-q2  DeepSeek V4 Flash Q2 (86GB MoE)" \
-    "dsv4fl-q2k DeepSeek V4 Flash Q2_K_XL (90GB MoE)" \
-    "dsv4fl-q3  DeepSeek V4 Flash Q3 (97GB MoE)") || return 1
+    "dense38-q4  Qwen3.8 Dense 27B  Q4" \
+    "dense38-q6  Qwen3.8 Dense 27B  Q6" \
+    "moe-q4      Qwen3.6 MoE 35B    Q4" \
+    "moe-q8      Qwen3.6 MoE 35B    Q8" \
+    "dsv4fl-q2   DeepSeek V4 Flash Q2 (86GB MoE)" \
+    "dsv4fl-q2k  DeepSeek V4 Flash Q2_K_XL (90GB MoE)" \
+    "dsv4fl-q3   DeepSeek V4 Flash Q3 (97GB MoE)" \
+    "ling3fl-q5  Ling 3.0 Flash Q5_K_M (91GB MoE)") || return 1
   case "${choice%%[ ]*}" in
     dense38-q4) print -r -- "Qwen3.8-27B-Q4" ;;
     dense38-q6) print -r -- "Qwen3.8-27B-Q6" ;;
-    moe-q4)    print -r -- "Qwen3.6-MoE-35B-Q4" ;;
-    moe-q8)    print -r -- "Qwen3.6-MoE-35B-Q8" ;;
-    dense-q4)  print -r -- "Qwen3.6-Dense-27B-Q4" ;;
-    dense-q6)  print -r -- "Qwen3.6-Dense-27B-Q6" ;;
-    dense-q8)  print -r -- "Qwen3.6-Dense-27B-Q8" ;;
-    dsv4fl-q2) print -r -- "DeepSeek-V4-Flash-Q2" ;;
+    moe-q4)     print -r -- "Qwen3.6-MoE-35B-Q4" ;;
+    moe-q8)     print -r -- "Qwen3.6-MoE-35B-Q8" ;;
+    dsv4fl-q2)  print -r -- "DeepSeek-V4-Flash-Q2" ;;
     dsv4fl-q2k) print -r -- "DeepSeek-V4-Flash-Q2K" ;;
-    dsv4fl-q3) print -r -- "DeepSeek-V4-Flash-Q3" ;;
+    dsv4fl-q3)  print -r -- "DeepSeek-V4-Flash-Q3" ;;
+    ling3fl-q5) print -r -- "Ling-3.0-Flash-Q5" ;;
     *) return 1 ;;
   esac
 }
@@ -757,7 +755,7 @@ _pi_pick_local_model() {
 # then load the model with those as a flag-level override merged over its saved recipe,
 # so the agent connects to exactly the config chosen here.
 _lem_preload() {
-  local id="$1" args="" mtp effort par
+  local id="$1" args="" mtp effort par nudge kv
   # real reachability check first, so a slow load is not mistaken for a dead server
   if ! curl -s -m 5 "$LEM_API/health" >/dev/null 2>&1; then
     print -r -- "Lemonade not reachable on $LEM_API (container up? try 'podman start lemonade')"
@@ -804,10 +802,28 @@ _lem_preload() {
       "nudge  budget nudges: 12k cap, gentle pushes (recommended)" \
       "plain  no nudges: uncapped thinking") || return 1
     [[ "$nudge" == plain* ]] || args+=" $QWEN38_NUDGE_ARGS"
+  elif [[ "$id" == Ling* ]]; then
+    args+=" --spec-type none $LING3FLASH_SAMPLING"
+
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || return 1
+    case "${kv%%[ ]*}" in
+      q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
   elif [[ "$id" == DeepSeek* ]]; then
     mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
     [[ "$mtp" == "off" ]] && args+=" --spec-type none"
     args+=" $DS4FLASH_SAMPLING"
+
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || return 1
+    case "${kv%%[ ]*}" in
+      q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
   elif [[ "$id" == Qwen* ]]; then
     mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
     [[ "$mtp" == "off" ]] && args+=" --spec-type none"
@@ -849,6 +865,7 @@ pi() {
 
   case "${go%%[ ]*}" in
     no)
+      printf '\033]2;π - %s\007' "${PWD##*/}"
       command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" "$@"
       printf '\a'
       ;;
@@ -868,6 +885,7 @@ pi() {
         echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
 
+      printf '\033]2;π - %s\007' "${abs_target##*/}"
       pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" "${@:2}"
       printf '\a'
       ;;
@@ -971,6 +989,7 @@ pihat() {
 
   case "${go%%[ ]*}" in
     no)
+      printf '\033]2;π̂ - %s\007' "${PWD##*/}"
       { command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "$@" } \
         always { rm -f "$_state_file"; printf '\a' > /dev/tty }
       ;;
@@ -990,6 +1009,7 @@ pihat() {
         echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
 
+      printf '\033]2;π̂ - %s\007' "${abs_target##*/}"
       { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
         always { rm -f "$_state_file"; printf '\a' > /dev/tty }
       ;;
@@ -1013,6 +1033,7 @@ beta() {
     "2   write to dir  +  no read elsewhere   +  Stata binary mounted") || return 1
   level="${level%%[ ]*}"
 
+  printf '\033]2;β - %s\007' "${abs_target##*/}"
   pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}"
   printf '\a' > /dev/tty
 }
@@ -1114,6 +1135,7 @@ betahat() {
   mkdir -p "$_state_dir"
   local _state_file="$_state_dir/$$.state"
   printf 'type=betahat\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
+  printf '\033]2;β̂ - %s\007' "${abs_target##*/}"
   { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --thinking "$thinking_choice" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; printf '\a' > /dev/tty }
 }

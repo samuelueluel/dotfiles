@@ -264,6 +264,13 @@
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
+        },
+        {
+          "id": "Ling-3.0-Flash-Q5",
+          "name": "Ling 3.0 Flash Q5_K_M (Lemonade Vulkan)",
+          "reasoning": true,
+          "contextWindow": 262144,
+          "maxTokens": 131072
         }
       ]
     }

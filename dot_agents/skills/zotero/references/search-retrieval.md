@@ -6,7 +6,7 @@
 
 | Goal | Tool |
 |---|---|
-| Find papers by concept/topic | `zotero_zotero_semantic_search(query, collection=<KEY>, limit=10)` |
+| Find papers by concept/topic | `zotero_zotero_semantic_search(query, collection=<KEY | NAME>, limit=10)` |
 | Find foundational hub papers in a collection | `zotero_zotero_get_collection_hubs(collection_key=<KEY>, top_n=5)` |
 | Trace paper lineage (ancestors & descendants) | `zotero_zotero_get_paper_lineage(item_key=<KEY>, depth=1)` |
 | Find co-cited / connected papers | `zotero_zotero_find_connected_papers(item_key=<KEY>, top_n=5)` |
@@ -57,7 +57,7 @@ Pick the retrieval tool matching the question's structure:
   - *RD manipulation:* "McCrary density test", "continuity of the score density at cutoff"
   - *Bunching:* "excess mass around the kink point", "notch in the tax schedule"
   If initial results seem poor (empty results, or top passage `Rerank` < 0.0), try a few reformulations or translations of the concept.
-- **Collection scoping:** pass `collection=<8-char KEY>` (includes subcollections) to restrict a search to a project.
+- **Collection scoping:** pass `collection=<KEY | NAME>` (e.g. `collection="Methods"` or `collection="2QWMWY2P"`, includes subcollections). Scoping resolves live from SQLite at query time against `item_key`, so folder moves in Zotero GUI take effect instantly.
 
 ## Retrieval limitations
 

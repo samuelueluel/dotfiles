@@ -2,46 +2,41 @@
   "user.Qwen3.6-MoE-35B-Q4": {
     "ctx_size": 262144,
     "llamacpp_backend": "vulkan",
-    "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
+    "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
   },
   "user.Qwen3.6-MoE-35B-Q8": {
     "ctx_size": 262144,
     "llamacpp_backend": "vulkan",
-    "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
-  },
-  "user.Qwen3.6-Dense-27B-Q4": {
-    "ctx_size": 262144,
-    "llamacpp_backend": "vulkan",
-    "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 2048 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
-  },
-  "user.Qwen3.6-Dense-27B-Q6": {
-    "ctx_size": 262144,
-    "llamacpp_backend": "vulkan",
-    "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 2048 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
-  },
-  "user.Qwen3.6-Dense-27B-Q8": {
-    "ctx_size": 262144,
-    "llamacpp_backend": "vulkan",
-    "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 2048 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
+    "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 2 --spec-draft-p-min 0.75 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.6-froggeric-v16.jinja -ctk q8_0 -ctv q8_0"
   },
   "user.DeepSeek-V4-Flash-Q2": {
     "ctx_size": 131072,
     "llamacpp_backend": "vulkan",
-    "llamacpp_args": "--cache-ram 0 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --reasoning on --reasoning-budget 50000 --slot-prompt-similarity 0.8 --temp 1.0 --top-k 20 --top-p 0.95 -b 2048 -ctk f16 -ctv f16 -fa on -t 16 -ub 2048 --spec-type draft-dspark -md /root/.cache/lemonade/dspark/dspark-DeepSeek-V4-Flash-0731-Q2K.gguf --spec-draft-n-max 4 --fit off -ngld 99"
+    "llamacpp_args": "--cache-ram 0 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --reasoning on --slot-prompt-similarity 0.8 --temp 1.0 --top-k 20 --top-p 0.95 -b 2048 -ctk f16 -ctv f16 -fa on -t 16 -ub 2048 --spec-type draft-dspark -md /root/.cache/lemonade/dspark/dspark-DeepSeek-V4-Flash-0731-Q2K.gguf --spec-draft-n-max 4 --fit off -ngld 99"
   },
   "user.DeepSeek-V4-Flash-Q3": {
     "ctx_size": 131072,
     "llamacpp_backend": "vulkan",
-    "llamacpp_args": "--cache-ram 0 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --reasoning on --reasoning-budget 50000 --slot-prompt-similarity 0.8 --temp 1.0 --top-k 20 --top-p 0.95 -b 2048 -ctk f16 -ctv f16 -fa on -t 16 -ub 2048 --spec-type draft-dspark -md /root/.cache/lemonade/dspark/dspark-DeepSeek-V4-Flash-0731-Q2K.gguf --spec-draft-n-max 4 --fit off -ngld 99"
+    "llamacpp_args": "--cache-ram 0 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --reasoning on --slot-prompt-similarity 0.8 --temp 1.0 --top-k 20 --top-p 0.95 -b 2048 -ctk f16 -ctv f16 -fa on -t 16 -ub 2048 --spec-type draft-dspark -md /root/.cache/lemonade/dspark/dspark-DeepSeek-V4-Flash-0731-Q2K.gguf --spec-draft-n-max 4 --fit off -ngld 99"
   },
   "user.DeepSeek-V4-Flash-Q2K": {
     "ctx_size": 131072,
     "llamacpp_backend": "vulkan",
-    "llamacpp_args": "--cache-ram 0 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --reasoning on --reasoning-budget 50000 --slot-prompt-similarity 0.8 --temp 1.0 --top-k 20 --top-p 0.95 -b 2048 -ctk f16 -ctv f16 -fa on -t 16 -ub 2048 --spec-type draft-dspark -md /root/.cache/lemonade/dspark/dspark-DeepSeek-V4-Flash-0731-Q2K.gguf --spec-draft-n-max 4 --fit off -ngld 99"
+    "llamacpp_args": "--cache-ram 0 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --reasoning on --slot-prompt-similarity 0.8 --temp 1.0 --top-k 20 --top-p 0.95 -b 2048 -ctk f16 -ctv f16 -fa on -t 16 -ub 2048 --spec-type draft-dspark -md /root/.cache/lemonade/dspark/dspark-DeepSeek-V4-Flash-0731-Q2K.gguf --spec-draft-n-max 4 --fit off -ngld 99"
   },
   "user.Qwen3.8-27B-Q6": {
     "ctx_size": 262144,
-    "llamacpp_backend": "rocm",
-    "llamacpp_args": "--spec-type draft-mtp --spec-draft-n-max 5 --spec-draft-p-min 0.75 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 2048 -b 2048 -t 16 --reasoning on --reasoning-budget 50000 --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja -ctk q8_0 -ctv q8_0"
+    "llamacpp_backend": "vulkan",
+    "llamacpp_args": "--spec-type draft-dflash -md /root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q8_0.gguf --spec-draft-n-max 4 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 256 -b 2048 -t 16 --reasoning on --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja -ctk f16 -ctv f16"
+  },
+  "user.Qwen3.8-27B-Q4": {
+    "ctx_size": 262144,
+    "llamacpp_backend": "vulkan",
+    "llamacpp_args": "--spec-type draft-dflash -md /root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q8_0.gguf --spec-draft-n-max 4 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 256 -b 2048 -t 16 --reasoning on --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja -ctk f16 -ctv f16"
+  },
+  "user.Ling-3.0-Flash-Q5": {
+    "ctx_size": 262144,
+    "llamacpp_backend": "vulkan",
+    "llamacpp_args": "--cache-ram 0 --cache-reuse 512 --checkpoint-min-step 2048 --context-shift --ctx-checkpoints 16 --direct-io --kv-unified --min-p 0 --no-mmap --parallel 1 --reasoning on --slot-prompt-similarity 0.8 --temp 0.6 --top-k 20 --top-p 0.95 -b 2048 -ctk f16 -ctv f16 -fa on -t 16 -ub 2048 --spec-type none"
   }
 }

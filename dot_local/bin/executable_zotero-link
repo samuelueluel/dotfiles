@@ -32,9 +32,14 @@ ctype = {
     ".doc": "application/msword",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }.get(ext, "application/octet-stream")
-att = [{"itemType": "attachment", "linkMode": "linked_file",
-        "contentType": ctype,
-        "path": "file://" + pdf, "title": title}]
+abs_pdf = os.path.abspath(pdf)
+att = [{
+    "itemType": "attachment",
+    "linkMode": "linked_file",
+    "contentType": ctype,
+    "path": abs_pdf,
+    "title": title
+}]
 try:
     r = z.create_items(att, parentid=item_key)
     keys = [v.get("key") for v in (r.get("successful") or {}).values()]

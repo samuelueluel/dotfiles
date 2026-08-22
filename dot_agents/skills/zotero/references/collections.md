@@ -5,9 +5,10 @@
 | Collection | Key | Parent |
 |---|---|---|
 | Detroit-Paper | `TRGBCDX5` | — |
+| Mathematics | `C8JGJRG7` | — |
 | Methods | `2QWMWY2P` | — |
 | Programming | `YKQ7724G` | — |
-| Test-collection | `7UU8LJJ5` | — |
+| Theory | `YKHC4X8Y` | — |
 
 ## Refreshing this table
 
@@ -17,5 +18,5 @@
 
 ## Scope semantics
 
-- `collection=<KEY>` on `zotero_zotero_semantic_search` scopes to the collection **and its subcollections** DB-side in ChromaDB.
+- `collection=<KEY | NAME>` on `zotero_zotero_semantic_search` scopes to the collection **and its subcollections** via real-time SQLite item-key resolution (zero manual sync needed when moving papers in GUI).
 - `zotero_zotero_search_collections(query)` matches case-insensitive substring on collection names. Use for unlisted names.

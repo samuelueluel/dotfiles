@@ -241,7 +241,7 @@ def link_local_pdf(zot: zotero.Zotero, item_key: str, pdf_path: Path, title: str
         "itemType": "attachment",
         "linkMode": "linked_file",
         "contentType": "application/pdf",
-        "path": "file://" + abs_path,
+        "path": abs_path,
         "title": display_title,
     }]
     try:
