@@ -44,7 +44,7 @@
       "tool-calling"
     ],
     "recipe": "llamacpp",
-    "size": 91.5,
+    "size": 85.2,
     "suggested": true
   },
   "Qwen3.6-MoE-35B-Q4": {

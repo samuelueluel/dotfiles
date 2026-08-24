@@ -196,9 +196,8 @@ DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penal
 LING3FLASH_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 
 # Qwen3.8 DFlash2 draft (block-diffusion drafter, used with --spec-type draft-dflash)
-# Q8_0 draft + --spec-draft-n-max 4 (Nathan's config): +26% over MTP on this box;
-# Q4_K_M + n-max 7 measured as a wash (acceptance 0.22 vs 0.65).
-QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q8_0.gguf"
+# Q4_K_M draft + --spec-draft-n-max 4: saves ~1GB VRAM/bandwidth over Q8_0 with equal/higher acceptance (~50-68%)
+QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
 
 # Small FIM autocomplete model for Zed (Continue → :8081). Runs on the iGPU ALONGSIDE
 # the main model, on its own name/port so a main-model swap doesn't evict it. No MTP (not an
@@ -320,7 +319,7 @@ model-check() {
         *gemini-3.7*)        _short="gem37"   ;;
         *)                  _short="$_m"     ;;
       esac
-      printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
+      if [[ -n "$_t" ]]; then printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"; else printf '  %-10s  %-8s\n' "$_type" "$_short"; fi
       _found_pi=1
     done
   fi
@@ -365,7 +364,8 @@ pi-safe-1() {
     -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
-    -e OPENROUTER_API_KEY \
+    -e OPENROUTER_API_KEY_US \
+    -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
@@ -412,7 +412,8 @@ pi-safe-2() {
     -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
-    -e OPENROUTER_API_KEY \
+    -e OPENROUTER_API_KEY_US \
+    -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_dir":"$abs_dir" \
@@ -461,7 +462,8 @@ pi-safe-3() {
     -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
-    -e OPENROUTER_API_KEY \
+    -e OPENROUTER_API_KEY_US \
+    -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_file":"$abs_file" \
@@ -513,7 +515,8 @@ pi-safe-stata-1() {
     -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
-    -e OPENROUTER_API_KEY \
+    -e OPENROUTER_API_KEY_US \
+    -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
@@ -567,7 +570,8 @@ pi-safe-stata-2() {
     -e TERM=xterm-256color \
     -e COLORTERM \
     -e LANG \
-    -e OPENROUTER_API_KEY \
+    -e OPENROUTER_API_KEY_US \
+    -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
@@ -702,7 +706,7 @@ print("slots (loaded/max): " + "  ".join(
         *gemini-3.7*)        _short="gem37"   ;;
         *)                  _short="$_m"     ;;
       esac
-      printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"
+      if [[ -n "$_t" ]]; then printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"; else printf '  %-10s  %-8s\n' "$_type" "$_short"; fi
       _found_pi=1
     done
   fi
@@ -755,7 +759,7 @@ _pi_pick_local_model() {
 # then load the model with those as a flag-level override merged over its saved recipe,
 # so the agent connects to exactly the config chosen here.
 _lem_preload() {
-  local id="$1" args="" mtp effort par nudge kv
+  local id="$1" args="" mtp effort par kv
   # real reachability check first, so a slow load is not mistaken for a dead server
   if ! curl -s -m 5 "$LEM_API/health" >/dev/null 2>&1; then
     print -r -- "Lemonade not reachable on $LEM_API (container up? try 'podman start lemonade')"
@@ -767,7 +771,7 @@ _lem_preload() {
       "dflash2  block-diffusion drafter (needs draft GGUF, ~1.5x MTP)" \
       "off") || return 1
     case "${mtp%%[ ]*}" in
-      dflash2) args+=" --spec-type draft-dflash --spec-draft-model $QWEN38_DFLASH2_DRAFT --spec-draft-n-max 4" ;;
+      dflash2) args+=" --spec-type draft-dflash --spec-draft-model $QWEN38_DFLASH2_DRAFT --spec-draft-n-max 4 -ctkd q8_0 -ctvd q8_0" ;;
       off) args+=" --spec-type none" ;;
     esac
 
@@ -798,12 +802,17 @@ _lem_preload() {
         ;;
     esac
 
-    nudge=$(gum choose --header "thinking nudges" --selected "nudge" \
-      "nudge  budget nudges: 12k cap, gentle pushes (recommended)" \
-      "plain  no nudges: uncapped thinking") || return 1
-    [[ "$nudge" == plain* ]] || args+=" $QWEN38_NUDGE_ARGS"
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || return 1
+    case "${kv%%[ ]*}" in
+      q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
   elif [[ "$id" == Ling* ]]; then
-    args+=" --spec-type none $LING3FLASH_SAMPLING"
+    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
+    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    args+=" $LING3FLASH_SAMPLING"
 
     kv=$(gum choose --header "KV cache quantization" --selected "f16" \
       "f16  default (unquantized f16)" \
@@ -828,6 +837,14 @@ _lem_preload() {
     mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
     [[ "$mtp" == "off" ]] && args+=" --spec-type none"
     args+=" $QWEN_SAMPLING"
+
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || return 1
+    case "${kv%%[ ]*}" in
+      q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
   fi
   par=$(gum choose --header "parallel slots" --selected "1" "1" "2") || return 1
   args+=" --parallel $par"
@@ -894,88 +911,14 @@ pi() {
 
 pihat() {
   export PI_SUBAGENTS_MAX_CONCURRENT=4
-  local model_choice model_key model_flag default_thinking thinking_choice
-  local -a thinking_opts
-
-  model_choice=$(gum choose \
-    --header "pihat · select model" \
-    "dsv4fl      DeepSeek V4 Flash (US)" \
-    "dsv4fl-cn   DeepSeek V4 Flash (China)" \
-    "opus        Claude Opus 4.8" \
-    "opus5       Claude Opus 5" \
-    "sonnet5     Claude Sonnet 5" \
-    "glm52       GLM 5.2" \
-    "kimik3      Kimi K3" \
-    "lunapro     OpenAI Luna Pro" \
-    "gem37       Gemini 3.7 Flash") || return 1
-  [[ -z "$model_choice" ]] && return 1
-
-  model_key="${model_choice%%[ ]*}"
-  case "$model_key" in
-    dsv4fl|dsv4fl-us)  
-      model_flag="openrouter/@preset/dsv4flash-cod"
-      default_thinking="xhigh"
-      thinking_opts=("high" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    dsv4fl-cn)  
-      model_flag="openrouter/@preset/dsv4flash-cod"
-      default_thinking="xhigh"
-      thinking_opts=("high" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
-      ;;
-    opus)
-      model_flag="openrouter/anthropic/claude-opus-4.8"
-      default_thinking="high"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    opus5)
-      model_flag="openrouter/anthropic/claude-opus-5"
-      default_thinking="xhigh"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    sonnet5)
-      model_flag="openrouter/anthropic/claude-sonnet-5"
-      default_thinking="xhigh"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    glm52)
-      model_flag="openrouter/z-ai/glm-5.2"
-      default_thinking="xhigh"
-      thinking_opts=("high" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    kimik3)
-      model_flag="openrouter/moonshotai/kimi-k3"
-      default_thinking="xhigh"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    lunapro)
-      model_flag="openrouter/openai/gpt-5.6-luna-pro"
-      default_thinking="xhigh"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    gem37)
-      model_flag="openrouter/google/gemini-3.7-flash"
-      default_thinking="medium"
-      thinking_opts=("low" "medium" "high")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    *)       return 1 ;;
-  esac
-
-  thinking_choice=$(gum choose \
-    --header "pihat · thinking effort  (default: $default_thinking)" \
-    --selected "$default_thinking" \
-    "${thinking_opts[@]}") || return 1
-  [[ -z "$thinking_choice" ]] && return 1
-
   _pi_nonstata_skills
+
+  # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
+  # openrouter-us (US key) = everything else. Model + thinking level via /model
+  # and Shift+Tab; per-model sampling via samplingParams.
+  local model_flag="${PIHAT_MODEL:-openrouter-ds/deepseek/deepseek-v4-flash-0731}"
+  # Scope /model to curated cloud providers (local hidden by default; Tab toggles all/scoped)
+  local model_scope="openrouter-us/**:max,openrouter-ds/**:max,openai-codex/**:max"
 
   local go
   go=$(gum choose --header "pihat · run in container?" \
@@ -985,12 +928,12 @@ pihat() {
   local _state_dir="$HOME/.pi/running"
   mkdir -p "$_state_dir"
   local _state_file="$_state_dir/$$.state"
-  printf 'type=pihat\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
+  printf 'type=pihat\nmodel=%s\n' "$model_flag" > "$_state_file"
 
   case "${go%%[ ]*}" in
     no)
       printf '\033]2;π̂ - %s\007' "${PWD##*/}"
-      { command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "$@" } \
+      { command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --models "$model_scope" "$@" } \
         always { rm -f "$_state_file"; printf '\a' > /dev/tty }
       ;;
     yes)
@@ -1010,7 +953,7 @@ pihat() {
       fi
 
       printf '\033]2;π̂ - %s\007' "${abs_target##*/}"
-      { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --thinking "$thinking_choice" "${@:2}" } \
+      { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --models "$model_scope" "${@:2}" } \
         always { rm -f "$_state_file"; printf '\a' > /dev/tty }
       ;;
   esac
@@ -1040,86 +983,13 @@ beta() {
 
 betahat() {
   export PI_SUBAGENTS_MAX_CONCURRENT=4
-  local model_choice model_key model_flag default_thinking thinking_choice
-  local -a thinking_opts
 
-  model_choice=$(gum choose \
-    --header "betahat · select model" \
-    "dsv4fl      DeepSeek V4 Flash (US)" \
-    "dsv4fl-cn   DeepSeek V4 Flash (China)" \
-    "opus        Claude Opus 4.8" \
-    "opus5       Claude Opus 5" \
-    "sonnet5     Claude Sonnet 5" \
-    "glm52       GLM 5.2" \
-    "kimik3      Kimi K3" \
-    "lunapro     OpenAI Luna Pro" \
-    "gem37       Gemini 3.7 Flash") || return 1
-  [[ -z "$model_choice" ]] && return 1
-
-  model_key="${model_choice%%[ ]*}"
-  case "$model_key" in
-    dsv4fl|dsv4fl-us)  
-      model_flag="openrouter/@preset/dsv4flash-cod"
-      default_thinking="xhigh"
-      thinking_opts=("high" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    dsv4fl-cn)  
-      model_flag="openrouter/@preset/dsv4flash-cod"
-      default_thinking="xhigh"
-      thinking_opts=("high" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_DS"
-      ;;
-    opus)
-      model_flag="openrouter/anthropic/claude-opus-4.8"
-      default_thinking="high"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    opus5)
-      model_flag="openrouter/anthropic/claude-opus-5"
-      default_thinking="xhigh"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    sonnet5)
-      model_flag="openrouter/anthropic/claude-sonnet-5"
-      default_thinking="xhigh"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    glm52)
-      model_flag="openrouter/z-ai/glm-5.2"
-      default_thinking="xhigh"
-      thinking_opts=("high" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    kimik3)
-      model_flag="openrouter/moonshotai/kimi-k3"
-      default_thinking="xhigh"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    lunapro)
-      model_flag="openrouter/openai/gpt-5.6-luna-pro"
-      default_thinking="xhigh"
-      thinking_opts=("low" "medium" "high" "max" "xhigh")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    gem37)
-      model_flag="openrouter/google/gemini-3.7-flash"
-      default_thinking="medium"
-      thinking_opts=("low" "medium" "high")
-      export OPENROUTER_API_KEY="$OPENROUTER_API_KEY_US"
-      ;;
-    *)       return 1 ;;
-  esac
-
-  thinking_choice=$(gum choose \
-    --header "betahat · thinking effort  (default: $default_thinking)" \
-    --selected "$default_thinking" \
-    "${thinking_opts[@]}") || return 1
-  [[ -z "$thinking_choice" ]] && return 1
+  # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
+  # openrouter-us (US key) = everything else. Model + thinking level via /model
+  # and Shift+Tab; per-model sampling via samplingParams.
+  local model_flag="${BETAHAT_MODEL:-openrouter-ds/deepseek/deepseek-v4-flash-0731}"
+  # Scope /model to curated cloud providers (local hidden by default; Tab toggles all/scoped)
+  local model_scope="openrouter-us/**:max,openrouter-ds/**:max,openai-codex/**:max"
 
   local target="${1:-$PWD}" abs_target
   abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
@@ -1134,9 +1004,9 @@ betahat() {
   local _state_dir="$HOME/.pi/running"
   mkdir -p "$_state_dir"
   local _state_file="$_state_dir/$$.state"
-  printf 'type=betahat\nmodel=%s\nthinking=%s\n' "$model_flag" "$thinking_choice" > "$_state_file"
+  printf 'type=betahat\nmodel=%s\n' "$model_flag" > "$_state_file"
   printf '\033]2;β̂ - %s\007' "${abs_target##*/}"
-  { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --thinking "$thinking_choice" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
+  { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; printf '\a' > /dev/tty }
 }
 
@@ -1167,5 +1037,6 @@ agy() {
 stata-start() { tmux new-session -s stata -c "$PWD" '/usr/local/stata19/stata-mp'; }
 alias stata-attach="tmux attach -t stata"
 alias stata-kill="tmux kill-session -t stata 2>/dev/null && echo 'stata session killed' || echo 'no stata session running'"
+
 
 
