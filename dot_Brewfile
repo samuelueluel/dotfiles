@@ -37,6 +37,10 @@ brew "fzf-tab"     # replace zsh completion menu with fzf
 brew "pipx"        # isolated Python CLI tool installer
 brew "gcc"         # C compiler — needed to build Python packages with native extensions
 brew "python@3.13" # pinned Python for packages incompatible with 3.14
+brew "gum"          # fuzzy/choice TUI — used by pi/pihat/beta launchers in ~/.zshrc
+brew "rustup"       # Rust toolchain manager
+brew "tree-sitter"  # incremental parsing library (dev)
+brew "tree-sitter-cli" # tree-sitter CLI (dev)
 
 
 cask "font-crimson-pro" # elegant variable serif

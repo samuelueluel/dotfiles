@@ -1,0 +1,8 @@
+# ~/.Npmfile
+# Declarative list of npm global packages (for replication).
+# Note: sjust npm performs a BLANKET upgrade (npm update -g --latest), so this
+# file is documentation of what should be installed on a fresh machine rather
+# than a per-package pin list. Install on a new machine with:
+#   npm install -g @openai/codex
+
+@openai/codex        # OpenAI Codex CLI — ChatGPT Plus quota check (/usage), subscription auth

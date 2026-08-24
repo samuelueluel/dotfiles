@@ -3,3 +3,5 @@
 # Install/Sync with: sjust pipx
 
 calcure                        # Modern TUI calendar and task manager
+mcp                            # Model Context Protocol CLI (mcp[cli])
+amd-debug-tools                # AMD suspend debug tools (amd-s2idle; used by 'sjust halo')

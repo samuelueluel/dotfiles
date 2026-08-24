@@ -1,52 +1,41 @@
 {
-  "security": {
-    "auth": {
-      "selectedType": "oauth-personal"
-    }
-  },
-  "hooks": {
-    "BeforeTool": [
-      {
-        "matcher": "run_shell_command",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "rtk hook gemini"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "prompt-sound",
-            "type": "command",
-            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message-new-instant.oga >/dev/null 2>&1 & echo '{}'",
-            "description": "Plays a sound when a notification or prompt occurs."
-          }
-        ]
-      }
-    ],
-    "AfterAgent": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "turn-completion-sound",
-            "type": "command",
-            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message-new-instant.oga >/dev/null 2>&1 & echo '{}'",
-            "description": "Plays a sound asynchronously after every turn completion."
-          }
-        ]
-      }
-    ]
-  },
-  "general": {
-    "enableNotifications": true
-  },
-  "ui": {
-    "theme": "Default"
+ "security": {
+  "auth": {
+   "selectedType": "oauth-personal"
   }
+ },
+ "hooks": {
+  "Notification": [
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "name": "prompt-sound",
+      "type": "command",
+      "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message-new-instant.oga >/dev/null 2>&1 & echo '{}'",
+      "description": "Plays a sound when a notification or prompt occurs."
+     }
+    ]
+   }
+  ],
+  "AfterAgent": [
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "name": "turn-completion-sound",
+      "type": "command",
+      "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message-new-instant.oga >/dev/null 2>&1 & echo '{}'",
+      "description": "Plays a sound asynchronously after every turn completion."
+     }
+    ]
+   }
+  ]
+ },
+ "general": {
+  "enableNotifications": true
+ },
+ "ui": {
+  "theme": "Default"
+ }
 }

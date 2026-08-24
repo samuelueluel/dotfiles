@@ -1,52 +1,41 @@
 {
-  "hooks": {
-    "PermissionRequest": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message.oga",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "rtk hook claude"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/dialog-information.oga",
-            "async": true
-          }
-        ]
-      }
+ "hooks": {
+  "PermissionRequest": [
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message.oga",
+      "async": true
+     }
     ]
-  },
-  "enabledPlugins": {
-    "mcp-stata@mcp-stata-marketplace": true
-  },
-  "extraKnownMarketplaces": {
-    "mcp-stata-marketplace": {
-      "source": {
-        "source": "github",
-        "repo": "tmonk/mcp-stata"
-      }
-    }
-  },
-  "effortLevel": "medium",
-  "theme": "custom:blur-theme"
+   }
+  ],
+  "Stop": [
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/dialog-information.oga",
+      "async": true
+     }
+    ]
+   }
+  ]
+ },
+ "enabledPlugins": {
+  "mcp-stata@mcp-stata-marketplace": true
+ },
+ "extraKnownMarketplaces": {
+  "mcp-stata-marketplace": {
+   "source": {
+    "source": "github",
+    "repo": "tmonk/mcp-stata"
+   }
+  }
+ },
+ "effortLevel": "medium",
+ "theme": "custom:blur-theme"
 }
