@@ -8,6 +8,13 @@ let currentMode: "plan" | "manual" | "auto" =
   process.env.PI_DEFAULT_MODE === "plan" ? "plan" :
   (process.argv.includes("-a") || process.argv.includes("--approve")) ? "auto" : "manual";
 
+// cptr launches a separate, headless Pi process for Open WebUI. Keep its
+// policy distinct from terminal Pi without changing the shared Pi settings.
+const CPTR_HEADLESS = process.env.PI_CPTR_HEADLESS === "1";
+const SCOPED_FILESYSTEM_PREFIX = "openwebui_filesystem_";
+const MCP_MUTATION_PATTERN = /delete|write|edit|move|rollback|create|update|remove|batch_execute/i;
+const HEADLESS_INTERACTIVE_COMMANDS = new Set(["bc", "less", "more", "zless", "man", "info", "apropos", "whatis"]);
+
 // ──────────────────────────────────────────────
 // Shared read-only tool set
 // Plan mode: strict whitelist (adds bash for shell exploration)
@@ -270,6 +277,100 @@ function isPlanSafeBashCommand(command: string): boolean {
   return true;
 }
 
+// Conservative headless bash policy. We allow known read-only commands and
+// pipelines, but reject shell operators that can redirect, chain, or execute
+// arbitrary commands. Terminal Pi continues to use the interactive policy.
+function splitReadOnlyPipeline(command: string): string[] | null {
+  const parts: string[] = [];
+  let current = "";
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+    const next = command[i + 1];
+
+    if (escapeNext) {
+      current += char;
+      escapeNext = false;
+      continue;
+    }
+    if (char === "\\" && !inSingleQuote) {
+      current += char;
+      escapeNext = true;
+      continue;
+    }
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      current += char;
+      continue;
+    }
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      current += char;
+      continue;
+    }
+    if (!inSingleQuote && (char === "`" || (char === "$" && next === "("))) {
+      return null;
+    }
+    if (!inSingleQuote && !inDoubleQuote) {
+      if (char === "|" && next !== "|") {
+        if (!current.trim()) return null;
+        parts.push(current.trim());
+        current = "";
+        continue;
+      }
+      if (char === "|" || char === ";" || char === "&" || char === "<" || char === ">" || char === "`" || char === "\n" || char === "\r") {
+        return null;
+      }
+      if (char === "$" && next === "(") {
+        return null;
+      }
+    }
+    current += char;
+  }
+
+  if (inSingleQuote || inDoubleQuote || !current.trim()) return null;
+  parts.push(current.trim());
+  return parts;
+}
+
+function isHeadlessReadOnlyBashCommand(command: string): boolean {
+  const parts = splitReadOnlyPipeline(command);
+  if (!parts) return false;
+
+  for (const part of parts) {
+    const words = part.split(/\s+/).filter(Boolean);
+    let index = 0;
+    while (index < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index])) index++;
+    if (index >= words.length) return false;
+
+    const commandName = words[index].replace(/^.*\//, "");
+    if (!SAFE_BASH_COMMANDS.has(commandName)) return false;
+    if (HEADLESS_INTERACTIVE_COMMANDS.has(commandName)) return false;
+
+    // These options turn otherwise read-oriented commands into command
+    // launchers or file writers.
+    if (commandName === "find" && /(?:^|\s)-(?:exec(?:dir)?|delete|ok(?:dir)?|fls|fprint(?:0|f)?|fprintf)(?:\s|$)/.test(part)) return false;
+    if (commandName === "fd" && /(?:^|\s)--exec(?:-batch)?(?:[=\s]|$)/.test(part)) return false;
+    if (commandName === "rg" && /(?:^|\s)--pre(?:[=\s]|$)/.test(part)) return false;
+    if (commandName === "sort" && /(?:^|\s)-o(?:[=\s]|$)/.test(part)) return false;
+    if (commandName === "env" || commandName === "time") return false;
+  }
+
+  return true;
+}
+
+function isZoteroReadOnlyTool(toolName: string): boolean {
+  const normalized = toolName.replace(/-/g, "_");
+  return normalized.startsWith("zotero_") && !MCP_MUTATION_PATTERN.test(normalized);
+}
+
+function isScopedFilesystemTool(toolName: string): boolean {
+  return toolName.replace(/-/g, "_").startsWith(SCOPED_FILESYSTEM_PREFIX);
+}
+
 // Ask the user a question using Pi's native UI
 async function askUser(query: string, ctx: any, details?: string): Promise<boolean> {
   const promptText = details ? `${details}\n\n${query}` : query;
@@ -482,13 +583,26 @@ export default function (pi: any) {
 
     // ── 2. MANUAL MODE ──
     if (currentMode === "manual") {
-      // ── MCP tool handling: auto-approve read-only MCP operations, gate mutations ──
+      // ── MCP tool handling ──
+      // Open WebUI may use the proxy form, while direct MCP tools are handled
+      // below. Zotero retrieval and the folder-scoped filesystem server are
+      // safe in cptr because their server-side scope is the policy boundary.
       if (event.toolName === "mcp") {
         const fullToolName = String(event.input?.tool || event.input?.name || event.input?.subcommand || event.input?.command || "");
-        const isWriteOp = /delete|write|edit|move|rollback|create|update|remove|batch_execute/i.test(fullToolName);
-        if (!isWriteOp) {
-          ctx.ui.notify(`MCP approved (read-only): ${fullToolName || 'mcp'}`, "success");
-          return {};
+        const isScopedTool = isScopedFilesystemTool(fullToolName);
+        const isTurboVaultTool = fullToolName.startsWith("turbovault_");
+        const isZoteroRead = isZoteroReadOnlyTool(fullToolName);
+        const isWriteOp = MCP_MUTATION_PATTERN.test(fullToolName);
+
+        if (isScopedTool || isTurboVaultTool || isZoteroRead) {
+          if (CPTR_HEADLESS || !isWriteOp) return {};
+        }
+        if (!isWriteOp) return {};
+        if (CPTR_HEADLESS) {
+          return {
+            block: true,
+            reason: `Open WebUI Pi policy blocks MCP mutation '${fullToolName}'. Use the explicitly allowed scoped server or TurboVault operation.`,
+          };
         }
         const details = `MCP Tool Call: ${fullToolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
         const approved = await askUser(`Approve MCP mutation '${fullToolName}'? [Y/n] `, ctx, details);
@@ -500,16 +614,23 @@ export default function (pi: any) {
         return {};
       }
 
-      // ── turbovault direct tools (exposed via directTools, not routed through `mcp`):
-      //    reads pass via COMMON_READ_ONLY; gate the remaining mutations ──
-      if (event.toolName.startsWith("turbovault_") && !COMMON_READ_ONLY.has(event.toolName)) {
-        const details = `turbovault tool call: ${event.toolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
-        const approved = await askUser(`Approve turbovault mutation '${event.toolName}'? [Y/n] `, ctx, details);
-        if (!approved) {
-          ctx.ui.notify(`turbovault mutation blocked: ${event.toolName}`, "error");
-          return { block: true, reason: `User rejected turbovault mutation: ${event.toolName}` };
+      // ── scoped filesystem direct tools ──
+      if (isScopedFilesystemTool(event.toolName) && CPTR_HEADLESS) {
+        return {};
+      }
+
+      // ── turbovault direct tools (exposed via directTools, not routed through `mcp`) ──
+      if (event.toolName.startsWith("turbovault_")) {
+        if (CPTR_HEADLESS) return {};
+        if (!COMMON_READ_ONLY.has(event.toolName)) {
+          const details = `turbovault tool call: ${event.toolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
+          const approved = await askUser(`Approve turbovault mutation '${event.toolName}'? [Y/n] `, ctx, details);
+          if (!approved) {
+            ctx.ui.notify(`turbovault mutation blocked: ${event.toolName}`, "error");
+            return { block: true, reason: `User rejected turbovault mutation: ${event.toolName}` };
+          }
+          ctx.ui.notify(`turbovault mutation approved`, "success");
         }
-        ctx.ui.notify(`turbovault mutation approved`, "success");
         return {};
       }
 
@@ -520,6 +641,12 @@ export default function (pi: any) {
 
       // ── write: show diff before approval ──
       if (event.toolName === "write") {
+        if (CPTR_HEADLESS) {
+          return {
+            block: true,
+            reason: "Open WebUI Pi policy blocks direct filesystem writes. Use the folder-scoped filesystem MCP instead.",
+          };
+        }
         const filePath = event.input.path || event.input.targetFile;
         const newContent = event.input.content || event.input.code || "";
         let oldContent = "";
@@ -543,6 +670,12 @@ export default function (pi: any) {
 
       // ── edit: show diff before approval ──
       if (event.toolName === "edit") {
+        if (CPTR_HEADLESS) {
+          return {
+            block: true,
+            reason: "Open WebUI Pi policy blocks direct filesystem edits. Use the folder-scoped filesystem MCP instead.",
+          };
+        }
         const filePath = event.input.path || event.input.targetFile;
         const oldText = event.input.oldText;
         const newText = event.input.newText;
@@ -573,11 +706,19 @@ export default function (pi: any) {
         return {};
       }
 
-      // ── bash: check whitelist first, then approval if needed ──
+      // ── bash: cptr allows only conservative read-only commands ──
       if (event.toolName === "bash") {
         const command = event.input.command || "";
 
-        // Check if the command is in the safe whitelist
+        if (CPTR_HEADLESS) {
+          if (isHeadlessReadOnlyBashCommand(command)) return {};
+          return {
+            block: true,
+            reason: "Open WebUI Pi policy blocks filesystem-changing or arbitrary shell commands. Use the folder-scoped filesystem MCP for file access.",
+          };
+        }
+
+        // Check whitelist first, then approval if needed
         if (isPlanSafeBashCommand(command)) {
           // Safe command - allow without approval
           ctx.ui.notify(`Command approved (safe): ${command.substring(0, 60)}${command.length > 60 ? '...' : ''}`, "success");
@@ -615,6 +756,12 @@ export default function (pi: any) {
 
       // ── stata / python-repl: show code before approval ──
       if (event.toolName === "stata" || event.toolName === "python-repl") {
+        if (CPTR_HEADLESS) {
+          return {
+            block: true,
+            reason: `Open WebUI Pi policy blocks ${event.toolName} execution because it requires interactive approval.`,
+          };
+        }
         const code = event.input.code || event.input.command || "";
         const details = `--- Proposed Code to Run (${event.toolName}) ---\n${code}`;
         const approved = await askUser(`Execute ${event.toolName} code? [Y/n] `, ctx, details);
@@ -630,6 +777,12 @@ export default function (pi: any) {
       }
 
       // ── catch-all: gate any unrecognized non-read-only tool ──
+      if (CPTR_HEADLESS) {
+        return {
+          block: true,
+          reason: `Open WebUI Pi policy blocks unapproved tool '${event.toolName}'.`,
+        };
+      }
       const details = `Tool: ${event.toolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
       const approved = await askUser(`Allow tool '${event.toolName}'? [Y/n] `, ctx, details);
       if (!approved) {

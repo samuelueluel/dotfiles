@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+# Select the Pi model used by the cptr-backed Open WebUI workspace.
+# Model metadata and per-model request settings remain authoritative in Pi's
+# ~/.pi/agent/models.json. Qwen's Lemonade effort menu additionally controls
+# this workspace's Pi thinking level; the normal/default level is max.
+set -euo pipefail
+
+WORKSPACE=${PI_CPTR_WORKSPACE:-"$HOME/Dropbox/OpenWebUI-Writable/pi-poc"}
+MODEL_FILE="$WORKSPACE/.cptr/model"
+SETTINGS_FILE="$WORKSPACE/.pi/settings.json"
+MODELS_JSON=${PI_MODELS_JSON:-"$HOME/.pi/agent/models.json"}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  pi-cptr-model                 # open the gum model menu
+  pi-cptr-model menu
+  pi-cptr-model show
+  pi-cptr-model list
+  pi-cptr-model use [PROVIDER/MODEL]
+
+Examples:
+  pi-cptr-model
+  pi-cptr-model use local/Qwen3.6-MoE-35B-Q4
+  pi-cptr-model use openrouter-us/anthropic/claude-opus-4.8
+
+Local selections first run the shared Lemonade gum loader used by pi/beta.
+For Qwen3.8, its gum effort choice also overrides cptr's Pi thinking level
+(xhigh maps to Pi max). Non-Qwen and cloud selections restore Pi max. The cptr
+target is written only after the load succeeds. The selection applies to the
+next cptr request. Existing chats resume with that model unless started as a
+new chat.
+EOF
+}
+
+die() {
+  printf 'pi-cptr-model: %s\n' "$*" >&2
+  exit 2
+}
+
+normalize_model() {
+  local value=${1:-}
+  [[ -n "$value" ]] || die "model is required"
+  if [[ "$value" == agent:pi/* ]]; then
+    value=${value#agent:pi/}
+  fi
+  [[ "$value" == */* ]] || die "use PROVIDER/MODEL"
+  [[ "$value" != *$'\n'* && "$value" != *$'\r'* && "$value" != *' '* ]] || die "model contains whitespace"
+  printf '%s\n' "$value"
+}
+
+current_target() {
+  if [[ -f "$MODEL_FILE" ]]; then
+    tr -d '\r\n' < "$MODEL_FILE"
+  else
+    printf '%s\n' '(not configured)'
+  fi
+}
+
+current_thinking_level() {
+  if [[ -f "$SETTINGS_FILE" ]] && command -v jq >/dev/null 2>&1; then
+    jq -r '.defaultThinkingLevel // "max"' "$SETTINGS_FILE"
+  else
+    printf '%s\n' 'max'
+  fi
+}
+
+set_cptr_thinking_level() {
+  local level=${1:-}
+  case "$level" in
+    off|minimal|low|medium|high|xhigh|max) ;;
+    *) die "invalid Pi thinking level: $level" ;;
+  esac
+
+  mkdir -p "$(dirname "$SETTINGS_FILE")"
+  python3 - "$SETTINGS_FILE" "$level" <<'PY'
+import json
+import os
+import stat
+import sys
+import tempfile
+
+path, level = sys.argv[1:]
+try:
+    with open(path, encoding="utf-8") as stream:
+        data = json.load(stream)
+except FileNotFoundError:
+    data = {}
+if not isinstance(data, dict):
+    raise SystemExit(f"{path} must contain a JSON object")
+
+data["defaultThinkingLevel"] = level
+directory = os.path.dirname(path) or "."
+mode = stat.S_IMODE(os.stat(path).st_mode) if os.path.exists(path) else 0o644
+fd, temporary = tempfile.mkstemp(prefix=".settings.", suffix=".tmp", dir=directory)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        json.dump(data, stream, indent=2)
+        stream.write("\n")
+    os.chmod(temporary, mode)
+    os.replace(temporary, path)
+finally:
+    if os.path.exists(temporary):
+        os.unlink(temporary)
+PY
+  printf 'cptr Pi thinking level set to %s\n' "$level"
+}
+
+show_model() {
+  local target
+  target=$(current_target)
+  printf 'workspace: %s\n' "$WORKSPACE"
+  printf 'model target: %s\n' "$target"
+  printf 'Pi thinking level: %s\n' "$(current_thinking_level)"
+  if [[ "$target" == agent:pi/* ]]; then
+    printf 'provider/model: %s\n' "${target#agent:pi/}"
+  fi
+}
+
+model_rows() {
+  {
+    printf '%s\t%s\n' 'openai-codex/gpt-5.6-luna' 'OpenAI Codex · GPT-5.6 Luna'
+    if [[ -f "$MODELS_JSON" ]] && command -v jq >/dev/null 2>&1; then
+      jq -r '.providers | to_entries[] as $provider | $provider.value.models[]? | "\($provider.key)/\(.id)\t\(.name // .id)"' "$MODELS_JSON"
+    fi
+  } | awk -F '\t' '!seen[$1]++'
+}
+
+list_models() {
+  model_rows | cut -f1
+}
+
+select_model() {
+  command -v gum >/dev/null 2>&1 || die "gum is required for interactive model selection"
+
+  local current choice model
+  current=$(current_target)
+  [[ "$current" == agent:pi/* ]] && current=${current#agent:pi/}
+  choice=$(model_rows | gum choose \
+    --header "Pi cptr model  (current: ${current:-none})" \
+    --height 20) || return 1
+  model=${choice%%$'\t'*}
+  [[ -n "$model" ]] || die "no model selected"
+  use_model "$model"
+}
+
+use_model() {
+  local model target tmp thinking_file selected_thinking_level
+  model=$(normalize_model "${1:-}")
+  mkdir -p "$WORKSPACE/.cptr"
+
+  if [[ "$model" == local/* ]]; then
+    command -v lem-load-model >/dev/null 2>&1 || die "lem-load-model is required for local models"
+    if [[ "${model#local/}" == Qwen3.8-* ]]; then
+      thinking_file=$(mktemp "$WORKSPACE/.cptr/.thinking.XXXXXX")
+      rm -f "$thinking_file"
+      if ! PI_CPTR_THINKING_LEVEL_FILE="$thinking_file" \
+        lem-load-model "${model#local/}"; then
+        rm -f "$thinking_file"
+        return 1
+      fi
+      selected_thinking_level=$(cat "$thinking_file" 2>/dev/null || true)
+      rm -f "$thinking_file"
+      [[ -n "$selected_thinking_level" ]] || die "Qwen effort menu returned no Pi thinking level"
+      set_cptr_thinking_level "$selected_thinking_level"
+    else
+      lem-load-model "${model#local/}" || return 1
+      set_cptr_thinking_level max
+    fi
+  else
+    set_cptr_thinking_level max
+  fi
+
+  target="agent:pi/$model"
+  tmp=$(mktemp "$WORKSPACE/.cptr/.model.XXXXXX")
+  trap 'rm -f "$tmp"' EXIT
+  printf '%s\n' "$target" > "$tmp"
+  chmod 600 "$tmp"
+  mv -f "$tmp" "$MODEL_FILE"
+  trap - EXIT
+  printf 'cptr Pi model set to %s\n' "$model"
+  printf 'This applies to the next request; no cptr restart is normally needed.\n'
+}
+
+command=${1:-menu}
+case "$command" in
+  menu|choose) select_model ;;
+  show) show_model ;;
+  list) list_models ;;
+  use)
+    if [[ -n "${2:-}" ]]; then
+      use_model "$2"
+    else
+      select_model
+    fi
+    ;;
+  -h|--help|help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

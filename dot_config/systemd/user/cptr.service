@@ -1,0 +1,17 @@
+[Unit]
+Description=Open WebUI Computer (Pi gateway)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/cptr/openrouter.env
+Environment=CPTR_DATA_DIR=%h/.cptr
+Environment=PI_CPTR_HEADLESS=1
+Environment=PATH=/var/home/samuel/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin
+ExecStart=/var/home/samuel/.local/bin/cptr-patched run --headless --host 127.0.0.1 --port 13309
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

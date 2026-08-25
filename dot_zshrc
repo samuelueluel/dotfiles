@@ -181,23 +181,9 @@ fi
 # OPENAI_API_KEY is set in ~/.zshenv.local (placeholder for local llama.cpp compat)
 RAMA_IMG=ghcr.io/nathanw1014/strix-halo-llamacpp:vulkan
 
-# Shared reasoning-model sampling parameters (used in _lem_preload)
-# Qwen3.6 thinking-mode guidance (temp 0.6 / top_p 0.95 / top_k 20 / min_p 0 / pres-pen 0)
-QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
-# Qwen3.8 official recommended sampling (thinking mode: temp 1.0 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
-QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
-# Qwen3.8 nudge mode: progressive thinking-budget nudges (intro at start, soft pushes at
-# 50%/75%, hard cutoff at 12k with closing tag). Messages are single-quoted — Lemonade's
-# arg tokenizer keeps single-quoted values intact (double quotes are eaten, see issue #1939).
-QWEN38_NUDGE_ARGS="--reasoning-budget-enable --reasoning-budget 12288 --reasoning-budget-grace-tokens 256 --reasoning-budget-intro-mode once --reasoning-budget-intro-message 'I have a thinking budget of {budget} tokens for this turn. I will reason efficiently, focus on the key points, and aim to finalize my answer well before the budget runs out.' --reasoning-budget-soft-ratio 0.5 --reasoning-budget-soft-message 'I have used about half of my thinking budget. Let me focus on the main line of reasoning and stop exploring side branches.' --reasoning-budget-soft2-ratio 0.75 --reasoning-budget-soft2-message 'I have spent most of my thinking budget. I should stop exploring new approaches and converge on the final answer now.' --reasoning-budget-message 'Considering the limited time by the user, I have to give the solution based on the thinking directly now.\n</think>'"
-# DeepSeek-V4-Flash official recommended agentic/thinking sampling (temp 1.0 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
-DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
-# Ling-3.0-Flash official recommended agentic/thinking sampling (temp 0.6 / top-p 0.95 / top-k 20 / min-p 0 / pres-pen 0)
-LING3FLASH_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
-
-# Qwen3.8 DFlash2 draft (block-diffusion drafter, used with --spec-type draft-dflash)
-# Q4_K_M draft + --spec-draft-n-max 4: saves ~1GB VRAM/bandwidth over Q8_0 with equal/higher acceptance (~50-68%)
-QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
+# Local-model loading is shared by pi, beta, and pi-cptr-model.
+# The implementation lives in ~/.local/bin/lem-load-model so all three paths
+# use the same speculative-decoding, reasoning, KV-cache, and slot menus.
 
 # Small FIM autocomplete model for Zed (Continue → :8081). Runs on the iGPU ALONGSIDE
 # the main model, on its own name/port so a main-model swap doesn't evict it. No MTP (not an
@@ -639,52 +625,70 @@ lem-status() {
 import sys, json
 d = json.load(sys.stdin)
 loaded = d.get("all_models_loaded") or []
-print("server: %s  (v%s)" % (d.get("status", "?"), d.get("version", "?")))
+print("Lemonade  %s  ·  v%s" % (d.get("status", "?"), d.get("version", "?")))
 if not loaded:
-    print("loaded: none (RAM clear)")
+    print("  models   none (RAM clear)")
 else:
-    print("loaded models:")
+    print("  models")
     for m in loaded:
-        pin = " [pinned]" if m.get("pinned") else ""
-        print("  - %-11s %s  (%s, %s)%s" % (
+        pin = "  pinned" if m.get("pinned") else ""
+        print("    %-8s %-34s %s · %s%s" % (
             m.get("type", "?"), m.get("model_name", "?"),
             m.get("device", "?"), m.get("status", "?"), pin))
 mm = d.get("max_models") or {}
 counts = {}
 for m in loaded:
     counts[m.get("type", "?")] = counts.get(m.get("type", "?"), 0) + 1
-print("slots (loaded/max): " + "  ".join(
-    "%s=%d/%s" % (k, counts.get(k, 0), v) for k, v in mm.items()))
+print("  slots    " + " · ".join(
+    "%s %d/%s" % (k, counts.get(k, 0), v) for k, v in mm.items()))
 '
+
+  # cptr Pi target (workspace selection; distinct from the Lemonade resident model)
+  local _cptr_workspace _cptr_model_file _cptr_settings_file _cptr_model _cptr_thinking
+  _cptr_workspace=${PI_CPTR_WORKSPACE:-"$HOME/Dropbox/OpenWebUI-Writable/pi-poc"}
+  _cptr_model_file="$_cptr_workspace/.cptr/model"
+  _cptr_settings_file="$_cptr_workspace/.pi/settings.json"
+  if [[ -r "$_cptr_model_file" ]]; then
+    _cptr_model=$(tr -d '\r\n' < "$_cptr_model_file")
+    _cptr_model=${_cptr_model#agent:pi/}
+  else
+    _cptr_model='(not configured)'
+  fi
+  _cptr_thinking=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("defaultThinkingLevel", "max"))' "$_cptr_settings_file" 2>/dev/null) || _cptr_thinking='max'
+  printf '\n%s\n' 'cptr / Open WebUI'
+  printf '  target   %s\n' "$_cptr_model"
+  printf '  thinking %s\n' "$_cptr_thinking"
+
+  printf '\n%s\n' 'Ramalama'
   # Ramalama embedder status (port 8082)
   local _embedder_id
   _embedder_id=$(curl -sf -m 2 "http://localhost:8082/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
   if [[ -n "$_embedder_id" ]]; then
-    printf '  %-10s  %-8s  active on :8082 (%s)\n' "embedder" "ramalama" "${_embedder_id##*/}"
+    printf '  %-10s %-8s :8082  %s\n' "embedder" "active" "${_embedder_id##*/}"
   else
-    printf '  %-10s  %-8s  off (:8082 inactive)\n' "embedder" "ramalama"
+    printf '  %-10s %-8s :8082\n' "embedder" "off"
   fi
 
   # Ramalama reranker status (port 8083)
   local _reranker_id
   _reranker_id=$(curl -sf -m 2 "http://localhost:8083/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
   if [[ -n "$_reranker_id" ]]; then
-    printf '  %-10s  %-8s  active on :8083 (%s)\n' "reranker" "ramalama" "${_reranker_id##*/}"
+    printf '  %-10s %-8s :8083  %s\n' "reranker" "active" "${_reranker_id##*/}"
   else
-    printf '  %-10s  %-8s  off (:8083 inactive)\n' "reranker" "ramalama"
+    printf '  %-10s %-8s :8083\n' "reranker" "off"
   fi
 
   # Ramalama VLM status (port 8084)
   local _vlm_id
   _vlm_id=$(curl -sf -m 2 "http://localhost:8084/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
   if [[ -n "$_vlm_id" ]]; then
-    printf '  %-10s  %-8s  active on :8084 (%s)\n' "vlm" "ramalama" "${_vlm_id##*/}"
+    printf '  %-10s %-8s :8084  %s\n' "vlm" "active" "${_vlm_id##*/}"
   else
-    printf '  %-10s  %-8s  off (:8084 inactive)\n' "vlm" "ramalama"
+    printf '  %-10s %-8s :8084\n' "vlm" "off"
   fi
 
   # Cloud agents (pihat / betahat) — state files written at launch, removed on exit
-  echo ""
+  printf '\n%s\n' 'Pi agents'
   local _state_dir="$HOME/.pi/running"
   local _found_pi=0 _f _spid _type _m _t _short
   if [[ -d "$_state_dir" ]]; then
@@ -706,11 +710,15 @@ print("slots (loaded/max): " + "  ".join(
         *gemini-3.7*)        _short="gem37"   ;;
         *)                  _short="$_m"     ;;
       esac
-      if [[ -n "$_t" ]]; then printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"; else printf '  %-10s  %-8s\n' "$_type" "$_short"; fi
+      if [[ -n "$_t" ]]; then
+        printf '  %-10s %-12s thinking: %s\n' "$_type" "$_short" "$_t"
+      else
+        printf '  %-10s %-12s\n' "$_type" "$_short"
+      fi
       _found_pi=1
     done
   fi
-  (( _found_pi )) || printf '  cloud     —\n'
+  (( _found_pi )) || printf '  none\n'
 }
 
 # lem-unload: drop ALL models from RAM and force-kill lingering engine processes
@@ -734,136 +742,33 @@ lem-unload() {
 _pi_pick_local_model() {
   local choice
   choice=$(gum choose --header "select model  (Lemonade · one loads at a time)" \
-    "dense38-q4  Qwen3.8 Dense 27B  Q4" \
-    "dense38-q6  Qwen3.8 Dense 27B  Q6" \
-    "moe-q4      Qwen3.6 MoE 35B    Q4" \
-    "moe-q8      Qwen3.6 MoE 35B    Q8" \
-    "dsv4fl-q2   DeepSeek V4 Flash Q2 (86GB MoE)" \
-    "dsv4fl-q2k  DeepSeek V4 Flash Q2_K_XL (90GB MoE)" \
-    "dsv4fl-q3   DeepSeek V4 Flash Q3 (97GB MoE)" \
-    "ling3fl-q5  Ling 3.0 Flash Q5_K_M (91GB MoE)") || return 1
+    "dense38-q4   Qwen3.8 Dense 27B  Q4" \
+    "dense38-q6   Qwen3.8 Dense 27B  Q6" \
+    "dense38-fp4  Qwen3.8 Dense 27B  ROCmFP4 (Laurent)" \
+    "moe-q4       Qwen3.6 MoE 35B    Q4" \
+    "moe-q8       Qwen3.6 MoE 35B    Q8" \
+    "dsv4fl-q2    DeepSeek V4 Flash Q2 (86GB MoE)" \
+    "dsv4fl-q2k   DeepSeek V4 Flash Q2_K_XL (90GB MoE)" \
+    "dsv4fl-q3    DeepSeek V4 Flash Q3 (97GB MoE)" \
+    "ling3fl-q5   Ling 3.0 Flash Q5_K_M (91GB MoE)") || return 1
   case "${choice%%[ ]*}" in
-    dense38-q4) print -r -- "Qwen3.8-27B-Q4" ;;
-    dense38-q6) print -r -- "Qwen3.8-27B-Q6" ;;
-    moe-q4)     print -r -- "Qwen3.6-MoE-35B-Q4" ;;
-    moe-q8)     print -r -- "Qwen3.6-MoE-35B-Q8" ;;
-    dsv4fl-q2)  print -r -- "DeepSeek-V4-Flash-Q2" ;;
-    dsv4fl-q2k) print -r -- "DeepSeek-V4-Flash-Q2K" ;;
-    dsv4fl-q3)  print -r -- "DeepSeek-V4-Flash-Q3" ;;
-    ling3fl-q5) print -r -- "Ling-3.0-Flash-Q5" ;;
+    dense38-q4)  print -r -- "Qwen3.8-27B-Q4" ;;
+    dense38-q6)  print -r -- "Qwen3.8-27B-Q6" ;;
+    dense38-fp4) print -r -- "Qwen3.8-27B-ROCmFP4" ;;
+    moe-q4)      print -r -- "Qwen3.6-MoE-35B-Q4" ;;
+    moe-q8)      print -r -- "Qwen3.6-MoE-35B-Q8" ;;
+    dsv4fl-q2)   print -r -- "DeepSeek-V4-Flash-Q2" ;;
+    dsv4fl-q2k)  print -r -- "DeepSeek-V4-Flash-Q2K" ;;
+    dsv4fl-q3)   print -r -- "DeepSeek-V4-Flash-Q3" ;;
+    ling3fl-q5)  print -r -- "Ling-3.0-Flash-Q5" ;;
     *) return 1 ;;
   esac
 }
 
-# _lem_preload <model_id>: pick MTP (Qwen/DeepSeek) + reasoning effort (Qwen3.8) + parallel,
-# then load the model with those as a flag-level override merged over its saved recipe,
-# so the agent connects to exactly the config chosen here.
+# Keep the historical helper name for pi/beta callers while sharing the
+# exact same loader with pi-cptr-model.
 _lem_preload() {
-  local id="$1" args="" mtp effort par kv
-  # real reachability check first, so a slow load is not mistaken for a dead server
-  if ! curl -s -m 5 "$LEM_API/health" >/dev/null 2>&1; then
-    print -r -- "Lemonade not reachable on $LEM_API (container up? try 'podman start lemonade')"
-    return 1
-  fi
-  if [[ "$id" == Qwen3.8* ]]; then
-    mtp=$(gum choose --header "speculative decoding" --selected "on" \
-      "on       MTP (built-in draft, no extra model)" \
-      "dflash2  block-diffusion drafter (needs draft GGUF, ~1.5x MTP)" \
-      "off") || return 1
-    case "${mtp%%[ ]*}" in
-      dflash2) args+=" --spec-type draft-dflash --spec-draft-model $QWEN38_DFLASH2_DRAFT --spec-draft-n-max 4 -ctkd q8_0 -ctvd q8_0" ;;
-      off) args+=" --spec-type none" ;;
-    esac
-
-    effort=$(gum choose --header "thinking / reasoning effort" \
-      "xhigh   deep reasoning (default)" \
-      "medium  balanced reasoning" \
-      "low     fast / concise reasoning" \
-      "off     instruct mode (no thinking)") || return 1
-    # NB: JSON cannot travel inside llamacpp_args — Lemonade's arg tokenizer eats
-    # the quotes (github.com/lemonade-sdk/lemonade issue #1939; still broken in
-    # 10.8.0). Reasoning effort is baked into per-effort jinja variants instead:
-    #   xhigh   = base template default (no override needed)
-    #   medium/low/off = qwen3.8-froggeric-v22-{medium,low,off}.jinja
-    # --chat-template-file (a plain path) survives tokenization and overrides the
-    # recipe's template at load time.
-    case "${effort%%[ ]*}" in
-      xhigh)
-        args+=" $QWEN38_SAMPLING"
-        ;;
-      medium)
-        args+=" $QWEN38_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-medium.jinja"
-        ;;
-      low)
-        args+=" $QWEN38_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-low.jinja"
-        ;;
-      off)
-        args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
-        ;;
-    esac
-
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || return 1
-    case "${kv%%[ ]*}" in
-      q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
-  elif [[ "$id" == Ling* ]]; then
-    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
-    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
-    args+=" $LING3FLASH_SAMPLING"
-
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || return 1
-    case "${kv%%[ ]*}" in
-      q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
-  elif [[ "$id" == DeepSeek* ]]; then
-    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
-    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
-    args+=" $DS4FLASH_SAMPLING"
-
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || return 1
-    case "${kv%%[ ]*}" in
-      q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
-  elif [[ "$id" == Qwen* ]]; then
-    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || return 1
-    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
-    args+=" $QWEN_SAMPLING"
-
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || return 1
-    case "${kv%%[ ]*}" in
-      q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
-  fi
-  par=$(gum choose --header "parallel slots" --selected "1" "1" "2") || return 1
-  args+=" --parallel $par"
-  args="${args# }"
-
-  # if the weights are not downloaded yet, the load also pulls them (can be tens of GB)
-  local note="loading ${id}  [override: ${args}]"
-  curl -s -m 10 "$LEM_API/models" 2>/dev/null | grep -q "\"$id\"" \
-    || note="first load of ${id}: downloading weights (several minutes) then loading  [override: ${args}]"
-
-  local load_json resp
-  load_json=$(python3 -c 'import sys, json; print(json.dumps({"model_name": sys.argv[1], "llamacpp_args": sys.argv[2]}))' "$id" "$args")
-
-  resp=$(gum spin --show-output --title "$note" -- \
-    curl -s -m 3600 -X POST "$LEM_API/load" -H 'Content-Type: application/json' \
-    -d "$load_json")
-  print -r -- "$resp" | grep -q '"status":"success"' && return 0
-  print -r -- "load failed: ${resp:-timed out; check 'podman logs lemonade' or 'lem-status'}"
-  return 1
+  command lem-load-model "$@"
 }
 
 pi() {
@@ -916,7 +821,7 @@ pihat() {
   # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
   # openrouter-us (US key) = everything else. Model + thinking level via /model
   # and Shift+Tab; per-model sampling via samplingParams.
-  local model_flag="${PIHAT_MODEL:-openrouter-ds/deepseek/deepseek-v4-flash-0731}"
+  local model_flag="${PIHAT_MODEL:-openai-codex/gpt-5.6-luna}"
   # Scope /model to curated cloud providers (local hidden by default; Tab toggles all/scoped)
   local model_scope="openrouter-us/**:max,openrouter-ds/**:max,openai-codex/**:max"
 
@@ -987,7 +892,7 @@ betahat() {
   # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
   # openrouter-us (US key) = everything else. Model + thinking level via /model
   # and Shift+Tab; per-model sampling via samplingParams.
-  local model_flag="${BETAHAT_MODEL:-openrouter-ds/deepseek/deepseek-v4-flash-0731}"
+  local model_flag="${BETAHAT_MODEL:-openai-codex/gpt-5.6-luna}"
   # Scope /model to curated cloud providers (local hidden by default; Tab toggles all/scoped)
   local model_scope="openrouter-us/**:max,openrouter-ds/**:max,openai-codex/**:max"
 
@@ -1037,6 +942,15 @@ agy() {
 stata-start() { tmux new-session -s stata -c "$PWD" '/usr/local/stata19/stata-mp'; }
 alias stata-attach="tmux attach -t stata"
 alias stata-kill="tmux kill-session -t stata 2>/dev/null && echo 'stata session killed' || echo 'no stata session running'"
+
+# Launch Ghostty writing session with Monaspace Xenon (closes caller)
+ghostty-write() {
+  (nohup ghostty --gtk-single-instance=false --config-file="$HOME/.config/ghostty/config-write.ghostty" "$@" >/dev/null 2>&1 &)
+  exit
+}
+
+
+
 
 
 

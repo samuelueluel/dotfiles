@@ -26,14 +26,11 @@
 - System: Reboot | systemctl reboot
 - System: Power off | systemctl poweroff
 - System: Clean unused flatpaks | flatpak uninstall --unused
-- System: RTK token savings | rtk gain
 - System: TuneD - Set GPU/LLM sustained profile | sudo tuned-adm profile gpu-sustained
 - System: TuneD - Set CPU/Stata sustained profile | sudo tuned-adm profile cpu-sustained
 - System: TuneD - Set throughput performance profile | sudo tuned-adm profile throughput-performance
 - System: TuneD - Set balanced profile | sudo tuned-adm profile balanced
 - System: TuneD - Check active profile | tuned-adm active
-- System: Sunset (Santa Fe) | night-on
-- System: Sunset off | night-off
 - System: Chezmoi | chezmoi
 - System: Tealdeer (tldr) | tldr
 - System: Waydroid status | waydroid status
@@ -42,6 +39,8 @@
 - TUI: Process monitor (btm) | btm
 - TUI: Network (wlctl) | wlctl
 - TUI: Bluetooth | bluetuith
+
+- Writing: Ghostty writing terminal (Monaspace Xenon) | ghostty-write
 
 - Niri: Toggle debug view | niri msg action toggle-debug-view
 - Niri: IPC msg | niri msg
@@ -56,6 +55,9 @@
 
 - AI: Rebuild Pi container image | pi-rebuild
 
+- AI: Select cptr Pi model (gum menu) | pi-cptr-model
+- AI: Show selected cptr Pi model | pi-cptr-model show
+- AI: List cptr Pi models | pi-cptr-model list
 - AI: Lemonade status (loaded models + slots) | lem-status
 - AI: Lemonade unload all models | lem-unload
 - AI: Lemonade logs (downloads / activity) | podman logs --tail 20 lemonade
@@ -68,11 +70,10 @@
 - AI: Serve reranker (background) | serve-reranker
 - AI: Stop reranker | stop-reranker
 - AI: Stop all ramalama models | ramalama stop --all
-- AI: Check which models are loaded | model-check
-
 
 - Stata: Open Stata GUI (detached) | xstata-mp 2>/dev/null & disown
 - Stata: Start Stata in tmux session | stata-start
 - Stata: Kill stata tmux session | stata-kill
 - Stata: List all tmux sessions | tmux list-sessions
 - Stata: Check for running Stata processes | pgrep -la stata
+

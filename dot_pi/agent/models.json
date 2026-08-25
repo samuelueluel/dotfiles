@@ -217,27 +217,6 @@
           "maxTokens": 131072
         },
         {
-          "id": "Qwen3.6-Dense-27B-Q4",
-          "name": "Qwen3.6 Dense 27B Q4 (Lemonade)",
-          "reasoning": true,
-          "contextWindow": 262144,
-          "maxTokens": 131072
-        },
-        {
-          "id": "Qwen3.6-Dense-27B-Q6",
-          "name": "Qwen3.6 Dense 27B Q6 (Lemonade)",
-          "reasoning": true,
-          "contextWindow": 262144,
-          "maxTokens": 131072
-        },
-        {
-          "id": "Qwen3.6-Dense-27B-Q8",
-          "name": "Qwen3.6 Dense 27B Q8 (Lemonade)",
-          "reasoning": true,
-          "contextWindow": 262144,
-          "maxTokens": 131072
-        },
-        {
           "id": "DeepSeek-V4-Flash-Q2",
           "name": "DeepSeek V4 Flash Q2 (MoE 90GB)",
           "reasoning": true,
@@ -260,16 +239,23 @@
         },
         {
           "id": "Qwen3.8-27B-Q4",
-          "name": "Qwen3.8 Dense 27B Q4 (Lemonade ROCm)",
+          "name": "Qwen3.8 Dense 27B Q4 (Vulkan)",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
         },
         {
           "id": "Qwen3.8-27B-Q6",
-          "name": "Qwen3.8 Dense 27B Q6 (Lemonade ROCm)",
+          "name": "Qwen3.8 Dense 27B Q6 (Vulkan)",
           "reasoning": true,
           "contextWindow": 262144,
+          "maxTokens": 131072
+        },
+        {
+          "id": "Qwen3.8-27B-ROCmFP4",
+          "name": "Qwen3.8 Dense 27B ROCmFP4 (Laurent Vulkan)",
+          "reasoning": true,
+          "contextWindow": 131072,
           "maxTokens": 131072
         },
         {

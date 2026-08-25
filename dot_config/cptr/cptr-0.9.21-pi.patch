@@ -1,0 +1,1185 @@
+--- cptr/utils/agents/pi.py
++++ cptr/utils/agents/pi.py
+@@ -6,8 +6,10 @@
+ import codecs
+ import collections
+ import json
++import logging
+ import os
+ from contextlib import suppress
++from pathlib import Path
+ from typing import Any, AsyncIterator
+ 
+ from cptr.utils.agents.attachments import PreparedAgentAttachments
+@@ -22,20 +24,80 @@
+ )
+ 
+ 
++logger = logging.getLogger(__name__)
++_THINKING_LEVELS = frozenset({"off", "minimal", "low", "medium", "high", "xhigh", "max"})
++
++
++def _normalize_thinking_level(value: Any) -> str | None:
++    if not isinstance(value, str):
++        return None
++    level = value.strip().lower()
++    if level == "none":
++        level = "off"
++    return level if level in _THINKING_LEVELS else None
++
++
++def _workspace_thinking_level(workspace: str) -> str | None:
++    try:
++        with open(os.path.join(workspace, ".pi", "settings.json"), encoding="utf-8") as stream:
++            settings = json.load(stream)
++    except (OSError, TypeError, ValueError):
++        return None
++    if not isinstance(settings, dict):
++        return None
++    return _normalize_thinking_level(settings.get("defaultThinkingLevel"))
++
++
++def _cptr_append_system_prompt_paths(workspace: str, env: dict[str, str]) -> list[str]:
++    """Layer the global Pi append prompt with the cptr-only supplement."""
++    # cptr-pi-append-layer-v1
++    home = Path(env.get("HOME") or os.path.expanduser("~"))
++    candidates = (
++        home / ".pi" / "agent" / "APPEND_SYSTEM.md",
++        Path(workspace) / ".pi" / "CPTR_APPEND_SYSTEM.md",
++    )
++    return [str(path) for path in candidates if path.is_file()]
++
++
+ def _content_text(value: Any) -> str:
+-    if not isinstance(value, dict) or not isinstance(value.get("content"), list):
++    """Extract displayable text from Pi's structured or string tool results."""
++    if isinstance(value, str):
++        return value
++    if isinstance(value, list):
++        return "\n".join(
++            text for item in value if (text := _content_text(item))
++        )
++    if not isinstance(value, dict):
+         return ""
+-    return "\n".join(
+-        item["text"]
+-        for item in value["content"]
+-        if isinstance(item, dict)
+-        and item.get("type") == "text"
+-        and isinstance(item.get("text"), str)
+-    )
++    content = value.get("content")
++    if content is not None:
++        return _content_text(content)
++    for key in ("text", "output"):
++        if isinstance(value.get(key), str):
++            return value[key]
++    return ""
++
++
++def _event_tool_name(event: dict[str, Any], tool_names: dict[str, str] | None) -> str:
++    """Resolve and remember a tool name across start/update/end events."""
++    call_id = event.get("toolCallId")
++    raw_name = event.get("toolName")
++    if isinstance(raw_name, str) and raw_name.strip():
++        name = _tool_name(raw_name)
++        if isinstance(call_id, str) and call_id and tool_names is not None:
++            tool_names[call_id] = name
++        return name
++    if isinstance(call_id, str) and call_id and tool_names is not None:
++        return tool_names.get(call_id, "agent_tool")
++    return "agent_tool"
+ 
+ 
+ def _tool_name(name: str) -> str:
+-    return "run_command" if name == "bash" else "agent_tool"
++    """Map Pi's native bash name while preserving every other tool name."""
++    if name == "bash":
++        return "run_command"
++    clean_name = str(name or "").strip()
++    return clean_name or "agent_tool"
+ 
+ 
+ def _message_text(messages: list[dict[str, Any]], system_prompt: str, resumed: bool) -> str:
+@@ -59,7 +121,10 @@
+     return "\n\n".join(parts)
+ 
+ 
+-def translate_event(event: dict[str, Any]) -> AgentEvent | None:
++def translate_event(
++    event: dict[str, Any], tool_names: dict[str, str] | None = None
++) -> AgentEvent | None:
++    # cptr-pi-tool-stream-v1
+     event_type = event.get("type")
+     if event_type == "message_update":
+         delta = event.get("assistantMessageEvent")
+@@ -76,10 +141,10 @@
+         call_id = event.get("toolCallId")
+         if not isinstance(call_id, str) or not call_id:
+             return None
+-        raw_name = str(event.get("toolName") or "agent_tool")
++        name = _event_tool_name(event, tool_names)
+         args = event.get("args") if isinstance(event.get("args"), dict) else {}
+-        arguments = {"command": args.get("command")} if raw_name == "bash" else {"input": args}
+-        return AgentToolUpdate(call_id, "in_progress", _tool_name(raw_name), arguments)
++        arguments = {"command": args.get("command")} if name == "run_command" else {"input": args}
++        return AgentToolUpdate(call_id, "in_progress", name, arguments)
+     elif event_type == "tool_execution_end":
+         call_id = event.get("toolCallId")
+         if not isinstance(call_id, str) or not call_id:
+@@ -87,18 +152,28 @@
+         return AgentToolUpdate(
+             call_id,
+             "failed" if event.get("isError") else "completed",
+-            _tool_name(str(event.get("toolName") or "agent_tool")),
++            _event_tool_name(event, tool_names),
+             output=_content_text(event.get("result")),
+         )
+     return None
+ 
+ 
+-def tool_output_delta(event: dict[str, Any], sent: dict[str, str]) -> AgentToolOutputDelta | None:
++def tool_output_delta(
++    event: dict[str, Any],
++    sent: dict[str, str],
++    tool_names: dict[str, str] | None = None,
++) -> AgentToolOutputDelta | None:
+     """Convert Pi's accumulated partial result into cptr's append/replace event."""
+     call_id = event.get("toolCallId")
+     if not isinstance(call_id, str) or not call_id:
+         return None
++    name = _event_tool_name(event, tool_names)
+     full = _content_text(event.get("partialResult"))
++    # Pi sends accumulated output. An empty/malformed update must not erase
++    # already-streamed output for this call, but its tool name is still useful
++    # for later events that omit toolName.
++    if not full:
++        return None
+     previous = sent.get(call_id, "")
+     replace = not full.startswith(previous)
+     delta = full if replace else full[len(previous) :]
+@@ -108,9 +183,7 @@
+     return AgentToolOutputDelta(
+         call_id,
+         delta,
+-        "command_output"
+-        if _tool_name(str(event.get("toolName") or "")) == "run_command"
+-        else "tool_output",
++        "command_output" if name == "run_command" else "tool_output",
+         replace,
+     )
+ 
+@@ -118,11 +191,19 @@
+ class PiRpcClient:
+     """Small stdio client for ``pi --mode rpc``."""
+ 
+-    def __init__(self, command: str, cwd: str, env: dict[str, str], model: str = "") -> None:
++    def __init__(
++        self,
++        command: str,
++        cwd: str,
++        env: dict[str, str],
++        model: str = "",
++        append_system_prompt_paths: list[str] | None = None,
++    ) -> None:
+         self.command = command
+         self.cwd = cwd
+         self.env = env
+         self.model = model
++        self.append_system_prompt_paths = list(append_system_prompt_paths or [])
+         self.proc: asyncio.subprocess.Process | None = None
+         self.reader_task: asyncio.Task[None] | None = None
+         self.stderr_task: asyncio.Task[None] | None = None
+@@ -133,6 +214,8 @@
+ 
+     async def start(self) -> None:
+         args = ["--mode", "rpc"]
++        for path in self.append_system_prompt_paths:
++            args.extend(["--append-system-prompt", path])
+         if self.model and self.model != "default":
+             args.extend(["--model", self.model])
+         self.proc = await asyncio.create_subprocess_exec(
+@@ -238,6 +321,25 @@
+         )
+ 
+ 
++_COMPLETION_METADATA_TIMEOUT = 5.0
++
++
++async def _best_effort_completion_request(
++    client: PiRpcClient, command: str
++) -> dict[str, Any] | None:
++    """Request optional post-completion metadata without failing the answer."""
++    # cptr-pi-completion-metadata-v1
++    try:
++        return await asyncio.wait_for(
++            client.request(command), timeout=_COMPLETION_METADATA_TIMEOUT
++        )
++    except asyncio.CancelledError:
++        raise
++    except Exception as exc:  # noqa: BLE001 - metadata is non-critical.
++        logger.warning("Pi completion metadata request %s failed: %s", command, exc)
++        return None
++
++
+ async def run_pi_agent(
+     *,
+     profile: dict[str, Any],
+@@ -252,7 +354,14 @@
+     env = os.environ.copy()
+     if profile.get("home"):
+         env["HOME"] = os.path.expanduser(str(profile["home"]))
+-    client = PiRpcClient(str(profile.get("command") or "pi"), workspace, env, model)
++    append_system_prompt_paths = _cptr_append_system_prompt_paths(workspace, env)
++    client = PiRpcClient(
++        str(profile.get("command") or "pi"),
++        workspace,
++        env,
++        model,
++        append_system_prompt_paths,
++    )
+     session_file = (resume_state or {}).get("session_file")
+     resumed = isinstance(session_file, str) and bool(session_file)
+ 
+@@ -260,6 +369,17 @@
+         await client.start()
+         if resumed:
+             await client.request("switch_session", {"sessionPath": session_file})
++
++        # cptr-pi-workspace-thinking-v2
++        thinking_level = _workspace_thinking_level(workspace)
++        if thinking_level:
++            try:
++                # Reapply the Pi workspace setting after session restore so a
++                # Qwen gum selection also affects existing cptr conversations.
++                await client.request("set_thinking_level", {"level": thinking_level})
++            except Exception as exc:  # noqa: BLE001 - preserve the chat if unsupported.
++                logger.warning("Could not set workspace Pi thinking level to %s: %s", thinking_level, exc)
++
+         images = [
+             {"type": "image", "data": image.base64, "mimeType": image.mime_type}
+             for image in attachments.images
+@@ -273,8 +393,9 @@
+         )
+ 
+         sent: dict[str, str] = {}
++        tool_names: dict[str, str] = {}
+         while True:
+-            event = await asyncio.wait_for(client.events.get(), timeout=120)
++            event = await client.events.get()
+             if event.get("type") == "process_exited":
+                 yield AgentError(client.error_detail(str(event.get("message") or "Pi exited")))
+                 return
+@@ -286,33 +407,48 @@
+                 )
+                 return
+             if event.get("type") == "tool_execution_update":
+-                output = tool_output_delta(event, sent)
++                output = tool_output_delta(event, sent, tool_names)
+                 if output:
+                     yield output
+                 continue
+-            translated = translate_event(event)
++            translated = translate_event(event, tool_names)
+             if translated:
+                 yield translated
+             if event.get("type") == "agent_settled":
+-                stats = await client.request("get_session_stats")
+-                state = await client.request("get_state")
+-                state_data = state.get("data") if isinstance(state.get("data"), dict) else {}
+-                stat_data = stats.get("data") if isinstance(stats.get("data"), dict) else {}
++                # These are optional bookkeeping calls. A completed answer must
++                # survive either failure, timeout, or malformed metadata.
++                stats = await _best_effort_completion_request(client, "get_session_stats")
++                state = await _best_effort_completion_request(client, "get_state")
++                state_data = (
++                    state.get("data")
++                    if isinstance(state, dict) and isinstance(state.get("data"), dict)
++                    else {}
++                )
++                stat_data = (
++                    stats.get("data")
++                    if isinstance(stats, dict) and isinstance(stats.get("data"), dict)
++                    else {}
++                )
+                 tokens = (
+                     stat_data.get("tokens") if isinstance(stat_data.get("tokens"), dict) else None
+                 )
+                 session = state_data.get("sessionFile")
+-                yield AgentDone(
+-                    usage=tokens,
+-                    resume_state={"session_file": session}
++                next_resume_state = (
++                    {"session_file": session}
+                     if isinstance(session, str) and session
+-                    else None,
++                    else (
++                        dict(resume_state)
++                        if isinstance(resume_state, dict) and resume_state.get("session_file")
++                        else None
++                    )
+                 )
++                yield AgentDone(usage=tokens, resume_state=next_resume_state)
+                 return
+             if event.get("type") == "extension_error":
+                 yield AgentError(f"Pi extension error: {event.get('error') or 'unknown error'}")
+                 return
+     except asyncio.CancelledError:
++        logger.info("Pi RPC task cancelled; sending abort")
+         with suppress(Exception):
+             await asyncio.wait_for(client.request("abort"), timeout=2)
+         raise
+--- cptr/routers/gateway.py
++++ cptr/routers/gateway.py
+@@ -26,13 +26,14 @@
+ from pathlib import Path
+ 
+ from fastapi import APIRouter, HTTPException, Request
+-from fastapi.responses import StreamingResponse
++from fastapi.responses import JSONResponse, StreamingResponse
+ from pydantic import BaseModel
+ 
+ from cptr.models import Chat, ChatMessage, Config
+ from cptr.models.workspaces import Workspace
+ from cptr.utils.agents.prompts import message_text
+ from cptr.utils.config import now_ms
++from cptr.utils.context import normalize_usage
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -44,7 +45,6 @@
+ OWUI_MESSAGE_ID_HEADER = "X-OpenWebUI-Message-Id"
+ OWUI_TASK_HEADER = "X-OpenWebUI-Task"
+ 
+-
+ # ── API key management ───────────────────────────────────────
+ 
+ 
+@@ -62,15 +62,137 @@
+     return hashlib.sha256(raw.encode()).hexdigest()
+ 
+ 
++_TOOL_DISPLAY_LABELS = {
++    "path": "Path",
++    "file": "File",
++    "directory": "Directory",
++    "query": "Query",
++    "command": "Command",
++    "url": "URL",
++    "from": "From",
++    "to": "To",
++    "old_target": "Old target",
++    "new_target": "New target",
++    "model": "Model",
++}
++_TOOL_DISPLAY_OMIT = frozenset({"content", "contents", "text", "data", "edits", "patch"})
++
++
++def _tool_call_arguments(item: dict) -> dict:
++    """Extract displayable tool arguments without changing the actual call."""
++    arguments = item.get("arguments")
++    if isinstance(arguments, str):
++        try:
++            arguments = json.loads(arguments)
++        except (TypeError, ValueError):
++            return {"input": arguments}
++    if not isinstance(arguments, dict):
++        return {}
++
++    arguments = dict(arguments)
++    arguments.pop("title", None)
++    nested = arguments.get("input")
++    if isinstance(nested, dict) and len(arguments) == 1:
++        return nested
++    return arguments
++
++
++def _inline_code(value: object) -> str:
++    """Wrap a value in Markdown code delimiters without breaking on backticks."""
++    text = str(value).replace("\n", " ")
++    longest_run = 0
++    run = 0
++    for character in text:
++        if character == "`":
++            run += 1
++            longest_run = max(longest_run, run)
++        else:
++            run = 0
++    fence = "`" * (longest_run + 1)
++    return f"{fence}{text}{fence}"
++
++
++def _format_tool_arguments(arguments: dict) -> str:
++    """Render useful tool inputs while omitting payloads such as file contents."""
++    visible = {
++        key: value for key, value in arguments.items() if key not in _TOOL_DISPLAY_OMIT
++    }
++    if not visible:
++        return ""
++
++    if len(visible) == 1:
++        key, value = next(iter(visible.items()))
++        label = _TOOL_DISPLAY_LABELS.get(key, key.replace("_", " ").title())
++        if isinstance(value, (dict, list)):
++            value = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
++        return f"**{label}:** {_inline_code(value)}"
++
++    serialized = json.dumps(
++        visible, ensure_ascii=False, sort_keys=True, separators=(",", ":")
++    )
++    return f"**Arguments:** {_inline_code(serialized)}"
++
++
+ def _format_tool_call(item: dict) -> str | None:
+-    """Render a tool call as compact markdown for OpenAI-compatible clients."""
++    """Render a descriptive tool call as Markdown for OpenAI-compatible clients."""
++    # cptr-pi-tool-display-v1
+     if item.get("type") != "function_call" or item.get("status") != "in_progress":
+         return None
+ 
+     arguments = item.get("arguments")
+     title = arguments.get("title") if isinstance(arguments, dict) else None
+-    name = str(title or item.get("name") or "tool").strip() or "tool"
+-    return f"\n\n`{name}`\n\n"
++    name = str(item.get("name") or title or "tool").strip() or "tool"
++    detail = _format_tool_arguments(_tool_call_arguments(item))
++    lines = [f"**Tool:** {_inline_code(name)}"]
++    if detail:
++        lines.append(detail)
++    return "\n\n" + "\n".join(lines) + "\n\n"
++
++
++def _openai_usage(usage: dict | None) -> dict | None:
++    """Convert cptr's canonical usage fields to OpenAI response fields."""
++    # cptr-pi-usage-v1
++    normalized = normalize_usage(usage)
++    if normalized is None:
++        return None
++    result = {
++        "prompt_tokens": normalized["input_tokens"],
++        "completion_tokens": normalized["output_tokens"],
++        "total_tokens": normalized["total_tokens"],
++    }
++    cached_tokens = normalized.get("cache_read_tokens", 0)
++    if cached_tokens:
++        result["prompt_tokens_details"] = {"cached_tokens": cached_tokens}
++    return result
++
++
++def _workspace_identity(path: str) -> str:
++    """Normalize workspace paths before using them as session identity."""
++    try:
++        return str(Path(path).expanduser().resolve(strict=False))
++    except (OSError, RuntimeError):
++        return str(path)
++
++
++async def _cancel_agent_task(message_id: str, reason: str) -> None:
++    """Cancel the producer owned by a disconnected gateway request."""
++    # cptr-pi-cancel-v1
++    from cptr.utils.chat_task import cancel_task
++
++    try:
++        found = await cancel_task(message_id)
++    except asyncio.CancelledError:
++        raise
++    except Exception:
++        logger.warning(
++            "[gateway] Failed to cancel agent task %s (%s)",
++            message_id[:8],
++            reason,
++            exc_info=True,
++        )
++        return
++    if found:
++        logger.info("[gateway] Cancelled agent task %s (%s)", message_id[:8], reason)
+ 
+ 
+ async def _authenticate(request: Request) -> str:
+@@ -126,7 +248,9 @@
+                 "object": "model",
+                 "created": ws.created_at or int(time.time()),
+                 "owned_by": "cptr",
+-                "name": f"{ws.name} - {ws.path}",
++                # cptr-pi-workspace-display-v1: keep the filesystem path out of
++                # the human-facing model label; the stable model ID remains basename-based.
++                "name": ws.name or basename,
+                 # Extra metadata for cptr
+                 "cptr_workspace": ws.path,
+             }
+@@ -147,7 +271,8 @@
+     model: str
+     messages: list[dict]
+     stream: bool = False
+-    # Other OpenAI params are accepted but ignored
++    # cptr-pi-only-params-v2: OpenAI/Open WebUI parameters are accepted for protocol compatibility but
++    # intentionally ignored; Pi workspace/model configuration is authoritative.
+     temperature: float | None = None
+     max_tokens: int | None = None
+     top_p: float | None = None
+@@ -216,7 +341,7 @@
+ 
+     if body.stream:
+         return StreamingResponse(
+-            _stream(output_queue, completion_id, created, body.model),
++            _stream(output_queue, completion_id, created, body.model, assistant_msg.id),
+             media_type="text/event-stream",
+             headers={
+                 "Cache-Control": "no-cache",
+@@ -226,7 +351,7 @@
+         )
+     else:
+         # Non-streaming: collect all text, return as single response
+-        full_text = await _collect(output_queue)
++        full_text, usage = await _collect(output_queue, assistant_msg.id)
+         return {
+             "id": completion_id,
+             "object": "chat.completion",
+@@ -237,11 +362,7 @@
+                 "message": {"role": "assistant", "content": full_text},
+                 "finish_reason": "stop",
+             }],
+-            "usage": {
+-                "prompt_tokens": 0,
+-                "completion_tokens": 0,
+-                "total_tokens": 0,
+-            },
++            "usage": _openai_usage(usage),
+         }
+ 
+ 
+@@ -392,6 +513,7 @@
+     completion_id: str,
+     created: int,
+     model: str,
++    message_id: str,
+ ):
+     """Translate queue events → OpenAI SSE chunks."""
+ 
+@@ -411,149 +533,167 @@
+         }
+         return f"data: {json.dumps(data)}\n\n"
+ 
+-    # Initial chunk with role
+-    yield _chunk({"role": "assistant", "content": ""})
+-
+-    while True:
+-        try:
+-            event = await asyncio.wait_for(queue.get(), timeout=300)
+-        except asyncio.TimeoutError:
+-            # Safety timeout, end the stream
+-            yield _chunk({}, "stop")
+-            yield "data: [DONE]\n\n"
+-            return
+-
+-        if event is None:
+-            # Sentinel: stream complete
+-            yield _chunk({}, "stop")
+-            yield "data: [DONE]\n\n"
+-            return
+-
+-        event_type = event.get("type")
+-
+-        if event_type == "delta":
+-            content = event.get("content", "")
+-            if content:
+-                yield _chunk({"content": content})
+-
+-        elif event_type == "output":
+-            content = _format_tool_call(event.get("item") or {})
+-            if content:
+-                yield _chunk({"content": content})
+-
+-        elif event_type == "done":
+-            finish = event.get("finish_reason", "stop")
+-            yield _chunk({}, finish)
+-            yield "data: [DONE]\n\n"
+-            return
+-
+-        elif event_type == "error":
+-            # Stream the error as content, then stop
+-            error_msg = event.get("message", "Internal error")
+-            yield _chunk({"content": f"\n\n> **Error:** {error_msg}"})
+-            yield _chunk({}, "stop")
+-            yield "data: [DONE]\n\n"
+-            return
++    def _usage_chunk(usage: dict) -> str:
++        data = {
++            "id": completion_id,
++            "object": "chat.completion.chunk",
++            "created": created,
++            "model": model,
++            "choices": [],
++            "usage": usage,
++        }
++        return f"data: {json.dumps(data)}\n\n"
+ 
+-        # Other output types are persisted in cptr's DB and visible in its sidebar.
++    try:
++        # Initial chunk with role
++        yield _chunk({"role": "assistant", "content": ""})
+ 
++        while True:
++            event = await queue.get()
+ 
+-async def _collect(queue: asyncio.Queue) -> str:
+-    """Collect all text from the queue for non-streaming mode."""
++            if event is None:
++                # Sentinel: stream complete
++                yield _chunk({}, "stop")
++                yield "data: [DONE]\n\n"
++                return
++
++            event_type = event.get("type")
++
++            if event_type == "delta":
++                content = event.get("content", "")
++                if content:
++                    yield _chunk({"content": content})
++
++            elif event_type == "output":
++                content = _format_tool_call(event.get("item") or {})
++                if content:
++                    yield _chunk({"content": content})
++
++            elif event_type == "done":
++                finish = event.get("finish_reason", "stop")
++                yield _chunk({}, finish)
++                usage = _openai_usage(event.get("usage"))
++                if usage is not None:
++                    yield _usage_chunk(usage)
++                yield "data: [DONE]\n\n"
++                return
++
++            elif event_type == "error":
++                # Stream the error as content, then stop
++                error_msg = event.get("message", "Internal error")
++                yield _chunk({"content": f"\n\n> **Error:** {error_msg}"})
++                yield _chunk({}, "stop")
++                yield "data: [DONE]\n\n"
++                return
++
++            # Other output types are persisted in cptr's DB and visible in its sidebar.
++    except asyncio.CancelledError:
++        # Starlette cancels this generator when Open WebUI stops or disconnects.
++        await _cancel_agent_task(message_id, "client disconnected")
++        raise
++
++
++async def _collect(
++    queue: asyncio.Queue, message_id: str
++) -> tuple[str, dict | None]:
++    """Collect response text and optional usage for non-streaming mode."""
+     parts = []
+-    while True:
+-        try:
+-            event = await asyncio.wait_for(queue.get(), timeout=300)
+-        except asyncio.TimeoutError:
+-            break
+-        if event is None:
+-            break
+-        if event.get("type") == "delta":
+-            parts.append(event.get("content", ""))
+-        elif event.get("type") == "output":
+-            content = _format_tool_call(event.get("item") or {})
+-            if content:
+-                parts.append(content)
+-        elif event.get("type") in ("done", "error"):
+-            if event.get("type") == "error":
+-                parts.append(f"\n\n> **Error:** {event.get('message', '')}")
+-            break
+-    return "".join(parts)
++    usage = None
++    try:
++        while True:
++            event = await queue.get()
++            if event is None:
++                break
++            if event.get("type") == "delta":
++                parts.append(event.get("content", ""))
++            elif event.get("type") == "output":
++                content = _format_tool_call(event.get("item") or {})
++                if content:
++                    parts.append(content)
++            elif event.get("type") in ("done", "error"):
++                if event.get("type") == "error":
++                    parts.append(f"\n\n> **Error:** {event.get('message', '')}")
++                else:
++                    usage = event.get("usage")
++                break
++    except asyncio.CancelledError:
++        await _cancel_agent_task(message_id, "client disconnected")
++        raise
++    return "".join(parts), usage
+ 
+ 
+ # ── Utility task interception ────────────────────────────────
+ 
+-# Patterns that identify OWUI background task prompts.
+-# These should be proxied directly to the LLM, not through the agentic loop.
+-_UTILITY_PATTERNS = [
+-    "follow_ups",  # follow-up generation
+-    "follow-up questions",
+-    "Generate a concise",  # title generation
+-    "generate a brief 2-3 word",
+-    "Generate 1-3 broad tags",  # tags generation
+-    "tags_generation",
+-]
+-
+ 
+ async def _intercept_task(
+     request: Request,
+     body: ChatCompletionRequest,
+     workspace: str,
+     model_id: str,
+-) -> dict | None:
+-    """Detect OWUI utility tasks and proxy them directly to the LLM.
++) -> dict | JSONResponse | None:
++    """Proxy explicit Open WebUI utility tasks without creating an agent chat.
+ 
+-    Detection priority:
+-      1. X-OpenWebUI-Task header (set via custom header template {{TASK}})
+-      2. Message content pattern matching (fallback)
+-
+-    Returns a response dict if this is a utility task, or None if it should
+-    go through the normal agentic loop.
++    Utility requests must carry the configured task header. Prompt-text
++    heuristics are intentionally not used: normal user messages can contain
++    words such as "title" or "tags" and must remain on the agentic path.
+     """
+-    # 1. Header-based detection (reliable, requires OWUI config)
+     task_header = request.headers.get(OWUI_TASK_HEADER, "").strip()
+-    if task_header:
+-        logger.info("[gateway] Detected utility task via header: %s", task_header)
+-        utility_target = await _resolve_utility_model(workspace, request.app.state)
+-        return await _proxy_to_llm(
+-            body, utility_target.connection, utility_target.runtime_model
+-        )
+-
+-    # 2. Message content pattern matching (fallback)
+-    if not body.messages:
+-        return None
+-
+-    last_msg = body.messages[-1]
+-    content = last_msg.get("content", "") if isinstance(last_msg, dict) else ""
+-    if not isinstance(content, str):
++    if not task_header:
+         return None
+ 
+-    is_utility = any(pattern in content for pattern in _UTILITY_PATTERNS)
+-    if not is_utility:
+-        return None
++    logger.info("[gateway] Detected utility task via header: %s", task_header)
++    try:
++        utility_target = await _resolve_utility_model(workspace, request.app.state)
++    except Exception as exc:  # noqa: BLE001 - convert utility setup failures to API errors.
++        logger.warning(
++            "[gateway] Utility task model resolution failed (%s): %s",
++            type(exc).__name__,
++            str(exc)[:300],
++        )
++        return _utility_error_response(
++            body,
++            "utility_model_unavailable",
++            "The utility task could not be completed because no usable utility model is available.",
++        )
+ 
+-    logger.info("[gateway] Detected utility task via content matching")
+-    utility_target = await _resolve_utility_model(workspace, request.app.state)
+     return await _proxy_to_llm(
+         body, utility_target.connection, utility_target.runtime_model
+     )
+ 
+ 
++def _utility_error_response(
++    body: ChatCompletionRequest, code: str, message: str
++) -> JSONResponse:
++    """Return an explicit OpenAI-compatible utility-task error."""
++    # cptr-pi-utility-errors-v1
++    return JSONResponse(
++        status_code=502,
++        content={
++            "error": {
++                "message": message,
++                "type": "utility_task_error",
++                "code": code,
++            }
++        },
++    )
++
++
+ async def _proxy_to_llm(
+     body: ChatCompletionRequest,
+     connection: dict,
+     runtime_model: str,
+-) -> dict:
++) -> dict | JSONResponse:
+     """Proxy a utility task directly to the underlying LLM."""
+     from cptr.utils.ai import chat_completion
+     from cptr.utils.config import _get_jwt_secret
+     from cptr.utils.crypto import decrypt_key
+ 
+-    provider = connection["provider"]
+-    api_key = decrypt_key(connection.get("api_key", ""), _get_jwt_secret())
+-    base_url = connection.get("base_url") or None
+-
+     try:
++        provider = connection.get("provider")
++        if not isinstance(provider, str) or not provider:
++            raise ValueError("utility connection has no provider")
++        api_key = decrypt_key(connection.get("api_key", ""), _get_jwt_secret())
++        base_url = connection.get("base_url") or None
+         result = await chat_completion(
+             provider=provider,
+             base_url=base_url,
+@@ -562,9 +702,25 @@
+             messages=body.messages,
+             max_tokens=200,
+         )
+-    except Exception as e:
+-        logger.warning("[gateway] Utility task LLM call failed: %r", e)
+-        result = ""
++    except Exception as exc:  # noqa: BLE001 - utility failures must be explicit.
++        logger.warning(
++            "[gateway] Utility task upstream call failed (%s): %s",
++            type(exc).__name__,
++            str(exc)[:300],
++        )
++        return _utility_error_response(
++            body,
++            "utility_upstream_error",
++            "The utility task could not be completed because the upstream model request failed.",
++        )
++
++    if not isinstance(result, str) or not result.strip():
++        logger.warning("[gateway] Utility task upstream call returned empty output")
++        return _utility_error_response(
++            body,
++            "utility_empty_result",
++            "The utility task returned an empty result.",
++        )
+ 
+     completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+     return {
+@@ -574,14 +730,10 @@
+         "model": body.model,
+         "choices": [{
+             "index": 0,
+-            "message": {"role": "assistant", "content": result or ""},
++            "message": {"role": "assistant", "content": result},
+             "finish_reason": "stop",
+         }],
+-        "usage": {
+-            "prompt_tokens": 0,
+-            "completion_tokens": 0,
+-            "total_tokens": 0,
+-        },
++        "usage": None,
+     }
+ 
+ 
+@@ -729,6 +881,20 @@
+                     meta.get("client_chat_id") == client_chat_id
+                     or meta.get("owui_chat_id") == client_chat_id
+                 ):
++                    stored_workspace = meta.get("workspace")
++                    if not isinstance(stored_workspace, str) or (
++                        _workspace_identity(stored_workspace) != _workspace_identity(workspace)
++                    ):
++                        logger.warning(
++                            "[gateway] Refusing chat %s across workspace identity",
++                            chat.id[:8],
++                        )
++                        continue
++                    current_workspace = _workspace_identity(workspace)
++                    if meta.get("workspace") != current_workspace or meta.get("model_id") != model_id:
++                        meta["workspace"] = current_workspace
++                        meta["model_id"] = model_id
++                        await Chat.update_meta(chat.id, meta, now_ms())
+                     return chat.id
+ 
+     # Create a new chat
+@@ -742,7 +908,8 @@
+             title = first_user.strip() or title
+ 
+     meta = {
+-        "workspace": workspace,
++        "workspace": _workspace_identity(workspace),
++        "model_id": model_id,
+         "params": {"tool_approval_mode": "full"},
+     }
+     if client_chat_id:
+--- cptr/utils/chat_task.py
++++ cptr/utils/chat_task.py
+@@ -416,13 +416,31 @@
+     asyncio.create_task(emit_active())
+ 
+ 
+-async def cancel_task(message_id: str) -> bool:
+-    """Cancel a running task. Returns True if found."""
++async def cancel_task(message_id: str, timeout: float = 5.0) -> bool:
++    """Cancel a running task and wait briefly for its cleanup."""
++    # cptr-pi-cancel-v1
+     task = _tasks.get(message_id)
+-    if task:
+-        task.cancel()
+-        return True
+-    return False
++    if not task or task.done():
++        return False
++
++    task.cancel()
++    try:
++        await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
++    except asyncio.TimeoutError:
++        logger.warning(
++            "[task %s] cancellation cleanup exceeded %.1fs",
++            message_id[:8],
++            timeout,
++        )
++    except asyncio.CancelledError:
++        # The producer itself may report CancelledError when it was stopped
++        # before its coroutine entered the normal cleanup handler.
++        if task.cancelled():
++            return True
++        raise
++    except Exception:
++        logger.debug("[task %s] cancellation cleanup failed", message_id[:8], exc_info=True)
++    return True
+ 
+ 
+ def is_running(message_id: str) -> bool:
+@@ -441,6 +459,36 @@
+     return {cid for mid, cid in _task_chat.items() if mid in _tasks and not _tasks[mid].done()}
+ 
+ 
++def _workspace_identity(path: str) -> str:
++    """Normalize workspace paths before comparing session identity."""
++    try:
++        return str(Path(path).expanduser().resolve(strict=False))
++    except (OSError, RuntimeError):
++        return str(path)
++
++
++def _agent_session_matches_target(
++    candidate: dict[str, Any], target: AgentModelTarget, workspace: str
++) -> bool:
++    """Return whether a stored agent session is safe to resume."""
++    # cptr-pi-session-guards-v1
++    if not isinstance(candidate, dict):
++        return False
++    if candidate.get("profile_id") != target.profile_id:
++        return False
++    if candidate.get("agent") != target.agent:
++        return False
++    if candidate.get("model") != target.model:
++        return False
++    if _workspace_identity(str(candidate.get("workspace") or "")) != _workspace_identity(workspace):
++        return False
++    if target.agent == "pi":
++        session_file = candidate.get("session_file")
++        if not isinstance(session_file, str) or not session_file or not Path(session_file).is_file():
++            return False
++    return True
++
++
+ def _plain_message_text(content) -> str:
+     if isinstance(content, list):
+         return " ".join(
+@@ -1410,9 +1458,13 @@
+                 if "error" in data:
+                     await output_queue.put({"type": "error", "message": data["error"]})
+                 else:
+-                    await output_queue.put({"type": "done", "finish_reason": "stop"})
++                    done_event = {"type": "done", "finish_reason": "stop"}
++                    normalized_usage = normalize_usage(data.get("usage"))
++                    if normalized_usage is not None:
++                        done_event["usage"] = normalized_usage
++                    await output_queue.put(done_event)
+ 
+-    async def _emit_done():
++    async def _emit_done(usage: dict | None = None):
+         """Emit done=True enriched with chat title and content preview."""
+         try:
+             chat_obj = await Chat.get_by_id(chat_id)
+@@ -1425,13 +1477,16 @@
+             await clear_active_tasks(chat_id, user_id, message_id)
+         except Exception:
+             logger.debug("[task %s] clear_active_tasks failed", message_id[:8], exc_info=True)
+-        await emit(
+-            done=True,
+-            title=title,
+-            content=preview,
+-            workspace=workspace,
+-            workspace_name=ws_name,
+-        )
++        done_data = {
++            "title": title,
++            "content": preview,
++            "workspace": workspace,
++            "workspace_name": ws_name,
++        }
++        normalized_usage = normalize_usage(usage)
++        if normalized_usage is not None:
++            done_data["usage"] = normalized_usage
++        await emit(done=True, **done_data)
+ 
+     event_workspace = (
+         {"id": workspace, "name": workspace.rstrip("/").rsplit("/", 1)[-1]} if workspace else None
+@@ -1526,7 +1581,7 @@
+             "profile_id": agent_target.profile_id,
+             "agent": agent_target.agent,
+             "model": agent_target.model,
+-            "workspace": workspace,
++            "workspace": _workspace_identity(workspace),
+             "updated_at": now_ms(),
+         }
+         meta["agent_sessions"] = sessions
+@@ -1593,7 +1648,14 @@
+             if isinstance(sessions, dict):
+                 candidate = sessions.get(agent_target.profile_id)
+                 if isinstance(candidate, dict):
+-                    resume_state = candidate
++                    if _agent_session_matches_target(candidate, agent_target, agent_workspace):
++                        resume_state = candidate
++                    else:
++                        logger.info(
++                            "[task %s] ignoring incompatible %s session; starting fresh",
++                            message_id[:8],
++                            agent_target.profile_id,
++                        )
+ 
+         runners = {
+             "codex": run_codex_agent,
+@@ -1794,16 +1856,17 @@
+                 flushed_item = _flush_text()
+                 if flushed_item:
+                     await emit(output=flushed_item)
++                normalized_usage = normalize_usage(event.usage)
+                 await save_session(agent_target, event.resume_state)
+                 await _save_message(
+                     "agent done",
+                     content=content,
+                     output=output_items,
+-                    usage=event.usage,
++                    usage=normalized_usage,
+                     done=True,
+                 )
+                 _task_state.pop(message_id, None)
+-                await _emit_done()
++                await _emit_done(normalized_usage)
+                 preview = content[:300] if content else ""
+                 await publish_event(
+                     EVENTS.CHAT_FINISHED,
+@@ -2362,7 +2425,7 @@
+                             done=True,
+                         )
+                         _task_state.pop(message_id, None)
+-                        await _emit_done()
++                        await _emit_done(last_usage)
+                         preview = content[:300] if content else ""
+                         await publish_event(
+                             EVENTS.CHAT_FINISHED,
+--- cptr/utils/context.py
++++ cptr/utils/context.py
+@@ -73,22 +73,91 @@
+ 
+ 
+ def normalize_usage(usage: dict | None) -> dict | None:
+-    """Return provider usage with cptr's canonical token field names."""
+-    if not usage:
++    """Return provider usage with cptr's canonical token field names.
++
++    Pi reports ``input``, ``output``, ``cacheRead``, ``cacheWrite``, and
++    ``total``. Cache-read tokens are part of the prompt/context total, so
++    they are included in canonical ``input_tokens`` while remaining available
++    as separate cache fields.
++    """
++    if not isinstance(usage, dict) or not usage:
+         return None
++
+     normalized = dict(usage)
+-    input_tokens = _parse_nonnegative_int(
+-        normalized.get("input_tokens", normalized.get("prompt_tokens"))
++
++    def first_value(*keys: str):
++        for key in keys:
++            if key in normalized:
++                return normalized[key]
++        return None
++
++    details = normalized.get("prompt_tokens_details")
++    cache_read_value = first_value(
++        "cache_read_tokens",
++        "cacheRead",
++        "cache_read",
++        "cache_read_input_tokens",
+     )
+-    output_tokens = _parse_nonnegative_int(
+-        normalized.get("output_tokens", normalized.get("completion_tokens"))
++    cache_write_value = first_value(
++        "cache_write_tokens",
++        "cacheWrite",
++        "cache_write",
++        "cache_creation_input_tokens",
+     )
+-    total_tokens = _parse_nonnegative_int(normalized.get("total_tokens"))
+-    if total_tokens == 0:
+-        total_tokens = input_tokens + output_tokens
++    if isinstance(details, dict):
++        if cache_read_value is None:
++            cache_read_value = details.get("cached_tokens")
++        if cache_write_value is None:
++            cache_write_value = details.get("cache_write_tokens")
++
++    cache_read_tokens = _parse_nonnegative_int(cache_read_value)
++    cache_write_tokens = _parse_nonnegative_int(cache_write_value)
++    explicit_input = "input_tokens" in normalized or "prompt_tokens" in normalized
++    raw_input = first_value("input_tokens", "prompt_tokens", "input")
++    raw_output = first_value("output_tokens", "completion_tokens", "output")
++    input_tokens = _parse_nonnegative_int(raw_input)
++    output_tokens = _parse_nonnegative_int(raw_output)
++    total_tokens = _parse_nonnegative_int(first_value("total_tokens", "total"))
++
++    # Pi's `input` excludes cache-read tokens; OpenAI-style prompt_tokens
++    # normally already includes them, so only add them for the Pi-shaped form.
++    if not explicit_input and "input" in normalized:
++        input_tokens += cache_read_tokens
++
++    # If a provider gives only total + output, recover the prompt total.
++    if input_tokens == 0 and total_tokens > output_tokens:
++        input_tokens = total_tokens - output_tokens
++
++    recognized = any(
++        key in normalized
++        for key in (
++            "input_tokens",
++            "prompt_tokens",
++            "input",
++            "output_tokens",
++            "completion_tokens",
++            "output",
++            "total_tokens",
++            "total",
++            "cache_read_tokens",
++            "cacheRead",
++            "cache_read",
++            "cache_read_input_tokens",
++            "cache_write_tokens",
++            "cacheWrite",
++            "cache_write",
++            "cache_creation_input_tokens",
++        )
++    ) or bool(cache_read_tokens or cache_write_tokens)
++    if not recognized:
++        return None
++
++    total_tokens = max(total_tokens, input_tokens + output_tokens)
+     normalized["input_tokens"] = input_tokens
+     normalized["output_tokens"] = output_tokens
+     normalized["total_tokens"] = total_tokens
++    normalized["cache_read_tokens"] = cache_read_tokens
++    normalized["cache_write_tokens"] = cache_write_tokens
+     return normalized
+ 
+ 

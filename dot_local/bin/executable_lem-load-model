@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# Load one local Lemonade model using the same interactive settings used by
+# the normal pi/beta wrappers. The provider/model target is configured by the
+# caller; this command only handles Lemonade's resident local model.
+set -euo pipefail
+
+LEM_API=${LEM_API:-http://127.0.0.1:13305/api/v1}
+QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+LING3FLASH_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  lem-load-model MODEL_ID
+
+Load a local Lemonade model and choose speculative decoding, reasoning,
+KV-cache quantization, and parallel slots using gum. When
+PI_CPTR_THINKING_LEVEL_FILE is set, the Qwen reasoning choice is also
+returned as a Pi thinking-level override for pi-cptr-model.
+EOF
+}
+
+die() {
+  printf 'lem-load-model: %s\n' "$*" >&2
+  exit 1
+}
+
+[[ -n "${1:-}" ]] || { usage >&2; exit 2; }
+id=$1
+[[ "$id" != *$'\n'* && "$id" != *$'\r'* && "$id" != *' '* ]] || die "model contains whitespace"
+command -v gum >/dev/null 2>&1 || die "gum is required for local model loading"
+
+curl -sS -m 5 "$LEM_API/health" >/dev/null 2>&1 \
+  || die "Lemonade not reachable on $LEM_API (container up? try 'podman start lemonade')"
+
+args=""
+pi_thinking_level=""
+case "$id" in
+  Qwen3.8-*)
+    mtp=$(gum choose --header "speculative decoding" --selected "dflash2" \
+      "dflash2  block-diffusion drafter (needs draft GGUF, ~1.5x MTP)" \
+      "on       MTP (built-in draft, no extra model)" \
+      "off") || exit 1
+    case "${mtp%%[ ]*}" in
+      dflash2)
+        if [[ "$id" == *"ROCmFP4"* ]]; then
+          args+=" --force-laurent --spec-type draft-dflash --spec-draft-model /root/.cache/huggingface/hub/models--agentionai--Qwen3.8-27B-DFlash2-ROCmFP4-FAST-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_0_ROCMFP4_FAST.gguf --spec-draft-adaptive --spec-draft-n-min 2 --spec-draft-n-max 6 -ctkd q8_0 -ctvd q8_0"
+        else
+          args+=" --spec-type draft-dflash --spec-draft-model $QWEN38_DFLASH2_DRAFT --spec-draft-n-max 4 -ctkd q8_0 -ctvd q8_0"
+        fi
+        ;;
+      on)
+        [[ "$id" == *"ROCmFP4"* ]] && args+=" --force-laurent"
+        ;;
+      off)
+        [[ "$id" == *"ROCmFP4"* ]] && args+=" --force-laurent"
+        args+=" --spec-type none"
+        ;;
+    esac
+
+    effort=$(gum choose --header "thinking / reasoning effort" \
+      "xhigh   deep reasoning (Pi cptr max; default)" \
+      "medium  balanced reasoning" \
+      "low     fast / concise reasoning" \
+      "off     instruct mode (no thinking)") || exit 1
+    case "${effort%%[ ]*}" in
+      xhigh)
+        pi_thinking_level="max"
+        args+=" $QWEN38_SAMPLING"
+        ;;
+      medium)
+        pi_thinking_level="medium"
+        args+=" $QWEN38_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-medium.jinja"
+        ;;
+      low)
+        pi_thinking_level="low"
+        args+=" $QWEN38_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-low.jinja"
+        ;;
+      off)
+        pi_thinking_level="off"
+        args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
+        ;;
+    esac
+
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || exit 1
+    case "${kv%%[ ]*}" in
+      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
+    ;;
+  Ling-*)
+    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || exit 1
+    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    args+=" $LING3FLASH_SAMPLING"
+
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || exit 1
+    case "${kv%%[ ]*}" in
+      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
+    ;;
+  DeepSeek-*)
+    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || exit 1
+    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    args+=" $DS4FLASH_SAMPLING"
+
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || exit 1
+    case "${kv%%[ ]*}" in
+      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
+    ;;
+  Qwen3.6-MoE-*)
+    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || exit 1
+    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    args+=" $QWEN_SAMPLING"
+
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || exit 1
+    case "${kv%%[ ]*}" in
+      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
+    ;;
+  *)
+    die "unsupported local model: $id"
+    ;;
+esac
+
+par=$(gum choose --header "parallel slots" --selected "1" "1" "2") || exit 1
+args+=" --parallel $par"
+args=${args# }
+
+if [[ -n "${PI_CPTR_THINKING_LEVEL_FILE:-}" && -n "$pi_thinking_level" ]]; then
+  printf '%s\n' "$pi_thinking_level" > "$PI_CPTR_THINKING_LEVEL_FILE"
+fi
+
+note="loading $id  [override: $args]"
+if ! curl -sS -m 10 "$LEM_API/models" 2>/dev/null | grep -q "\"id\"[[:space:]]*:[[:space:]]*\"$id\""; then
+  note="first load of $id: downloading weights (several minutes) then loading  [override: $args]"
+fi
+
+load_json=$(python3 -c 'import json, sys; print(json.dumps({"model_name": sys.argv[1], "llamacpp_args": sys.argv[2]}))' "$id" "$args")
+resp=$(gum spin --show-output --title "$note" -- \
+  curl -sS -m 3600 -X POST "$LEM_API/load" \
+  -H 'Content-Type: application/json' -d "$load_json")
+
+if printf '%s' "$resp" | grep -q '"status"[[:space:]]*:[[:space:]]*"success"'; then
+  printf '%s\n' "$resp"
+  exit 0
+fi
+printf '%s\n' "load failed: ${resp:-timed out; check 'podman logs lemonade' or 'lem-status'}" >&2
+exit 1

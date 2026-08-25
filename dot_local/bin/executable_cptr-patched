@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+patch_root=/var/home/samuel/.local/share/cptr-pi-patch
+venv="$patch_root/venv"
+python="$venv/bin/python"
+site_packages="$venv/lib/python3.11/site-packages"
+patch_file=/var/home/samuel/.config/cptr/cptr-0.9.21-pi.patch
+
+if [ ! -x "$venv/bin/cptr" ]; then
+    uv venv --python 3.11 "$venv"
+    uv pip install --python "$python" 'cptr==0.9.21'
+fi
+
+pi_sentinel='cptr-pi-workspace-thinking-v2'
+gateway_sentinel='cptr-pi-only-params-v2'
+task_sentinel='cptr-pi-cancel-v1'
+metadata_sentinel='cptr-pi-completion-metadata-v1'
+usage_sentinel='cptr-pi-usage-v1'
+session_sentinel='cptr-pi-session-guards-v1'
+tool_sentinel='cptr-pi-tool-stream-v1'
+utility_sentinel='cptr-pi-utility-errors-v1'
+tool_display_sentinel='cptr-pi-tool-display-v1'
+workspace_display_sentinel='cptr-pi-workspace-display-v1'
+append_layer_sentinel='cptr-pi-append-layer-v1'
+if ! grep -q "$pi_sentinel" "$site_packages/cptr/utils/agents/pi.py" \
+    || ! grep -q "$metadata_sentinel" "$site_packages/cptr/utils/agents/pi.py" \
+    || ! grep -q "$usage_sentinel" "$site_packages/cptr/routers/gateway.py" \
+    || ! grep -q "$gateway_sentinel" "$site_packages/cptr/routers/gateway.py" \
+    || ! grep -q "$session_sentinel" "$site_packages/cptr/utils/chat_task.py" \
+    || ! grep -q "$tool_sentinel" "$site_packages/cptr/utils/agents/pi.py" \
+    || ! grep -q "$utility_sentinel" "$site_packages/cptr/routers/gateway.py" \
+    || ! grep -q "$tool_display_sentinel" "$site_packages/cptr/routers/gateway.py" \
+    || ! grep -q "$workspace_display_sentinel" "$site_packages/cptr/routers/gateway.py" \
+    || ! grep -q "$append_layer_sentinel" "$site_packages/cptr/utils/agents/pi.py" \
+    || ! grep -q "$task_sentinel" "$site_packages/cptr/utils/chat_task.py"; then
+    # Reinstall the pinned wheel first so a partial/stale patch cannot block
+    # application of the complete patch.
+    uv pip install --python "$python" --reinstall 'cptr==0.9.21'
+    git -C "$site_packages" apply --unsafe-paths --check -p0 "$patch_file"
+    git -C "$site_packages" apply --unsafe-paths -p0 "$patch_file"
+fi
+
+exec "$venv/bin/cptr" "$@"

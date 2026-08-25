@@ -1,6 +1,7 @@
 {
-  "defaultProvider": "local",
-  "defaultModel": "Qwen3.6-MoE-35B-Q8",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-luna",
+  "defaultThinkingLevel": "max",
   "theme": "noctalia",
   "skills": [
     "/var/home/samuel/.agents/skills",
@@ -29,7 +30,6 @@
         "extensions/answer/index.ts",
         "extensions/ask-user/index.ts",
         "extensions/btw/index.ts",
-        "extensions/cwd-history/index.ts",
         "extensions/files/index.ts",
         "extensions/handoff/index.ts",
         "extensions/loop/index.ts",
@@ -54,6 +54,7 @@
   ],
   "lastChangelogVersion": "0.84.2",
   "hideThinkingBlock": true,
+  "showCacheMissNotices": true,
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,
