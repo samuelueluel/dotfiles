@@ -1,78 +1,118 @@
-# Search & Retrieval (RAG)
+# Search and Retrieval
 
-**Load this file when** doing semantic or structured search, constructing queries, verifying retrieved passages, or running the retrieval → answer loop.
+**Load this file when** choosing among semantic RAG, bibliography search, metadata search, or citation-graph tools; selecting graph scope; handling an external reference; or executing a discovery-to-evidence workflow.
 
-## Tool selection
+## Fast router
 
-| Goal | Tool |
+| User goal | First tool |
 |---|---|
-| Find papers by concept/topic | `zotero_zotero_semantic_search(query, collection=<KEY | NAME>, limit=10)` |
-| Find foundational hub papers in a collection | `zotero_zotero_get_collection_hubs(collection_key=<KEY>, top_n=5)` |
-| Trace paper lineage (ancestors & descendants) | `zotero_zotero_get_paper_lineage(item_key=<KEY>, depth=1)` |
-| Find co-cited / connected papers | `zotero_zotero_find_connected_papers(item_key=<KEY>, top_n=5)` |
-| Precise metadata filters (date range, item type) | `zotero_zotero_advanced_search` |
-| Find a specific paper by name | `zotero_zotero_search_items` (substring) |
-| Exact citekey lookup | `zotero_zotero_search_by_citation_key` |
-| Items with a tag | `zotero_zotero_search_by_tag` |
-| Collection key lookup | `zotero_zotero_search_collections` / `references/collections.md` |
+| Findings, mechanisms, estimates, equations, robustness, figure prose | `zotero_zotero_semantic_search` |
+| Exact DOI/title in bibliographies; “which local items cite X?”; raw reference entry | `zotero_zotero_search_references` |
+| **Citation counts** (“how many times is X cited”, “most-cited work in / external to a collection”) | `zotero_zotero_search_references` — count raw occurrences, dedupe citing items per identity. **Never read counts off `get_collection_hubs`** (see below). |
+| Known Zotero metadata or item identity | `zotero_zotero_search_items`, `zotero_zotero_advanced_search`, or citekey lookup |
+| Citation anchors / hub structure (graph-edge counts; approximate for external) | `zotero_zotero_get_collection_hubs` with `collection` or `library` |
+| Direct cited/citing neighbors of a known graph node | `zotero_zotero_get_paper_lineage` |
+| Local papers sharing references with a known local seed | `zotero_zotero_find_connected_papers` |
+| Reference parsing/resolution coverage | `zotero_zotero_audit_references` |
 
-## Query routing: Semantic RAG vs. Citation Graph
+`zotero_zotero_rebuild_citation_graph` and `zotero_zotero_rebuild_reference_index` are maintenance tools, not query-time discovery tools.
 
-Pick the retrieval tool matching the question's structure:
+## Three distinct retrieval layers
 
-1. **Cross-Paper Empirical Synthesis & Literature Consensus $\to$ `semantic_search`:**
-   - *Triggers:* "What does my literature say about the effect of Y?", "What are the estimated elasticities across my papers?", "What mechanisms link foreclosure to blight?", "What is the empirical consensus on X?"
-   - *Mechanism:* Cross-corpus hybrid dense + BM25 retrieval with cross-encoder reranking. Pulls top passages across multiple papers for comparative empirical synthesis under the `citation-integrity` discipline.
+1. **Passage RAG** searches locally indexed Zotero full text. It can support substantive source claims.
+2. **Reference search** uses a separate BM25 index over individual bibliography entries. It supports literal citation-occurrence and reference-metadata claims, not the cited work's findings.
+3. **Citation graph** traverses resolved citation identities and computes structural measures. It is deterministic but incomplete because parsing and entity resolution are incomplete.
 
-2. **Specific Empirical Estimates, Equations, or Figures $\to$ `semantic_search`:**
-   - *Triggers:* "What point estimate did Larson report in Table 4?", "What estimator did X use?", "Find papers discussing parallel trends testing", "Show me event study figures with 95% CIs."
-   - *Mechanism:* Chunk-level retrieval matching specific model specifications, numbers, formulas, and VLM figure schemas.
+**`get_collection_hubs` counts are graph-edge based, not raw-occurrence based.** A node's `inward_citations` counts bibliography entries that became graph edges: resolved library items, DOI-carrying `ext:doi:*` nodes, and — since the metadata-external fix — heuristic `ext:meta:*` nodes for DOI-less entries. Entries that stay `unresolved` (broad/collapsed/garbled) still contribute zero edges; in economics sidecars the unresolved share can be large (run `zotero_zotero_audit_references` to see current coverage). Consequences: (a) hubs counts remain a **lower bound** on true citations (unresolved leftovers, self-citations, and title-variant splits are not counted); (b) `ext:meta` counts are **approximate** — OCR-garbled entries can add spurious nodes, and typos can split one work across nodes. Use `zotero_zotero_search_references` for exact counts; use `zotero_zotero_audit_references` to check residual resolution coverage before trusting any graph-derived count.
 
-3. **Collection Overviews & Foundational Literature $\to$ `get_collection_hubs`:**
-   - *Triggers:* "What are the core / anchor papers in my Detroit collection?", "What foundational literature is most cited across this project?", "Give me an overview of collection X."
-   - *Mechanism:* Inward citation in-degree and PageRank centrality across `# References` sections in local sidecars.
+Do not use semantic RAG for exact DOI/bibliography lookup, and do not use reference or graph metadata to assert findings.
 
-4. **Intellectual Lineage & Follow-Up Literature $\to$ `get_paper_lineage`:**
-   - *Triggers:* "What literature does paper X build on?", "What papers in my library cite Glaeser & Gyourko (2005)?", "Trace the descendants of the Bartik paper."
-   - *Mechanism:* Directed graph traversal of local ancestor citations (`cites`) and descendant papers (`cited_by`).
+## External-reference decision tree
 
-5. **Structural Paper Similarity & Related Work $\to$ `find_connected_papers`:**
-   - *Triggers:* "Find papers in my library related to X even if they use different terminology", "What papers share the same theoretical foundation as paper X?"
-   - *Mechanism:* Jaccard bibliographic coupling (overlap in cited reference sets). Completely immune to vocabulary mismatch.
+Run `zotero_zotero_search_references` with an exact DOI when available, otherwise a distinctive title/author query. Inspect each result:
 
-6. **Two-Stage Literature Synthesis Loop (Graph $\to$ RAG):**
-   - For broad literature review queries:
-     - **Stage 1 (Graph):** Call `get_collection_hubs` or `find_connected_papers` to identify the anchor papers in the collection.
-     - **Stage 2 (RAG):** Run targeted `semantic_search` or deep-dive sidecar reading on those exact keys for specific empirical claims and equations.
+- `resolution: resolved`, target type `zotero_item` → use the returned Zotero key for graph traversal or local passage retrieval.
+- `resolution: external_reference`, target key `ext:*` → metadata-only graph node. Two kinds: `ext:doi:*` (DOI-backed, confidence ~0.95) and `ext:meta:*` (derived from first-author surname + year + title fingerprint, confidence ≤ 0.72 — heuristic). Use an expanded lineage scope to find local source items with known incoming citations to that node. **Verify `ext:meta:*` labels with `search_references` before presenting them as clean metadata** — they are extracted from possibly OCR-garbled bibliography text and can be mislabeled (e.g. a garbled entry attributed to the wrong author) or split across title-variant nodes.
+- `resolution: unresolved` or `ambiguous` → the raw bibliography occurrence is available, but there is no trustworthy graph edge. Report that limitation; never force a match.
 
-## Query construction
+Before declaring an `external_reference` absent from the library, search Zotero metadata by DOI, title, authors, and likely preprint/published variants. A conservative resolver may keep two versions separate. Do not merge them without identity evidence.
 
-- **Instruct prefix:** the embedder prepends `Instruct: <task>` to queries, so task-style phrasing ("which papers estimate event-study DiD designs?") retrieves better than bare keywords.
-- **Titles & Author/Year in DCR prefix:** the DCR prefix (`[Paper: <title> (<author> <year>) | Section: <breadcrumb>]`) imprints the title, author citation (e.g. `Larson 2019`, `Callaway & Sant'Anna 2021`, or `Carrillo et al. 2019`), and section heading on every chunk across both the dense and BM25 indexes.
-- **Figure-query composition:** content-bearing phrasing + author/figure numbers (e.g. "Larson 2019 figure 1 demolitions bar chart") hits the exact figure schema and caption chunk. Pure meta-style phrasing ("what does figure 1 show") misses.
-- **Quantitative concept reformulation:** when performing a search related to a quantitative concept in economics, econometrics, statistics, or mathematics, keep in mind that the same quantitative concept can be expressed in multiple ways. For example:
-  - *Staggered DiD / rollout:* "differential timing of adoption", "variation in treatment timing", "two-way fixed effects decomposition"
-  - *Event study / pre-trends:* "leads and lags of adoption", "dynamic treatment effects", "$H_0: \gamma_k = 0$"
-  - *Weak IV:* "first-stage F-statistic", "Montiel Olea Pflueger effective F", "Anderson-Rubin confidence set"
-  - *RD manipulation:* "McCrary density test", "continuity of the score density at cutoff"
-  - *Bunching:* "excess mass around the kink point", "notch in the tax schedule"
-  If initial results seem poor (empty results, or top passage `Rerank` < 0.0), try a few reformulations or translations of the concept.
-- **Collection scoping:** pass `collection=<KEY | NAME>` (e.g. `collection="Methods"` or `collection="2QWMWY2P"`, includes subcollections). Scoping resolves live from SQLite at query time against `item_key`, so folder moves in Zotero GUI take effect instantly.
+An external node can have incoming edges from local sidecar-backed sources. It cannot supply its own outgoing bibliography, findings, or bibliographic coupling because it is never a graph source. `find_connected_papers` therefore starts from a resolved local item, not an `ext:*` node.
 
-## Retrieval limitations
+Metadata-based external nodes (`ext:meta:*`) are created from DOI-less entries that match no library item, using a conservative (surname, year, title) extraction. They make previously `unresolved` citations visible to hubs/lineage, but carry real noise: OCR-garbled entries can produce spurious nodes, and title variants (typos, "housing prices" vs "house prices", quoted vs unquoted) can split one work across several nodes. Treat their inward counts as approximate and verify with `search_references`. A work cited sometimes with and sometimes without a DOI may split into `ext:doi` + `ext:meta` nodes (version-splitting).
 
-- **Metadata staleness:** a title change needs a re-embed (the old title is baked into every chunk's DCR prefix). Result display is live (enriched from the Zotero API at query time), but semantic/BM25 matching is stale until re-embed.
-- **Reference-chunk suppression:** bibliography chunks are dropped from dense/sparse retrieval on general queries (`[REF]` annotation on surviving citations). Citation-shaped lookups still retain them.
-- **No-date items:** Items lacking a date do not match date-range filters in `advanced_search`.
-- **Result enrichment** (title/creators/page/citation) requires the Zotero desktop/API up; otherwise `semantic_search` returns passages with a `Connection refused` enrich error — read the passage directly from the sidecar instead.
+## Graph scopes
 
-## Interpreting results
+| Scope | Sources | Allowed citation targets | Use when |
+|---|---|---|---|
+| `collection` | selected collection | resolved items in the same collection | closed project map |
+| `library` | resolved library items | resolved library items | closed library map |
+| `collection-expanded` | selected collection | resolved items anywhere plus external nodes | collection's wider intellectual context |
+| `library-expanded` | all sidecar-backed library sources | resolved items plus external nodes | library-wide external context |
 
-- Each result carries `item_key`, `chunk_index`, char offsets, matched text, and a `Rerank` score (cross-encoder). A rerank floor (~-2.0) trims junk; scores are rank-correct, not calibrated.
-- Gate answer confidence on `Rerank` and verify numbers against the passage text — see the `citation-integrity` skill.
+`collection-expanded` is not merely “collection plus external works”: resolved targets outside the collection also enter.
 
-## Retrieval → answer loop
+Always pass an explicit scope. Pass `collection_key` for either collection scope. Expanded scopes cover only references extracted from local sidecars; they are not universal citation indexes.
 
-1. `semantic_search(query)` → candidate passages.
-2. Verify: grep the sidecar (`references/deep-dive-reading.md`) or `get_item_fulltext` (needs desktop).
-3. Synthesize + cite per `citation-integrity`: every claim cites a retrieved passage (author, year, passage, page), numbers verified against passage text, confidence gated on `Rerank`. "No evidence found" is a complete answer.
+## Membership taxonomy & routing
+
+Five phrasings map onto three distinct membership states. The pair that causes confusion is the first two rows — “external to the collection” can mean a library item outside the collection, or a work outside the library entirely. Disambiguate with `zotero_zotero_search_items` (rows 1–2) vs `search_references` resolution (row 3).
+
+| Membership state | How to identify | Graph visibility | Count semantics | Routing |
+|---|---|---|---|---|
+| **In the scoped collection** (library item, member) | `zotero_zotero_get_collection_items`; item `Collections` field | all scopes; closed `collection` limits both ends to members | graph edges in; complete on the source side only if members have sidecars | closed scope for internal structure; `search_references(collection_key=...)` for occurrence counts |
+| **In the library, outside the scoped collection** (= “external to the collection but internal to the library”) | `search_items` finds it; `Collections` lacks the key | `collection-expanded` as a *resolved* target; `library` / `library-expanded` | counted as a resolved node, NOT an `ext:*` node | expanded lineage/hubs to see it as a target of collection papers; `search_references` to enumerate citing collection items |
+| **Outside the library entirely** (= “external to the collection and to the library”) | no `search_items` match; `search_references` returns `resolution: external_reference` | `collection-expanded` / `library-expanded` only, as `ext:doi:*` (confident) or `ext:meta:*` (heuristic) | counted via `ext:*` edges; `ext:meta` approximate and fragmented across title/version variants | expanded lineage to find local citers; verify every `ext:*` label with `search_references` before treating it as clean metadata; never infer findings from an ext node |
+
+“External to the library” alone always means row 3; “internal to the library” means rows 1–2 together. A resolved item outside the collection must never be reported as an external work, and an `ext:*` node must never be presented as a library item.
+
+### What citation counts still miss
+
+All citation counts — graph hubs **and** `search_references` occurrence counts — are **lower bounds**. Not counted:
+
+- **Sources without sidecars.** Only sidecar-backed library items contribute bibliography entries, so citations *from* sidecar-less papers are invisible to both graph and reference search. Library-wide coverage is partial (run `zotero_zotero_audit_references` for the current figure); a collection's counts are only as complete as that collection's sidecar coverage.
+- **Collapsed/broad entries.** Where the parser merged several references into one line, the entry stays `unresolved` and contributes no edge — these are real citations lost to parsing, not to absence.
+- **Fragmented works.** A single work cited under title variants splits across multiple `ext:meta:*` nodes; a work cited sometimes with and sometimes without a DOI splits into `ext:doi` + `ext:meta`. Per-node counts therefore undercount the work — add variant nodes when presenting totals.
+- **Self-citations** (source citing its own earlier version) are excluded by design.
+
+Verify a candidate's count with `search_references` on its exact identity before quoting it.
+
+## Tool-specific limits
+
+- `get_paper_lineage(depth=...)` currently returns direct neighbors only; do not claim recursive depth traversal.
+- Expanded lineage on books/manuals can return hundreds of nodes and exceed the MCP output guard. Prefer a targeted reference query first; use lineage only after resolving a specific target or when a broad list is explicitly needed.
+- `search_references(collection_key=...)` filters citing source items by direct membership only; it does not include subcollections.
+- `semantic_search(collection=...)` resolves live membership and includes subcollections.
+- `find_connected_papers` couples on **resolved** outgoing citations. A paper can be a hub with many incoming citations yet have few resolved outgoing references (old-style citations without DOIs, references to works outside the library) and return few or no connected papers. That is a coverage property, not an error, and not evidence the paper lacks related work. If it returns empty, fall back to `get_paper_lineage` (citing papers), `get_collection_hubs` on the scope, or a semantic search using the paper's key terms.
+- `get_collection_hubs` ranks **graph nodes** (library items + `ext:doi:*` + `ext:meta:*` external works) by inbound graph edges. Counts are directional, not exact: unresolved leftovers and title-variant splits are excluded, and `ext:meta` counts are approximate. For exact totals, count raw occurrences via `search_references`.
+- Expanded hub/connected output can contain noisy labels from imperfect bibliography parsing — especially `ext:meta:*` nodes (see the external-reference section). Verify an external label, DOI, and confidence with `search_references` before presenting it as clean metadata.
+
+## Topic-conditioned discovery
+
+Graph tools do not accept a semantic topic query. `get_collection_hubs` ranks the whole selected scope among graph nodes (library + external); it is a good quick map of a genuinely narrow project collection, but its counts are directional, never exact citation totals (see the graph-edge warning above).
+
+For a topic inside a broad or mixed collection:
+
+1. Use collection-scoped semantic search or metadata search to identify local seed items.
+2. Expand from their item keys with lineage or connected-papers, choosing closed or expanded scope based on the question.
+3. Return to targeted semantic search or direct PDF pages for substantive evidence.
+
+For a narrow collection overview, hubs may come first — it now surfaces external anchors too, but label its counts as graph-edge/directional; if the question is “what is cited most,” count occurrences with `search_references` for precision.
+
+## Query construction and verification
+
+- Prefer task-oriented phrasing over bare keywords.
+- Include author/year or title when targeting a known local paper; DCR breadcrumbs are indexed.
+- Use `collection=<key>` for project-scoped semantic RAG.
+- Treat `Rerank` as the passage-confidence signal. `Relevance` alone is not sufficient.
+- Never use a hit marked `REF`, a `References` breadcrumb, or a bibliography-only passage as substantive evidence.
+- For numbers, use direct PDF/full-text tools if the returned passage is truncated or incomplete.
+- Apply the citation-integrity skill to passage, reference-index, and graph claims.
+
+## Concrete routing examples
+
+- “What assumptions identify Callaway–Sant'Anna group-time effects?” → semantic search, preferably Methods-scoped; cite the matched passage and raw Rerank score.
+- “Which of my papers cite DOI 10.x/y?” → exact DOI reference search; optionally traverse the returned target key.
+- “Which Programming items cite this external preprint?” → reference search scoped to the Programming collection, then `collection-expanded` lineage on the returned `ext:*` key.
+- “What external works anchor my Detroit collection?” → quick map: `collection-expanded` hubs lists both resolved and external (`ext:meta:*`) anchors with graph-edge counts — good for a first pass, but counts are directional. For citation *totals*, run `search_references` scoped to the collection on candidate identities (or topical queries) and count distinct citing items; cross-check the returned `resolution` field.
+- "What local papers are related to this paper despite different vocabulary?" → connected-papers from the local item key; use an expanded scope when shared external citations should count. If connected-papers returns empty, the seed may have few *resolved* outgoing references — fall back to citing papers via lineage or a semantic search rather than concluding no related work exists.

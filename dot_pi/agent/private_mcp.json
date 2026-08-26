@@ -1,0 +1,83 @@
+{
+  "mcpServers": {
+    "searxng": {
+      "command": "/var/home/samuel/.agents/mcp/searxng/venv/bin/python3",
+      "args": [
+        "/var/home/samuel/.agents/mcp/searxng/searxng_mcp.py"
+      ],
+      "disabled": true
+    },
+    "stata": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<2.0.0",
+        "mcp-stata"
+      ],
+      "lifecycle": "lazy",
+      "disabled": true,
+      "env": {
+        "STATA_PATH": "/usr/local/stata19/stata-mp",
+        "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"
+      }
+    },
+    "turbovault": {
+      "command": "turbovault",
+      "args": [
+        "--vault",
+        "/var/home/samuel/Dropbox/Sam-Obsidian-Vault",
+        "--config",
+        "/var/home/samuel/.config/turbovault/config.yaml",
+        "--profile",
+        "production"
+      ],
+      "lifecycle": "lazy",
+      "directTools": true,
+      "includeTools": [
+        "turbovault_read_note",
+        "turbovault_write_note",
+        "turbovault_edit_note",
+        "turbovault_delete_note",
+        "turbovault_move_note",
+        "turbovault_get_notes_info",
+        "turbovault_search",
+        "turbovault_advanced_search",
+        "turbovault_get_backlinks",
+        "turbovault_get_forward_links",
+        "turbovault_get_broken_links",
+        "turbovault_get_related_notes",
+        "turbovault_get_hub_notes",
+        "turbovault_suggest_links",
+        "turbovault_query_frontmatter_sql",
+        "turbovault_inspect_frontmatter",
+        "turbovault_search_by_frontmatter",
+        "turbovault_semantic_search",
+        "turbovault_manage_tags",
+        "turbovault_update_frontmatter",
+        "turbovault_list_templates",
+        "turbovault_create_from_template",
+        "turbovault_generate_index",
+        "turbovault_batch_execute",
+        "turbovault_get_vault_context",
+        "turbovault_quick_health_check"
+      ]
+    },
+    "lastfm": {
+      "command": "mcp-lastfm",
+      "lifecycle": "lazy",
+      "disabled": true,
+      "env": {
+        "MCP_LASTFM_API_KEY": "57b159cbe17c3dd01a82cd0122479750",
+        "MCP_LASTFM_USERNAME": "samuelueluel"
+      }
+    },
+    "zotero": {
+      "url": "http://127.0.0.1:13308/mcp",
+      "lifecycle": "lazy",
+      "excludeTools": [
+        "zotero_search",
+        "zotero_fetch"
+      ]
+    }
+  }
+}

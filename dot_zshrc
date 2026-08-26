@@ -337,9 +337,7 @@ pi-safe-1() {
     return 1
   fi
 
-  setopt localtraps
   local container_name="pi-safe-1-$$"
-  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -385,9 +383,7 @@ pi-safe-2() {
     return 1
   fi
 
-  setopt localtraps
   local container_name="pi-safe-2-$$"
-  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -435,9 +431,7 @@ pi-safe-3() {
     return 1
   fi
 
-  setopt localtraps
   local container_name="pi-safe-3-$$"
-  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -488,9 +482,7 @@ pi-safe-stata-1() {
     return 1
   fi
 
-  setopt localtraps
   local container_name="pi-safe-stata-1-$$"
-  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -543,9 +535,7 @@ pi-safe-stata-2() {
     return 1
   fi
 
-  setopt localtraps
   local container_name="pi-safe-stata-2-$$"
-  trap 'podman rm -f -t0 "$container_name" >/dev/null 2>&1 &!' EXIT INT TERM HUP
 
   podman run --init -it --rm \
     --name "$container_name" \
@@ -588,8 +578,8 @@ pi-safe-stata-2() {
 #
 # "Stata skills/binary excluded": no Stata skill files loaded, MCP will not start,
 #   Stata binary never mounted. Use for general coding tasks.
-# "Stata skills + MCP + binary": all Stata skills and MCP config loaded;
-#   /usr/local/stata19 mounted so the agent can actually run do-files.
+# "Stata skills + MCP + binary": Stata skills and the beta MCP config loaded
+#   (Last.fm excluded); /usr/local/stata19 mounted for do-file execution.
 #
 # pihat / betahat write a state file to ~/.pi/running/ for status monitoring.
 
@@ -915,7 +905,7 @@ beta() {
   level="${level%%[ ]*}"
 
   printf '\033]2;β - %s\007' "${abs_target##*/}"
-  pi-safe-stata-${level} "${abs_target}" "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}"
+  pi-safe-stata-${level} "${abs_target}" "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}"
   printf '\a' > /dev/tty
 }
 
@@ -946,7 +936,7 @@ betahat() {
   local _state_file="$_state_dir/$$.state"
   printf 'type=betahat\nmodel=%s\n' "$model_flag" > "$_state_file"
   printf '\033]2;β̂ - %s\007' "${abs_target##*/}"
-  { pi-safe-stata-${level} "${abs_target}" "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
+  { pi-safe-stata-${level} "${abs_target}" "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; printf '\a' > /dev/tty }
 }
 

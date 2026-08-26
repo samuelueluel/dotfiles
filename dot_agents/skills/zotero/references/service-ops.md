@@ -1,63 +1,71 @@
-# Service Operations (embedder, reranker, desktop)
+# Service Operations (Embedder, Reranker, Desktop & SQLite)
 
-**Load this file when** a search or index run fails with a connection error, when a service looks up but behaves abnormally (slow or wedged), when you need to work with Zotero desktop closed, or when running post-ingest SQL verification queries.
+**Load this file when** a search or index run fails with a connection error, when a service behaves abnormally (slow or wedged), when Zotero item metadata or semantic enrichment returns HTTP 500 while Zotero is open, when operating with Zotero Desktop closed, or when running post-ingest SQL verification.
 
-## Why the embedder is never auto-started
+## Service Gating & Auto-Start Rules
 
-The :8082 embedder loads a multi-GB quantized model into unified memory. Auto-starting it has crashed the machine. This is an explicit standing rule that overrides convenience — even for an explicit "index this" request, ask Samuel to run `serve-embedder` first and wait for the port to answer.
+- **Embedder (:8082) — Indexes and Search Queries:** Loads a multi-GB quantized model into unified RAM. Auto-starting can cause system instability. **Ask Samuel to run `serve-embedder`; NEVER auto-start.**
+- **Reranker (:8083) — Ranking Precision:** The configured local HTTP reranker is mandatory and fail-closed. The MCP validates configuration at startup but does not launch the Ramalama container. If the port is down, ask Samuel to run `serve-reranker`, then retry. Never substitute Hugging Face, an in-process model, or an unranked result.
+- **Zotero Desktop (:23119) — Metadata Writes & Enrichment:** Vector search works without it (omitting live title/creator metadata), but fulltext retrieval and write operations fail. Metadata writes and CSL exports require Desktop. Read-only graph/reference rebuilds and SQLite integrity checks may run with Desktop fully closed; see the WAL rule below. Do not silently use a fallback for failed live enrichment.
+- **VLM (:8084) — Offline Figure Enrichment:** Serves the vision model for `zotero-vlm-enrich.py`. Run `serve-vlm` for batch processing and `stop-vlm` immediately after to free RAM.
 
-The reranker (:8083) is different: it is small, only reorders candidates already retrieved, and if missing, search still returns correct results in dense-only order. The reranker may be auto-started via `serve-reranker`, but the embedder may not.
+## Error-to-Cause Diagnostic Map
 
-## What each service actually gates
-
-- **Embedder :8082 — both indexing and search:** Embeds chunk text at index time and embeds query strings at query time before ChromaDB similarity search. If the embedder is down, search cannot execute.
-- **Reranker :8083 — ranking precision only:** Cross-encoder reranking over dense+sparse candidates. When unavailable, search returns fused dense/sparse ranking with a harmless log warning (`HTTP reranker error ... returning unreranked order`).
-- **Zotero desktop :23119 — enrichment and write operations:** Vector retrieval functions without it, but results omit title/creators/page metadata, `get_item_fulltext` fails, and write operations (add, update, delete, attach) cannot execute.
-- **VLM :8084 — offline figure enrichment:** Serves Qwen3-VL-30B-A3B-Instruct (UD-Q8_K_XL, ~36 GB) for `zotero-vlm-enrich.py`. Never queried during search or standard indexing. Run `serve-vlm` for batch processing and `stop-vlm` immediately after to free RAM.
-
-## Error-to-cause map
-
-| Symptom | Cause | Action |
+| Symptom | Root Cause | Remediation |
 |---|---|---|
 | `Semantic search error: Connection error.` | Embedder :8082 down | Ask Samuel to run `serve-embedder`; retry after port answers |
-| `Error enriching result for item <key>: Connection refused` | Desktop down | Non-fatal; ask Samuel to open Zotero if citation metadata is needed, or use SQLite fallback below |
-| `HTTP reranker error ... returning unreranked order` | Reranker :8083 down | Auto-start `serve-reranker`, or proceed with fused ranking |
-| `Connection error in upsert` during index run | Embedder wedged or down | Probe for wedge (below), restart embedder container |
-| Tool reports missing Python module | Optional extra missing | Install `zotero-mcp-server[semantic,pdf]` via `sjust update` |
+| `Error enriching result for item <key>: Connection refused` | Zotero Desktop down | Stop and ask Samuel to open Zotero Desktop. If Samuel explicitly says to continue regardless, use the SQLite fallback below; live metadata enrichment, fulltext retrieval, and write operations remain unavailable |
+| `HTTP 500` from `localhost:23119` item metadata or enrichment while ping works | Zotero Desktop local API is wedged even though the process and port are available | Ask Samuel to restart Zotero Desktop, then retry the same request |
+| `Local reranker endpoint failed` / `HTTP reranker error` | Reranker :8083 down or local endpoint failed | Ask Samuel to run `serve-reranker`, verify the port, and retry. The MCP does not auto-start it; do not use a remote/in-process model or unranked results |
+| Semantic results omit the `Rerank` field | Stale service process or incomplete local patch | Treat results as discovery-only, restart/repair the service, and retry before citing a passage; never invent a score |
+| `Connection error in upsert` during index run | Embedder wedged or down | Probe for wedge (below) and restart embedder container |
+| Tool reports missing Python module | Extra package missing | Run `sjust update` to reinstall `zotero-mcp-server[semantic,pdf]` |
 
-## Embedder wedge detection and recovery
+## Zotero Desktop Local API Recovery
 
-The :8082 server can wedge at container start in deadlock (0% CPU) or slow-crawl (~20+ s per embedding). Probe with:
+If Zotero Desktop is open but item metadata or semantic-search enrichment returns HTTP 500 from `localhost:23119`, the local API is wedged even though the process and port are available.
+
+- Ask Samuel to restart Zotero Desktop.
+- Retry the same metadata or semantic-search request after the restart.
+- Do not rebuild the semantic index or silently treat the failed enrichment as successful before retrying.
+- If the error persists, report the exact endpoint and HTTP status.
+- A `403` indicates that Zotero’s local API permission is disabled; this is different from the HTTP 500 recovery case.
+
+## Embedder Wedge Detection and Recovery
+
+The `:8082` embedder can occasionally deadlock at container start (0% CPU) or slow-crawl (~20+ s per embedding). Probe responsiveness with:
 ```bash
 time curl -s http://127.0.0.1:8082/v1/embeddings \
   -H 'Content-Type: application/json' \
   -d '{"input":"probe","model":"embed"}' >/dev/null
 ```
-Recovery: `podman restart embedder`. Always re-probe before starting long batch jobs.
+- **Recovery:** `podman restart embedder`. Always probe before starting long batch jobs.
 
-## Service interaction guidelines
+## Service Safety Guidelines
 
-- **Never host-wide `pkill llama-server`:** Containerized rootless podman engines run as host processes. Host-wide kills terminate embedder, reranker, and VLM engines simultaneously. Target specific containers instead (e.g. `podman exec lemonade pkill -9 llama-server`).
-- Ramalama containers do not survive engine process termination. Recovery requires running the corresponding shell launcher (`serve-embedder` / `serve-reranker`).
+- **Never host-wide `pkill llama-server`:** Containerized rootless Podman engines run as host processes. Host-wide kills terminate embedder, reranker, and VLM engines simultaneously. Target specific containers instead:
+  ```bash
+  podman exec lemonade pkill -9 llama-server
+  ```
+- **Sandbox detection:** Scripts in `~/.local/bin` and commands like `serve-embedder` run on the host shell. Detect if running inside a container sandbox:
+  ```bash
+  command -v ramalama    # empty output indicates sandboxed environment
+  ```
 
-## Sandbox detection
+## Working with Zotero Desktop Closed (SQLite fallback)
 
-`serve-embedder` / `serve-reranker` and `~/.local/bin` index scripts exist only on the host shell; container sandboxes lack ramalama and podman. Detect sandbox:
+If Zotero Desktop is closed, live metadata enrichment, full-text retrieval, CSL exports, and writes are unavailable. Read-only graph/reference rebuilds and verification may proceed when Samuel has explicitly authorized them.
+
+**WAL rule:** `immutable=1` ignores `zotero.sqlite-wal`. After a sync, deletion, or metadata change, quit Zotero Desktop completely and wait for its WAL to checkpoint before using an immutable read. Otherwise the query can return an older snapshot even though the live database has changed.
+
+Once the database is fully closed and checkpointed, use the immutable URI for read-only checks:
 ```bash
-command -v ramalama    # empty => sandboxed environment
-```
-From a sandbox, report which service is down and request Samuel to start it on the host.
-
-## Working with Zotero desktop closed
-
-Direct SQLite reads bypass desktop dependency.
-
-**Lock Prevention:** Standard SQLite reads fail with `database is locked` when desktop is open. Use the immutable URI parameter, which works concurrently regardless of desktop state:
-```bash
-sqlite3 "file:$HOME/Zotero/zotero.sqlite?immutable=1" "<query>"
+sqlite3 "file:$HOME/Zotero/zotero.sqlite?immutable=1" "<SQL_QUERY>"
 ```
 
-Query item metadata and creators:
+Never use immutable SQLite reads to perform writes, retrieve live full text, or infer that a failed live enrichment succeeded.
+
+### Query Item Metadata and Creators
 ```sql
 SELECT i.key, f.fieldName, idv.value
 FROM items i
@@ -74,11 +82,9 @@ JOIN creatorTypes ct ON ct.creatorTypeID = ic.creatorTypeID
 WHERE i.key IN ('KEY1','KEY2') ORDER BY i.key, ic.orderIndex;
 ```
 
-Read full text from MinerU sidecars (`~/.config/zotero-mcp/mineru-sidecars/<item_key>.md`) when desktop is closed.
+## Post-Ingest Verification SQL
 
-## Post-ingest verification SQL
-
-Always exclude deleted items (`deletedItems`) to prevent trashed attachments from creating false positives:
+Verify database health and attachment consistency (excluding trashed items):
 ```sql
 -- Live standalone attachments (expected count: 0)
 SELECT COUNT(*) FROM itemAttachments a
@@ -101,11 +107,9 @@ WHERE a.linkMode = 2 GROUP BY 1,2 HAVING c > 1;
 SELECT COUNT(*) FROM itemAttachments
 WHERE linkMode = 2 AND COALESCE(contentType,'') = '';
 ```
-`linkMode`: 0 imported_file, 1 imported_url, 2 linked_file, 3 linked_url.
+*Note:* `linkMode` values: `0` imported_file, `1` imported_url, `2` linked_file, `3` linked_url.
 
-## Live state verification
+## Live State Verification Tools
 
-Retrieve live status from active tools rather than memorized numbers:
-- `zotero_zotero_get_search_database_status` — index doc count, embedding model, last update timestamp.
-- `zotero_zotero_list_libraries` — accessible libraries and item counts.
-- Provenance and design rationale: `10_Projects/Local-LLMs/MCP-Servers/Zotero-MCP.md`.
+- `zotero_zotero_get_search_database_status` — Reports total indexed document count, active embedding model, and last update timestamp.
+- `zotero_zotero_list_libraries` — Displays accessible libraries and item counts.

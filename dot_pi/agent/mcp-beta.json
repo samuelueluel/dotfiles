@@ -4,7 +4,8 @@
       "command": "/var/home/samuel/.agents/mcp/searxng/venv/bin/python3",
       "args": [
         "/var/home/samuel/.agents/mcp/searxng/searxng_mcp.py"
-      ]
+      ],
+      "disabled": true
     },
     "stata": {
       "command": "uvx",
@@ -14,6 +15,7 @@
         "mcp-stata"
       ],
       "lifecycle": "lazy",
+      "disabled": true,
       "env": {
         "STATA_PATH": "/usr/local/stata19/stata-mp",
         "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"
