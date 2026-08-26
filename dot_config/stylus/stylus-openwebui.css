@@ -1,0 +1,419 @@
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400..700;1,400..700&display=swap');
+
+/* Gruvbox Light Soft palette */
+:root {
+    color-scheme: light;
+
+    --gb-bg: #f2e5bc;
+    --gb-bg-alt: #ebdbb2;
+    --gb-surface: #ebdbb2;
+    --gb-surface-2: #d5c4a1;
+    --gb-border: #bdae93;
+
+    --gb-text: #3c3836;
+    --gb-muted: #665c54;
+    --gb-faint: #7c6f64;
+
+    --gb-red: #9d0006;
+    --gb-orange: #af3a03;
+    --gb-yellow: #b57614;
+    --gb-green: #79740e;
+    --gb-blue: #076678;
+    --gb-purple: #8f3f71;
+    --gb-aqua: #427b58;
+}
+
+/* Typography */
+.markdown-prose,
+.markdown-prose p,
+.markdown-prose li,
+.markdown-prose td,
+.markdown-prose th,
+.markdown-prose blockquote {
+    font-family: 'Crimson Pro', serif !important;
+    font-size: 1.4rem !important;
+    line-height: 1.6 !important;
+}
+
+.markdown-prose h1,
+.markdown-prose h2,
+.markdown-prose h3,
+.markdown-prose h4 {
+    font-family: 'Crimson Pro', serif !important;
+    font-weight: 600 !important;
+}
+
+#chat-input,
+[data-message-role="user"],
+.chat-user-message {
+    font-family: 'Crimson Pro', serif !important;
+    font-size: 1.3rem !important;
+}
+
+/* Global page surfaces */
+html,
+body,
+#app,
+.app,
+.app > *,
+#chat-container,
+#messages-container {
+    background-color: var(--gb-bg) !important;
+    color: var(--gb-text) !important;
+}
+
+/* Global text and icon colors */
+.app * {
+    color: var(--gb-text) !important;
+    stroke: var(--gb-muted) !important;
+}
+
+/* Left sidebar (base fallback) */
+nav,
+#sidebar,
+.py-2\.5.my-auto.flex.flex-col.justify-between.h-screen {
+    background-color: var(--gb-bg-alt) !important;
+    color: var(--gb-text) !important;
+    border-color: var(--gb-border) !important;
+}
+
+nav *,
+#sidebar *,
+.py-2\.5.my-auto.flex.flex-col.justify-between.h-screen * {
+    color: var(--gb-text) !important;
+}
+
+nav [class*="bg-gray-"],
+#sidebar [class*="bg-gray-"],
+.py-2\.5.my-auto.flex.flex-col.justify-between.h-screen [class*="bg-gray-"] {
+    background-color: var(--gb-bg-alt) !important;
+}
+
+nav a:hover,
+nav button:hover,
+#sidebar a:hover,
+#sidebar button:hover {
+    background-color: var(--gb-surface-2) !important;
+}
+
+nav svg,
+#sidebar svg {
+    color: var(--gb-muted) !important;
+    stroke: var(--gb-muted) !important;
+}
+
+/* Selected sidebar row */
+.w-full.flex.justify-between.rounded-md.px-3.py-2.hover\:bg-gray-900.bg-gray-900.transition.whitespace-nowrap.text-ellipsis {
+    background-color: var(--gb-surface-2) !important;
+    color: var(--gb-text) !important;
+    font-weight: 600 !important;
+}
+
+.hover\:bg-gray-900:hover {
+    background-color: var(--gb-surface-2) !important;
+}
+
+/* Main response area */
+#response,
+#response-content-container,
+.message.svelte-1nauejd,
+.message.svelte-1nauejd > *,
+.chat-assistant {
+    background-color: var(--gb-bg) !important;
+    color: var(--gb-text) !important;
+}
+
+/* User-message wrappers: page background only */
+.user-message,
+.user-message > div,
+.user-message .flex-auto,
+.user-message .chat-user,
+.user-message .chat-user > div,
+[data-message-role="user"],
+[data-message-role="user"] > div {
+    background-color: var(--gb-bg) !important;
+    color: var(--gb-text) !important;
+    border: none !important;
+}
+
+/* Actual user bubble */
+.user-message .chat-user .rounded-3xl,
+.user-message .chat-user [class~="dark:bg-gray-850"],
+.user-message .chat-user [class~="bg-gray-50"],
+[data-message-role="user"] .rounded-3xl,
+.chat-user-message .rounded-3xl {
+    background-color: var(--gb-surface) !important;
+    color: var(--gb-text) !important;
+    border: 1px solid var(--gb-surface-2) !important;
+    border-radius: 1.5rem !important;
+}
+
+/* Text inside user bubbles */
+.user-message .chat-user .rounded-3xl *,
+[data-message-role="user"] .rounded-3xl *,
+.chat-user-message .rounded-3xl * {
+    color: var(--gb-text) !important;
+    stroke: var(--gb-muted) !important;
+}
+
+/* Markdown response text */
+.markdown-prose,
+.markdown-prose p,
+.markdown-prose li,
+.markdown-prose td,
+.markdown-prose th,
+.markdown-prose h1,
+.markdown-prose h2,
+.markdown-prose h3,
+.markdown-prose h4 {
+    color: var(--gb-text) !important;
+}
+
+.markdown-prose strong {
+    color: var(--gb-text) !important;
+}
+
+.markdown-prose a {
+    color: var(--gb-blue) !important;
+}
+
+.markdown-prose blockquote {
+    border-left-color: var(--gb-orange) !important;
+    color: var(--gb-muted) !important;
+}
+
+/* Code blocks */
+pre,
+.markdown-prose pre,
+#response-content-container pre {
+    background-color: var(--gb-surface) !important;
+    color: var(--gb-text) !important;
+    border: 1px solid var(--gb-border) !important;
+    border-radius: 0.5rem !important;
+    padding: 1rem !important;
+}
+
+pre *,
+.markdown-prose pre *,
+#response-content-container pre * {
+    background-color: transparent !important;
+    color: var(--gb-text) !important;
+}
+
+.markdown-prose :not(pre) > code,
+#response-content-container :not(pre) > code {
+    background-color: var(--gb-surface-2) !important;
+    color: var(--gb-orange) !important;
+    padding: 0.1em 0.3em !important;
+    border-radius: 0.25rem !important;
+}
+
+.markdown-prose pre code,
+#response-content-container pre code {
+    background-color: transparent !important;
+    color: var(--gb-text) !important;
+}
+
+/* Chat input */
+#chat-input,
+#chat-input *,
+textarea,
+input,
+select {
+    background-color: var(--gb-surface) !important;
+    color: var(--gb-text) !important;
+    border-color: var(--gb-border) !important;
+}
+
+#chat-input::placeholder,
+textarea::placeholder,
+input::placeholder {
+    color: var(--gb-faint) !important;
+}
+
+/* Input area */
+#chat-container .bg-linear-to-t {
+    background-color: var(--gb-bg-alt) !important;
+    padding-top: 0.6rem;
+}
+
+.base.enter.svelte-ug60r4 {
+    background-color: var(--gb-surface) !important;
+}
+
+/* Send button */
+#send-message-button.disabled {
+    background-color: var(--gb-border) !important;
+}
+
+#send-message-button.w-7.h-7.self-center {
+    background-color: var(--gb-blue) !important;
+}
+
+#send-message-button.w-7.h-7.self-center > * {
+    fill: var(--gb-bg) !important;
+    stroke: var(--gb-bg) !important;
+}
+
+/* Model/chat selector */
+.w-full.flex.justify-between.rounded-md.px-3.py-2.hover\:bg-gray-900.bg-gray-900.transition.whitespace-nowrap.text-ellipsis {
+    background-color: var(--gb-surface-2) !important;
+    color: var(--gb-text) !important;
+    font-weight: 600 !important;
+}
+
+/* Small labels */
+.text-xs.text-gray-700.uppercase.bg-gray-50.dark\:bg-gray-700.dark\:text-gray-400 {
+    background-color: var(--gb-surface-2) !important;
+    color: var(--gb-muted) !important;
+}
+
+/* Icons */
+.w-4.h-4 {
+    fill: var(--gb-orange) !important;
+}
+
+/* Component accents */
+.svelte-1ee93ns {
+    --primary: var(--gb-orange) !important;
+    --secondary: var(--gb-text) !important;
+}
+
+.svelte-11kvm4p {
+    --primary: var(--gb-blue) !important;
+    --secondary: var(--gb-bg) !important;
+}
+
+/* Rounded tab/header strip */
+.scrollbar-hidden.relative.overflow-x-auto.whitespace-nowrap.svelte-3g4avz {
+    border-radius: 16px 16px 0 0;
+    background-color: var(--gb-bg-alt) !important;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar-thumb {
+    background-color: var(--gb-border) !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--gb-muted) !important;
+}
+
+::selection {
+    background-color: var(--gb-blue) !important;
+    color: var(--gb-bg) !important;
+}
+
+/* Remove the chat-title navbar gradient */
+#navbar-bg-gradient-to-b {
+    display: none !important;
+    background: none !important;
+    background-image: none !important;
+}
+
+/* Keep the chat-title navbar on the page background */
+nav:has(#navbar-bg-gradient-to-b) {
+    background-color: var(--gb-bg) !important;
+    color: var(--gb-text) !important;
+}
+
+nav:has(#navbar-bg-gradient-to-b) * {
+    color: var(--gb-text) !important;
+    stroke: var(--gb-muted) !important;
+}
+
+/* Dark sidebar with light text */
+#sidebar,
+.py-2\.5.my-auto.flex.flex-col.justify-between.h-screen {
+    --sidebar-bg: #1d2021;
+    --sidebar-surface: #282828;
+    --sidebar-hover: #3c3836;
+    --sidebar-border: #504945;
+    --sidebar-text: #f2e5bc;
+    --sidebar-muted: #d5c4a1;
+
+    background-color: var(--sidebar-bg) !important;
+    color: var(--sidebar-text) !important;
+    border-color: var(--sidebar-border) !important;
+}
+
+/* All sidebar text overrides the global Gruvbox-light text rule */
+#sidebar *,
+.py-2\.5.my-auto.flex.flex-col.justify-between.h-screen * {
+    color: var(--sidebar-text) !important;
+}
+
+/* Sidebar controls and nested panels */
+#sidebar [class*="bg-"],
+#sidebar [class*="dark:bg-"],
+.py-2\.5.my-auto.flex.flex-col.justify-between.h-screen [class*="bg-"] {
+    background-color: var(--sidebar-bg) !important;
+}
+
+/* Chat rows and navigation items */
+#sidebar a,
+#sidebar button,
+.py-2\.5.my-auto.flex.flex-col.justify-between.h-screen a,
+.py-2\.5.my-auto.flex.flex-col.justify-between.h-screen button {
+    color: var(--sidebar-text) !important;
+    border-color: transparent !important;
+}
+
+#sidebar a:hover,
+#sidebar button:hover,
+#sidebar [class*="hover:bg-"]:hover {
+    background-color: var(--sidebar-hover) !important;
+    color: #ffffff !important;
+}
+
+/* Selected chat/model row */
+#sidebar .w-full.flex.justify-between.rounded-md.px-3.py-2.hover\:bg-gray-900.bg-gray-900.transition.whitespace-nowrap.text-ellipsis {
+    background-color: #504945 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+/* Sidebar search and inputs */
+#sidebar input,
+#sidebar textarea {
+    background-color: var(--sidebar-surface) !important;
+    color: var(--sidebar-text) !important;
+    border-color: var(--sidebar-border) !important;
+}
+
+#sidebar input::placeholder,
+#sidebar textarea::placeholder {
+    color: var(--sidebar-muted) !important;
+}
+
+/* Sidebar icons */
+#sidebar svg {
+    color: var(--sidebar-muted) !important;
+    stroke: var(--sidebar-muted) !important;
+}
+
+#sidebar button:hover svg,
+#sidebar a:hover svg {
+    color: #ffffff !important;
+    stroke: #ffffff !important;
+}
+
+/* Account area */
+#sidebar .sticky.bottom-0,
+#sidebar .sticky.bottom-0 > div,
+#sidebar .sticky.bottom-0 button[aria-label="User menu"] {
+    background-color: var(--sidebar-bg) !important;
+    color: var(--sidebar-text) !important;
+}
+
+#sidebar .sticky.bottom-0 button[aria-label="User menu"]:hover {
+    background-color: var(--sidebar-hover) !important;
+}
+
+/* Remove sidebar gradients */
+#sidebar .sidebar-bg-gradient-to-b,
+#sidebar .sidebar-bg-gradient-to-t {
+    display: none !important;
+    background: none !important;
+    background-image: none !important;
+}

@@ -613,6 +613,35 @@ _pi_nonstata_skills() {
   done
 }
 
+# Helper: populate global _PI_STATA_SKILL_ARGS with --no-skills + --skill for Stata research skills.
+# Skips agy-only skills (auto, mode, manual) and non-research skills (music).
+_pi_stata_skills() {
+  typeset -ga _PI_STATA_SKILL_ARGS
+  _PI_STATA_SKILL_ARGS=("--no-skills")
+  local -a _beta_skip=(auto mode manual music)
+  local s
+  for s in ~/.agents/skills/*; do
+    [[ -d "$s" ]] || continue
+    (( ${_beta_skip[(Ie)${s:t}]} )) && continue
+    _PI_STATA_SKILL_ARGS+=("--skill" "$s")
+  done
+  for s in ~/.pi/agent/skills/*(N); do
+    [[ -d "$s" ]] || continue
+    (( ${_beta_skip[(Ie)${s:t}]} )) && continue
+    _PI_STATA_SKILL_ARGS+=("--skill" "$s")
+  done
+}
+
+# Helper: detect ghostty-write profile and set --use-theme gruvbox-light-soft per-run
+_pi_theme_args() {
+  typeset -ga _PI_THEME_ARGS
+  if [[ "$GHOSTTY_PROFILE" == "write" ]]; then
+    _PI_THEME_ARGS=("--use-theme" "gruvbox-light-soft")
+  else
+    _PI_THEME_ARGS=()
+  fi
+}
+
 # --- LEMONADE HELPERS ---
 LEM_API="http://127.0.0.1:13305/api/v1"
 
@@ -774,6 +803,7 @@ _lem_preload() {
 pi() {
   export PI_SUBAGENTS_MAX_CONCURRENT=1
   _pi_nonstata_skills
+  _pi_theme_args
 
   local model_id
   model_id=$(_pi_pick_local_model) || return 1
@@ -788,7 +818,7 @@ pi() {
   case "${go%%[ ]*}" in
     no)
       printf '\033]2;π - %s\007' "${PWD##*/}"
-      command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" "$@"
+      command pi "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "$@"
       printf '\a'
       ;;
     yes)
@@ -808,7 +838,7 @@ pi() {
       fi
 
       printf '\033]2;π - %s\007' "${abs_target##*/}"
-      pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" "${@:2}"
+      pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "${@:2}"
       printf '\a'
       ;;
   esac
@@ -817,6 +847,7 @@ pi() {
 pihat() {
   export PI_SUBAGENTS_MAX_CONCURRENT=4
   _pi_nonstata_skills
+  _pi_theme_args
 
   # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
   # openrouter-us (US key) = everything else. Model + thinking level via /model
@@ -838,7 +869,7 @@ pihat() {
   case "${go%%[ ]*}" in
     no)
       printf '\033]2;π̂ - %s\007' "${PWD##*/}"
-      { command pi "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --models "$model_scope" "$@" } \
+      { command pi "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "$@" } \
         always { rm -f "$_state_file"; printf '\a' > /dev/tty }
       ;;
     yes)
@@ -858,7 +889,7 @@ pihat() {
       fi
 
       printf '\033]2;π̂ - %s\007' "${abs_target##*/}"
-      { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" --model "$model_flag" --models "$model_scope" "${@:2}" } \
+      { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "${@:2}" } \
         always { rm -f "$_state_file"; printf '\a' > /dev/tty }
       ;;
   esac
@@ -866,6 +897,8 @@ pihat() {
 
 beta() {
   export PI_SUBAGENTS_MAX_CONCURRENT=1
+  _pi_stata_skills
+  _pi_theme_args
   local target="${1:-$PWD}" abs_target
   abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
   [[ -d "$abs_target" ]] || { echo "Error: '$target' is not a directory."; return 1; }
@@ -882,12 +915,14 @@ beta() {
   level="${level%%[ ]*}"
 
   printf '\033]2;β - %s\007' "${abs_target##*/}"
-  pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}"
+  pi-safe-stata-${level} "${abs_target}" "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}"
   printf '\a' > /dev/tty
 }
 
 betahat() {
   export PI_SUBAGENTS_MAX_CONCURRENT=4
+  _pi_stata_skills
+  _pi_theme_args
 
   # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
   # openrouter-us (US key) = everything else. Model + thinking level via /model
@@ -911,7 +946,7 @@ betahat() {
   local _state_file="$_state_dir/$$.state"
   printf 'type=betahat\nmodel=%s\n' "$model_flag" > "$_state_file"
   printf '\033]2;β̂ - %s\007' "${abs_target##*/}"
-  { pi-safe-stata-${level} "${abs_target}" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
+  { pi-safe-stata-${level} "${abs_target}" "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; printf '\a' > /dev/tty }
 }
 
@@ -945,7 +980,7 @@ alias stata-kill="tmux kill-session -t stata 2>/dev/null && echo 'stata session 
 
 # Launch Ghostty writing session with Monaspace Xenon (closes caller)
 ghostty-write() {
-  (nohup ghostty --gtk-single-instance=false --config-file="$HOME/.config/ghostty/config-write.ghostty" "$@" >/dev/null 2>&1 &)
+  (nohup ghostty --gtk-single-instance=false --config-default-files=false --config-file="$HOME/.config/ghostty/config-write.ghostty" "$@" >/dev/null 2>&1 &)
   exit
 }
 

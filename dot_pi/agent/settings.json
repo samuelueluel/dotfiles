@@ -49,6 +49,7 @@
     "extensions/pi-advisor"
   ],
   "extensions": [
+    "extensions/subagent-profile.ts",
     "extensions/modes.ts",
     "extensions/powerline-footer.ts"
   ],
