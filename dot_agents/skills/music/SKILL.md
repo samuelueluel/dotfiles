@@ -1,73 +1,74 @@
 ---
 name: music
-description: This skill manages MPD playback and queues with mpc/rmpc and manages music metadata, covers, Beets imports, and onboarding with local music-* tools. Use when the user mentions MPD, mpc, rmpc, Beets, music metadata or tagging, album art, queues, playlists, or adding new music.
+description: Manage MPD playback and queues with mpc/rmpc, and handle music metadata, covers, Beets imports, and onboarding with local music-* tools. Use when managing music playback, queues, playlists, tags, album art, Beets library, or onboarding downloads.
 ---
 
-# Music: MPD, `mpc`, `rmpc`, scripts, and Beets
+# Music Management: MPD, `mpc`, `rmpc`, and Beets
 
-## Tool split
+## Architecture & Tool Split
 
-- **MPD** is the daemon and database. Do not restart or reconfigure it unless asked.
-- **`mpc`** is the default for shell automation: status, metadata searches, filter expressions, queue changes, and pipelines.
-- **`rmpc`** is the interactive TUI plus a small CLI for rmpc-specific features such as `addrandom`, remote TUI control, and external-media integration. Both clients control the same MPD queue.
-- For local-library metadata search, use `mpc`; do not assume an `rmpc search` subcommand exists. Check `rmpc --help` for the installed release.
+- **MPD (`mpd`):** Music server daemon and database. Do not restart or reconfigure unless explicitly requested.
+- **`mpc`:** Primary CLI for playback control, status, queue management, searches, and filter pipelines.
+- **`rmpc`:** Interactive terminal TUI and CLI helper (for `addrandom`, `remote keybind`, `save`/`load` playlists). Controls the same MPD queue.
+- **Search Tooling:** Always use `mpc search` for local metadata queries (no `rmpc search` exists).
 
-## Quick start
+## Safe Mutation Invariants
 
-Inspect without changing playback:
+- **Queue Preservation:** Do not clear or replace the queue unless explicitly instructed. Commands like `mpc clear`, `searchadd`, `insert`, `shuffle`, and `play` mutate playback state.
+- **Dry-Run First:** Always preview metadata and filesystem modifications with `--dry-run`.
+- **Destructive Onboarding:** `music-onboard` is interactive, moves/deletes source files, and has no dry-run mode. Run only upon explicit request.
+- **No `--help` on Legacy Scripts:** Never pass `--help` to `music-fix-multivalue` or `music-fix-separators-legacy` (they do not parse help and may trigger unintended library scans).
+- **MPD Cache Invalidation:** Refresh MPD after approved tag or file changes using `mpc -w update`.
+
+## Quick Playback & Queue Cheatsheet
 
 ```bash
-mpc status
-mpc current
+# Non-mutating inspection
+mpc status && mpc current
 mpc playlist
 mpc stats
-```
 
-Search, preview, then queue:
-
-```bash
+# Search & queue (appends without clearing)
 mpc search artist "Artist Name"
 mpc find artist "Artist Name" album "Album Name"       # exact match
 mpc searchadd artist "Artist Name" album "Album Name"  # append to queue
-mpc insert "Artist Name/Album Name/01 - Song.mp3"       # play next
+mpc insert "Artist/Album/01 - Song.mp3"                # queue next
+
+# Replace queue & play (explicit request only)
+mpc clear && mpc searchadd artist "Artist" album "Album" && mpc play
+
+# Playback controls
+mpc play | pause | toggle | next | prev
+mpc seek +30 | volume +5
+mpc repeat on|off | random on|off | single on|once|off | consume on|off
+mpc shuffle | del <POSITION> | move <FROM> <TO>
 ```
 
-Replace the queue and play only when explicitly requested:
+## `rmpc` CLI Operations
 
 ```bash
-mpc clear && mpc searchadd artist "Artist Name" album "Album Name" && mpc play
-```
-
-Basic controls include `mpc play`, `pause`, `toggle`, `next`, `prev`, `seek +30`, `volume +5`, `repeat on|off`, `random on|off`, `single on|once|off`, `consume on|off`, `shuffle`, `del POSITION`, and `move FROM TO`. Queue positions are zero-based.
-
-## Safe mutation rules
-
-- Preserve the existing queue unless the request says to replace it; `clear`, `searchadd`, `insert`, `shuffle`, and playback commands change state.
-- Treat every metadata or filesystem helper as a write. Run its `--dry-run` first and review the scope. `music-onboard` has no dry-run and moves/deletes files.
-- Refresh MPD after approved file/tag changes with `mpc -w update`; onboarding already updates MPD.
-- Never probe `music-fix-multivalue` or `music-fix-separators-legacy` with `--help`: they do not parse help and may scan/write the library.
-
-## rmpc essentials
-
-```bash
-rmpc                         # TUI; requires a real terminal
-rmpc status
-rmpc queue
-rmpc add "Artist/Album/track.mp3"
-rmpc add --position +0 "Artist/Album/track.mp3"
+rmpc status | rmpc queue
+rmpc add "Artist/Album/track.mp3" [--position +0]
 rmpc addrandom album 10
-rmpc save "playlist name"
-rmpc load "playlist name"
-rmpc remote keybind "<KEY>"
+rmpc save "playlist_name" | rmpc load "playlist_name"
 rmpc remote switchtab "Queue"
+rmpc remote keybind "<KEY>"
 ```
 
-Do not assume TUI keybindings; inspect the configured rmpc file. Run `rmpc debuginfo` before using `addyt` or `searchyt`; external playback needs a configured cache directory, local MPD socket, yt-dlp, ffmpeg/ffprobe, and Python Mutagen. A URL playlist may download every item.
+## RateYourMusic Genre Tagging Convention & Datasets
 
-## Progressive disclosure
+- **Standard Genre Convention:** RateYourMusic (RYM) is Samuel's official gold-standard taxonomy for all genre tagging.
+- **Canonical RYM Subgenres:** When tagging or onboarding music, always assign canonical **RYM Primary and Secondary Genres** (e.g. `Slowcore`, `Midwest Emo`, `Shibuya-kei`, `Chamber Folk`, `Atmospheric Black Metal`, `Neo-Psychedelia`, `Glitch Pop`, `Alt-Country`, `Art Pop`).
+- **Native Multi-Value Storage:** Genres are stored as discrete array elements in ID3v2.4 `TCON` (MP3) and Vorbis `genre` (FLAC) via `tag_utils.py` (never raw embedded semicolons in a single string).
+- **Library Manifest & Reference Files:**
+  - `~/.config/music/library_rym_genres_manifest.csv`: The complete, authoritative RYM genre manifest for all 1,376+ albums in `~/Music/mp3-library`.
+  - `~/.config/music/rym_collection_genres.csv`: Snapshot of Samuel's 720+ rated releases with star ratings and release URLs for taste grounding (4.0, 4.5, and 5.0 star tiers).
+- **Player State & Ratings:** Active library ratings remain tracked via live MPD `grouping` tags (`R: 5`, `R: 4.5`, `R: 4`, `Unrated`, etc.).
 
-- For grouping vocabulary, tag fields, metadata search, or MPD filters, load [references/tagging-taxonomy.md](references/tagging-taxonomy.md).
-- For custom `music-*` behavior, dry-runs, cover art, separator repair, or format conversion, load [references/scripts.md](references/scripts.md).
-- For new downloads, `music-onboard`, Beets import/update/replaygain, or metadata-write decisions, load [references/beets-and-onboarding.md](references/beets-and-onboarding.md).
 
-Useful upstream references: [rmpc GitHub](https://github.com/mierak/rmpc), [rmpc CLI mode](https://rmpc.mierak.dev/reference/cli-command-mode/), and [MPD filter syntax](https://www.musicpd.org/doc/protocol/filter_syntax.html).
+## Progressive Disclosure & Reference Routing
+
+- **Metadata Fields, Grouping, RYM Querying & Filter Grammar:** Tag mappings, canonical grouping order, RYM CSV query recipes, and verified MPD filter syntax $\to$ [references/tagging-taxonomy.md](references/tagging-taxonomy.md).
+- **Custom `music-*` Scripts & Tag Surgery:** Bulk tag edits, separator repairs, cover art fixes, and format conversion $\to$ [references/scripts.md](references/scripts.md).
+- **Album Onboarding & Beets Operations:** `music-onboard` pipeline, Beets configuration, ReplayGain, and metadata sync $\to$ [references/beets-and-onboarding.md](references/beets-and-onboarding.md).
+

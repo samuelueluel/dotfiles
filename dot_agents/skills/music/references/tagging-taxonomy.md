@@ -1,120 +1,131 @@
-# Tagging taxonomy and MPD search reference
+# Tagging Taxonomy & MPD Filter Reference
 
-Load this file when searching by metadata, inspecting grouping/genre values, or changing tags.
+**Load this file when** querying metadata, constructing MPD filter expressions, inspecting custom tag fields, or verifying grouping vocabularies.
 
-## Storage and field names
+## Tag Field Mappings
 
-`~/.local/bin/tag_utils.py` maps the custom fields as follows:
+`~/.local/bin/tag_utils.py` manages custom tags across formats (MP3 and FLAC only):
 
-| Meaning | MP3 | FLAC |
+| Field Meaning | MP3 (ID3v2.4) | FLAC (Vorbis Comment) |
 |---|---|---|
-| grouping | ID3 `TIT1` | Vorbis `grouping` |
-| genres | ID3 `TCON` | Vorbis `genre` |
-| title/album/artist/track/date | `TIT2`/`TALB`/`TPE1`/`TRCK`/`TDRC` | corresponding Vorbis fields |
+| Grouping | `TIT1` | `grouping` |
+| Genre | `TCON` | `genre` |
+| Title / Album / Artist | `TIT2` / `TALB` / `TPE1` | `title` / `album` / `artist` |
+| Track / Date | `TRCK` / `TDRC` | `tracknumber` / `date` |
 
-The tag-surgery scripts support MP3 and FLAC only. MPD exposes `grouping` and `genre` as searchable tags.
+## Grouping Vocabulary & Normalization
 
-## Grouping vocabulary
-
-Samuel's grouping vocabulary includes:
-
+Samuel's library uses a strictly controlled grouping taxonomy:
 - `[Priority]`
-- Ratings: `R: 5`, `R: 4.5`, `R: 4`, `R: 3.5`, `R: 3`, and `R: 2.5`
-- `Unrated`
-- `Overrated`
-- `Underrated`
-- `<500 ratings`
-- `FL`
-- `Wall`
+- Ratings: `R: 5`, `R: 4.5`, `R: 4`, `R: 3.5`, `R: 3`, `R: 2.5` *(Note: use `R: 5`, never `R: 5.0`)*
+- Flags: `Unrated`, `Overrated`, `Underrated`, `<500 ratings`, `FL`, `Wall`
 
-Use the spellings already in the files. In particular, the library uses `R: 5`, not `R: 5.0`.
-
-`tag_utils.normalize_grouping()` implements this order:
-
+### Canonical Sort Order (`tag_utils.normalize_grouping`)
+When normalized, grouping values are deduplicated and ordered as follows:
 1. `[Priority]`
-2. values beginning with `R:` (reverse lexical order)
-3. `Unrated`
-4. `Overrated`
-5. `Underrated`
-6. `<500 ratings`
-7. `FL`
-8. `Wall`
-9. other values, alphabetically
+2. Ratings `R:` (reverse lexical order: `R: 5`, `R: 4.5`, ..., `R: 2.5`)
+3. `Unrated` $\to$ `Overrated` $\to$ `Underrated` $\to$ `<500 ratings` $\to$ `FL` $\to$ `Wall`
+4. Custom/other values (alphabetical)
 
-It also deduplicates grouping values because it starts from a set. It does not validate ratings numerically. `music-set-tags`, `music-add-tag`, `music-rename-tag`, and `music-normalize-order` can therefore change grouping order or remove duplicate grouping values.
-
-## Search forms
-
-Use the simple form for case-insensitive substring searches:
+## MPD Search Forms
 
 ```bash
+# Case-insensitive substring search
 mpc search artist "Artist Name"
 mpc search album "Album Name"
 mpc search title "Song Title"
 mpc search grouping "R: 5"
-```
 
-Use `find` for exact, case-sensitive tag values:
-
-```bash
+# Exact case-sensitive match
 mpc find artist "Artist Name" album "Album Name"
+
+# Queue results directly
+mpc searchadd artist "Artist" album "Album"
+mpc findadd artist "Artist" album "Album"
 ```
 
-Use `searchadd` or `findadd` to add results directly to the queue; preview with `search` first. Search results are tracks, even when the query identifies an album.
+## MPD Filter Grammar (MPD 0.24 Verified)
 
-## Filter expressions: verified MPD syntax
-
-The MPD filter grammar accepts `==`, `!=`, `contains`, `starts_with`, regex `=~` when PCRE is available, negation, and `AND`. Parenthesize every expression:
+MPD filter expressions require explicit parentheses around each clause and sub-expression:
 
 ```bash
-# All tracks carrying both flags.
+# Multiple tag match (AND)
 mpc search '((grouping == "[Priority]") AND (grouping == "Unrated"))'
 
-# 1990s releases. Date is treated as a string.
+# Genre + Date prefix (dates are treated as strings)
 mpc search '((genre == "Art Rock") AND (date starts_with "199"))'
 
-# Rating 4 or higher among the obscure-release group.
+# Regex match (PCRE)
 mpc search '((grouping == "<500 ratings") AND (grouping =~ "^R: (4([.]5)?|5)$"))'
 
-# Exclude a flag.
+# Negation
 mpc search '(!(grouping == "Overrated"))'
 ```
 
-Important limitations verified against MPD 0.24:
+### Grammar Limitations & Rules
+- **No `OR` operator:** `OR` is unsupported and causes `MPD error: 'AND' expected`. Use regex (`=~`) or separate queries.
+- **No numeric comparisons:** Expressions like `date >= "1990"` fail. Use `starts_with` or regex.
+- **Multiple Tag Values:** Separate `(grouping == "...")` clauses can match distinct multi-value tags on the same track.
 
-- `OR` is not accepted; it returns `MPD error: 'AND' expected`. Use a regex or separate searches.
-- Numeric date comparisons such as `date >= "1990"` are not accepted. Use `starts_with` or regex.
-- Multiple values of one tag are supported, so two `grouping ==` clauses can match two values on one track.
-
-For queueing, replace `search` with `searchadd` or `findadd`:
-
-```bash
-mpc searchadd '((grouping == "[Priority]") AND (grouping == "Unrated"))'
-```
-
-Adding a 4+ rating without regex is also possible with separate exact searches, but check for duplicates:
+## Common Queue Recipes
 
 ```bash
-for rating in "R: 4" "R: 4.5" "R: 5"; do
-    mpc searchadd grouping "$rating"
-done
-```
-
-## Queue recipes
-
-```bash
-# Add 5-star tracks to the end of the queue.
+# Append all 5-star tracks to queue
 mpc searchadd grouping "R: 5"
 
-# Add a specific album and artist, case-insensitively.
+# Append specific album
 mpc searchadd artist "Artist Name" album "Album Name"
 
-# Add priority/unrated tracks, then shuffle only if requested.
+# Append filtered tracks and shuffle (if requested)
 mpc searchadd '((grouping == "[Priority]") AND (grouping == "Unrated"))'
 mpc shuffle
 
-# Replace the queue and play a filtered set only when explicitly requested.
+# Replace queue and start playback (explicit request only)
 mpc clear && mpc searchadd '((genre == "Art Rock") AND (date starts_with "199"))' && mpc play
 ```
 
-Do not call the last recipe merely to preview a query: `clear`, `searchadd`, `shuffle`, and `play` mutate playback state.
+## RateYourMusic Genre Tagging Convention & Taxonomy
+
+RateYourMusic (RYM) is Samuel's official gold-standard genre taxonomy across the entire library.
+
+### Tagging Rules & Conventions
+1. **Canonical Primary & Secondary Genres:** Always use official RateYourMusic genre nomenclature with strict Title Case and standard hyphenation:
+   - Examples: `Slowcore`, `Midwest Emo`, `Shibuya-kei`, `Chamber Folk`, `Atmospheric Black Metal`, `Neo-Psychedelia`, `Glitch Pop`, `Alt-Country`, `Art Pop`, `Math Rock`, `Singer-Songwriter`, `Post-Rock`.
+2. **Multi-Value Tag Storage:**
+   - Genres must be written as discrete array items in `tag_utils.set_values(audio, 'genres', ['Genre 1', 'Genre 2'])`.
+   - Never write flattened strings with embedded semicolons into a single tag frame.
+3. **Library Manifest:** `~/.config/music/library_rym_genres_manifest.csv` holds the complete, verified mapping for all 1,376+ albums in `~/Music/mp3-library`.
+
+## RateYourMusic Datasets & References
+
+- **Library-Wide RYM Manifest:** `~/.config/music/library_rym_genres_manifest.csv` (1,376 albums mapped to canonical RYM genres).
+- **Rated Collection Snapshot:** `~/.config/music/rym_collection_genres.csv` (720+ rated releases with star ratings and URLs for taste grounding across 4.0★, 4.5★, and 5.0★ tiers).
+
+### Quick Query Patterns
+
+```python
+import csv
+
+# Query full library manifest for specific RYM genres
+with open("/var/home/samuel/.config/music/library_rym_genres_manifest.csv") as f:
+    manifest = list(csv.DictReader(f))
+
+slowcore_albums = [
+    r for r in manifest
+    if "Slowcore" in r["Proposed RYM Genres"]
+]
+```
+
+### CLI One-Liner (Search Snapshot)
+```bash
+python3 -c '
+import csv
+with open("/var/home/samuel/.config/music/rym_collection_genres.csv") as f:
+    for r in csv.DictReader(f):
+        if r["Rating"] in ("5.00 stars", "4.50 stars", "4.00 stars"):
+            print(f"{r[\"Rating\"]} | {r[\"Artist\"]} - {r[\"Album\"]} ({r[\"Genres\"]})")
+'
+```
+
+
+

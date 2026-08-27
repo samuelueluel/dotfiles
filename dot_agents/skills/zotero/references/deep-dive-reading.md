@@ -1,73 +1,65 @@
-# Deep-Dive Reading (sidecar grep)
+# Deep-Dive Reading & Targeted Sidecar Extraction
 
-**Load this file when** the agent needs specific content from papers — coefficients, standard errors, table notes, design/method sections — or when deciding whether to read a paper in full during literature work (e.g., "qualify these results", "what did Table 5 show?", "did they cluster SEs?", "how credible is the identification?").
+**Load this file when** extracting specific empirical content (coefficients, standard errors, table notes, design sections, proofs) without injecting full papers into context, or when deciding whether full reading is necessary.
 
-## Why grep instead of full text
+## Sidecar Markdown Architecture
 
-Every MinerU-parsed item gets a sidecar at `~/.config/zotero-mcp/mineru-sidecars/<item_key>.md` (LaTeX equations, HTML tables, OCR text). Check one exists with `ls ~/.config/zotero-mcp/mineru-sidecars/<key>.md`.
+MinerU parses PDF documents into structured Markdown sidecars at `~/.config/zotero-mcp/mineru-sidecars/<item_key>.md`, containing LaTeX equations, HTML tables, and OCR text.
 
-`zotero_zotero_get_item_fulltext` reads the SAME sidecar, but:
+Targeted shell commands (`grep`, `sed`) directly on sidecars provide immediate access to exact data without requiring Zotero Desktop or consuming 12–24K tokens per paper.
 
-- injects the whole paper into context (~12–24K tokens), and
-- requires Zotero desktop/API up — its metadata fetch errors out with desktop closed (`Connection refused`, before any content is reached).
+## Decision Rules & Extraction Patterns
 
-`grep`/`sed` on the sidecar reads the same content with neither cost: no desktop dependency, only matching lines enter context.
+### 1. Extractive Data (Estimates, Coefficients, Table Notes)
+For point estimates, standard errors, and table notes:
+```bash
+# Locate table numbers or formatted point estimates
+grep -nE "Table 5|\(0\.0[0-9]+\)" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
 
-## Decision rule: extract vs. understand
-
-- **Extractive** ("coefficient", "standard error", "what did Table 5 show?"): grep for the pattern.
-
-  ```bash
-  grep -nE "Table 5|\(0\.0[0-9]+\)" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
-  grep -n -i "standard error" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
-  ```
-
-  Tables are HTML (`<tr><td>`); SEs look like `(0.0359)` inside cells. Add `-B2 -A6` for surrounding context.
-
-- **Assessable / semantic** ("how credible is the identification?", "is the result robust?"): grep to LOCATE the design sections, then read only those regions.
-
-  ```bash
-  grep -n -iE "identification|instrument|placebo|robust|clustered|Note:" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
-  sed -n '120,150p' ~/.config/zotero-mcp/mineru-sidecars/<key>.md
-  ```
-
-  Reading becomes surgical instead of whole-paper.
-
-- **Textbook / method extraction** (equations, theorems, definitions in big books): locate by **section heading**, then read the range around the hit — never chase a vague concept phrase. `grep -i "asymptotic variance"` on Hayashi hits ch. 7 OLS noise when the answer sits under "13.8 EFFICIENT GMM".
-
-  ```bash
-  # 1. pick the best source across ALL sidecars in one pass
-  grep -l "EFFICIENT GMM" ~/.config/zotero-mcp/mineru-sidecars/*.md
-  # 2. locate the heading
-  grep -n "EFFICIENT GMM" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
-  # 3. read the range around the hit immediately — stop grepping
-  sed -n '16055,16130p' ~/.config/zotero-mcp/mineru-sidecars/<key>.md
-  ```
-
-  Heading hit at line N → read roughly `N-5` to `N+70`. A broad grep after a heading hit wastes turns; the content is ~50 lines below the heading you already found.
-
-- **Holistic** ("write a literature-review paragraph on this paper", "synthesize across these papers", big-picture understanding): a full read is the RIGHT choice — `zotero_zotero_get_item_fulltext` (desktop must be up) or read the sidecar in chunks. Never substitute grep for a read when the question is what the paper says overall — grep is a cost-aware default for targeted extraction, not a gate on full reading.
-
-## Do not use read_pdf_pages as a middle path
-
-`zotero_zotero_read_pdf_pages(item_key, start_page, end_page)` looks like an attractive page-scoped compromise. It is **text-layer only, with no OCR**, so on this scan-heavy corpus it commonly returns:
-
+# Search for standard errors with surrounding row context
+grep -n -i "standard error" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
 ```
-*[No text layer on this page — it is a scanned image]*
+*Formatting Note:* Tables use HTML (`<tr><td>`). Standard errors appear as `(0.0359)`. Use `-B2 -A6` to view surrounding table rows.
+
+### 2. Methodological Sections (Identification, Robustness, Clustering)
+To inspect design credibility or econometric specifications:
+```bash
+# 1. Locate relevant section lines
+grep -n -iE "identification|instrument|placebo|robust|clustered|Note:" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
+
+# 2. Extract specific line window (e.g., lines 120 to 150)
+sed -n '120,150p' ~/.config/zotero-mcp/mineru-sidecars/<key>.md
 ```
 
-— for pages MinerU parsed perfectly well. That is the dangerous failure class: the call succeeds, returns clean-looking output, and the content is simply absent. **Prefer the sidecar.** Reach for `read_pdf_pages` only to confirm pagination or to read a page you already know carries a text layer, and never conclude a paper lacks content because this tool came back empty.
+### 3. Textbook & Method Extraction (Definitions, Proofs, Formulas)
+To extract theorems or estimators from large reference works:
+```bash
+# 1. Locate matching heading across sidecars
+grep -l "EFFICIENT GMM" ~/.config/zotero-mcp/mineru-sidecars/*.md
 
-The `[pdf]` extra is installed, so `get_pdf_outline` (bookmark TOC for long PDFs) and `get_page_layout` (figure/table coordinates) are live — see `library-ops.md` for details. Content still comes from the sidecar; `get_page_layout` adds the geometry, it doesn't replace the sidecar.
+# 2. Find exact line number in target sidecar
+grep -n "EFFICIENT GMM" ~/.config/zotero-mcp/mineru-sidecars/<key>.md
 
-## Practical notes
+# 3. Read surrounding window (e.g., line N-5 to N+70)
+sed -n '<START_LINE>,<END_LINE>p' ~/.config/zotero-mcp/mineru-sidecars/<key>.md
+```
+*Rule:* Target specific section headers rather than broad concepts across large books.
 
-- Item keys come from semantic-search results (or `zotero_zotero_get_item_children`).
-- Sidecar grep works with Zotero desktop closed; fulltext via MCP does not. Desktop-down metadata lookup: `service-ops.md`.
-- A missing sidecar means the item was never MinerU-parsed (or the parse failed). Re-running `zotero_zotero_update_search_database` retries formerly-failed items; see `index-maintenance.md`.
-- For a holistic read of an item whose highlights matter, check `zotero_zotero_synthesize_annotations` — but note it returns nothing until there are Zotero-DB annotations (file-embedded highlights from external readers are read-only; see `library-ops.md`).
-- For several papers, loop over keys:
+### 4. Comprehensive Reading (Literature Reviews & Synthesis)
+When synthesizing full arguments or writing literature reviews:
+- Read the entire paper using `zotero_zotero_get_item_fulltext` (when Desktop is running) or read the sidecar in structured chunks.
+- Do not substitute grep fragments for comprehensive comprehension when evaluating full arguments.
 
-  ```bash
-  for k in KEY1 KEY2; do echo "===== $k"; grep -nE "Table [0-9]|\(0\.[0-9]+\)" ~/.config/zotero-mcp/mineru-sidecars/$k.md | head -30; done
-  ```
+## Scanned PDFs vs. Sidecars
+
+`zotero_zotero_read_pdf_pages` extracts text-layer data only and returns `*[No text layer on this page — it is a scanned image]*` on scanned PDFs. Always prefer the OCR-processed sidecar Markdown. Use `read_pdf_pages` only to verify physical page layouts on native text-layer PDFs.
+
+## Batch Extraction Across Papers
+
+Extract table lines across multiple items:
+```bash
+for k in KEY1 KEY2; do
+  echo "===== $k"
+  grep -nE "Table [0-9]|\(0\.[0-9]+\)" ~/.config/zotero-mcp/mineru-sidecars/$k.md | head -30
+done
+```

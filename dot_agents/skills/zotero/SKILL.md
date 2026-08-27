@@ -5,50 +5,39 @@ description: Manage Samuel's local Zotero library through MCP and CLI tools, inc
 
 # Zotero Library Management
 
-## Operating boundary (CRITICAL)
+## Operating Boundaries & Safety
 
-- Zotero MCP tools use the literal `zotero_zotero_*` prefix; the collections resource is `zotero_read_zotero_collections`.
-- An `external_reference` is a graph identity not resolved to a Zotero item. It is metadata-only, but is not proof that no equivalent preprint or published version exists in the library. Check library metadata before saying it is absent; never merge versions silently. Two kinds exist: `ext:doi:*` (DOI-backed, confident) and `ext:meta:*` (heuristic, derived from surname+year+title of a DOI-less bibliography entry, confidence ≤ 0.72) — treat `ext:meta:*` labels as approximate and verify via `zotero_zotero_search_references`.
-- Reference metadata and graph edges are not evidence of a paper's findings. Never infer absent-source results. Full-text acquisition is separate, explicitly authorized, and never bulk-triggered by citations.
-- For every Zotero-grounded content, reference-occurrence, or graph claim, load and follow `~/.agents/skills/citation-integrity/SKILL.md`.
+- **Tool Names:** MCP tools use the literal prefix `zotero_zotero_*`; the collections resource is `zotero_read_zotero_collections`.
+- **Evidence Contracts:** For all literature claims, reference occurrences, or graph assertions, follow `~/.agents/skills/citation-integrity/SKILL.md`. Reference metadata and graph edges do not prove source findings.
+- **Zero Cloud PDFs:** Never delete from `~/Zotero/storage/`, call `zotero_zotero_attach_file`, or upload PDF bytes to Zotero Cloud. Attach local PDFs via `zotero_zotero_add_item(attach_mode="none")` followed by `~/.local/bin/zotero-link <key> <pdf_path>`, preserving Dropbox originals.
+- **Acquisition Gating:** Do not download, create, parse, or embed items merely because they appear in bibliographies. `zotero_zotero_delete_item` requires explicit user confirmation (moves item to Trash).
+- **External References:** Graph nodes prefixed with `ext:*` are unmapped to library items (`ext:doi:*` are DOI-backed; `ext:meta:*` are heuristic from DOI-less entries, confidence ≤ 0.72). Treat `ext:meta:*` as approximate and verify via `zotero_zotero_search_references`. Check library metadata before declaring a work absent; never merge versions silently.
+- **Subagent Policy:** Zotero operations remain interactive in the main session (no subagents). Never run a host-wide `pkill llama-server`.
 
-## Files, attachments, and safety
+## Required Services
 
-- Never delete from `~/Zotero/storage/`, call `zotero_zotero_attach_file`, or upload PDF bytes to Zotero cloud.
-- For an authorized PDF already in Dropbox, prefer a linked attachment: create metadata with `zotero_zotero_add_item(..., attach_mode="none")`, then run `~/.local/bin/zotero-link <item_key> <absolute_pdf_path>`. Keep the original.
-- Do not download, create, parse, or embed an item merely because it appears in a bibliography. `zotero_zotero_delete_item` requires explicit authorization and moves the item to Trash.
+- **Embedder (`127.0.0.1:8082`):** Ask Samuel to run `serve-embedder`; never auto-start.
+- **Reranker (`127.0.0.1:8083`):** Fail-closed. Ask Samuel to run `serve-reranker`, then retry. Never substitute unranked results or remote models.
+- **Zotero Desktop (`127.0.0.1:23119`):** Required for metadata writes, CSL exports, and live full-text retrieval.
+- **Offline / Troubleshooting:** When services fail, wedged APIs occur, or Desktop is closed for SQLite reads, load [service operations](references/service-ops.md).
 
-## Services
+## Workflows & Reference Routing
 
-- Embeddings require `127.0.0.1:8082`; ask Samuel to run `serve-embedder` if unavailable. Never auto-start it.
-- Reranking requires `127.0.0.1:8083/v1/rerank`; the MCP does not auto-start it. Ask Samuel to run `serve-reranker`, then retry. It is fail-closed: never substitute Hugging Face, an in-process model, or unranked results.
-- Zotero Desktop is required for writes, CSL exports, and live full-text retrieval. Graph/reference rebuilds read Zotero SQLite immutably and require Desktop fully closed and WAL-checkpointed; load [service operations](references/service-ops.md) before recovery or maintenance.
-- Never run a host-wide `pkill llama-server`. Zotero work stays in the main session, never a subagent.
+### 1. Search & Evidence Retrieval
+- **Findings, Mechanisms, Estimates, Equations:** Run `zotero_zotero_semantic_search` (use `collection=<KEY>` to scope). Verify raw `Rerank` score; ignore chunks marked `REF`.
+- **Exact DOIs, Raw References, "Who Cites X?":** Run `zotero_zotero_search_references`.
+- **Citation Totals:** Count distinct citing items via `zotero_zotero_search_references`. `zotero_zotero_get_collection_hubs` provides directional most-cited rankings based on graph edges, but does not provide exact raw citation totals.
+- **Graph Traversal:** Run `zotero_zotero_get_paper_lineage`, `find_connected_papers`, or `get_collection_hubs` with explicit scopes (`collection`, `library`, `collection-expanded`, `library-expanded`).
+- For routing logic, scope semantics, and unresolved citations, load [search and retrieval](references/search-retrieval.md).
 
-## Workflows
+### 2. Collection Scopes & Keys
+- For known collection keys (`Detroit-Paper`, `Methods`, `Theory`, etc.) and dynamic collection discovery, load [collections](references/collections.md).
 
-### 1. Metadata and library operations
+### 3. Targeted Reading & Sidecar Extraction
+- To extract estimates, standard errors, table notes, or specific proofs via `grep`/`sed` without loading full papers into context, load [deep-dive reading](references/deep-dive-reading.md).
 
-- Existing records: `zotero_zotero_search_items`, `zotero_zotero_advanced_search`, citekey, tag, and collection tools.
-- Add or ingest only when explicitly requested. Prefer DOI metadata; use `zotero-auto-ingest` only for an explicitly supplied local PDF.
-- For edits, annotations, exports, and lifecycle operations, load [library operations](references/library-ops.md).
+### 4. Library Operations, Ingestion & Metadata
+- For CLI ingestion (`zotero-auto-ingest`), CSL manuscript exports (`zotero_zotero_export_bibliography`), bulk edits (`zotero_zotero_batch_update`), and lecture note schemas, load [library operations](references/library-ops.md).
 
-### 2. Search, references, and graphs
-
-- Substantive findings, mechanisms, estimates, equations, and robustness passages from locally indexed items → `zotero_zotero_semantic_search`. Use its `collection` argument for project scope when appropriate.
-- Literal bibliography occurrence, DOI/title lookup, citing-item context, or external-node resolution → `zotero_zotero_search_references`.
-- Citation-count questions (“how many times is X cited”, “most-cited work in / external to a collection”): count raw bibliography occurrences with `zotero_zotero_search_references`, deduping citing items per identity. `zotero_zotero_get_collection_hubs` can *surface* the leading anchors quickly (it now includes external works via `ext:meta:*` nodes), but its counts are graph-edge based, not raw-occurrence based: unresolved leftovers drop out, and `ext:meta` counts are approximate (typo variants can split one work). Treat hubs counts as directional; quote `search_references` counts for anything precise.
-- Closed internal structure → graph scope `collection` or `library`; include external and out-of-collection citation targets only with `collection-expanded` or `library-expanded`.
-- External workflow: reference search → inspect `resolution` → pass a returned `ext:*` key to expanded lineage for known incoming local citers. An external node has no outgoing references unless a local full-text version is separately identified.
-- For the complete routing tree, scope semantics, unresolved entries, topic-first discovery, and fan-out limits, load [search and retrieval](references/search-retrieval.md).
-
-### 3. Sidecars and indexes
-
-- `zotero-sidecar.sh create|enrich|embed|reembed` is only for PDFs already represented by Zotero library items, never `external_reference` nodes.
-- Graph, content-BM25, or reference-index recovery requires [index maintenance](references/index-maintenance.md).
-
-### 4. Evidence checks
-
-- Discard any semantic hit marked `REF` or containing a bibliography-only passage; route it to reference search instead.
-- A semantic claim requires the displayed raw `Rerank` score plus a matching passage. If the score is absent, report an instrumentation failure and do not invent one.
-- Verify empirical numbers against the retrieved passage or direct PDF/full text under the citation-integrity contract. “No evidence found” is a complete answer.
+### 5. Sidecars & Index Maintenance
+- For the 3-stage pipeline (`zotero-sidecar.sh create|enrich|embed|reembed`), BM25 convergence, and ChromaDB recovery, load [index maintenance](references/index-maintenance.md).

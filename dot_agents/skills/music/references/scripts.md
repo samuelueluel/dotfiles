@@ -1,101 +1,92 @@
-# Custom music scripts
+# Custom Music Scripts (`music-*`)
 
-Load this file when editing tags, repairing separators or cover art, converting formats, or checking the scope and side effects of a `music-*` command.
+**Load this file when** editing audio tags, fixing multi-value separators, repairing cover art, or converting audio formats.
 
-## Shared safety rules
+## Safety Invariants
 
-- The default library is `~/Music/mp3-library`; bulk scripts honor `MUSIC_DIR`.
-- Run `--dry-run` first and review the listed paths and counts.
-- `tag_utils.py` supports MP3 and FLAC. Its tag operations may abort when unsupported audio such as M4A, OGG, OPUS, AAC, APE, or WV is present.
-- Use an album path for album-level work. Never omit `MUSIC_DIR` for a bulk operation unless the main library is intended.
-- Refresh MPD after an approved file/tag change with `mpc -w update`.
+- **Default Library:** `~/Music/mp3-library` (bulk scripts respect `MUSIC_DIR`).
+- **Dry-Run Gating:** Always run `--dry-run` first to preview affected paths and track counts.
+- **Audio Formats:** `tag_utils.py` supports MP3 and FLAC only. M4A/OGG/OPUS/AAC files will cause operations to abort.
+- **Scope:** Provide explicit album/directory paths for targeted work. Never omit `MUSIC_DIR` for bulk operations unless targeting the primary library.
+- **Cache Refresh:** Run `mpc -w update` after applying approved metadata changes.
 
-## Tag scripts
+## Tag Editing Scripts
 
 ### `music-set-tags`
-
+Replaces genre and/or grouping tags in a target directory (non-recursive; normalizes grouping; sets canonical multi-value RYM genres):
 ```bash
 music-set-tags "/path/to/album" \
   --grouping "R: 5" "FL" \
-  --genres "Art Rock" "Indie Rock" \
+  --genres "Chamber Folk" "Ambient Pop" \
   --dry-run
 ```
-
-Requires a directory and processes supported files directly inside it; it is not recursive. It replaces grouping and/or genre values. Grouping values are normalized and deduplicated when written.
+*Convention:* Always provide canonical **RateYourMusic Primary & Secondary Genres** in Title Case (e.g. `"Slowcore"` `"Post-Rock"` `"Midwest Emo"`).
 
 ### `music-add-tag`
-
+Recursively appends grouping or canonical RYM genre tags without overwriting existing tags:
 ```bash
 music-add-tag "/path/to/album" --grouping "[Priority]" --dry-run
-MUSIC_DIR="$HOME/Music/mp3-library" music-add-tag \
-  --genres "Experimental" --dry-run
+MUSIC_DIR="$HOME/Music/mp3-library" music-add-tag --genres "Neo-Psychedelia" --dry-run
 ```
 
-It defaults to `MUSIC_DIR` or the main library and recursively processes the supplied tree. It appends exact values only when absent, then normalizes grouping values.
 
 ### `music-set-info`
-
+Updates standard metadata fields on tracks or top-level directory files (does not clear fields):
 ```bash
 music-set-info "/path/to/track.mp3" \
   --title "Song Title" --album "Album Name" \
   --artist "Artist Name" --date "YEAR" --track "01" --dry-run
 ```
 
-It accepts one or more files or directories. A directory is processed only at its top level. Supported fields are title, album, artist, date, and track; it does not clear fields.
-
-### Exact library-wide tag surgery
-
-`music-rename-tag` and `music-delete-tag` recurse through `MUSIC_DIR` and match complete values, not substrings:
-
+### `music-rename-tag` & `music-delete-tag`
+Performs recursive exact-match tag updates across `MUSIC_DIR` (matches full values, not substrings):
 ```bash
+# Rename tag values
 music-rename-tag --grouping "Old Value" "New Value" --dry-run
 music-rename-tag --genres "Old Genre" "New Genre" --dry-run
+
+# Delete tag values
 music-delete-tag --grouping "Obsolete Value" --dry-run
 music-delete-tag --genres "Wrong Genre" --dry-run
 ```
 
-Deletion can remove the last value of a field. Use the dry-run as the review step.
+## Tag & Separator Normalization
 
-## Grouping and separator repair
-
+### `music-normalize-order`
+Recursively applies canonical grouping order and eliminates duplicates:
 ```bash
-music-normalize-order --dry-run
 music-normalize-order "/path/to/tree" --dry-run
 ```
 
-`music-normalize-order` recursively applies the grouping order in [tagging-taxonomy.md](tagging-taxonomy.md) and deduplicates grouping values.
-
-`music-fix-multivalue` has no argparse help output. It honors `--dry-run` and recursively splits a single MP3/FLAC grouping or genre value containing `; ` into separate values:
-
+### `music-fix-multivalue`
+Splits single grouping/genre tags containing `; ` into separate tag entries:
 ```bash
 MUSIC_DIR="/path/to/tree" music-fix-multivalue --dry-run
 ```
+*Warning:* Does not implement `--help`. Never invoke with `--help`.
 
-`music-fix-separators-legacy` is a Bash, MP3-only script. It replaces the legacy literal separator ` / ` with `; ` in ID3 `TIT1` and `TCON`:
-
+### `music-fix-separators-legacy`
+Bash utility for MP3 files; converts legacy ` / ` separators to `; ` in ID3 `TIT1` and `TCON`:
 ```bash
 MUSIC_DIR="/path/to/tree" music-fix-separators-legacy --dry-run
 ```
+*Warning:* Does not implement `--help`. If running both fixes, run `music-fix-separators-legacy` before `music-fix-multivalue`.
 
-It does not implement normal `--help`; never run `music-fix-separators-legacy --help`. If both repairs are needed, review the dry-run of the legacy conversion before running `music-fix-multivalue`.
-
-## Cover-art utilities
+## Cover Art Utilities
 
 ```bash
+# Rename artwork (folder.jpg, Cover.jpg, front.jpg -> cover.*)
 music-fix-cover-names "/path/to/tree" --dry-run
+
+# Extract embedded audio artwork to cover.jpg via ffmpeg
 music-extract-covers "/path/to/tree" --dry-run
 ```
 
-Both recurse through directories containing audio. `music-fix-cover-names` renames known candidates such as `folder.jpg`, `Cover.jpg`, `artwork.png`, or `front.jpg` to an MPD-friendly `cover.*` name when no recognized cover exists. `music-extract-covers` uses ffmpeg on the first sorted audio file and writes `cover.jpg` when embedded art is available.
+## Format Conversion: `music-m4a-to-flac`
 
-## `music-m4a-to-flac`
-
-The script has no positional directory argument; it recursively scans `MUSIC_DIR`:
-
+Recursively converts all M4A files in `MUSIC_DIR` to FLAC using ffmpeg, overwrites targets (`-y`), and deletes source M4A files:
 ```bash
-# Always preview first.
-MUSIC_DIR="/path/to/tree" /usr/bin/python3 \
-  "$HOME/.local/bin/music-m4a-to-flac" --dry-run
+# Always preview first
+MUSIC_DIR="/path/to/tree" /usr/bin/python3 "$HOME/.local/bin/music-m4a-to-flac" --dry-run
 ```
-
-A real run converts every M4A to FLAC with ffmpeg, overwrites an existing destination (`ffmpeg -y`), deletes each successfully converted source, and performs limited FLAC tag cleanup. Do not run it without a backup and explicit approval. If the normal command raises `ModuleNotFoundError: mutagen`, use `/usr/bin/python3` as above or fix the script's interpreter before proceeding.
+*Requirement:* Requires explicit user authorization and a recent backup before live runs.

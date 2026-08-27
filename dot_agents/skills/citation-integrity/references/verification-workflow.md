@@ -1,67 +1,53 @@
-# Verification Workflow
+# Verification Workflow & Gating Rules
 
-**Load this file when** checking empirical numbers, interpreting semantic scores, handling figures, comparing papers, or escalating from a search snippet to direct source text.
+**Load this file when** verifying empirical numbers, evaluating reranker scores, handling figure schemas, isolating cross-paper claims, or reporting failure states.
 
-## Passage-score gate
+## Passage-Score Confidence Gate
 
-The local `bge-reranker-v2-m3` endpoint returns a raw cross-encoder score:
+The local `bge-reranker-v2-m3` endpoint returns raw cross-encoder scores:
 
-| Raw Rerank | Interpretation | Use |
+| Raw `Rerank` Score | Confidence Level | Permitted Usage |
 |---|---|---|
-| `> 0` | confident match | may support a claim after reading the passage |
-| `-2..0` | weak | flag explicitly; prefer a stronger or direct source |
-| `-4..-2` | marginal/noisy | normally exclude |
-| `≤ -4` | junk | drop |
+| `> 0` | Confident match | May support substantive claims after verifying passage text. |
+| `-2` to `0` | Weak match | Flag explicitly; prefer stronger semantic hits or direct source reads. |
+| `-4` to `-2` | Marginal / Noisy | Exclude from substantive claims. |
+| `≤ -4` | Irrelevant | Discard. |
 
-`Relevance = 1 - dense distance` is not a substitute. BM25-only rescues can be useful despite modest dense relevance, but still require a satisfactory raw Rerank score.
+- **Dense Relevance Warning:** `Relevance = 1 - dense distance` is an uncalibrated similarity measure and cannot substitute for `Rerank`.
+- **Missing Score:** If `Rerank` is absent from semantic output, treat as an instrumentation failure. Repair the service or fall back to a direct source read (`read_pdf_pages` / `get_item_fulltext`). Never fabricate scores.
 
-If `Rerank` is absent, treat that as an instrumentation failure. Retry after service/patch repair; otherwise use a direct PDF/full-text read and the direct-source contract. Never synthesize a score.
+## Number Verification Checklist
 
-## Number verification
+Before reporting any coefficient, standard error, sample size, percentage, or currency figure:
 
-Before writing a coefficient, elasticity, percentage, currency amount, standard error, sample size, or table value:
+1. **Exact Match:** Locate the exact value verbatim in the retrieved passage or direct page.
+2. **Context Check:** Confirm units, sign, specification, comparison group, outcome variable, and time horizon.
+3. **Attribution Check:** Ensure the number belongs to the cited paper itself, not an in-text review of another study.
+4. **Context Escalation:** If a semantic snippet is truncated around a key table or note, read the direct PDF page.
+5. **Failure Fallback:** If the exact number cannot be verified, drop it or explicitly label it `UNVERIFIED`.
 
-1. Confirm the exact value appears in the retrieved passage or direct page.
-2. Confirm units, sign, comparison group, outcome, specification, and time horizon.
-3. Confirm the text belongs to the paper being cited—not a bibliography entry or a discussion of another study.
-4. If the snippet truncates the necessary context, read the relevant PDF page(s).
-5. If it cannot be located, drop the value or mark it `UNVERIFIED`.
+*Precedence Rule:* Verified source text always overrides model memory.
 
-When a retrieved value conflicts with memory, the source text wins.
+## Cross-Paper Isolation
 
-## Cross-paper isolation
+When making comparative statements (e.g., "Paper A finds X, whereas Paper B finds Y"):
+- Retrieve and verify claim X independently from Paper A.
+- Retrieve and verify claim Y independently from Paper B.
+- Attach separate canonical tokens to each distinct clause.
+- Never use one source's passage or graph metric to support another paper's finding.
 
-For a comparison such as “Paper A finds X, while Paper B finds Y”:
+## Figure & Table Schema Handling
 
-- retrieve and verify X from Paper A;
-- retrieve and verify Y from Paper B;
-- attach a separate token to each clause;
-- never let one source's passage, reference entry, or graph measure carry another source's claim.
+A `[Figure Schema]` block serves as a discovery beacon, not standalone evidence.
+- The displayed `Rerank` score reflects the raw cross-encoder evaluation.
+- Verify empirical claims against figure captions, surrounding prose, HTML table cells, or direct PDF pages.
+- Never infer quantitative estimates from schema YAML alone.
 
-Apply the same isolation to graph metrics and bibliography occurrences.
+## Canonical Failure Statements
 
-## Figure and table handling
-
-A `[Figure Schema]` is a discovery beacon. It can help identify the relevant figure, axes, series, or table, but it is not sufficient evidence by itself.
-
-- The displayed `Rerank` remains the raw cross-encoder score; any configured figure boost affects candidate ordering/floor admission, not the displayed confidence.
-- Verify claims against the figure caption, surrounding prose, table cells, or direct PDF page.
-- Never infer an estimate from schema YAML alone.
-
-## Reference and graph escalation
-
-- A raw reference occurrence answers “does this bibliography contain this rendered entry?”
-- A resolved graph edge answers “did the deterministic resolver link these identities under this scope?”
-- If reference search finds an unresolved entry, do not promote it to a graph claim.
-- If an expanded graph returns a noisy external label, verify it with the raw reference and resolution confidence.
-- Before calling an external node absent, search for local preprint/published variants.
-
-## Failure states
-
-Use explicit language:
-
-- “No evidence found in the indexed library.”
-- “The only match has weak negative rerank evidence.”
-- “The bibliography occurrence is unresolved, so no clean target identity is established.”
-- “The graph may be stale or incomplete; rebuild/audit is required before making this structural claim.”
-- “The number was not located in the retrieved source text and is therefore unverified.”
+When evidence is incomplete, weak, or absent, use explicit standard phrasing:
+- *"No evidence found in the indexed library."*
+- *"The best semantic match has weak negative reranker evidence (`Rerank: -0.85`)."*
+- *"The bibliography occurrence is unresolved, so no verified entity identity exists."*
+- *"The number was not located in the retrieved source text and is unverified."*
+- *"The citation graph may be incomplete due to missing sidecars; audit coverage before asserting structural claims."*

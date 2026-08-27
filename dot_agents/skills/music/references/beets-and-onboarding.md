@@ -1,35 +1,30 @@
-# Beets and album onboarding
+# Beets & Album Onboarding Pipeline
 
-Load this file when importing a download, moving an album into the library, checking Beets metadata, calculating ReplayGain, or deciding whether a command will write tags.
+**Load this file when** onboarding new downloads, moving albums into the library, inspecting Beets metadata, or managing ReplayGain.
 
-## `music-onboard`
+## Interactive Onboarding: `music-onboard`
 
 ```bash
 music-onboard "/path/to/Downloads/Album Folder"
 ```
 
-This is an interactive, mutating workflow with no pretend mode:
+`music-onboard` is an interactive, mutating script with **no dry-run mode**. Run only upon explicit request.
 
-1. Converts direct M4A/WAV/FLAC files to V0 MP3 and deletes successful source conversions.
-2. Reads artist, album, and date from the first supported file and prompts to accept or edit them.
-3. Optionally edits direct track titles and numbers and applies album metadata.
-4. Fuzzy-matches an existing artist directory in the main library or `MUSIC_DIR/USB_Library`, asks where to place the album, and moves or merges files.
-5. Renames, extracts, or optionally downloads cover art.
-6. Prompts for comma-separated genres and grouping values, then calls `music-set-tags`.
-7. Calls `beet import`, `beet replaygain`, and `mpc update`.
+### Pipeline Execution Steps:
+1. **Audio Conversion:** Converts M4A/WAV/FLAC to V0 MP3 and deletes source files upon success.
+2. **Metadata Extraction:** Reads artist, album, and date from the first file; prompts for user confirmation/edits.
+3. **Track Editing:** Optionally prompts to adjust track titles and track numbers.
+4. **Library Placement:** Fuzzy-matches existing artist directories in `MUSIC_DIR` or `USB_Library`; prompts for placement/merge.
+5. **Cover Art:** Renames, extracts, or downloads `cover.jpg`.
+6. **Tagging:** Prompts for canonical **RateYourMusic Primary & Secondary Genres** (e.g. `Slowcore`, `Dream Pop`, `Post-Rock`) and grouping tags, then invokes `music-set-tags`.
+7. **Indexing:** Executes `beet import`, `beet replaygain`, and `mpc update`.
 
-Run it only for an explicit onboarding request. Review every prompt, especially conversion, target-directory, merge, cover-download, and grouping choices. Verify the result with `beet info` and `mpc search`.
 
-## Beets configuration
+## Beets Configuration & Behavior
 
-Inspect the effective configuration before relying on a default:
+Inspect active configuration: `beet config`.
 
-```bash
-beet config
-```
-
-Samuel's configured workflow is intentionally manual:
-
+### Configured Invariants (`~/.config/beets/config.yaml`):
 ```yaml
 import:
   autotag: no
@@ -43,42 +38,31 @@ replaygain:
   targetlevel: 89
 ```
 
-Consequences:
+### Operational Rules:
+- **`beet import`:** Interactive; does not autotag against MusicBrainz, write file tags, copy, or move files by default.
+- **`beet replaygain`:** With `write: no`, calculated gain values are stored in the Beets database without modifying audio files (use `--write` to force file tag writes).
+- **`beet update`:** Reads file tags into the Beets database.
+- **`beet write`:** Writes Beets database metadata to physical audio files (explicit mutation).
 
-- `beet import` is interactive and does not automatically MusicBrainz-autotag, write tags, copy files, or move files unless command-line options override those settings.
-- `beet replaygain` uses the import write setting unless `--write` or `--nowrite` is supplied. With `write: no`, the onboarding call stores calculated values in the Beets database but does not write ReplayGain tags to audio files.
-- `beet update` reads file metadata into the Beets database. `beet write` writes Beets metadata to audio files and is a separate mutation.
-
-## Beets queries and maintenance
+## Beets Queries & Maintenance
 
 ```bash
-beet version
+# Library statistics & listings
 beet stats
 beet ls -f '$artist — $album — $title' 'artist:Artist Name'
 beet ls -a -f '$albumartist — $album' 'artist:Artist Name'
 beet ls -f '$artist — $album' 'added:-1w..'
-beet info 'artist:Artist Name'       # file tags
-beet info -l 'artist:Artist Name'    # Beets library fields
-```
 
-Use explicit no-write/pretend modes when reviewing changes:
+# Metadata inspection
+beet info 'artist:Artist Name'       # Physical audio tags
+beet info -l 'artist:Artist Name'    # Beets database fields
 
-```bash
+# Non-mutating simulation checks
 beet update --pretend 'artist:Artist Name'
 beet replaygain --nowrite 'artist:Artist Name'
-```
 
-These commands write metadata and require explicit approval:
-
-```bash
+# Approved tag writing
 beet replaygain --write 'artist:Artist Name'
 beet write 'artist:Artist Name'
-```
-
-After an approved file metadata change outside onboarding:
-
-```bash
 mpc -w update
 ```
-
-Then verify both indexes: `beet info`/`beet ls` for Beets and tags, and `mpc search` for MPD.

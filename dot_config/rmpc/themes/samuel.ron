@@ -229,7 +229,7 @@
                 (size: "0", pane: Pane(Empty())),
                 (size: "1", pane: Component("volume")),
                 (size: "0", pane: Pane(Empty())),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#ED6D42"), default: (kind: Text("-"), style: (fg: "#ED6D42")))], align: Center))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#ED6D42"), default: (kind: Text("-"), style: (fg: "#ED6D42")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("grouping"))), style: (fg: "#ED6D42"), default: (kind: Text("-"), style: (fg: "#ED6D42")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("date"))), style: (fg: "#ED6D42"), default: (kind: Text("-"), style: (fg: "#ED6D42")))], align: Center))),
                 (size: "1", pane: Pane(Empty())),
@@ -243,7 +243,7 @@
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Artist)), style: (fg: "#96E050"), default: (kind: Text("Unknown")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Album)), style: (fg: "#96E050"), default: (kind: Text("Unknown Album")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("date"))), style: (fg: "#ED6D42"), default: (kind: Text("-")))], align: Center))),
-                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#ED6D42"), default: (kind: Text("-")))], align: Center))),
+                (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), style: (fg: "#ED6D42"), default: (kind: Text("-")))], align: Center, scroll_speed: 1))),
                 (size: "1", pane: Pane(Property(content: [(kind: Property(Song(Other("grouping"))), style: (fg: "#ED6D42"), default: (kind: Text("-")))], align: Center, scroll_speed: 1))),
             ]
         ),

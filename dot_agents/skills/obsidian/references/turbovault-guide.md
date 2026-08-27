@@ -1,49 +1,40 @@
 # TurboVault MCP Server & Substrate Guide
 
-Load this reference when interacting with the TurboVault MCP server, handling git-substrate mutations, managing timestamps, or delegating discovery vs inline reads.
+**Load this file when** routing TurboVault MCP operations, handling git-substrate mutations, managing timestamps, or delegating discovery searches.
 
----
+## 1. Tool Routing Table
 
-## 1. Mandatory TurboVault Substrate
+All vault operations at `~/Dropbox/Sam-Obsidian-Vault/` **must** use TurboVault MCP tools. Never run raw shell commands against vault files.
 
-All operations on `~/Dropbox/Sam-Obsidian-Vault/` **MUST** use the `turbovault` MCP tools. **NEVER** execute raw shell commands (`find`, `grep`, `cat`, `ls`, `sed`, `awk`) directly against vault notes.
+| Operation | MCP Tool Name | Purpose |
+|---|---|---|
+| Read note | `read_note` (`turbovault_read_note`) | Fetch note markdown by relative path |
+| Write / Overwrite | `write_note` (`turbovault_write_note`) | Create or overwrite note |
+| Structured edit | `edit_note` (`turbovault_edit_note`) | Apply SEARCH/REPLACE diff blocks |
+| Move / rename note | `move_note` (`turbovault_move_note`) | Move note and update backlinks |
+| Move binary assets | `move_file` (`turbovault_move_file`) | Move images, PDFs, attachments |
+| Atomic multi-file edits | `batch_execute` (`turbovault_batch_execute`) | Transactional multi-note operations |
+| Update frontmatter / tags | `update_frontmatter`, `manage_tags` | Structured YAML mutations |
+| Discovery / Search | `search`, `advanced_search` | Keyword and regex searches |
+| Frontmatter SQL Search | `query_frontmatter_sql` | Fast SQL metadata and tag queries |
+| Graph & Link Analysis | `get_backlinks`, `get_related_notes` | Graph topology and link queries |
+| Health & Verification | `get_vault_context`, `quick_health_check` | Check vault health and note stats |
 
-* **Tool Routing:**
-  * Read a note -> `turbovault_read_note`
-  * Write / append / prepend -> `turbovault_write_note` (or `turbovault_edit_note` for SEARCH/REPLACE diff blocks)
-  * Move / rename notes -> `turbovault_move_note` (or `turbovault_move_file` for binary assets)
-  * Multi-file atomic mutations -> `turbovault_batch_execute`
-  * Frontmatter / tags -> `turbovault_update_frontmatter`, `turbovault_manage_tags`
-  * Full-text search -> `turbovault_search` (discovery)
-  * Frontmatter SQL search -> `turbovault_query_frontmatter_sql` (discovery)
-  * Vault context / health -> `turbovault_get_vault_context`, `turbovault_quick_health_check`
+*Commit Messages:* Every mutation (`write_note`, `edit_note`, `delete_note`, `move_note`, `update_frontmatter`, `batch_execute`) requires a non-empty `commit_message` describing the change.
 
-* **Commit Messages:** Every write operation (`turbovault_write_note`, `turbovault_edit_note`, `turbovault_delete_note`, `turbovault_move_note`, `turbovault_update_frontmatter`, `turbovault_batch_execute`) requires a non-empty `commit_message`. Always provide a descriptive commit message.
+## 2. Timestamps, Tags & Substrate Invariants
 
----
+- **Timestamp Ownership:** The agent owns timestamps:
+  - Note creation: set `created: YYYY-MM-DDTHH:MM:SS` (local time, no timezone).
+  - Note edit: update `updated: YYYY-MM-DDTHH:MM:SS`.
+- **Tag Invariants:** Tags must reside exclusively in frontmatter `tags:`. Never insert inline `#tags` into note text. All `00_` notes must include `moc`.
+- **Git-Substrate Divergence Guard:** The git backend refuses mutations when working-tree state differs from HEAD. If external processes (Obsidian app, sync) leave uncommitted modifications, commit or reconcile working-tree state before retrying MCP calls.
 
-## 2. Timestamps, Tags & Frontmatter Enforcement on Mutations
+## 3. Context Hygiene: Reads vs. Subagent Delegation
 
-Every mutation executed via `turbovault_write_note`, `turbovault_edit_note`, `turbovault_update_frontmatter`, `turbovault_manage_tags`, or `turbovault_batch_execute` must strictly adhere to the vault's frontmatter schema:
+Split vault operations by purpose to prevent KV cache pollution:
 
-* **Timestamp Ownership:** The AGENT owns timestamps.
-  * When **creating** a note: set frontmatter `created` timestamp in `YYYY-MM-DDTHH:MM:SS` format (e.g. `2026-08-16T17:35:00`).
-  * When **editing** a note: refresh frontmatter `updated` timestamp in `YYYY-MM-DDTHH:MM:SS` format.
-* **Tag Enforcement:**
-  * Tags must live **exclusively** in the frontmatter `tags:` array. Never insert inline `#tags` into note prose during write/edit operations.
-  * Pick tags strictly from the canonical flat baseline (`pin`, `to-read`, `to-do`, `moc`, `python`, `stata`, `latex`, `linux`, `probability`, `econometrics`, `economics`, `math`).
-  * Every `00_` Map of Content / Hub note must include `moc`.
-* **Git-Substrate Divergence Guard:** The git backend refuses mutations when a file's working-tree state differs from HEAD. If external writers (Obsidian, sync) modify the file, commit or restore the working-tree change before retrying the MCP operation.
-
----
-
-## 3. Context Hygiene: Reads vs. Delegation
-
-Vault operations split by purpose, not tool identity:
-
-1. **Discovery (Result Sets):**
-   * Operations returning ranked match lists or graph traversals (`turbovault_search`, `turbovault_advanced_search`, `turbovault_semantic_search`, `turbovault_get_backlinks`, `turbovault_get_related_notes`, `turbovault_query_frontmatter_sql`, `turbovault_get_broken_links`) **MUST** be delegated to a subagent (`invoke_subagent` with `TypeName: "research"` or `Explore`).
-   * Rationale: Large search results pollute the main session's KV cache.
-2. **Working-Set Reads:**
-   * `turbovault_read_note` on known paths stays **INLINE in the main session** when the content is actively discussed, quoted, or edited.
-   * Disclose progressively: read the relevant note or index before fetching referenced nodes.
+1. **Discovery (Result Sets $\to$ Research Subagent):**
+   - Delegate operations that return match lists or graph traversals (`search`, `advanced_search`, `semantic_search`, `get_backlinks`, `get_related_notes`, `query_frontmatter_sql`, `get_broken_links`) to `invoke_subagent` (`TypeName: "research"`).
+2. **Working-Set Reads (Main Session Inline):**
+   - Call `turbovault_read_note` directly in the main session when reading specific working files being actively analyzed, quoted, or edited.

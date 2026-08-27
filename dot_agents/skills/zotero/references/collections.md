@@ -1,22 +1,23 @@
-# Known Zotero Collections (name → key)
+# Zotero Collection Scopes & Keys
 
-**Load this file when** scoping searches to specific collections or looking up collection keys without discovery calls.
+**Load this file when** scoping searches to specific collections or looking up collection keys without dynamic discovery calls.
 
-| Collection | Key | Parent |
+## Core Collection Keys
+
+| Collection | Key | Description |
 |---|---|---|
-| Detroit-Paper | `TRGBCDX5` | — |
-| Mathematics | `C8JGJRG7` | — |
-| Methods | `2QWMWY2P` | — |
-| Programming | `YKQ7724G` | — |
-| Theory | `YKHC4X8Y` | — |
+| Detroit-Paper | `TRGBCDX5` | Empirical project literature |
+| Mathematics | `C8JGJRG7` | Math & statistics course materials/books |
+| Methods | `2QWMWY2P` | Econometrics, causal inference & PhD methods |
+| Programming | `YKQ7724G` | Stata/Python/R technical docs & manuals |
+| Theory | `YKHC4X8Y` | Economic theory literature |
 
-## Refreshing this table
+## Dynamic Discovery & Verification
 
-- `zotero_read_zotero_collections` (resource tool, **no params**) returns the live map — name, key, item count — in one call. Use it to verify or rebuild this table.
-- After creating, renaming, or deleting collections in Zotero: refresh and update this table.
-- Collection keys are stable per library until deleted and recreated.
+- `zotero_read_zotero_collections`: Resource tool (no parameters); returns names, keys, and item counts for the active library.
+- `zotero_zotero_search_collections(query)`: Case-insensitive substring search across all collection names.
 
-## Scope semantics
+## Scope Semantics
 
-- `collection=<KEY | NAME>` on `zotero_zotero_semantic_search` scopes to the collection **and its subcollections** via real-time SQLite item-key resolution (zero manual sync needed when moving papers in GUI).
-- `zotero_zotero_search_collections(query)` matches case-insensitive substring on collection names. Use for unlisted names.
+- Setting `collection=<KEY | NAME>` on `zotero_zotero_semantic_search` dynamically resolves SQLite membership to include the target collection **and all its child subcollections** at query time.
+- Moving items between collections in the Zotero GUI takes effect immediately in semantic search without requiring re-indexing.
