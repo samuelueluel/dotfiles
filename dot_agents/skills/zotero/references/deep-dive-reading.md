@@ -2,11 +2,13 @@
 
 **Load this file when** extracting specific empirical content (coefficients, standard errors, table notes, design sections, proofs) without injecting full papers into context, or when deciding whether full reading is necessary.
 
-## Sidecar Markdown Architecture
+## Scope & Sidecar Markdown Architecture
 
 MinerU parses PDF documents into structured Markdown sidecars at `~/.config/zotero-mcp/mineru-sidecars/<item_key>.md`, containing LaTeX equations, HTML tables, and OCR text.
 
-Targeted shell commands (`grep`, `sed`) directly on sidecars provide immediate access to exact data without requiring Zotero Desktop or consuming 12–24K tokens per paper.
+This is an exceptional known-item fallback after collection-scoped semantic retrieval has identified an item key. For ordinary RAG, prefer targeted `semantic_search` and `read_pdf_pages`. Use sidecar shell extraction when page extraction is unavailable, a table is malformed/truncated, or a large technical work needs a precise section window.
+
+Targeted shell commands (`grep`, `sed`) directly on a known sidecar can recover exact data without loading an entire paper. Never use shell tools to parse MCP gateway temporary/spill files; rerun the MCP query with a narrower query or smaller limit instead.
 
 ## Decision Rules & Extraction Patterns
 

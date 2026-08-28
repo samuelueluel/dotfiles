@@ -1,0 +1,57 @@
+# Noctalia/New Mexico colors with the writing font
+background = #6E3840
+foreground = #E2D8D0
+cursor-color = #1AAAD4
+cursor-text = #E2D8D0
+cursor-style = block
+shell-integration-features = no-cursor
+selection-background = #1AAAD4
+selection-foreground = #E2D8D0
+
+# ANSI palette (normal)
+palette = 0=#E2D8D0
+palette = 1=#ED2658
+palette = 2=#96E050
+palette = 3=#ED6D42
+palette = 4=#1AAAD4
+palette = 5=#ED6D42
+palette = 6=#1AAAD4
+palette = 7=#DA9E8A
+# ANSI palette (bright)
+palette = 8=#716E75
+palette = 9=#ED2658
+palette = 10=#96E050
+palette = 11=#ED6D42
+palette = 12=#1AAAD4
+palette = 13=#ED6D42
+palette = 14=#1AAAD4
+palette = 15=#DA9E8A
+
+# Font
+font-codepoint-map = U+2764=Adwaita Mono
+font-family = Monaspace Xenon
+font-style = Medium
+font-style-italic = Italic
+font-size = 12
+adjust-cell-height = 15%
+
+desktop-notifications = false
+confirm-close-surface = false
+gtk-single-instance = false
+quit-after-last-window-closed = false
+env = GHOSTTY_PROFILE=write-nm
+# Scrollback buffer size in BYTES — 200 MB
+scrollback-limit = 200000000
+
+# Window
+background-opacity = 0.9
+window-padding-x = 10
+window-padding-y = 1
+window-decoration = false
+
+# Keybindings
+keybind = ctrl+shift+c=copy_to_clipboard
+keybind = ctrl+shift+v=paste_from_clipboard
+keybind = performable:ctrl+c=copy_to_clipboard
+keybind = ctrl+v=paste_from_clipboard
+keybind = ctrl+enter=unbind

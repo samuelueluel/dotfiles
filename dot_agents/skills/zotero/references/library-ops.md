@@ -33,6 +33,8 @@ Generate formatted citations via `zotero_zotero_export_bibliography`:
 | Filtered metadata queries | `zotero_zotero_advanced_search(conditions, join_mode)` |
 | Full collection contents | `zotero_zotero_get_collection_items(collection_key)` |
 
+`zotero_zotero_search_by_tag` ANDs list entries, accepts `OR`/`||` within one entry, and uses a leading `-` for exclusion; its default `item_type="-attachment"` excludes attachments. Metadata search and `get_item_metadata` reflect successful API tag writes immediately. Semantic tag filters instead read the local SQLite snapshot and may remain stale until Zotero Desktop closes and its WAL checkpoints.
+
 ### Advanced Search & Date Filters
 `zotero_zotero_advanced_search` takes conditions formatted as `[{field, operation, value}]` with `join_mode: "all"|"any"`. Supported operations include: `is`, `isNot`, `contains`, `doesNotContain`, `beginsWith`, `endsWith`, `isGreaterThan`, `isLessThan`, `isBefore`, `isAfter`.
 
@@ -45,18 +47,18 @@ Generate formatted citations via `zotero_zotero_export_bibliography`:
 - **Attachment Paths:** `zotero_zotero_get_attachment_path(item_key=...)` takes the parent key and returns the `file://` URI and local filesystem path.
 - **Child Records:** `zotero_zotero_get_item_children(item_key)` lists child attachment keys, titles, and MIME types.
 - **Bulk Updates:** `zotero_zotero_batch_update` modifies multiple records simultaneously:
-  - `add_tags` / `remove_tags`: Modifies tags additively/subtractively.
+  - `add_tags` / `remove_tags`: Modifies tags additively/subtractively. Prefer these incremental fields; `zotero_zotero_update_item(tags=...)` replaces the complete tag list.
   - `set_keys` / `remove_keys`: Updates key-value lines in the `Extra` field without erasing citekeys.
 
 ## Lecture Notes & Course Materials Standard
 
 When filing lecture notes or textbooks into `Methods` (`2QWMWY2P`) or `Mathematics` (`C8JGJRG7`):
 
-- **Item Type:** `document` for lecture notes, `presentation` for slide decks, `book` for published textbooks/excerpts. Never use `journalArticle` for lecture notes.
+- **Item Type:** `manuscript` for personal/unpublished compiled notes, `report` for institution-issued notes, `book` for published textbooks/excerpts, and `presentation` for slide decks. Never use Zotero `note` for a PDF or duplicate a native itemType as a tag.
 - **Title Format:** `Course: Lecture N — Topic` (e.g., `Econ 715: Lecture 3 — Consistency of Extremum Estimators`); plain title for compiled notes or books.
 - **Extra Field (structured lines):** `Type: Lecture Notes|Slides`, `Course: <code> <name>`, `Institution:`, `Instructor:`, `URL:`. Upsert via `batch_update(set_keys=...)`.
 - **Date:** Year of the course offering/version (e.g., `2017`).
-- **Tags:** Format tag (`lecture-notes` / `slides` / `book` / `article`) + subject tags (e.g., `econometrics`, `did`, `rdd`, `causal-inference`, `identification`, `treatment-effects`, `cluster-robust`).
+- **Tags:** Use only `review:unreviewed`, `review:skimmed`, or `review:checked`, plus missing-subtype tags such as `type:lecture-notes` or `type:textbook` when needed. Do not create credibility, standing, research-role, publication-status, or subject tags.
 - **Attachments:** Use `zotero-link` to attach local Dropbox PDFs; never upload raw bytes to cloud storage.
 
 ## Ingestion, Audit & Lifecycle CLI (`zotero-auto-ingest`)
@@ -80,7 +82,7 @@ When filing lecture notes or textbooks into `Methods` (`2QWMWY2P`) or `Mathemati
 - Resolves canonical records via OpenAlex/Crossref and updates records with missing DOIs or author lists in place.
 
 ### 3. Correcting & Updating Records
-- **Update Metadata:** `zotero_zotero_update_item(item_key, {"DOI": "...", "publicationTitle": "..."})` or `zotero_zotero_batch_update(item_keys=[KEY], set_keys={"DOI": "..."})`.
+- **Update Metadata:** `zotero_zotero_update_item(item_key="<KEY>", fields={"DOI": "...", "publicationTitle": "..."})`. `zotero_zotero_batch_update(set_keys=...)` edits structured `Key: value` lines in `Extra`; it does not update native DOI or publication fields.
 - **Corrupt Metadata Replacement:** Delete item (`zotero_zotero_delete_item`) and re-ingest via `zotero-auto-ingest <pdf_path>`.
 
 ### 4. Working Paper to Published Journal Article Lifecycle

@@ -4,6 +4,6 @@
   "model": "gpt-5.6-sol",
   "maxUsesPerRun": 4,
   "maxTokens": 16384,
-  "reasoning": "max",
+  "reasoning": "medium",
   "maxContextMessages": 20
 }

@@ -46,9 +46,12 @@
     },
     "extensions/pi-tool-display",
     "npm:@tintinweb/pi-subagents",
-    "extensions/pi-advisor"
+    "extensions/pi-advisor",
+    "local-packages/pi-agent-beautify"
   ],
   "extensions": [
+    "extensions/agent-title.ts",
+    "extensions/session-state.ts",
     "extensions/subagent-profile.ts",
     "extensions/modes.ts",
     "extensions/powerline-footer.ts"

@@ -14,6 +14,8 @@ Do not run the sidecar pipeline on `external_reference` nodes. Use dedicated mai
 
 **Graph Node Filtering:** Nodes are parent items filtered by `itemTypes.typeName NOT IN ('attachment','note','annotation')` (not hardcoded IDs, ensuring resilience across Zotero schema versions).
 
+**Metadata-only filter rule:** Do not run `reembed` solely for tag, native `itemType`, `source_group`, or collection changes. Semantic filters use existing parent `item_key` identity plus live local metadata; re-embed only when source text, parsed content, or chunking changes.
+
 ## 1. Sidecar Pipeline Execution & Watching
 
 Run the 3-stage pipeline via `zotero-sidecar.sh`:

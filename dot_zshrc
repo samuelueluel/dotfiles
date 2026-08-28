@@ -293,17 +293,21 @@ model-check() {
       _type=$(grep '^type=' "$_f" | cut -d= -f2)
       _m=$(grep    '^model=' "$_f" | cut -d= -f2)
       _t=$(grep    '^thinking=' "$_f" | cut -d= -f2)
-      case "$_m" in
-        *deepseek-v4-pro)   _short="dsv4pro" ;;
-        *deepseek-v4-flash) _short="dsv4fl"  ;;
-        *claude-opus-4*)    _short="opus"    ;;
-        *claude-opus-5*)    _short="opus5"   ;;
-        *claude-sonnet-5)   _short="sonnet5" ;;
-        *glm-5.2*)          _short="glm52"   ;;
-        *kimi-k3*)          _short="kimik3"  ;;
+      case "${_m:l}" in
+        *deepseek-v4-pro*)   _short="dsv4pro" ;;
+        *deepseek-v4-flash*) _short="dsv4fl"  ;;
+        *claude-opus-4*)     _short="opus"    ;;
+        *claude-opus-5*)     _short="opus5"   ;;
+        *claude-sonnet-5*)   _short="sonnet5" ;;
+        *glm-5.3*)           _short="glm53"   ;;
+        *glm-5.2*)           _short="glm52"   ;;
+        *kimi-k3*)           _short="kimik3"  ;;
         *gpt-5.6-luna-pro*|*luna-pro*) _short="lunapro" ;;
-        *gemini-3.7*)        _short="gem37"   ;;
-        *)                  _short="$_m"     ;;
+        *gpt-5.6-luna*|*luna*)         _short="luna"    ;;
+        *gpt-5.6-sol*|*sol*)           _short="sol"     ;;
+        *gpt-5.6-terra*|*terra*)       _short="terra"   ;;
+        *gemini-3.7*)         _short="gem37"   ;;
+        *)                   _short="${_m##*/}" ;;
       esac
       if [[ -n "$_t" ]]; then printf '  %-10s  %-8s  thinking: %s\n' "$_type" "$_short" "$_t"; else printf '  %-10s  %-8s\n' "$_type" "$_short"; fi
       _found_pi=1
@@ -351,6 +355,7 @@ pi-safe-1() {
     -e OPENROUTER_API_KEY_US \
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
+    -e PI_STATE_FILE \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
     -v "$HOME":"$HOME":ro \
@@ -397,6 +402,7 @@ pi-safe-2() {
     -e OPENROUTER_API_KEY_US \
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
+    -e PI_STATE_FILE \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
@@ -445,6 +451,7 @@ pi-safe-3() {
     -e OPENROUTER_API_KEY_US \
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
+    -e PI_STATE_FILE \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_file":"$abs_file" \
     -v "$HOME/.pi":"$HOME/.pi" \
@@ -496,6 +503,7 @@ pi-safe-stata-1() {
     -e OPENROUTER_API_KEY_US \
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
+    -e PI_STATE_FILE \
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
@@ -549,6 +557,7 @@ pi-safe-stata-2() {
     -e OPENROUTER_API_KEY_US \
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
+    -e PI_STATE_FILE \
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
@@ -622,122 +631,225 @@ _pi_stata_skills() {
   done
 }
 
-# Helper: detect ghostty-write profile and set --use-theme gruvbox-light-soft per-run
+# Helper: choose Pi theme for Ghostty profiles per-run.
 _pi_theme_args() {
   typeset -ga _PI_THEME_ARGS
-  if [[ "$GHOSTTY_PROFILE" == "write" ]]; then
-    _PI_THEME_ARGS=("--use-theme" "gruvbox-light-soft")
-  else
-    _PI_THEME_ARGS=()
-  fi
+  case "$GHOSTTY_PROFILE" in
+    write)
+      _PI_THEME_ARGS=("--use-theme" "gruvbox-light-soft")
+      ;;
+    write-nm)
+      _PI_THEME_ARGS=("--use-theme" "noctalia")
+      ;;
+    *)
+      _PI_THEME_ARGS=()
+      ;;
+  esac
 }
 
 # --- LEMONADE HELPERS ---
 LEM_API="http://127.0.0.1:13305/api/v1"
 
-# lem-status: show all loaded models across every slot category, not just the LLM
+# lem-status: show all loaded models across every slot category, cptr/Open WebUI, Ramalama, and active Pi sessions
 lem-status() {
-  local out
-  out=$(curl -s -m 5 "$LEM_API/health" 2>/dev/null) || { echo "Lemonade not reachable on $LEM_API"; return 1; }
-  [[ -z "$out" ]] && { echo "Lemonade not reachable on $LEM_API"; return 1; }
-  print -r -- "$out" | python3 -c '
-import sys, json
-d = json.load(sys.stdin)
-loaded = d.get("all_models_loaded") or []
-print("Lemonade  %s  ·  v%s" % (d.get("status", "?"), d.get("version", "?")))
-if not loaded:
-    print("  models   none (RAM clear)")
-else:
-    print("  models")
-    for m in loaded:
-        pin = "  pinned" if m.get("pinned") else ""
-        print("    %-8s %-34s %s · %s%s" % (
-            m.get("type", "?"), m.get("model_name", "?"),
-            m.get("device", "?"), m.get("status", "?"), pin))
-mm = d.get("max_models") or {}
-counts = {}
-for m in loaded:
-    counts[m.get("type", "?")] = counts.get(m.get("type", "?"), 0) + 1
-print("  slots    " + " · ".join(
-    "%s %d/%s" % (k, counts.get(k, 0), v) for k, v in mm.items()))
-'
-
-  # cptr Pi target (workspace selection; distinct from the Lemonade resident model)
-  local _cptr_workspace _cptr_model_file _cptr_settings_file _cptr_model _cptr_thinking
+  local _cptr_workspace _cptr_model_file _cptr_settings_file
   _cptr_workspace=${PI_CPTR_WORKSPACE:-"$HOME/Dropbox/OpenWebUI-Writable/pi-poc"}
   _cptr_model_file="$_cptr_workspace/.cptr/model"
   _cptr_settings_file="$_cptr_workspace/.pi/settings.json"
-  if [[ -r "$_cptr_model_file" ]]; then
-    _cptr_model=$(tr -d '\r\n' < "$_cptr_model_file")
-    _cptr_model=${_cptr_model#agent:pi/}
-  else
-    _cptr_model='(not configured)'
-  fi
-  _cptr_thinking=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("defaultThinkingLevel", "max"))' "$_cptr_settings_file" 2>/dev/null) || _cptr_thinking='max'
-  printf '\n%s\n' 'cptr / Open WebUI'
-  printf '  target   %s\n' "$_cptr_model"
-  printf '  thinking %s\n' "$_cptr_thinking"
 
-  printf '\n%s\n' 'Ramalama'
-  # Ramalama embedder status (port 8082)
-  local _embedder_id
+  local _coder_id _embedder_id _reranker_id _vlm_id
+  _coder_id=$(curl -sf -m 2 "http://localhost:8081/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
   _embedder_id=$(curl -sf -m 2 "http://localhost:8082/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-  if [[ -n "$_embedder_id" ]]; then
-    printf '  %-10s %-8s :8082  %s\n' "embedder" "active" "${_embedder_id##*/}"
-  else
-    printf '  %-10s %-8s :8082\n' "embedder" "off"
-  fi
-
-  # Ramalama reranker status (port 8083)
-  local _reranker_id
   _reranker_id=$(curl -sf -m 2 "http://localhost:8083/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-  if [[ -n "$_reranker_id" ]]; then
-    printf '  %-10s %-8s :8083  %s\n' "reranker" "active" "${_reranker_id##*/}"
-  else
-    printf '  %-10s %-8s :8083\n' "reranker" "off"
-  fi
-
-  # Ramalama VLM status (port 8084)
-  local _vlm_id
   _vlm_id=$(curl -sf -m 2 "http://localhost:8084/v1/models" 2>/dev/null | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-  if [[ -n "$_vlm_id" ]]; then
-    printf '  %-10s %-8s :8084  %s\n' "vlm" "active" "${_vlm_id##*/}"
-  else
-    printf '  %-10s %-8s :8084\n' "vlm" "off"
-  fi
 
-  # Cloud agents (pihat / betahat) — state files written at launch, removed on exit
-  printf '\n%s\n' 'Pi agents'
-  local _state_dir="$HOME/.pi/running"
-  local _found_pi=0 _f _spid _type _m _t _short
-  if [[ -d "$_state_dir" ]]; then
-    for _f in "$_state_dir"/*.state(N); do
-      _spid="${${_f:t}%.state}"
-      kill -0 "$_spid" 2>/dev/null || { rm -f "$_f"; continue; }
-      _type=$(grep '^type=' "$_f" | cut -d= -f2)
-      _m=$(grep    '^model=' "$_f" | cut -d= -f2)
-      _t=$(grep    '^thinking=' "$_f" | cut -d= -f2)
-      case "$_m" in
-        *deepseek-v4-pro)   _short="dsv4pro" ;;
-        *deepseek-v4-flash) _short="dsv4fl"  ;;
-        *claude-opus-4*)    _short="opus"    ;;
-        *claude-opus-5*)    _short="opus5"   ;;
-        *claude-sonnet-5)   _short="sonnet5" ;;
-        *glm-5.2*)          _short="glm52"   ;;
-        *kimi-k3*)          _short="kimik3"  ;;
-        *gpt-5.6-luna-pro*|*luna-pro*) _short="lunapro" ;;
-        *gemini-3.7*)        _short="gem37"   ;;
-        *)                  _short="$_m"     ;;
-      esac
-      if [[ -n "$_t" ]]; then
-        printf '  %-10s %-12s thinking: %s\n' "$_type" "$_short" "$_t"
-      else
-        printf '  %-10s %-12s\n' "$_type" "$_short"
-      fi
-      _found_pi=1
-    done
-  fi
-  (( _found_pi )) || printf '  none\n'
+  python3 - \
+    "$(curl -s -m 5 "$LEM_API/health" 2>/dev/null || true)" \
+    "$_cptr_model_file" \
+    "$_cptr_settings_file" \
+    "${_coder_id:-}" \
+    "${_embedder_id:-}" \
+    "${_reranker_id:-}" \
+    "${_vlm_id:-}" <<'PY'
+import sys, json, os, glob
+
+c_bold = "\033[1m"
+c_dim = "\033[90m"
+c_cyan = "\033[36m"
+c_green = "\033[32m"
+c_yellow = "\033[33m"
+c_reset = "\033[0m"
+
+def banner(title, extra=""):
+    width = 62
+    title_part = f"── {title} "
+    extra_part = f" {extra} ──" if extra else "──"
+    fill_len = width - len(title_part) - len(extra_part)
+    line = "─" * max(2, fill_len)
+    if extra:
+        print(f"{c_cyan}{c_bold}── {title} {c_dim}{line} {c_green}{extra}{c_reset}{c_cyan}{c_bold} ──{c_reset}")
+    else:
+        print(f"{c_cyan}{c_bold}── {title} {c_dim}{line}{c_reset}{c_cyan}{c_bold}──{c_reset}")
+
+def short_model(m):
+    ml = m.lower()
+    if "deepseek-v4-pro" in ml: return "dsv4pro"
+    if "deepseek-v4-flash" in ml: return "dsv4fl"
+    if "claude-opus-4" in ml: return "opus"
+    if "claude-opus-5" in ml: return "opus5"
+    if "claude-sonnet-5" in ml: return "sonnet5"
+    if "glm-5.3" in ml: return "glm53"
+    if "glm-5.2" in ml: return "glm52"
+    if "kimi-k3" in ml: return "kimik3"
+    if "gpt-5.6-luna-pro" in ml or "luna-pro" in ml: return "lunapro"
+    if "gpt-5.6-luna" in ml or "luna" in ml: return "luna"
+    if "gpt-5.6-sol" in ml or "sol" in ml: return "sol"
+    if "gpt-5.6-terra" in ml or "terra" in ml: return "terra"
+    if "gemini-3.7" in ml: return "gem37"
+    return m.split("/")[-1] if "/" in m else m
+
+# 1. Lemonade
+lem_raw = sys.argv[1] if len(sys.argv) > 1 else ""
+if not lem_raw:
+    banner("Lemonade", "offline")
+    print(f"  {c_dim}status{c_reset}   unreachable on :13305")
+else:
+    try:
+        d = json.loads(lem_raw)
+        status = d.get("status", "ok")
+        ver = d.get("version", "")
+        banner("Lemonade", f"{status} · v{ver}" if ver else status)
+        loaded = d.get("all_models_loaded") or []
+        if not loaded:
+            print(f"  {c_dim}models{c_reset}   none (RAM clear)")
+        else:
+            print(f"  {c_dim}models{c_reset}")
+            for m in loaded:
+                pin = f"  {c_dim}pinned{c_reset}" if m.get("pinned") else ""
+                m_type = m.get("type", "?")
+                m_name = m.get("model_name", "?")
+                m_dev = m.get("device", "?")
+                m_stat = m.get("status", "?")
+                print(f"    {m_type:<8} {m_name:<34} {m_dev} · {m_stat}{pin}")
+        mm = d.get("max_models") or {}
+        counts = {}
+        for m in loaded:
+            t = m.get("type", "?")
+            counts[t] = counts.get(t, 0) + 1
+        print(f"  {c_dim}slots{c_reset}    " + " · ".join(f"{k} {counts.get(k, 0)}/{v}" for k, v in mm.items()))
+    except Exception:
+        banner("Lemonade", "error")
+        print(f"  {c_dim}status{c_reset}   invalid response")
+
+print()
+
+# 2. cptr / Open WebUI
+banner("cptr / Open WebUI", ":13309")
+cptr_model_path = sys.argv[2] if len(sys.argv) > 2 else ""
+cptr_settings_path = sys.argv[3] if len(sys.argv) > 3 else ""
+
+cptr_model = "(not configured)"
+if os.path.exists(cptr_model_path):
+    try:
+        with open(cptr_model_path, encoding="utf-8") as f:
+            raw = f.read().strip()
+            if raw.startswith("agent:pi/"): raw = raw[len("agent:pi/"):]
+            if raw: cptr_model = raw
+    except Exception:
+        pass
+
+cptr_thinking = "max"
+if os.path.exists(cptr_settings_path):
+    try:
+        with open(cptr_settings_path, encoding="utf-8") as f:
+            data = json.load(f)
+            val = data.get("defaultThinkingLevel")
+            if val: cptr_thinking = val
+    except Exception:
+        pass
+
+print(f"  {c_dim}target{c_reset}   {cptr_model}")
+print(f"  {c_dim}thinking{c_reset} {c_yellow}{cptr_thinking}{c_reset}")
+
+print()
+
+# 3. Ramalama
+banner("Ramalama", ":8081-:8084")
+coder = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] else ""
+embedder = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] else ""
+reranker = sys.argv[6] if len(sys.argv) > 6 and sys.argv[6] else ""
+vlm = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] else ""
+
+def rama_fmt(val, port):
+    if val:
+        short_val = val.split("/")[-1]
+        return f"{c_green}active{c_reset}   :{port}  {short_val}"
+    return f"{c_dim}off{c_reset}      :{port}"
+
+print(f"  {c_dim}coder{c_reset}         {rama_fmt(coder, 8081)}")
+print(f"  {c_dim}embedder{c_reset}      {rama_fmt(embedder, 8082)}")
+print(f"  {c_dim}reranker{c_reset}      {rama_fmt(reranker, 8083)}")
+print(f"  {c_dim}vlm{c_reset}           {rama_fmt(vlm, 8084)}")
+
+print()
+
+# 4. Active Pi Sessions
+state_dir = os.path.expanduser("~/.pi/running")
+sessions = []
+if os.path.exists(state_dir):
+    for fpath in glob.glob(os.path.join(state_dir, "*.state")):
+        base = os.path.basename(fpath)
+        pid_str = os.path.splitext(base)[0]
+        try:
+            pid = int(pid_str)
+            os.kill(pid, 0)
+        except (ValueError, OSError):
+            try: os.unlink(fpath)
+            except OSError: pass
+            continue
+
+        meta = {}
+        try:
+            with open(fpath, encoding="utf-8") as sf:
+                for line in sf:
+                    line = line.strip()
+                    if "=" in line:
+                        k, v = line.split("=", 1)
+                        meta[k.strip()] = v.strip()
+        except Exception:
+            continue
+
+        sessions.append({
+            "pid": pid_str,
+            "type": meta.get("type", "pi"),
+            "model": meta.get("model", "?"),
+            "thinking": meta.get("thinking", "max"),
+            "cwd": meta.get("cwd", ""),
+            "sandbox": meta.get("sandbox", "")
+        })
+
+if not sessions:
+    banner("Active Pi Sessions", "idle")
+    print(f"  {c_dim}none{c_reset}")
+else:
+    count_str = f"{len(sessions)} running" if len(sessions) > 1 else "1 running"
+    banner("Active Pi Sessions", count_str)
+    for s in sorted(sessions, key=lambda x: int(x["pid"])):
+        pid_display = f"[{s['pid']}]"
+        agent_type = s['type']
+        m_short = short_model(s['model'])
+        thinking_str = f"thinking: {s['thinking']}"
+        ctx_info = ""
+        if s['cwd']:
+            cwd_disp = f"~/{s['cwd']}" if not s['cwd'].startswith("~") else s['cwd']
+            if s['sandbox'] and s['sandbox'] != "none":
+                ctx_info = f"  {c_dim}·{c_reset} {cwd_disp} ({s['sandbox']})"
+            else:
+                ctx_info = f"  {c_dim}·{c_reset} {cwd_disp}"
+        elif s['sandbox'] and s['sandbox'] != "none":
+            ctx_info = f"  {c_dim}·{c_reset} ({s['sandbox']})"
+        print(f"  {c_dim}{pid_display:<9}{c_reset} {c_bold}{agent_type:<8}{c_reset} {m_short:<12} {c_yellow}{thinking_str:<15}{c_reset}{ctx_info}")
+PY
 }
 
 # lem-unload: drop ALL models from RAM and force-kill lingering engine processes
@@ -805,11 +917,17 @@ pi() {
     "no   unsandboxed" \
     "yes  sandboxed") || return 1
 
+  local _state_dir="$HOME/.pi/running"
+  mkdir -p "$_state_dir"
+  local _state_file="$_state_dir/$$.state"
+  export PI_STATE_FILE="$_state_file"
+
   case "${go%%[ ]*}" in
     no)
+      printf 'type=pi\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=unsandboxed\n' "$model_flag" "${PWD##*/}" > "$_state_file"
       printf '\033]2;π - %s\007' "${PWD##*/}"
-      command pi "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "$@"
-      printf '\a'
+      { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "$@" } \
+        always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
     yes)
       local target="${1:-$PWD}" abs_target is_file=0
@@ -827,9 +945,10 @@ pi() {
         echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
 
+      printf 'type=pi\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
       printf '\033]2;π - %s\007' "${abs_target##*/}"
-      pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "${@:2}"
-      printf '\a'
+      { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "${@:2}" } \
+        always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
   esac
 }
@@ -854,13 +973,14 @@ pihat() {
   local _state_dir="$HOME/.pi/running"
   mkdir -p "$_state_dir"
   local _state_file="$_state_dir/$$.state"
-  printf 'type=pihat\nmodel=%s\n' "$model_flag" > "$_state_file"
+  export PI_STATE_FILE="$_state_file"
 
   case "${go%%[ ]*}" in
     no)
+      printf 'type=pihat\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=unsandboxed\n' "$model_flag" "${PWD##*/}" > "$_state_file"
       printf '\033]2;π̂ - %s\007' "${PWD##*/}"
-      { command pi "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "$@" } \
-        always { rm -f "$_state_file"; printf '\a' > /dev/tty }
+      { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "$@" } \
+        always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
     yes)
       local target="${1:-$PWD}" abs_target is_file=0
@@ -878,9 +998,10 @@ pihat() {
         echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
 
+      printf 'type=pihat\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
       printf '\033]2;π̂ - %s\007' "${abs_target##*/}"
-      { pi-safe-${level} "${abs_target}" "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "${@:2}" } \
-        always { rm -f "$_state_file"; printf '\a' > /dev/tty }
+      { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "${@:2}" } \
+        always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
   esac
 }
@@ -904,9 +1025,15 @@ beta() {
     "2   write to dir  +  no read elsewhere   +  Stata binary mounted") || return 1
   level="${level%%[ ]*}"
 
+  local _state_dir="$HOME/.pi/running"
+  mkdir -p "$_state_dir"
+  local _state_file="$_state_dir/$$.state"
+  export PI_STATE_FILE="$_state_file"
+  printf 'type=beta\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
+
   printf '\033]2;β - %s\007' "${abs_target##*/}"
-  pi-safe-stata-${level} "${abs_target}" "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}"
-  printf '\a' > /dev/tty
+  { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
+    always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
 }
 
 betahat() {
@@ -934,10 +1061,11 @@ betahat() {
   local _state_dir="$HOME/.pi/running"
   mkdir -p "$_state_dir"
   local _state_file="$_state_dir/$$.state"
-  printf 'type=betahat\nmodel=%s\n' "$model_flag" > "$_state_file"
+  export PI_STATE_FILE="$_state_file"
+  printf 'type=betahat\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
   printf '\033]2;β̂ - %s\007' "${abs_target##*/}"
-  { pi-safe-stata-${level} "${abs_target}" "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
-    always { rm -f "$_state_file"; printf '\a' > /dev/tty }
+  { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
+    always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
 }
 
 # --- LLM CODING BENCHMARK ---
@@ -970,7 +1098,25 @@ alias stata-kill="tmux kill-session -t stata 2>/dev/null && echo 'stata session 
 
 # Launch Ghostty writing session with Monaspace Xenon (closes caller)
 ghostty-write() {
-  (nohup ghostty --gtk-single-instance=false --config-default-files=false --config-file="$HOME/.config/ghostty/config-write.ghostty" "$@" >/dev/null 2>&1 &)
+  local log_dir="$HOME/.cache/ghostty"
+  mkdir -p "$log_dir" || return 1
+  (setsid -f env GHOSTTY_PROFILE=write ghostty \
+    --gtk-single-instance=false \
+    --config-default-files=false \
+    --config-file="$HOME/.config/ghostty/config-write.ghostty" \
+    "$@" </dev/null >>"$log_dir/launcher.log" 2>&1 &)
+  exit
+}
+
+# Launch the regular Noctalia/New Mexico profile with the writing font (closes caller)
+ghostty-write-nm() {
+  local log_dir="$HOME/.cache/ghostty"
+  mkdir -p "$log_dir" || return 1
+  (setsid -f env GHOSTTY_PROFILE=write-nm ghostty \
+    --gtk-single-instance=false \
+    --config-default-files=false \
+    --config-file="$HOME/.config/ghostty/config-write-nm.ghostty" \
+    "$@" </dev/null >>"$log_dir/launcher.log" 2>&1 &)
   exit
 }
 

@@ -22,7 +22,10 @@ export default function(pi: ExtensionAPI) {
 	pi.on("turn_start", async (_event, ctx) => {
 		updateTitle(ctx);
 	});
-	pi.on("model_change", async (_event, ctx) => {
+	pi.on("model_select", async (_event, ctx) => {
+		updateTitle(ctx);
+	});
+	pi.on("thinking_level_select", async (_event, ctx) => {
 		updateTitle(ctx);
 	});
 }
