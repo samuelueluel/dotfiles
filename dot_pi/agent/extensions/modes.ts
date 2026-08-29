@@ -12,6 +12,7 @@ let currentMode: "plan" | "manual" | "auto" =
 // policy distinct from terminal Pi without changing the shared Pi settings.
 const CPTR_HEADLESS = process.env.PI_CPTR_HEADLESS === "1";
 const SCOPED_FILESYSTEM_PREFIX = "openwebui_filesystem_";
+const TURBOVAULT_NAMESPACE_PROXY = "mcp__turbovault";
 const MCP_MUTATION_PATTERN = /delete|write|edit|move|rollback|create|update|remove|batch_execute/i;
 const HEADLESS_INTERACTIVE_COMMANDS = new Set(["bc", "less", "more", "zless", "man", "info", "apropos", "whatis"]);
 
@@ -37,7 +38,7 @@ const COMMON_READ_ONLY = new Set([
   "get_search_content",
   // Export (renders to PDF/HTML/PNG without modifying project files)
   "preview_export",
-  // turbovault direct-exposed vault tools — read-only subset
+  // TurboVault read-only operations (used by direct tools and proxy payloads)
   "turbovault_read_note",
   "turbovault_get_notes_info",
   "turbovault_search",
@@ -584,33 +585,60 @@ export default function (pi: any) {
     // ── 2. MANUAL MODE ──
     if (currentMode === "manual") {
       // ── MCP tool handling ──
-      // Open WebUI may use the proxy form, while direct MCP tools are handled
-      // below. Zotero retrieval and the folder-scoped filesystem server are
-      // safe in cptr because their server-side scope is the policy boundary.
+      // Open WebUI may use the generic proxy form, while proxy-only servers
+      // use mcp__<server>. Inspect the nested operation so read-only
+      // TurboVault calls pass without exposing every server tool directly.
+      if (event.toolName === TURBOVAULT_NAMESPACE_PROXY) {
+        const fullToolName = String(event.input?.tool || "");
+
+        // Only exact entries in COMMON_READ_ONLY bypass approval. In
+        // particular, do not treat the namespace proxy itself as safe: any
+        // mutable or unknown underlying operation still requires approval.
+        if (fullToolName.startsWith("turbovault_") && COMMON_READ_ONLY.has(fullToolName)) return {};
+
+        if (CPTR_HEADLESS) {
+          return {
+            block: true,
+            reason: `Open WebUI Pi policy blocks unapproved TurboVault operation '${fullToolName}'.`,
+          };
+        }
+        const details = `TurboVault proxy call: ${fullToolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
+        const approved = await askUser(`Approve TurboVault operation '${fullToolName}'? [Y/n] `, ctx, details);
+        if (!approved) {
+          ctx.ui.notify(`TurboVault operation blocked: ${fullToolName}`, "error");
+          return { block: true, reason: `User rejected TurboVault operation: ${fullToolName}` };
+        }
+        ctx.ui.notify(`TurboVault operation approved`, "success");
+        return {};
+      }
+
+      // The generic proxy is still used by some clients. Keep its existing
+      // scoped-server/Zotero behavior, but require exact read-only names for
+      // TurboVault rather than relying only on mutation-name heuristics.
       if (event.toolName === "mcp") {
         const fullToolName = String(event.input?.tool || event.input?.name || event.input?.subcommand || event.input?.command || "");
         const isScopedTool = isScopedFilesystemTool(fullToolName);
         const isTurboVaultTool = fullToolName.startsWith("turbovault_");
+        const isTurboVaultRead = isTurboVaultTool && COMMON_READ_ONLY.has(fullToolName);
         const isZoteroRead = isZoteroReadOnlyTool(fullToolName);
         const isWriteOp = MCP_MUTATION_PATTERN.test(fullToolName);
 
-        if (isScopedTool || isTurboVaultTool || isZoteroRead) {
-          if (CPTR_HEADLESS || !isWriteOp) return {};
-        }
-        if (!isWriteOp) return {};
+        if (isTurboVaultRead) return {};
+        if ((isScopedTool || isZoteroRead) && (CPTR_HEADLESS || !isWriteOp)) return {};
+        if (!isTurboVaultTool && !isWriteOp) return {};
         if (CPTR_HEADLESS) {
           return {
             block: true,
-            reason: `Open WebUI Pi policy blocks MCP mutation '${fullToolName}'. Use the explicitly allowed scoped server or TurboVault operation.`,
+            reason: `Open WebUI Pi policy blocks MCP operation '${fullToolName}'. Use the explicitly allowed scoped server or read-only TurboVault operation.`,
           };
         }
         const details = `MCP Tool Call: ${fullToolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
-        const approved = await askUser(`Approve MCP mutation '${fullToolName}'? [Y/n] `, ctx, details);
+        const approved = await askUser(`Approve MCP operation '${fullToolName}'? [Y/n] `, ctx, details);
         if (!approved) {
-          ctx.ui.notify(`MCP mutation blocked: ${fullToolName}`, "error");
-          return { block: true, reason: `User rejected MCP mutation: ${fullToolName}` };
+          ctx.ui.notify(`MCP operation blocked: ${fullToolName}`, "error");
+          return { block: true, reason: `User rejected MCP operation: ${fullToolName}` };
         }
-        ctx.ui.notify(`MCP mutation approved`, "success");
+        ctx.ui.notify(`MCP operation approved`, "success");
         return {};
       }
 
@@ -621,16 +649,20 @@ export default function (pi: any) {
 
       // ── turbovault direct tools (exposed via directTools, not routed through `mcp`) ──
       if (event.toolName.startsWith("turbovault_")) {
-        if (CPTR_HEADLESS) return {};
-        if (!COMMON_READ_ONLY.has(event.toolName)) {
-          const details = `turbovault tool call: ${event.toolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
-          const approved = await askUser(`Approve turbovault mutation '${event.toolName}'? [Y/n] `, ctx, details);
-          if (!approved) {
-            ctx.ui.notify(`turbovault mutation blocked: ${event.toolName}`, "error");
-            return { block: true, reason: `User rejected turbovault mutation: ${event.toolName}` };
-          }
-          ctx.ui.notify(`turbovault mutation approved`, "success");
+        if (COMMON_READ_ONLY.has(event.toolName)) return {};
+        if (CPTR_HEADLESS) {
+          return {
+            block: true,
+            reason: `Open WebUI Pi policy blocks unapproved TurboVault operation '${event.toolName}'.`,
+          };
         }
+        const details = `turbovault tool call: ${event.toolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
+        const approved = await askUser(`Approve turbovault operation '${event.toolName}'? [Y/n] `, ctx, details);
+        if (!approved) {
+          ctx.ui.notify(`turbovault operation blocked: ${event.toolName}`, "error");
+          return { block: true, reason: `User rejected turbovault operation: ${event.toolName}` };
+        }
+        ctx.ui.notify(`turbovault operation approved`, "success");
         return {};
       }
 

@@ -38,5 +38,15 @@
     "ctx_size": 262144,
     "llamacpp_args": "--spec-type draft-dflash -md /root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf --spec-draft-n-max 4 -ctkd q8_0 -ctvd q8_0 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 256 -b 2048 -t 16 --reasoning on --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja -ctk f16 -ctv f16",
     "llamacpp_backend": "vulkan"
+  },
+  "user.Qwen3.8-27B-ROCmFP4": {
+    "ctx_size": 131072,
+    "llamacpp_backend": "vulkan",
+    "llamacpp_args": "--force-laurent --spec-type draft-dflash -md /root/.cache/huggingface/hub/models--agentionai--Qwen3.8-27B-DFlash2-ROCmFP4-FAST-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_0_ROCMFP4_FAST.gguf --spec-draft-adaptive --spec-draft-n-min 2 --spec-draft-n-max 6 -ctkd q8_0 -ctvd q8_0 --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 256 -b 2048 -t 16 --reasoning on --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on --parallel 1 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja -ctk f16 -ctv f16"
+  },
+  "extra.UD-Q4_K_XL": {
+    "ctx_size": 262144,
+    "llamacpp_backend": "vulkan",
+    "llamacpp_args": "--force-vulkan --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --parallel 1 --reasoning on --spec-type none --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 --presence-penalty 0.0 --repeat-penalty 1.0"
   }
 }

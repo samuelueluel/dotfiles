@@ -106,5 +106,19 @@
     "recipe": "llamacpp",
     "size": 24.1,
     "suggested": true
+  },
+  "Qwen3.8-27B-ROCmFP4": {
+    "checkpoints": {
+      "main": "kingjones777/Qwen3.8-27B-ROCmFP4-STRIX-MTP-GGUF:Qwen3.8-27B-Q4_0_ROCMFP4_FAST.gguf"
+    },
+    "labels": [
+      "custom",
+      "fp4",
+      "dflash2",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 14.3,
+    "suggested": true
   }
 }

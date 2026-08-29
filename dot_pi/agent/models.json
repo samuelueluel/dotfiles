@@ -267,6 +267,13 @@
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
+        },
+        {
+          "id": "UD-Q4_K_XL",
+          "name": "Qwen3.8 Flash Next Q4 (Nathan Vulkan, mmap lazy, vision)",
+          "reasoning": true,
+          "contextWindow": 262144,
+          "maxTokens": 131072
         }
       ]
     }

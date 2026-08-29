@@ -7,9 +7,11 @@ set -euo pipefail
 LEM_API=${LEM_API:-http://127.0.0.1:13305/api/v1}
 QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
+QWEN38_FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 --presence-penalty 0.0 --repeat-penalty 1.0"
 DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 LING3FLASH_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
+QWEN38_FLASH_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf"
 
 usage() {
   cat <<'EOF'
@@ -38,7 +40,65 @@ curl -sS -m 5 "$LEM_API/health" >/dev/null 2>&1 \
 
 args=""
 pi_thinking_level=""
+fixed_parallel=0
 case "$id" in
+  Qwen3.8-Flash-CIRU-*|*CIRU*)
+    # Qwen3.8-Flash-CIRU is a custom-runtime build with exact FP8 PLE paged from NVMe
+    # via CIRUPLE1 sidecar, native IU4 WMMA on gfx1151, and Q8_0 MTP draft.
+    fixed_parallel=1
+    pi_thinking_level="max"
+    args+=" --force-ciru --ple-sidecar /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/ple --ple-cache-mib 4096 --cache-prompt --cache-ram 8192 --cache-idle-slots --ctx-checkpoints 32 --checkpoint-min-step 8192 -ngl all -sm none --fit off -b 2048 -ub 512 --parallel 1 -t 8 -tb 8 -fa on --cont-batching --reasoning on"
+
+    mtp=$(gum choose --header "speculative decoding" --selected "on   native MTP (depth 3)" \
+      "on   native MTP (depth 3)" \
+      "off  base model") || exit 1
+    case "${mtp%%[ ]*}" in
+      on)
+        args+=" --spec-type draft-mtp --spec-draft-model /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/mtp/Qwen3.8-Flash-CIRU-STRIX-IU4-MTP-Q8_0.gguf --spec-draft-n-max 3"
+        ;;
+      off)
+        args+=" --spec-type none"
+        ;;
+    esac
+
+    args+=" $QWEN38_FLASH_SAMPLING"
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || exit 1
+    case "${kv%%[ ]*}" in
+      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
+    ;;
+  UD-Q4_K_XL|Qwen3.8-Flash-Next-*)
+    # Qwen3.8-Flash-Next is a qwen4exp model with a very large PLE tensor.
+    # The extra-model registry attaches mmproj-F16.gguf; keep the model on
+    # Nathan's Vulkan path and preserve mmap-backed lazy loading.
+    fixed_parallel=1
+    pi_thinking_level="max"
+    args+=" --force-vulkan --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
+
+    mtp=$(gum choose --header "speculative decoding" --selected "on   native MTP" \
+      "on   native MTP" \
+      "off  base model") || exit 1
+    case "${mtp%%[ ]*}" in
+      on)
+        args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_MTP --spec-draft-n-max 3"
+        ;;
+      off)
+        args+=" --spec-type none"
+        ;;
+    esac
+
+    args+=" $QWEN38_FLASH_SAMPLING"
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || exit 1
+    case "${kv%%[ ]*}" in
+      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
+    ;;
   Qwen3.8-*)
     mtp=$(gum choose --header "speculative decoding" --selected "dflash2" \
       "dflash2  block-diffusion drafter (needs draft GGUF, ~1.5x MTP)" \
@@ -137,8 +197,12 @@ case "$id" in
     ;;
 esac
 
-par=$(gum choose --header "parallel slots" --selected "1" "1" "2") || exit 1
-args+=" --parallel $par"
+if (( fixed_parallel )); then
+  args+=" --parallel 1"
+else
+  par=$(gum choose --header "parallel slots" --selected "1" "1" "2") || exit 1
+  args+=" --parallel $par"
+fi
 args=${args# }
 
 if [[ -n "${PI_CPTR_THINKING_LEVEL_FILE:-}" && -n "$pi_thinking_level" ]]; then

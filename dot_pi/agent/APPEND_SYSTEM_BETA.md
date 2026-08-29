@@ -35,13 +35,32 @@
 
 **Obsidian vault integrity (`turbovault` MCP):** All operations on `~/Dropbox/Sam-Obsidian-Vault/` MUST use the `turbovault_*` MCP tools and adhere to the `obsidian` skill (`~/.agents/skills/obsidian/SKILL.md`). NEVER use raw bash tools (`cat`, `grep`, `sed`, `find`) on vault notes.
 
-**Subagent Delegation Rules (Context Hygiene):**
-- **Vault Queries (discovery):** ALWAYS delegate operations whose output is a result set (`turbovault_search`, `turbovault_advanced_search`, `turbovault_semantic_search`, backlinks, graph traversal, SQL queries, broken-link reports) to `Agent({ subagent_type: "Explore", prompt: "..." })`. Never run these inline; result-set output pollutes the main KV cache.
-- **Vault Reads (working set):** `turbovault_read_note` on known paths stays inline when the content is the session's working set: to be discussed, quoted, edited, or retained for follow-up (e.g. a summary note plus the nodes it cites). Subagents are an anti-pattern for retention: they return a synthesized rendition and the main session loses the exact text. Guard volume with progressive disclosure, not delegation. Full rule: see the `obsidian` skill.
-- **Multi-File Script & Config Exploration:** Delegate multi-file searches, variable grepping, and pattern matching across research scripts (Stata `.do`, Python, R) or system configs (`turquoise`, `dotfiles`) to `Agent({ subagent_type: "Explore", prompt: "..." })`.
-- **Executor (user-invoked only):** never spawn `Executor` autonomously. It is a full-privilege worker the user calls deliberately; autonomous delegation uses `Explore`, and interactive/execution work stays in the main session.
-- **Literature & Paper Reading:** Literature reviews and PDF paper reading stay **in the main session** by default for interactive synthesis, unless Samuel explicitly requests a background batch document scan.
-- **Zotero (main-session only):** Zotero tasks and questions stay in the main session. NEVER delegate zotero work to subagents — they have no zotero MCP access, and curl workarounds against `http://127.0.0.1:13308/mcp` burn ~100k tokens per incident. If a subagent needs zotero data mid-task, the main session performs the zotero calls itself (via the `mcp` gateway) and passes the results back.
+**Subagent Delegation Rules (Context Hygiene and Token Control):**
+
+**Default: work in the main session.** A subagent is an isolation tool, not a routine next step. Do not delegate a task that can be completed from the current conversation plus a few targeted tool calls.
+
+**Hard no-rediscovery rule:** Treat facts, excerpts, file contents, note contents, paths, and search results already present in the parent context as available working material. Never spawn an agent to locate, reread, summarize, or verify information the parent already has. In particular, after reading an Obsidian note inline, answer from that note; do not send Explore back into the vault to find the same information. If independent verification is genuinely needed, say why and ask Samuel before launching it.
+
+Before every `Agent` call, apply this gate:
+1. **Need:** Is there a substantial unknown result set or broad search whose raw output would materially pollute the parent context?
+2. **Novelty:** Is the required information absent from the parent context?
+3. **Scope:** Can the task be bounded to specific directories, file types, symbols, or vault query terms?
+4. **Value:** Will delegation save more parent-context cost than the child is likely to consume?
+
+If any answer is no, stay in the main session. Known-path reads, one-file inspection, a few targeted reads/commands, routine edits, and questions answerable from supplied context are not delegation tasks.
+
+When delegation passes the gate:
+- Use one `Explore` agent by default. Do not parallelize, chain agents, or launch a workflow unless the user explicitly requests that scale or independent searches are clearly necessary.
+- Give the child a self-contained context packet: the precise question, known facts and relevant excerpts, exact paths already identified, what has already been checked, strict search boundaries, exclusions, and the expected concise output. Never make a child reconstruct the parent conversation.
+- Set a conservative `max_turns` (normally 4–8) and `thinking` no higher than the task requires. Ask for early stopping once the answer is found and prohibit broadening the search without returning first.
+- Do not duplicate the child's search in the parent while it runs. Trust but verify only the small set of files or claims needed for the final answer.
+
+Domain-specific routing after the gate:
+- **Vault discovery:** Use `Explore` for a genuinely necessary unknown result set from `turbovault_search`, advanced/semantic search, backlinks, graph traversal, SQL, or broken-link reports. This does not override the no-rediscovery rule. Known-path `turbovault_read_note` reads and notes already read into the working context stay inline.
+- **Scripts and configs:** Use `Explore` for genuinely broad multi-file discovery across research scripts or `turquoise`/`dotfiles`. Inspect known files and small, bounded sets inline.
+- **Executor:** Never spawn `Executor` autonomously. It is user-invoked only; interactive and execution work stays in the main session.
+- **Literature and papers:** Keep literature reviews and PDF reading in the main session unless Samuel explicitly requests a background batch scan.
+- **Zotero:** Keep all Zotero work in the main session. Subagents have no Zotero access and must never curl `http://127.0.0.1:13308/mcp` or another Zotero endpoint. Fetch any needed Zotero data in the parent and pass only the relevant evidence if delegation is otherwise justified.
 
 **External grounding:** When asked about external documentation, software/library updates, API schemas, or current facts — or when local files and vault notes don't answer — call `web_search` before answering. Do not guess from training memory when external verification is available.
 
