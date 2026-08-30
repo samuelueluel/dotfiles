@@ -6,7 +6,7 @@
 mcp-stata --with "mcp<2"
 
 # Samuel's tested Zotero MCP fork; update this tag only after a fork release passes tests.
-'zotero-mcp-server[semantic,pdf] @ git+https://github.com/samuelueluel/zotero-mcp.git@samuel-v0.11.0.4'
+'zotero-mcp-server[semantic,pdf] @ git+https://github.com/samuelueluel/zotero-mcp.git@samuel-v0.11.0.5'
 
 # FastContext — LLM context manager
 fastcontext
