@@ -4,7 +4,7 @@
 
 ## 1. Semantic-Passage Evidence
 
-Use for substantive findings, mechanisms, definitions, formulas, and empirical estimates retrieved via `zotero_zotero_semantic_search`.
+Use for substantive findings, mechanisms, definitions, formulas, and empirical estimates retrieved via `zotero_semantic_search`.
 
 - **Canonical Format:** `{Author Year, item KEY, passage N/M, p. X if available, Rerank +S; itemType/source_group; canonical tags if present}`
 - **Example:** `{Author 2024, item ABCDEFGH, passage 27/40, p. 14, Rerank +3.22; journalArticle/article; review:checked}`
@@ -25,10 +25,10 @@ Use when verifying empirical numbers, resolving truncated snippets, or operating
   - `{Author Year, item KEY, p. X; itemType/source_group; canonical tags if present}`
   - `{Author Year, item KEY, § heading; itemType/source_group; canonical tags if present}` (when exact page numbers are unmapped)
   - `{Author Year, item KEY, p. X if mapped, lines X–Y; itemType/source_group; canonical tags if present}`
-  - Tokens never display route labels (`read_pdf_pages`, `get_item_fulltext`, `mineru_sidecar`); the location fields carry the audit trail.
+  - Tokens never display route labels (`zotero_read_pdf_pages`, `zotero_get_item_fulltext`, `mineru_sidecar`); the location fields carry the audit trail.
 - **Rules:**
   - Quote or paraphrase only text actually returned by the read route or sidecar extraction used.
-  - Prefer page reads (`read_pdf_pages`) for paper-grade numerical claims when page extraction is reliable.
+  - Prefer page reads (`zotero_read_pdf_pages`) for paper-grade numerical claims when page extraction is reliable.
   - Use `mineru_sidecar` when page extraction is unavailable or malformed, or when a precise window in a large known work avoids loading irrelevant text. Include the PDF page only when the sidecar maps it; otherwise include the extracted line range.
   - Sidecar extraction is limited to an already identified local item. Never treat MCP gateway temporary/spill files as source evidence.
   - Do not use the vague label `direct PDF`. Keep provenance truthful internally: sidecar, shell, or other local extraction is never treated or described as a page read. Cite sidecar evidence with its line range (plus mapped page if any) and never imply a page read occurred when it did not.
@@ -36,7 +36,7 @@ Use when verifying empirical numbers, resolving truncated snippets, or operating
 
 ## 3. Exact-Source Identity Evidence (Gate)
 
-Use `zotero_zotero_resolve_exact_source` when a request names a source by title, author/title/year, DOI, citation key, item key, or explicit “in this paper” language.
+Use `zotero_resolve_exact_source` when a request names a source by title, author/title/year, DOI, citation key, item key, or explicit “in this paper” language.
 
 - **Canonical Formats:**
   - `{resolve_exact_source → exact, item KEY, collection scope verified}`
@@ -50,12 +50,12 @@ Use `zotero_zotero_resolve_exact_source` when a request names a source by title,
 
 ## 4. Bibliography-Reference Evidence (Evidence Layer)
 
-Use `zotero_zotero_search_references` for literal reference occurrences, raw bibliography strings, citing-source context, and graph resolution status.
+Use `zotero_search_bibliography_entries` for literal reference occurrences, raw bibliography strings, citing-source context, and graph resolution status.
 
-- **Canonical Format:** `{search_references → citing KEY, entry N, status/method, resolution confidence C, parse P}`
+- **Canonical Format:** `{zotero_search_bibliography_entries → citing KEY, entry N, status/method, resolution confidence C, parse P}`
 - **Examples:**
-  - `{search_references → citing F7EGNIBT, entry 20, unresolved, parse 0.78}`
-  - `{search_references → citing BXCIHFPR, entry 73, external_reference via DOI, resolution 0.95, parse 0.78}`
+  - `{zotero_search_bibliography_entries → citing F7EGNIBT, entry 20, unresolved, parse 0.78}`
+  - `{zotero_search_bibliography_entries → citing BXCIHFPR, entry 73, external_reference via DOI, resolution 0.95, parse 0.78}`
 - **Rules:**
   - BM25 score reflects text match ranking, not entity identity confidence.
   - Report raw bibliography occurrences literally (e.g., "The bibliography contains an entry rendered as...").
@@ -64,19 +64,19 @@ Use `zotero_zotero_search_references` for literal reference occurrences, raw bib
 
 ## 5. Citation-Graph Evidence (Judgment Layer)
 
-Use for most-cited rankings, direct lineage neighbors, and bibliographic coupling.
+Use for inbound-citation rankings, direct citation neighbors, and bibliographic coupling.
 
 - **Canonical Formats:**
-  - `{get_collection_hubs → scope collection KEY, item ABCDEFGH, hub #1, 14 inward citations}`
-  - `{get_paper_lineage → seed ABCDEFGH, scope library-expanded, direct incoming neighbor ext:...}`
-  - `{find_connected_papers → seed ABCDEFGH, result HGFEDCBA, scope collection-expanded, Jaccard 0.50, 1 shared citation}`
+  - `{zotero_rank_works_by_inbound_citations → scope collection KEY, item ABCDEFGH, rank #1, 14 inward citations}`
+  - `{zotero_get_citation_neighbors → seed ABCDEFGH, scope library-expanded, direct incoming neighbor ext:...}`
+  - `{zotero_find_bibliographically_coupled_papers → seed ABCDEFGH, result HGFEDCBA, scope collection-expanded, Jaccard 0.50, 1 shared citation}`
 - **Rules:**
   - State the explicit `scope` parameter in every graph token.
-  - "Hub" denotes a **most-cited ranking in scope** (inbound edges), not network centrality. Phrase claims as "top-cited in scope".
+  - The inbound-citation ranking is a simple graph in-degree ordering, not a hub, authority, or centrality measure. Phrase claims as "top-cited in scope".
   - Graph counts are graph-edge counts and directional, not total citation counts (unresolved and sidecar-less citations are omitted).
-  - Cross-check graph identities and counts against `search_references` (the evidence layer).
+  - Cross-check graph identities and counts against `zotero_search_bibliography_entries` (the evidence layer).
   - Explicitly identify external node kinds (`ext:doi` vs. `ext:meta`). Treat `ext:meta` counts as heuristic and approximate.
-  - `get_paper_lineage` output reflects direct (depth 1) neighbors only.
+  - `zotero_get_citation_neighbors` requires `depth=1` and supports direct neighbors only; multi-hop values are rejected.
 
 ## 6. Metadata API Facts & Token Labels
 

@@ -21,7 +21,7 @@
 | Semantic results omit `Rerank` field | Stale service process or incomplete patch | Treat results as discovery-only; restart/repair service before citing evidence. |
 | `Live tag-filtered semantic search requires local Zotero mode` | Local SQLite unavailable or not configured | Restore local SQLite access and retry the same filtered call; never silently fall back to unfiltered search. |
 | `Connection error in upsert` during indexing | Embedder wedged | Probe embedder responsiveness (below) and restart container. |
-| Missing Python module in tool | Outdated package environment | Run `sjust update` to reinstall `zotero-mcp-server[semantic,pdf]`. |
+| Missing Python module in tool | Outdated package environment | Run `sjust uv` to reinstall the exact fork from `~/.Uvfile`, then restart `zotero-mcp.service`. |
 
 ## Embedder Probe & Recovery
 
@@ -99,5 +99,5 @@ WHERE linkMode = 2 AND COALESCE(contentType,'') = '';
 
 ## Live Status Tools
 
-- `zotero_zotero_get_search_database_status`: Reports indexed document counts, active embedding model, and last update timestamp.
-- `zotero_zotero_list_libraries`: Displays accessible libraries and item counts.
+- `zotero_get_semantic_index_status`: Reports indexed document counts, active embedding model, and last update timestamp.
+- `zotero_list_libraries`: Displays accessible libraries and item counts.

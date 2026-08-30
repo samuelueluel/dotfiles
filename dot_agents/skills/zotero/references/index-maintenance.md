@@ -6,9 +6,9 @@
 
 Do not run the sidecar pipeline on `external_reference` nodes. Use dedicated maintenance tools:
 
-- `zotero_zotero_rebuild_citation_graph`: Rebuilds graph nodes and citation edges from SQLite metadata and existing sidecars without touching ChromaDB.
-- `zotero_zotero_rebuild_reference_index`: Rebuilds the separate per-entry BM25 reference index.
-- `zotero_zotero_audit_references`: Reports parsing coverage and initializes the reference index if absent.
+- `zotero_rebuild_citation_graph`: Rebuilds graph nodes and citation edges from SQLite metadata and existing sidecars without touching ChromaDB.
+- `zotero_rebuild_reference_index`: Rebuilds the separate per-entry BM25 reference index.
+- `zotero_get_reference_index_status`: Reports parsing coverage and initializes the reference index if absent.
 
 **Desktop Closed / WAL Requirement:** Perform graph/reference rebuilds only when Zotero Desktop is fully closed and WAL checkpointing has finished (`immutable=1` ignores active WAL files).
 

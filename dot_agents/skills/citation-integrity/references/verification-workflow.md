@@ -14,7 +14,7 @@ The local `bge-reranker-v2-m3` endpoint returns raw cross-encoder scores:
 | `≤ -4` | Irrelevant | Discard. |
 
 - **Dense Relevance Warning:** `Relevance = 1 - dense distance` is an uncalibrated similarity measure and cannot substitute for `Rerank`.
-- **Missing Score:** If `Rerank` is absent from semantic output, treat as an instrumentation failure. Repair the service or fall back to a direct source read (`read_pdf_pages` / `get_item_fulltext`). Never fabricate scores.
+- **Missing Score:** If `Rerank` is absent from semantic output, treat as an instrumentation failure. Repair the service or fall back to a direct source read (`zotero_read_pdf_pages` / `zotero_get_item_fulltext`). Never fabricate scores.
 
 ## Number Verification Checklist
 
@@ -23,7 +23,7 @@ Before reporting any coefficient, standard error, sample size, percentage, or cu
 1. **Exact Match:** Locate the exact value verbatim in the retrieved passage or direct page.
 2. **Context Check:** Confirm units, sign, specification, comparison group, outcome variable, and time horizon.
 3. **Attribution Check:** Ensure the number belongs to the cited paper itself, not an in-text review of another study.
-4. **Context Escalation:** If a semantic snippet is truncated around a key table or note, verify the relevant page with `zotero_zotero_read_pdf_pages`; if page extraction is unavailable or malformed, use a targeted extraction from the known item's MinerU sidecar (keep provenance truthful internally; cite it by line range, never as a page read).
+4. **Context Escalation:** If a semantic snippet is truncated around a key table or note, verify the relevant page with `zotero_read_pdf_pages`; if page extraction is unavailable or malformed, use a targeted extraction from the known item's MinerU sidecar (keep provenance truthful internally; cite it by line range, never as a page read).
 5. **Failure Fallback:** If the exact number cannot be verified, drop it or explicitly label it `UNVERIFIED`.
 
 *Precedence Rule:* Verified source text always overrides model memory.
@@ -49,7 +49,7 @@ For “largest,” “smallest,” or “strongest” claims:
 
 A `[Figure Schema]` block serves as a discovery beacon, not standalone evidence.
 - The displayed `Rerank` score reflects the raw cross-encoder evaluation.
-- Verify empirical claims against figure captions, surrounding prose, HTML table cells, or `read_pdf_pages` output.
+- Verify empirical claims against figure captions, surrounding prose, HTML table cells, or `zotero_read_pdf_pages` output.
 - Never infer quantitative estimates from schema YAML alone.
 
 ## Retrieval Efficiency Checks

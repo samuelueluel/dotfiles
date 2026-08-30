@@ -14,10 +14,10 @@
 
 ## Dynamic Discovery & Verification
 
-- `zotero_read_zotero_collections`: Resource tool (no parameters); returns names, keys, and item counts for the active library.
-- `zotero_zotero_search_collections(query)`: Case-insensitive substring search across all collection names.
+- `zotero_list_collections()`: Lists names and keys for collections in the active library.
+- `zotero_search_collections(query)`: Case-insensitive substring search across all collection names.
 
 ## Scope Semantics
 
-- Setting `collection=<KEY | NAME>` on `zotero_zotero_semantic_search` dynamically resolves SQLite membership to include the target collection **and all its child subcollections** at query time.
+- Setting `collection=<KEY | NAME>` on `zotero_semantic_search` dynamically resolves SQLite membership to include the target collection **and all its child subcollections** at query time.
 - Moving items between collections in the Zotero GUI takes effect immediately in semantic search without requiring re-indexing.
