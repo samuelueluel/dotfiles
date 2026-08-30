@@ -22,15 +22,33 @@ Use for substantive findings, mechanisms, definitions, formulas, and empirical e
 Use when verifying empirical numbers, resolving truncated snippets, or operating when semantic score instrumentation is unavailable.
 
 - **Canonical Formats:**
-  - `{Author Year, item KEY, p. X, read_pdf_pages; itemType/source_group; canonical tags if present}`
-  - `{Author Year, item KEY, get_item_fulltext; itemType/source_group; canonical tags if present}` (when exact page numbers are unmapped)
+  - `{Author Year, item KEY, p. X; itemType/source_group; canonical tags if present}`
+  - `{Author Year, item KEY, § heading; itemType/source_group; canonical tags if present}` (when exact page numbers are unmapped)
+  - `{Author Year, item KEY, p. X if mapped, lines X–Y; itemType/source_group; canonical tags if present}`
+  - Tokens never display route labels (`read_pdf_pages`, `get_item_fulltext`, `mineru_sidecar`); the location fields carry the audit trail.
 - **Rules:**
-  - Quote or paraphrase only text returned by `zotero_zotero_read_pdf_pages` or `zotero_zotero_get_item_fulltext`.
-  - Prefer page reads (`read_pdf_pages`) for paper-grade numerical claims.
-  - Do not use the legacy route label `direct PDF`; name the actual tool route.
+  - Quote or paraphrase only text actually returned by the read route or sidecar extraction used.
+  - Prefer page reads (`read_pdf_pages`) for paper-grade numerical claims when page extraction is reliable.
+  - Use `mineru_sidecar` when page extraction is unavailable or malformed, or when a precise window in a large known work avoids loading irrelevant text. Include the PDF page only when the sidecar maps it; otherwise include the extracted line range.
+  - Sidecar extraction is limited to an already identified local item. Never treat MCP gateway temporary/spill files as source evidence.
+  - Do not use the vague label `direct PDF`. Keep provenance truthful internally: sidecar, shell, or other local extraction is never treated or described as a page read. Cite sidecar evidence with its line range (plus mapped page if any) and never imply a page read occurred when it did not.
   - Append verified source classification exactly as for semantic-passage evidence.
 
-## 3. Bibliography-Reference Evidence (Evidence Layer)
+## 3. Exact-Source Identity Evidence (Gate)
+
+Use `zotero_zotero_resolve_exact_source` when a request names a source by title, author/title/year, DOI, citation key, item key, or explicit “in this paper” language.
+
+- **Canonical Formats:**
+  - `{resolve_exact_source → exact, item KEY, collection scope verified}`
+  - `{resolve_exact_source → absent, requested identity, collection scope}`
+  - `{resolve_exact_source → ambiguous, competing item KEYs or metadata conflict}`
+- **Rules:**
+  - This route verifies metadata identity and collection membership only; it does not support findings, mechanisms, estimates, equations, or numerical claims.
+  - For `exact`, use the returned `item_key` to retrieve substantive evidence and cite that separate route. Emit a resolver token only when identity or collection membership is material; do not duplicate it in an ordinary substantive answer whose content token already identifies the verified item.
+  - For `ambiguous` or `absent`, report only the identity boundary/conflict. `related_matches` are metadata-only and cannot be used as substantive evidence.
+  - Preserve the original requested identity. Do not shorten a title or issue a new resolver call for a related result unless the user explicitly clarifies/changes the target or asks about that related work as a separate task.
+
+## 4. Bibliography-Reference Evidence (Evidence Layer)
 
 Use `zotero_zotero_search_references` for literal reference occurrences, raw bibliography strings, citing-source context, and graph resolution status.
 
@@ -44,14 +62,14 @@ Use `zotero_zotero_search_references` for literal reference occurrences, raw bib
   - `unresolved` or `ambiguous` statuses support raw string occurrences only, never clean target identities or graph edges.
   - Reference search evidence proves citation occurrence only, never the cited paper's substantive findings.
 
-## 4. Citation-Graph Evidence (Judgment Layer)
+## 5. Citation-Graph Evidence (Judgment Layer)
 
 Use for most-cited rankings, direct lineage neighbors, and bibliographic coupling.
 
 - **Canonical Formats:**
-  - `{get_collection_hubs → scope collection, hub #1, 14 inward citations}`
-  - `{get_paper_lineage → scope library-expanded, direct incoming neighbor of ext:...}`
-  - `{find_connected_papers → scope collection-expanded, Jaccard 0.50, 1 shared citation}`
+  - `{get_collection_hubs → scope collection KEY, item ABCDEFGH, hub #1, 14 inward citations}`
+  - `{get_paper_lineage → seed ABCDEFGH, scope library-expanded, direct incoming neighbor ext:...}`
+  - `{find_connected_papers → seed ABCDEFGH, result HGFEDCBA, scope collection-expanded, Jaccard 0.50, 1 shared citation}`
 - **Rules:**
   - State the explicit `scope` parameter in every graph token.
   - "Hub" denotes a **most-cited ranking in scope** (inbound edges), not network centrality. Phrase claims as "top-cited in scope".
@@ -60,9 +78,9 @@ Use for most-cited rankings, direct lineage neighbors, and bibliographic couplin
   - Explicitly identify external node kinds (`ext:doi` vs. `ext:meta`). Treat `ext:meta` counts as heuristic and approximate.
   - `get_paper_lineage` output reflects direct (depth 1) neighbors only.
 
-## 5. Metadata API Facts & Token Labels
+## 6. Metadata API Facts & Token Labels
 
-Plain metadata (title, creators, year, item key, tags, collection membership, attachment status) are API facts and require verification. For substantive local Zotero claims, include these compact source labels inside the evidence token:
+Plain metadata (title, creators, year, item key, tags, collection membership, attachment status) are API facts and require verification. The resolver may verify an identity or collection-membership claim, but it cannot replace substantive passage/page evidence. For substantive local Zotero claims, include these compact source labels inside the evidence token:
 
 - Native `itemType` (for example, `journalArticle`, `preprint`, `report`).
 - Derived `source_group` (`article`, `unpublished`, `institutional`, `reference`, `web-media`, or `other`).

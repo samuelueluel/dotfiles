@@ -49,12 +49,12 @@ case "$id" in
     pi_thinking_level="max"
     args+=" --force-ciru --ple-sidecar /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/ple --ple-cache-mib 4096 --cache-prompt --cache-ram 8192 --cache-idle-slots --ctx-checkpoints 32 --checkpoint-min-step 8192 -ngl all -sm none --fit off -b 2048 -ub 512 --parallel 1 -t 8 -tb 8 -fa on --cont-batching --reasoning on"
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on   native MTP (depth 3)" \
-      "on   native MTP (depth 3)" \
+    mtp=$(gum choose --header "speculative decoding" --selected "on   native MTP" \
+      "on   native MTP" \
       "off  base model") || exit 1
     case "${mtp%%[ ]*}" in
       on)
-        args+=" --spec-type draft-mtp --spec-draft-model /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/mtp/Qwen3.8-Flash-CIRU-STRIX-IU4-MTP-Q8_0.gguf --spec-draft-n-max 3"
+        args+=" --spec-type draft-mtp --spec-draft-model /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/mtp/Qwen3.8-Flash-CIRU-STRIX-IU4-MTP-Q8_0.gguf --spec-draft-n-max 3 --spec-draft-p-split 0.10 -ctkd q8_0 -ctvd q8_0"
         ;;
       off)
         args+=" --spec-type none"
@@ -90,7 +90,30 @@ case "$id" in
         ;;
     esac
 
-    args+=" $QWEN38_FLASH_SAMPLING"
+    effort=$(gum choose --header "thinking / reasoning effort" \
+      "xhigh   deep reasoning (Pi cptr max; default)" \
+      "medium  balanced reasoning" \
+      "low     fast / concise reasoning" \
+      "off     instruct mode (no thinking)") || exit 1
+    case "${effort%%[ ]*}" in
+      xhigh)
+        pi_thinking_level="max"
+        args+=" $QWEN38_FLASH_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja"
+        ;;
+      medium)
+        pi_thinking_level="medium"
+        args+=" $QWEN38_FLASH_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-medium.jinja"
+        ;;
+      low)
+        pi_thinking_level="low"
+        args+=" $QWEN38_FLASH_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-low.jinja"
+        ;;
+      off)
+        pi_thinking_level="off"
+        args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
+        ;;
+    esac
+
     kv=$(gum choose --header "KV cache quantization" --selected "f16" \
       "f16  default (unquantized f16)" \
       "q8   Q8 kv cache (saves RAM)") || exit 1

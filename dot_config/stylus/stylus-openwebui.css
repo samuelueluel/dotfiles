@@ -182,37 +182,133 @@ nav svg,
     color: var(--gb-muted) !important;
 }
 
-/* Code blocks */
+/* ==========================================================================
+   Code blocks & CodeMirror 6 (Surgical Overrides)
+   ========================================================================== */
+
+/* Outer code container background & border */
+.markdown-prose div[dir="ltr"] {
+    background-color: var(--gb-surface) !important;
+    border-color: var(--gb-border) !important;
+}
+
+/* Code block header bar */
+.markdown-prose .sticky:has(.copy-code-button),
+.sticky:has(.copy-code-button) {
+    background-color: var(--gb-surface-2) !important;
+    color: var(--gb-text) !important;
+    border-bottom: 1px solid var(--gb-border) !important;
+}
+
+/* Header buttons (Run, Copy, Save, Collapse) */
+.sticky:has(.copy-code-button) button,
+.copy-code-button,
+.run-code-button,
+.save-code-button {
+    background-color: var(--gb-surface-2) !important;
+    color: var(--gb-text) !important;
+}
+
+.sticky:has(.copy-code-button) button:hover,
+.copy-code-button:hover,
+.run-code-button:hover,
+.save-code-button:hover {
+    background-color: var(--gb-border) !important;
+}
+
+/* Top spacer behind sticky header */
+.markdown-prose div[dir="ltr"] [class*="pt-"] {
+    background-color: var(--gb-surface) !important;
+}
+
+/* CodeMirror Editor & Pre body */
+[id^="code-textarea-"],
+.cm-editor,
+.cm-scroller,
+.cm-content,
 pre,
 .markdown-prose pre,
 #response-content-container pre {
     background-color: var(--gb-surface) !important;
     color: var(--gb-text) !important;
-    border: 1px solid var(--gb-border) !important;
-    border-radius: 0.5rem !important;
-    padding: 1rem !important;
 }
 
-pre *,
-.markdown-prose pre *,
-#response-content-container pre * {
-    background-color: transparent !important;
+.cm-line,
+pre code {
     color: var(--gb-text) !important;
 }
 
+/* Line number gutters */
+.cm-editor .cm-gutters,
+.cm-gutters,
+.cm-gutter,
+.cm-gutterElement,
+.cm-lineNumbers,
+.cm-foldGutter {
+    background-color: var(--gb-surface-2) !important;
+    color: var(--gb-muted) !important;
+    border-right: 1px solid var(--gb-border) !important;
+}
+
+.cm-editor .cm-gutterElement,
+.cm-gutterElement,
+.cm-lineNumbers .cm-gutterElement {
+    background-color: transparent !important;
+    color: var(--gb-muted) !important;
+}
+
+/* Active line and gutter highlight */
+.cm-activeLine {
+    background-color: rgba(213, 196, 161, 0.35) !important;
+}
+
+.cm-editor .cm-activeLineGutter,
+.cm-activeLineGutter {
+    background-color: var(--gb-border) !important;
+    color: var(--gb-text) !important;
+    font-weight: 600 !important;
+}
+
+.cm-cursor {
+    border-left-color: var(--gb-text) !important;
+}
+
+.cm-selectionBackground,
+.cm-editor ::selection {
+    background-color: var(--gb-surface-2) !important;
+    color: var(--gb-text) !important;
+}
+
+/* Monospace font exclusively for code */
+.cm-editor,
+.cm-editor *,
+pre,
+code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+/* Inline code `code` */
 .markdown-prose :not(pre) > code,
 #response-content-container :not(pre) > code {
     background-color: var(--gb-surface-2) !important;
     color: var(--gb-orange) !important;
-    padding: 0.1em 0.3em !important;
+    padding: 0.1em 0.35em !important;
     border-radius: 0.25rem !important;
 }
 
-.markdown-prose pre code,
-#response-content-container pre code {
-    background-color: transparent !important;
-    color: var(--gb-text) !important;
-}
+/* Gruvbox Syntax Highlighting Tokens */
+.hljs-keyword, .token.keyword, [class*="cm-keyword"] { color: var(--gb-red) !important; font-weight: 600 !important; }
+.hljs-string, .token.string, [class*="cm-string"] { color: var(--gb-green) !important; }
+.hljs-comment, .token.comment, [class*="cm-comment"] { color: var(--gb-faint) !important; font-style: italic !important; }
+.hljs-number, .token.number, [class*="cm-number"] { color: var(--gb-purple) !important; }
+.hljs-function, .hljs-title, .token.function, [class*="cm-def"], [class*="cm-variableName"] { color: var(--gb-blue) !important; }
+.hljs-variable, .hljs-attr, .token.variable, [class*="cm-propertyName"] { color: var(--gb-yellow) !important; }
+.hljs-built_in, .token.builtin, [class*="cm-builtin"] { color: var(--gb-orange) !important; }
+.hljs-operator, .token.operator, [class*="cm-operator"] { color: var(--gb-aqua) !important; }
+
+/* ==========================================================================
+   Inputs & Controls
+   ========================================================================== */
 
 /* Chat input */
 #chat-input,

@@ -10,25 +10,80 @@ description: Manages Samuel's local Zotero library through MCP, including collec
 - Keep Zotero work in the main session; never delegate it to subagents.
 - For claims about source content, load and follow `~/.agents/skills/citation-integrity/SKILL.md`.
 - Ordinary literature questions are MCP-first. Use tools with the literal `zotero_zotero_*` prefix; do not parse MCP transport/spill files with shell commands.
+- Do not call `advisor` for ordinary Zotero RAG. This skill and `citation-integrity` govern retrieval; generic review must not expand a bounded evidence search into an exhaustive audit.
 - Never upload PDF bytes to Zotero Cloud, call `zotero_zotero_attach_file`, or use `add_item` with a file. For explicitly requested ingestion, follow [library operations](references/library-ops.md) and attach local PDFs with `zotero-link`.
 - Never download, ingest, parse, or embed a cited work merely because it appears in a bibliography. Never delete an item without explicit confirmation.
 - Never run a host-wide `pkill llama-server`.
 
-## Default Literature-RAG Fast Path
+## Request-Routing Playbook
 
-For ordinary findings, mechanisms, estimates, equations, and “which paper?” questions, follow this sequence and stop when the answer is supported:
+Before the first Zotero call, interpret the request as one or more ordered routes. Routes may be chained; this is an internal attention aid, not a user-visible plan, fixed classifier, or call quota.
 
-1. **Search once:** Call `zotero_zotero_semantic_search` with a task-oriented query, `limit=5–8`, and `collection=<KEY>` when scoped. `Detroit-Paper` is `TRGBCDX5`; other known keys are in [collections](references/collections.md).
-2. **Gate passages:** Keep positive-`Rerank`, non-`REF` results whose displayed passages actually support the requested claim. Never substitute `Relevance` for `Rerank`.
-3. **Refine at most once:** Use one materially different targeted query only if the first call does not expose the needed estimate or comparison. Do not issue near-duplicate searches.
-4. **Compare correctly:** For comparative or superlative questions, record outcome, sign, unit, treatment dose, geography, horizon, and specification for the leading candidates. Rank only comparable estimates. Otherwise identify the “largest reported estimate” and state the incompatibility.
-5. **Verify narrowly:** Verify the exact number/context for the likely winner and, only if needed, one close comparator. Use `zotero_zotero_read_pdf_pages`; call `zotero_zotero_get_pdf_outline` only when the relevant page is unknown. Use `zotero_zotero_get_item_fulltext` only when bounded retrieval cannot recover the context or the user asks to read the paper.
-6. **Fetch final metadata once:** Call `zotero_zotero_get_item_metadata` only for sources actually cited. Record native `itemType` and any canonical `review:*` / `type:*` tags; derive `source_group` from semantic output or the locked mapping.
-7. **Answer with evidence tokens:** Use the exact token format required by `citation-integrity`, including item key, retrieval route, source classification, and canonical tags when present.
+```text
+REQUEST
+├─ Library mutation? ───────────────→ MUTATION: load library-ops; confirm destructive actions
+├─ Bibliography occurrence/count? ─→ REFERENCE: search_references (raw entries/counts)
+├─ Named source or item? ──────────→ IDENTITY: resolve_exact_source
+│                                    ├─ exact → bind item_key, then CONTENT and/or VERIFY
+│                                    ├─ ambiguous → clarify; do not choose semantically
+│                                    └─ absent → stop named-source task; never substitute related work
+├─ Substantive topic/question? ────→ CONTENT: scoped semantic_search → positive Rerank evidence
+├─ Exact number/table/page? ───────→ VERIFY: read_pdf_pages; outline only if page unknown;
+│                                             known-item sidecar only if page extraction fails
+├─ Citation relationships? ────────→ GRAPH: lineage / connected papers / top-cited ranking
+└─ Metadata/inventory? ────────────→ METADATA: item metadata / metadata search / collection items
 
-A collection scope defines the retrieval corpus, not study geography. A paper about Chicago or Saginaw can be a valid result from `Detroit-Paper` unless the user also requests Detroit-only studies.
+Common chains:
+  named-paper finding      = IDENTITY → CONTENT → VERIFY
+  named table/coefficient  = IDENTITY → VERIFY
+  comparison/superlative  = CONTENT → COMPARE → VERIFY winner/challenger
+  exact citing items/count = REFERENCE
+  graph neighbors of item  = IDENTITY → GRAPH
+  topic-expanded graph     = CONTENT seeds → GRAPH → CONTENT/VERIFY for findings
+```
 
-### Minimal Example
+Precedence and boundaries: REFERENCE handles literal bibliography occurrences and exact citation counts even when the cited work is not a local item. IDENTITY precedes source-specific content, metadata, or graph-neighbor claims. GRAPH provides structural traversal and approximate edge rankings; metadata establishes identity/description. Neither supports substantive findings. After each retrieval, follow only an answer-changing evidence gap; verify and stop under the rules below.
+
+## Adaptive Literature-RAG Fast Path
+
+For findings, mechanisms, estimates, equations, and topical “which paper?” questions, use a bounded agentic loop rather than either one-shot retrieval or an exhaustive audit. If the user names a source, the exact-source identity gate below takes precedence over semantic discovery.
+
+1. **Start scoped:** Call `zotero_zotero_semantic_search` with a task-oriented query, normally `limit=5–8`, and `collection=<KEY>` when scoped. `Detroit-Paper` is `TRGBCDX5`; other known keys are in [collections](references/collections.md).
+2. **Gate passages:** Keep positive-`Rerank`, non-`REF` results whose displayed passages concern the requested claim. Never substitute `Relevance` for `Rerank`.
+3. **Identify the evidence gap:** Before every follow-up, determine internally: the current answer, the unresolved issue that could materially change it, and the cheapest reliable retrieval that resolves that issue. Do not use a fixed ledger; track whatever facts the task requires.
+4. **Follow up adaptively:** A materially different semantic query, an orthogonal lexical/metadata recall check, a page read, an outline, or targeted sidecar extraction is appropriate when tied to that gap. Do not issue near-duplicate searches or gather context that cannot change the answer.
+5. **Compare correctly:** For comparative or superlative questions, establish the relevant outcome, sign, unit, treatment dose, geography, horizon, and specification for plausible leaders. Rank comparable estimates; otherwise name the dimension on which one estimate is largest and state the incompatibility.
+6. **Verify and stop:** Directly verify the winning claim and any plausible challenger needed to justify it. Stop when the answer is stable: the requested claim is supported, material ambiguities are resolved or disclosed, and another retrieval is unlikely to change the answer. Two uninformative follow-ups are a strong signal to stop, not a quota to fill.
+7. **Fetch final metadata once:** Call `zotero_zotero_get_item_metadata` only for sources actually cited. Record native `itemType` and canonical `review:*` / `type:*` tags; derive `source_group` from semantic output or the locked mapping.
+8. **Answer with evidence tokens:** Use the exact token format required by `citation-integrity`: item key, evidence location (page, passage/`Rerank`, or line range), source classification, and canonical tags when present. Do not print retrieval-route labels such as `read_pdf_pages` or `semantic_search` inside `{...}`; the correct route must still be used internally.
+
+A collection scope defines the retrieval corpus, not study geography. A paper about Chicago or Saginaw can be valid in `Detroit-Paper` unless the user also requests Detroit-only studies. Full workflow and stopping rules are in [search and retrieval](references/search-retrieval.md).
+
+### Exact-source identity gate
+
+When the user identifies a source by title, author/title/year, DOI, citation key, item key, or “this paper,” resolve identity before substantive retrieval. This gate is for named sources, not topical discovery.
+
+1. Call `zotero_zotero_resolve_exact_source` with the original wording and explicit metadata. Do not shorten or “repair” the target using `related_matches`.
+2. `exact`: bind every substantive claim and final evidence token to the returned `item_key`. Prefer a direct-source route; if semantic search is needed to locate a passage, pass `filters={"item_keys": ["<KEY>"]}` so both dense and sparse retrieval are restricted to that paper. An empty result means no passage from the verified item matched the query — fall back to direct reading; never drop the filter to keep neighbors.
+3. `ambiguous`: stop and disclose the conflict or ask for clarification. When an identifier conflicts, state explicitly that no in-scope item carries the requested identifier. Do not use semantic relevance to choose.
+4. `absent`: stop the named-source task and report absence. Related matches are metadata-only suggestions, never substitutes. If a collection was supplied, use each match's `in_requested_scope` and `scope_basis` fields; an empty `collections` display field is not evidence of non-membership. Do not run semantic/full-text/graph retrieval or re-resolve a related title unless the user explicitly starts that separate task.
+5. If the resolver is unavailable, use the narrowest exact metadata/citation-key lookup. A uniquely verified exact record may bind identity; simplified or related fallback results remain discovery only.
+
+Do not infer absence from a failed semantic query. Full routing and fallback details are in [search and retrieval](references/search-retrieval.md).
+
+### Minimal Examples
+
+For a named source, resolve identity before substantive retrieval:
+
+```python
+zotero_zotero_resolve_exact_source(
+    source="Find the paper titled 'Example title' and summarize its result.",
+    title="Example title",
+    collection_key="TRGBCDX5",
+)
+```
+
+For topical discovery, do not invoke the identity gate:
 
 ```python
 zotero_zotero_semantic_search(
@@ -38,16 +93,16 @@ zotero_zotero_semantic_search(
 )
 ```
 
-Shortlist from that response, verify only the likely winner's exact page/table, then fetch metadata only for sources cited in the answer.
+Form a provisional answer, run only follow-ups tied to a material uncertainty, verify the winner and any plausible challenger needed for the claim, then fetch metadata only for cited sources.
 
 ### Do Not Do These by Default
 
 - Do not preflight `get_search_database_status`; use it only after a readiness/index error.
-- Do not enumerate `get_collection_items` unless the user requests an inventory/completeness audit or semantic retrieval clearly fails.
+- Do not enumerate `get_collection_items` merely to feel exhaustive. Use a cheap orthogonal recall check for a collection-wide superlative; inventory only when completeness is itself requested or targeted retrieval demonstrably leaves the candidate set unresolved.
 - Do not call graph tools unless the question concerns citations/relationships or deliberately expands identified seeds.
-- Do not read outlines, full text, or every candidate “just in case.”
-- If MCP output is oversized, narrow the query or lower `limit`; never shell-parse the gateway's temporary result file.
-- Sidecar `grep`/`sed` is a known-item fallback only for malformed tables, unavailable page extraction, or large technical works; see [deep-dive reading](references/deep-dive-reading.md).
+- Do not read outlines, full text, or every candidate “just in case.” Each expansion must address a material evidence gap.
+- If MCP output is oversized, narrow the request or use the known-item fallback; never shell-parse the gateway's temporary result file.
+- Sidecar `grep`/`sed` is valid for malformed tables, unavailable page extraction, or precise windows in large known works; see [deep-dive reading](references/deep-dive-reading.md).
 
 ## Tool Router
 
@@ -55,7 +110,8 @@ Shortlist from that response, verify only the likely winner's exact page/table, 
 |---|---|
 | Findings, estimates, mechanisms, equations | `zotero_zotero_semantic_search` |
 | Exact page/table verification | `zotero_zotero_read_pdf_pages` |
-| Known author/title/citekey | `zotero_zotero_search_items` / `zotero_zotero_search_by_citation_key` |
+| Specific paper/item identity | `zotero_zotero_resolve_exact_source` |
+| Author/title discovery or metadata after identity | `zotero_zotero_search_items` / `zotero_zotero_search_by_citation_key` |
 | Metadata, item type, review/subtype tags | `zotero_zotero_get_item_metadata` / `zotero_zotero_search_by_tag` |
 | Exact bibliography occurrence, DOI, “who cites X?” | `zotero_zotero_search_references` |
 | Citation neighbors or shared references | `zotero_zotero_get_paper_lineage` / `zotero_zotero_find_connected_papers` |
@@ -69,7 +125,7 @@ Reference search proves a bibliography occurrence, not a finding. Graph tools pr
 
 - Native Zotero `itemType` is canonical; `source_group` is a query-time alias, not a stored tag.
 - Canonical tags are `review:unreviewed`, `review:skimmed`, `review:checked`, `type:textbook`, and `type:lecture-notes`. Do not invent subject, credibility, role, or publication-status tags.
-- Semantic filters accept `item_type(s)`, `source_group(s)`, `tag(s)` / `required_tags`, and `exclude_tags`; supplied fields combine with `AND`. Never silently drop a filter.
+- Semantic filters accept `item_type(s)`, `item_key(s)`, `source_group(s)`, `tag(s)` / `required_tags`, and `exclude_tags`; supplied fields combine with `AND`. Never silently drop a filter.
 - Metadata labels describe sources and never replace passage/page evidence or `Rerank` gating.
 
 ## Fail Closed

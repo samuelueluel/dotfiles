@@ -9,7 +9,7 @@ The local `bge-reranker-v2-m3` endpoint returns raw cross-encoder scores:
 | Raw `Rerank` Score | Confidence Level | Permitted Usage |
 |---|---|---|
 | `> 0` | Confident match | May support substantive claims after verifying passage text. |
-| `-2` to `0` | Weak match | Flag explicitly; prefer stronger semantic hits or direct source reads. |
+| `-2` to `0` | Weak match | Diagnostic/discovery only; cannot support a substantive claim. Use a stronger hit or direct source read. |
 | `-4` to `-2` | Marginal / Noisy | Exclude from substantive claims. |
 | `≤ -4` | Irrelevant | Discard. |
 
@@ -23,7 +23,7 @@ Before reporting any coefficient, standard error, sample size, percentage, or cu
 1. **Exact Match:** Locate the exact value verbatim in the retrieved passage or direct page.
 2. **Context Check:** Confirm units, sign, specification, comparison group, outcome variable, and time horizon.
 3. **Attribution Check:** Ensure the number belongs to the cited paper itself, not an in-text review of another study.
-4. **Context Escalation:** If a semantic snippet is truncated around a key table or note, verify the relevant page with `zotero_zotero_read_pdf_pages`.
+4. **Context Escalation:** If a semantic snippet is truncated around a key table or note, verify the relevant page with `zotero_zotero_read_pdf_pages`; if page extraction is unavailable or malformed, use a targeted extraction from the known item's MinerU sidecar (keep provenance truthful internally; cite it by line range, never as a page read).
 5. **Failure Fallback:** If the exact number cannot be verified, drop it or explicitly label it `UNVERIFIED`.
 
 *Precedence Rule:* Verified source text always overrides model memory.
@@ -37,11 +37,13 @@ When making comparative statements (e.g., “Paper A finds X, whereas Paper B fi
 - Never use one source's passage or graph metric to support another paper's finding.
 
 For “largest,” “smallest,” or “strongest” claims:
-1. Use the bounded, collection-scoped candidate workflow in the Zotero skill rather than enumerating the collection by default.
-2. Compare outcome, sign, units, treatment dose, geography, time horizon, and specification.
-3. Rank only sufficiently comparable estimates. Otherwise say “largest reported estimate in the scoped collection,” name the dimension (for example, local shots-fired reduction), and explain the incompatibility in one sentence.
-4. Directly verify the winning estimate's exact table/prose and any close comparator needed to justify the ranking.
-5. Fetch native `itemType` and canonical tags only for sources actually cited in the final answer, then include source classification in each token.
+1. Use the adaptive, collection-scoped workflow in the Zotero skill. Begin with semantic discovery, then follow only material evidence gaps.
+2. Compare the dimensions required by the question—commonly outcome, sign, units, treatment dose, geography, time horizon, and specification—without imposing a universal ledger.
+3. When a missed candidate could plausibly change a collection-wide superlative, permit one cheap orthogonal lexical/metadata recall check. Enumerate the collection only when targeted discovery leaves a concrete completeness problem or the user requests an audit.
+4. Rank only sufficiently comparable estimates. Otherwise say “largest reported estimate in the scoped collection,” name the dimension (for example, local shots-fired reduction), and explain the incompatibility in one sentence.
+5. Directly verify the winning estimate's exact table/prose and any plausible challenger needed to justify the ranking.
+6. Stop when the ranking is stable and another retrieval is unlikely to change it; disclose unresolved incompatibilities rather than searching indefinitely.
+7. Fetch native `itemType` and canonical tags only for sources actually cited in the final answer, then include source classification in each token.
 
 ## Figure & Table Schema Handling
 
@@ -53,11 +55,14 @@ A `[Figure Schema]` block serves as a discovery beacon, not standalone evidence.
 ## Retrieval Efficiency Checks
 
 Before expanding a Zotero RAG query, ask:
-- Did the first scoped semantic call already expose the likely answer?
-- Would one materially different reformulation resolve the missing detail?
+- What does the current evidence support?
+- What unresolved issue could materially change or qualify the answer?
+- What is the cheapest reliable retrieval that resolves that issue?
 - Is a page read sufficient instead of an outline or full-text read?
+- If page extraction is malformed, would a precise known-item sidecar window resolve it?
 - Am I fetching metadata only for final cited sources?
-- If MCP output is oversized, can I reduce the result limit or narrow the query rather than parse a temporary transport file?
+- If MCP output is oversized, can I narrow the request or use the sanctioned known-item fallback rather than parse a temporary transport file?
+- After the retrieval, did the answer change? Repeated uninformative follow-ups are a strong signal to stop.
 
 ## Canonical Failure Statements
 

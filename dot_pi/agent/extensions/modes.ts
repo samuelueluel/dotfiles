@@ -13,8 +13,65 @@ let currentMode: "plan" | "manual" | "auto" =
 const CPTR_HEADLESS = process.env.PI_CPTR_HEADLESS === "1";
 const SCOPED_FILESYSTEM_PREFIX = "openwebui_filesystem_";
 const TURBOVAULT_NAMESPACE_PROXY = "mcp__turbovault";
+const ZOTERO_NAMESPACE_PROXY = "mcp__zotero";
 const MCP_MUTATION_PATTERN = /delete|write|edit|move|rollback|create|update|remove|batch_execute/i;
 const HEADLESS_INTERACTIVE_COMMANDS = new Set(["bc", "less", "more", "zless", "man", "info", "apropos", "whatis"]);
+
+// MCP operations whose implementations are read-only. Unknown Zotero and
+// TurboVault operations remain gated; safety must not be inferred merely from
+// a name that happens not to contain "write" or "delete".
+const READ_ONLY_ZOTERO_TOOLS = new Set([
+  "zotero_zotero_get_annotations",
+  "zotero_zotero_get_notes",
+  "zotero_zotero_get_page_layout",
+  "zotero_zotero_get_item_metadata",
+  "zotero_zotero_get_item_fulltext",
+  "zotero_zotero_get_attachment_path",
+  "zotero_zotero_get_collections",
+  "zotero_zotero_get_collection_items",
+  "zotero_zotero_get_item_children",
+  "zotero_zotero_get_tags",
+  "zotero_zotero_list_libraries",
+  "zotero_zotero_get_recent",
+  "zotero_zotero_get_collection_hubs",
+  "zotero_zotero_get_paper_lineage",
+  "zotero_zotero_find_connected_papers",
+  "zotero_zotero_audit_references",
+  "zotero_zotero_read_pdf_pages",
+  "zotero_zotero_search_references",
+  "zotero_zotero_search_items",
+  "zotero_zotero_resolve_exact_source",
+  "zotero_zotero_search_by_tag",
+  "zotero_zotero_search_by_citation_key",
+  "zotero_zotero_advanced_search",
+  "zotero_zotero_semantic_search",
+  "zotero_zotero_get_search_database_status",
+  "zotero_zotero_synthesize_annotations",
+  "zotero_zotero_export_bibliography",
+  "zotero_zotero_search_collections",
+  "zotero_zotero_get_pdf_outline",
+  "zotero_read_zotero_collections",
+]);
+
+const READ_ONLY_TURBOVAULT_TOOLS = new Set([
+  "turbovault_get_vault_context",
+  "turbovault_read_note",
+  "turbovault_get_backlinks",
+  "turbovault_get_forward_links",
+  "turbovault_get_related_notes",
+  "turbovault_get_hub_notes",
+  "turbovault_quick_health_check",
+  "turbovault_get_broken_links",
+  "turbovault_search",
+  "turbovault_advanced_search",
+  "turbovault_search_by_frontmatter",
+  "turbovault_inspect_frontmatter",
+  "turbovault_query_frontmatter_sql",
+  "turbovault_list_templates",
+  "turbovault_get_notes_info",
+  "turbovault_suggest_links",
+  "turbovault_semantic_search",
+]);
 
 // ──────────────────────────────────────────────
 // Shared read-only tool set
@@ -363,9 +420,62 @@ function isHeadlessReadOnlyBashCommand(command: string): boolean {
   return true;
 }
 
-function isZoteroReadOnlyTool(toolName: string): boolean {
-  const normalized = toolName.replace(/-/g, "_");
-  return normalized.startsWith("zotero_") && !MCP_MUTATION_PATTERN.test(normalized);
+function normalizeMcpToolName(toolName: string): string {
+  return toolName.replace(/-/g, "_");
+}
+
+function getMcpToolName(input: any): string {
+  return String(
+    input?.tool ||
+      input?.name ||
+      input?.subcommand ||
+      input?.command ||
+      "",
+  );
+}
+
+function getMcpToolArguments(input: any): any {
+  const args = input?.args ?? input?.arguments ?? input;
+  if (typeof args !== "string") return args;
+
+  try {
+    return JSON.parse(args);
+  } catch {
+    return undefined;
+  }
+}
+
+function isNonMutableMcpTool(toolName: string, input?: any): boolean {
+  const normalized = normalizeMcpToolName(toolName);
+  if (READ_ONLY_ZOTERO_TOOLS.has(normalized) || READ_ONLY_TURBOVAULT_TOOLS.has(normalized)) {
+    return true;
+  }
+
+  // These tools are normally mutating, but have explicitly read-only modes.
+  if (normalized === "turbovault_manage_tags") {
+    return String(input?.operation || "").toLowerCase() === "list";
+  }
+  if (normalized === "turbovault_generate_index" || normalized === "turbovault_edit_note") {
+    return input?.dry_run === true;
+  }
+
+  return false;
+}
+
+function isKnownMcpServerTool(toolName: string): boolean {
+  const normalized = normalizeMcpToolName(toolName);
+  return normalized.startsWith("zotero_") || normalized.startsWith("turbovault_");
+}
+
+function isNonMutableMcpCall(toolName: string, input: any): boolean {
+  const isProxyCall =
+    toolName === "mcp" ||
+    toolName === TURBOVAULT_NAMESPACE_PROXY ||
+    toolName === ZOTERO_NAMESPACE_PROXY;
+  const operationName = isProxyCall ? getMcpToolName(input) : toolName;
+  const operationInput = isProxyCall ? getMcpToolArguments(input) : input;
+
+  return isNonMutableMcpTool(operationName, operationInput);
 }
 
 function isScopedFilesystemTool(toolName: string): boolean {
@@ -555,8 +665,13 @@ export default function (pi: any) {
   pi.on("tool_call", async (event: any, ctx: any) => {
     // ── 1. PLAN MODE ──
     if (currentMode === "plan") {
-      // Non-bash tools: use the whitelist
-      if (event.toolName !== "bash" && !PLAN_WHITELIST.has(event.toolName)) {
+      // Non-bash tools: use the whitelist. Zotero/TurboVault calls are
+      // classified by the forwarded operation regardless of dispatch path.
+      if (
+        event.toolName !== "bash" &&
+        !PLAN_WHITELIST.has(event.toolName) &&
+        !isNonMutableMcpCall(event.toolName, event.input)
+      ) {
         ctx.ui.notify(`[Plan Mode] Blocked tool execution: ${event.toolName}`, "error");
         return {
           block: true,
@@ -584,48 +699,52 @@ export default function (pi: any) {
 
     // ── 2. MANUAL MODE ──
     if (currentMode === "manual") {
+      // Any non-mutable Zotero/TurboVault operation is safe regardless of
+      // whether it arrives directly, through `mcp`, or via a namespace proxy.
+      if (isNonMutableMcpCall(event.toolName, event.input)) return {};
+
       // ── MCP tool handling ──
       // Open WebUI may use the generic proxy form, while proxy-only servers
-      // use mcp__<server>. Inspect the nested operation so read-only
-      // TurboVault calls pass without exposing every server tool directly.
-      if (event.toolName === TURBOVAULT_NAMESPACE_PROXY) {
-        const fullToolName = String(event.input?.tool || "");
-
-        // Only exact entries in COMMON_READ_ONLY bypass approval. In
-        // particular, do not treat the namespace proxy itself as safe: any
-        // mutable or unknown underlying operation still requires approval.
-        if (fullToolName.startsWith("turbovault_") && COMMON_READ_ONLY.has(fullToolName)) return {};
+      // use mcp__<server>. Unknown or mutable operations still require
+      // approval; the read-only classification happened above.
+      if (
+        event.toolName === TURBOVAULT_NAMESPACE_PROXY ||
+        event.toolName === ZOTERO_NAMESPACE_PROXY
+      ) {
+        const fullToolName = getMcpToolName(event.input);
+        const serverLabel =
+          event.toolName === TURBOVAULT_NAMESPACE_PROXY ? "TurboVault" : "Zotero";
 
         if (CPTR_HEADLESS) {
           return {
             block: true,
-            reason: `Open WebUI Pi policy blocks unapproved TurboVault operation '${fullToolName}'.`,
+            reason: `Open WebUI Pi policy blocks unapproved ${serverLabel} operation '${fullToolName}'.`,
           };
         }
-        const details = `TurboVault proxy call: ${fullToolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
-        const approved = await askUser(`Approve TurboVault operation '${fullToolName}'? [Y/n] `, ctx, details);
+        const details = `${serverLabel} proxy call: ${fullToolName}\nInput: ${JSON.stringify(event.input, null, 2)}`;
+        const approved = await askUser(`Approve ${serverLabel} operation '${fullToolName}'? [Y/n] `, ctx, details);
         if (!approved) {
-          ctx.ui.notify(`TurboVault operation blocked: ${fullToolName}`, "error");
-          return { block: true, reason: `User rejected TurboVault operation: ${fullToolName}` };
+          ctx.ui.notify(`${serverLabel} operation blocked: ${fullToolName}`, "error");
+          return { block: true, reason: `User rejected ${serverLabel} operation: ${fullToolName}` };
         }
-        ctx.ui.notify(`TurboVault operation approved`, "success");
+        ctx.ui.notify(`${serverLabel} operation approved`, "success");
         return {};
       }
 
-      // The generic proxy is still used by some clients. Keep its existing
-      // scoped-server/Zotero behavior, but require exact read-only names for
-      // TurboVault rather than relying only on mutation-name heuristics.
+      // The generic proxy is still used by some clients. Known Zotero and
+      // TurboVault tools are fail-closed here: only the explicit read-only
+      // allowlists can bypass approval.
       if (event.toolName === "mcp") {
-        const fullToolName = String(event.input?.tool || event.input?.name || event.input?.subcommand || event.input?.command || "");
+        const fullToolName = getMcpToolName(event.input);
         const isScopedTool = isScopedFilesystemTool(fullToolName);
-        const isTurboVaultTool = fullToolName.startsWith("turbovault_");
-        const isTurboVaultRead = isTurboVaultTool && COMMON_READ_ONLY.has(fullToolName);
-        const isZoteroRead = isZoteroReadOnlyTool(fullToolName);
+        const isKnownMcpTool = isKnownMcpServerTool(fullToolName);
         const isWriteOp = MCP_MUTATION_PATTERN.test(fullToolName);
 
-        if (isTurboVaultRead) return {};
-        if ((isScopedTool || isZoteroRead) && (CPTR_HEADLESS || !isWriteOp)) return {};
-        if (!isTurboVaultTool && !isWriteOp) return {};
+        if (
+          (isScopedTool || (!isKnownMcpTool && !isWriteOp)) &&
+          (CPTR_HEADLESS || !isWriteOp)
+        ) return {};
+        if (!isKnownMcpTool && !isWriteOp) return {};
         if (CPTR_HEADLESS) {
           return {
             block: true,
