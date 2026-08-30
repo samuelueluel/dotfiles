@@ -47,6 +47,51 @@
     "size": 85.2,
     "suggested": true
   },
+  "Qwen3.6-Dense-27B-Q4": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL",
+      "mmproj": "unsloth/Qwen3.6-27B-MTP-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 17.5,
+    "suggested": true
+  },
+  "Qwen3.6-Dense-27B-Q6": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q6_K_XL",
+      "mmproj": "unsloth/Qwen3.6-27B-MTP-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 25.1,
+    "suggested": true
+  },
+  "Qwen3.6-Dense-27B-Q8": {
+    "checkpoints": {
+      "main": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q8_K_XL",
+      "mmproj": "unsloth/Qwen3.6-27B-MTP-GGUF:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "vision",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 34.2,
+    "suggested": true
+  },
   "Qwen3.6-MoE-35B-Q4": {
     "checkpoints": {
       "main": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL",
@@ -133,6 +178,40 @@
     ],
     "recipe": "llamacpp",
     "size": 126.6,
+    "suggested": true
+  },
+  "Qwen3.8-Flash-Next-ROCmFP4": {
+    "checkpoints": {
+      "main": "agentionai/Qwen3.8-Flash-Next-ROCmFP4-FAST-imatrix-GGUF:Qwen3.8-Flash-Next-ROCmFP4-FAST-v2-ple16.gguf",
+      "mmproj": "agentionai/Qwen3.8-Flash-Next-ROCmFP4-FAST-imatrix-GGUF:mmproj/mmproj-Qwen3.8-Flash-Next-f16.gguf"
+    },
+    "labels": [
+      "custom",
+      "fp4",
+      "imatrix",
+      "mtp",
+      "tool-calling",
+      "vision"
+    ],
+    "recipe": "llamacpp",
+    "size": 87.9,
+    "suggested": true
+  },
+  "Tiel-Coder-35B-A3B-MTP-Q8": {
+    "checkpoints": {
+      "main": "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:Tiel-Coder-35B-A3B-MTP-UD-Q8_K_XL.gguf",
+      "mmproj": "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:mmproj-BF16.gguf"
+    },
+    "labels": [
+      "coding",
+      "custom",
+      "mtp",
+      "reasoning",
+      "tool-calling",
+      "vision"
+    ],
+    "recipe": "llamacpp",
+    "size": 39.4,
     "suggested": true
   }
 }

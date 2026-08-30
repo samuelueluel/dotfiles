@@ -296,6 +296,7 @@ model-check() {
       case "${_m:l}" in
         *deepseek-v4-pro*)   _short="dsv4pro" ;;
         *deepseek-v4-flash*) _short="dsv4fl"  ;;
+        *qwen3.8-flash-next-rocmfp4*) _short="flash38fp4" ;;
         *claude-opus-4*)     _short="opus"    ;;
         *claude-opus-5*)     _short="opus5"   ;;
         *claude-sonnet-5*)   _short="sonnet5" ;;
@@ -878,8 +879,10 @@ _pi_pick_local_model() {
     "dense38-fp4  Qwen3.8 Dense 27B  ROCmFP4" \
     "flash38-ciru Qwen3.8 Flash CIRU IU4" \
     "flash38-next Qwen3.8 Flash Next Q4" \
+    "flash38-fp4  Qwen3.8 Flash Next ROCmFP4" \
     "moe-q4       Qwen3.6 MoE 35B    Q4" \
     "moe-q8       Qwen3.6 MoE 35B    Q8" \
+    "tiel-q8      Tiel Coder 35B A3B  Q8" \
     "dsv4fl-q2    DeepSeek V4 Flash Q2" \
     "dsv4fl-q2k   DeepSeek V4 Flash Q2_K_XL" \
     "dsv4fl-q3    DeepSeek V4 Flash Q3" \
@@ -889,9 +892,11 @@ _pi_pick_local_model() {
     dense38-q6)  print -r -- "Qwen3.8-27B-Q6" ;;
     flash38-ciru) print -r -- "Qwen3.8-Flash-CIRU-STRIX-IU4" ;;
     flash38-next) print -r -- "UD-Q4_K_XL" ;;
+    flash38-fp4)  print -r -- "Qwen3.8-Flash-Next-ROCmFP4" ;;
     dense38-fp4) print -r -- "Qwen3.8-27B-ROCmFP4" ;;
     moe-q4)      print -r -- "Qwen3.6-MoE-35B-Q4" ;;
     moe-q8)      print -r -- "Qwen3.6-MoE-35B-Q8" ;;
+    tiel-q8)     print -r -- "Tiel-Coder-35B-A3B-MTP-Q8" ;;
     dsv4fl-q2)   print -r -- "DeepSeek-V4-Flash-Q2" ;;
     dsv4fl-q2k)  print -r -- "DeepSeek-V4-Flash-Q2K" ;;
     dsv4fl-q3)   print -r -- "DeepSeek-V4-Flash-Q3" ;;

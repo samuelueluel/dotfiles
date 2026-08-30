@@ -12,6 +12,9 @@ DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penal
 LING3FLASH_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
 QWEN38_FLASH_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf"
+QWEN38_FLASH_FP4_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf"
+QWEN38_FLASH_FP4_MTP_URL="https://huggingface.co/agentionai/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST-GGUF/resolve/main/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf?download=true"
+QWEN38_FLASH_FP4_MTP_SIZE=2444519296
 
 usage() {
   cat <<'EOF'
@@ -28,6 +31,32 @@ EOF
 die() {
   printf 'lem-load-model: %s\n' "$*" >&2
   exit 1
+}
+
+ensure_qwen38_flash_fp4_mtp() {
+  local cache_root target part size
+  cache_root=$(podman volume inspect --format '{{.Mountpoint}}' lemonade-cache 2>/dev/null || true)
+  [[ -n "$cache_root" ]] || cache_root="$HOME/.local/share/containers/storage/volumes/lemonade-cache/_data"
+  target="$cache_root/qwen3.8-flash-next/$(basename "$QWEN38_FLASH_FP4_MTP")"
+  part="$target.part"
+
+  size=$(stat -c '%s' "$target" 2>/dev/null || echo 0)
+  [[ "$size" == "$QWEN38_FLASH_FP4_MTP_SIZE" ]] && return 0
+
+  mkdir -p "$(dirname "$target")"
+  if [[ -f "$target" && ! -f "$part" ]]; then
+    mv -f "$target" "$part"
+  fi
+
+  gum spin --show-output --title "downloading ROCmFP4 MTP sidecar (2.28 GiB)" -- \
+    curl -fL --retry 5 --retry-delay 3 --retry-connrefused --continue-at - \
+      -o "$part" "$QWEN38_FLASH_FP4_MTP_URL" \
+    || die "ROCmFP4 MTP sidecar download failed"
+
+  size=$(stat -c '%s' "$part" 2>/dev/null || echo 0)
+  [[ "$size" == "$QWEN38_FLASH_FP4_MTP_SIZE" ]] \
+    || die "ROCmFP4 MTP sidecar has size $size; expected $QWEN38_FLASH_FP4_MTP_SIZE"
+  mv -f "$part" "$target"
 }
 
 [[ -n "${1:-}" ]] || { usage >&2; exit 2; }
@@ -54,7 +83,7 @@ case "$id" in
       "off  base model") || exit 1
     case "${mtp%%[ ]*}" in
       on)
-        args+=" --spec-type draft-mtp --spec-draft-model /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/mtp/Qwen3.8-Flash-CIRU-STRIX-IU4-MTP-Q8_0.gguf --spec-draft-n-max 3 --spec-draft-p-split 0.10 -ctkd q8_0 -ctvd q8_0"
+        args+=" --spec-type draft-mtp --spec-draft-model /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/mtp/Qwen3.8-Flash-CIRU-STRIX-IU4-MTP-Q8_0.gguf --spec-draft-n-max 3 --spec-draft-p-min 0.75 --spec-draft-p-split 0.10 -ctkd q8_0 -ctvd q8_0"
         ;;
       off)
         args+=" --spec-type none"
@@ -65,6 +94,59 @@ case "$id" in
     kv=$(gum choose --header "KV cache quantization" --selected "f16" \
       "f16  default (unquantized f16)" \
       "q8   Q8 kv cache (saves RAM)") || exit 1
+    case "${kv%%[ ]*}" in
+      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
+    ;;
+  Qwen3.8-Flash-Next-ROCmFP4*)
+    # Agention's per-head ROCmFP4-FAST imatrix GGUF. This is not the
+    # Nathan Q4_K_XL file: Laurent's qwen4exp-rocmfpx Vulkan engine is required.
+    fixed_parallel=1
+    pi_thinking_level="max"
+    args+=" --force-laurent --fit off -b 2048 -ub 512 -ngl 99 -fa on --reasoning on"
+
+    mtp=$(gum choose --header "speculative decoding" --selected "on   adaptive native MTP" \
+      "on   adaptive native MTP" \
+      "off  base model") || exit 1
+    case "${mtp%%[ ]*}" in
+      on)
+        ensure_qwen38_flash_fp4_mtp
+        args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_FP4_MTP --spec-draft-adaptive --spec-draft-n-min 2 --spec-draft-n-max 4 --n-gpu-layers-draft 99 -ctkd q8_0 -ctvd q8_0"
+        ;;
+      off)
+        args+=" --spec-type none"
+        ;;
+    esac
+
+    args+=" $QWEN38_FLASH_SAMPLING"
+    effort=$(gum choose --header "thinking / reasoning effort" \
+      "xhigh   deep reasoning (Pi cptr max; default)" \
+      "medium  balanced reasoning" \
+      "low     fast / concise reasoning" \
+      "off     instruct mode (no thinking)") || exit 1
+    case "${effort%%[ ]*}" in
+      xhigh)
+        pi_thinking_level="max"
+        args+=" --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja"
+        ;;
+      medium)
+        pi_thinking_level="medium"
+        args+=" --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-medium.jinja"
+        ;;
+      low)
+        pi_thinking_level="low"
+        args+=" --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-low.jinja"
+        ;;
+      off)
+        pi_thinking_level="off"
+        args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
+        ;;
+    esac
+
+    kv=$(gum choose --header "KV cache quantization" --selected "q8" \
+      "q8   Q8_0 (recommended; saves RAM)" \
+      "f16  F16 (more RAM)") || exit 1
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;
@@ -83,7 +165,7 @@ case "$id" in
       "off  base model") || exit 1
     case "${mtp%%[ ]*}" in
       on)
-        args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_MTP --spec-draft-n-max 3"
+        args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_MTP --spec-draft-n-max 3 --spec-draft-p-min 0.75"
         ;;
       off)
         args+=" --spec-type none"
@@ -111,6 +193,33 @@ case "$id" in
       off)
         pi_thinking_level="off"
         args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
+        ;;
+    esac
+
+    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
+      "f16  default (unquantized f16)" \
+      "q8   Q8 kv cache (saves RAM)") || exit 1
+    case "${kv%%[ ]*}" in
+      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
+      f16) args+=" -ctk f16 -ctv f16" ;;
+    esac
+    ;;
+  Tiel-Coder-35B-A3B-MTP-Q8)
+    # Tiel's trained MTP head is packaged in the MTP main GGUF; no separate
+    # --spec-draft-model path is needed. Keep it on Nathan's Vulkan backend.
+    fixed_parallel=1
+    pi_thinking_level="max"
+    args+=" --force-vulkan --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on"
+
+    mtp=$(gum choose --header "speculative decoding" --selected "on   native MTP" \
+      "on   native MTP" \
+      "off  base model") || exit 1
+    case "${mtp%%[ ]*}" in
+      on)
+        args+=" --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75"
+        ;;
+      off)
+        args+=" --spec-type none"
         ;;
     esac
 

@@ -1,228 +1,2110 @@
 #!/usr/bin/env python3
 """
-LLM benchmark using llama-server's native /completion endpoint.
-Uses server-side timings for accuracy; captures MTP acceptance rate.
+llm-bench — reproducible Lemonade/llama.cpp speed benchmark.
 
-Metrics reported:
-  TTFT      — time to first token (= prompt processing time, server-measured)
-  out t/s   — output tokens/s including MTP speculative decoding
-  pp t/s    — prompt processing tokens/s
-  mtp acc%  — MTP draft token acceptance rate
+The benchmark is deliberately a client of the running Lemonade server rather
+than a second, hand-maintained llama-server launcher.  It discovers registered
+models and their saved recipe arguments from Lemonade, applies only the
+requested benchmark overrides, and measures the server's own timings.
+
+Protocol
+--------
+* target prompt prefill: approximately 2048 new tokens (PP2048)
+* target generation: exactly 182 tokens (TG182; EOS is ignored)
+* context depths: d0, d30000, d60000 by default
+* workloads: prose synthesis and Stata code
+* reasoning: always disabled
+* cache control: every cell gets a unique nonce at the beginning of its
+  context; the context-fill request and its target request share a cache only
+  within that one cell.  This makes deep-context decoding measurable without
+  reusing another run's prefix.  The target response reports cache_n, so a
+  cache miss is visible instead of silently producing a misleading row.
+
+No third-party Python packages are required.  The only runtime dependency is a
+reachable Lemonade server at http://127.0.0.1:13305/api/v1.
 """
 
+from __future__ import annotations
+
 import argparse
+import datetime as dt
+import fcntl
+import hashlib
 import json
+import math
+import os
+import re
+import shlex
+import socket
 import statistics
+import subprocess
 import sys
+import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
-from datetime import datetime
+import uuid
 from pathlib import Path
-
-BENCH_DIR = Path.home() / ".local/share/ramalama/benchmarks"
-
-# Padding text used to construct prompts of target token length (~4 chars/token).
-_PAD = (
-    "The quick brown fox jumps over the lazy dog. "
-    "Pack my box with five dozen liquor jugs. "
-    "How vexingly quick daft zebras jump. "
-) * 200
+from typing import Any, Callable
 
 
-def _pad_prompt(target_tokens: int) -> str:
-    return _PAD[: target_tokens * 4] + "\n\nBriefly say hello."
+SCRIPT_NAME = "llm-bench"
+SCRIPT_VERSION = "2.2"
+DEFAULT_BASE_URL = "http://127.0.0.1:13305/api/v1"
+DEFAULT_OUTDIR = Path.home() / ".local/share/ramalama/benchmarks"
+LOCK_PATH = DEFAULT_OUTDIR / "llm-bench.lock"
+PP_TARGET = 2048
+TG_TARGET = 182
+DEFAULT_DEPTHS = [0, 30000, 60000]
+DEFAULT_RUNS = 2
+PROMPT_VERSION = "builtin-2"
 
 
-def _request(base_url: str, prompt: str, n_predict: int) -> dict:
-    """Non-streaming /completion request. Returns server timings dict."""
-    payload = json.dumps({
-        "prompt": prompt,
-        "n_predict": n_predict,
-        "stream": False,
-        "temperature": 0.0,
-        "cache_prompt": False,
-    }).encode()
+TASK_LABELS = {
+    "prose": "prose synthesis",
+    "stata": "Stata code",
+}
+TASK_ORDER = ("prose", "stata")
 
-    req = urllib.request.Request(
-        f"{base_url}/completion",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+# These are intentionally in the executable.  A benchmark should not require a
+# prompt file, a repository checkout, or a working directory to be meaningful.
+# They are workload-shaped context, not a quality test: only server timings are
+# reported.
+TASK_INSTRUCTIONS = {
+    "prose": (
+        "Read the source passage below and write exactly two concise, polished "
+        "paragraphs for an applied economist. Synthesize its central mechanism, "
+        "evidence, limitations, and policy implications. Use only the passage. "
+        "Do not use hidden reasoning or a preamble."
+    ),
+    "stata": (
+        "Write complete Stata 19 code for the specification below. Return only a "
+        "single do-file in a fenced code block; make it executable, explicit about "
+        "variable construction, and robust to missing values. Do not use hidden "
+        "reasoning or explanatory prose outside the code."
+    ),
+}
 
-    t_wall_start = time.perf_counter()
+TASK_SEEDS = {
+    "prose": """
+The following passage concerns applied empirical economics. Urban economic activity
+is shaped by access to jobs, housing costs, transportation networks, environmental
+amenities, and local public finance. A change in a transport network can alter the
+spatial distribution of employment and households, but the observed correlation
+between access and outcomes is not automatically causal. Researchers therefore make
+the estimand explicit, define the treatment and comparison populations, and state
+which potential outcomes are being compared. A credible design explains why the
+counterfactual trend is plausible, how treatment timing is determined, and whether
+anticipation, displacement, and changes in composition threaten interpretation.
+
+Difference-in-differences compares changes in treated and comparison units, often
+using unit and period fixed effects. Its central identifying restriction is a form
+of parallel trends, which must be assessed using pre-treatment outcomes and
+institutional knowledge rather than a mechanical significance test alone. Event
+studies can display dynamic effects, but leads and lags may be contaminated by
+staggered adoption, treatment effect heterogeneity, and noisy estimates. Modern
+implementations distinguish the treatment cohort from the calendar period and
+aggregate cohort-specific effects transparently. Standard errors should reflect
+the level at which treatment varies and the dependence induced by repeated
+observations.
+
+Environmental policy creates related measurement problems. Pollution monitors are
+not randomly located, exposure may be spatially correlated, and weather affects
+both emissions and measured concentrations. Satellite measures can broaden spatial
+coverage but introduce retrieval error and missingness. A useful analysis reports
+the measurement process, checks sensitivity to alternative samples and bandwidths,
+and separates short-run behavioral responses from long-run investment responses.
+Distributional effects matter because exposure and adaptation capacity can differ
+by income, age, race, tenure, and neighborhood. A policy that improves an average
+outcome may still impose costs on a subgroup or shift pollution to an unmeasured
+location.
+
+The strongest empirical writing connects institutional detail to the statistical
+model. It distinguishes descriptive patterns from causal claims, reports the units
+and scale of the estimates, and explains which assumptions are testable and which
+are maintained. Robustness checks are informative when they probe a concrete threat
+rather than merely producing a longer list of specifications. External validity
+requires identifying the population, time period, and policy margin to which the
+result is intended to apply. These principles are useful when reading a paper,
+report, or long technical memo and deciding whether its mechanism and evidence
+support the conclusion.
+""".strip(),
+    "stata": """
+Write a Stata 19 do-file for a panel-data difference-in-differences analysis of a
+local transit expansion. The input data contain county_id, year, treated, first_treat,
+employment, population, pm25, median_rent, and distance_to_station. Some counties
+are never treated, first_treat is missing for them, and the panel can be unbalanced.
+The code must set a reproducible project root through a global or local macro,
+create a log, validate identifiers and years, and preserve the raw data by using
+a tempfile or a preserved frame for intermediate work.
+
+Construct log employment and log population carefully, retaining missing values
+rather than converting them to zero. Create treatment timing and event-time
+variables, cap a displayed event window at -5 and 8, and make the omitted period
+-1 explicit. Estimate a two-way-fixed-effects event study with county and year
+fixed effects and standard errors clustered by county. Also estimate a compact
+post-treatment specification for employment and PM2.5. Use modern Stata syntax
+where appropriate, label variables, and export a readable results table. Include
+checks for duplicate county-year observations, treatment timing inconsistencies,
+small or nonpositive outcomes before logging, and a summary of the estimation
+sample. The do-file should run even when optional user-written commands are not
+installed; if a community-contributed export command is unavailable, leave a
+clearly marked fallback using built-in Stata commands.
+""".strip(),
+}
+
+FILLER_SEEDS = {
+    "prose": (
+        "A research memo records an institutional fact, a measurement choice, and "
+        "a possible threat to inference. The reader should track the population, "
+        "time horizon, comparison group, and mechanism while separating evidence "
+        "from interpretation. Spatial exposure, treatment timing, selection, "
+        "spillovers, and serial correlation can all change the meaning of an "
+        "estimate. A transparent memo reports these choices and the sensitivity "
+        "of the conclusion to plausible alternatives."
+    ),
+    "stata": (
+        "A reproducible Stata project separates raw data from derived data, validates "
+        "keys before merging, records the sample used by each model, and makes all "
+        "transformations visible. Panel estimators require explicit unit and time "
+        "variables, a clear treatment date, and standard errors that reflect the "
+        "assignment process. Missing, zero, and negative values must be handled "
+        "deliberately rather than silently recoded."
+    ),
+}
+
+BENCH_SYSTEM = (
+    "You are a local throughput benchmark target. Follow the task request directly. "
+    "Do not emit chain-of-thought or hidden reasoning; provide only the requested "
+    "answer content. The benchmark records server timings, not answer quality."
+)
+
+
+class BenchmarkError(RuntimeError):
+    """A recoverable benchmark/setup error with a user-facing message."""
+
+
+class ApiError(BenchmarkError):
+    pass
+
+
+def eprint(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
+
+
+def log(message: str) -> None:
+    print(message, flush=True)
+
+
+def normalize_url(url: str) -> str:
+    """Normalize the API URL and avoid the IPv6 localhost trap in this setup."""
+    url = url.strip().rstrip("/")
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.hostname == "localhost":
+        host = "127.0.0.1"
+        netloc = host
+        if parsed.port:
+            netloc += f":{parsed.port}"
+        url = urllib.parse.urlunsplit(
+            (parsed.scheme or "http", netloc, parsed.path, parsed.query, parsed.fragment)
+        ).rstrip("/")
+    return url or DEFAULT_BASE_URL
+
+
+def safe_float(value: Any) -> float | None:
     try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            body = json.loads(resp.read())
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Request failed: {e}") from e
-    t_wall = (time.perf_counter() - t_wall_start) * 1000  # ms
+        if value is None or value == "":
+            return None
+        value = float(value)
+        return value if math.isfinite(value) else None
+    except (TypeError, ValueError):
+        return None
 
-    timings = body.get("timings", {})
+
+def safe_int(value: Any) -> int | None:
+    try:
+        if value is None or value == "":
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def json_request(
+    url: str,
+    payload: dict[str, Any] | None = None,
+    timeout: float | None = 30,
+) -> dict[str, Any]:
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {"Content-Type": "application/json"} if payload is not None else {}
+    method = "POST" if payload is not None else "GET"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        if timeout is None:
+            response_ctx = urllib.request.urlopen(request)
+        else:
+            response_ctx = urllib.request.urlopen(request, timeout=timeout)
+        with response_ctx as response:
+            raw = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        detail = raw[:1000]
+        try:
+            detail = json.loads(raw).get("message") or json.loads(raw).get("error") or detail
+        except Exception:
+            pass
+        raise ApiError(f"HTTP {exc.code} from {url}: {detail}") from exc
+    except (urllib.error.URLError, TimeoutError, socket.timeout, OSError) as exc:
+        raise ApiError(f"request failed for {url}: {exc}") from exc
+    if not raw.strip():
+        return {}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ApiError(f"non-JSON response from {url}: {raw[:500]}") from exc
+    if not isinstance(value, dict):
+        raise ApiError(f"unexpected JSON response from {url}")
+    return value
+
+
+def parse_depth(value: str) -> int:
+    raw = value.strip().lower().replace(" ", "")
+    if raw.startswith("d"):
+        raw = raw[1:]
+    multiplier = 1
+    if raw.endswith("k"):
+        raw = raw[:-1]
+        multiplier = 1000
+    elif raw.endswith("m"):
+        raw = raw[:-1]
+        multiplier = 1_000_000
+    try:
+        depth = int(float(raw) * multiplier)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid context depth: {value!r}") from exc
+    if depth < 0:
+        raise argparse.ArgumentTypeError("context depth cannot be negative")
+    return depth
+
+
+def parse_depths(value: str) -> list[int]:
+    parts = [p for p in value.split(",") if p.strip()]
+    if not parts:
+        raise argparse.ArgumentTypeError("at least one context depth is required")
+    values = list(dict.fromkeys(parse_depth(p) for p in parts))
+    return values
+
+
+def parse_tasks(value: str) -> list[str]:
+    aliases = {
+        "prose": ["prose"],
+        # Keep old command lines working while treating reading/writing as one
+        # combined prose workload.
+        "reading": ["prose"],
+        "writing": ["prose"],
+        "code": ["stata"],
+        "stata": ["stata"],
+        "all": list(TASK_ORDER),
+    }
+    selected: list[str] = []
+    for part in value.split(","):
+        key = part.strip().lower()
+        if not key:
+            continue
+        if key in aliases:
+            candidates = aliases[key]
+        elif key in TASK_ORDER:
+            candidates = [key]
+        else:
+            raise argparse.ArgumentTypeError(
+                f"unknown task {part!r}; use prose, stata, code, or all"
+            )
+        for task in candidates:
+            if task not in selected:
+                selected.append(task)
+    if not selected:
+        raise argparse.ArgumentTypeError("at least one task is required")
+    return [task for task in TASK_ORDER if task in selected]
+
+
+def parse_csv_models(value: str) -> list[str]:
+    values = [x.strip() for x in value.split(",") if x.strip()]
+    if not values:
+        raise argparse.ArgumentTypeError("at least one model is required")
+    return list(dict.fromkeys(values))
+
+
+def parse_extra_args(value: str) -> list[str]:
+    try:
+        return shlex.split(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid --extra-args: {exc}") from exc
+
+
+def option_value(tokens: list[str], names: set[str]) -> str | None:
+    value: str | None = None
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if token in names:
+            if i + 1 < len(tokens):
+                value = tokens[i + 1]
+                i += 2
+                continue
+        for name in names:
+            if token.startswith(name + "="):
+                value = token.split("=", 1)[1]
+                break
+        i += 1
+    return value
+
+
+def remove_options(
+    tokens: list[str],
+    value_names: set[str],
+    flag_names: set[str] | None = None,
+) -> list[str]:
+    """Remove both --option value/--option=value and bare boolean options."""
+    flag_names = flag_names or set()
+    output: list[str] = []
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if token in value_names:
+            i += 2 if i + 1 < len(tokens) else 1
+            continue
+        if any(token.startswith(name + "=") for name in value_names):
+            i += 1
+            continue
+        if token in flag_names:
+            i += 1
+            continue
+        output.append(token)
+        i += 1
+    return output
+
+
+def set_option(tokens: list[str], name: str, value: str) -> list[str]:
+    result = remove_options(tokens, {name})
+    result.extend([name, value])
+    return result
+
+
+def has_flag(tokens: list[str], name: str) -> bool:
+    return name in tokens or any(token.startswith(name + "=") for token in tokens)
+
+
+def model_is_qwen38(model_id: str, original_args: str) -> bool:
+    low = f"{model_id} {original_args}".lower()
+    return "qwen3.8" in low or "qwen3-8" in low or model_id.lower() == "ud-q4_k_xl"
+
+
+def model_is_draft_only(model: dict[str, Any]) -> bool:
+    """Exclude registered speculative sidecars from chat-model candidates."""
+    model_id = str(model.get("id") or "").lower()
+    checkpoint = str(model.get("checkpoint") or "").lower()
+    recipe_options = model.get("recipe_options")
+    args = recipe_options.get("llamacpp_args") if isinstance(recipe_options, dict) else None
+    draft_marker = re.search(
+        r"(?:^|[-_/])(mtp|dflash|dspark)(?:[-_./]|$)",
+        f"{model_id} {checkpoint}",
+    )
+    return bool(draft_marker and not args)
+
+
+SPEC_VALUE_NAMES = {
+    "--spec-type",
+    "--spec-draft-model",
+    "-md",
+    "--spec-draft-n-max",
+    "--spec-draft-n-min",
+    "--spec-draft-p-min",
+    "--spec-draft-p-split",
+    "--draft-p-min",
+    "--draft-p-split",
+}
+SPEC_FLAG_NAMES = {
+    "--spec-draft-adaptive",
+    "--speculative",
+}
+
+
+def spec_method(tokens: list[str]) -> str:
+    value = option_value(tokens, {"--spec-type"})
+    if not value or value.lower() in {"none", "off"}:
+        return "off"
+    low = value.lower()
+    if "dspark" in low:
+        return "dspark"
+    if "dflash" in low:
+        return "dflash"
+    if "mtp" in low and "ngram-mod" in low:
+        return "mtp-ngram"
+    if "mtp" in low:
+        return "mtp"
+    return value
+
+
+def apply_spec_overrides(
+    tokens: list[str],
+    requested: str,
+    draft_model: str | None,
+    n_max: int | None,
+    n_min: int | None,
+    p_min: float | None,
+    p_split: float | None,
+    adaptive: bool,
+) -> list[str]:
+    requested = requested.lower()
+    current = spec_method(tokens)
+    if requested == "canonical":
+        result = list(tokens)
+    elif requested == "off":
+        result = remove_options(tokens, SPEC_VALUE_NAMES, SPEC_FLAG_NAMES)
+        result.extend(["--spec-type", "none"])
+    elif requested in {"mtp", "mtp-ngram", "dflash", "dspark"}:
+        result = list(tokens)
+        if current != requested:
+            result = remove_options(result, SPEC_VALUE_NAMES, SPEC_FLAG_NAMES)
+            spec_type = "draft-mtp,ngram-mod" if requested == "mtp-ngram" else f"draft-{requested}"
+            result.extend(["--spec-type", spec_type])
+            if draft_model:
+                result.extend(["--spec-draft-model", draft_model])
+            elif requested not in {"mtp", "mtp-ngram"}:
+                raise BenchmarkError(
+                    f"cannot change this model from canonical {current} to {requested} "
+                    "without --spec-draft-model <path>"
+                )
+    else:
+        raise BenchmarkError(
+            f"unknown speculative mode {requested!r}; use canonical, off, mtp, mtp-ngram, dflash, or dspark"
+        )
+
+    if draft_model and requested != "off" and (requested == "canonical" or current == requested):
+        result = set_option(result, "--spec-draft-model", draft_model)
+    if requested != "off" and (n_max is not None or n_min is not None or p_min is not None or p_split is not None or adaptive):
+        if spec_method(result) == "off":
+            raise BenchmarkError("speculative settings were supplied while speculation is off")
+        if n_max is not None:
+            result = set_option(result, "--spec-draft-n-max", str(n_max))
+        if n_min is not None:
+            result = set_option(result, "--spec-draft-n-min", str(n_min))
+        if p_min is not None:
+            result = set_option(result, "--spec-draft-p-min", str(p_min))
+        if p_split is not None:
+            result = set_option(result, "--spec-draft-p-split", str(p_split))
+        if adaptive and not has_flag(result, "--spec-draft-adaptive"):
+            result.append("--spec-draft-adaptive")
+    return result
+
+
+def apply_kv_overrides(
+    tokens: list[str],
+    main_cache: str,
+    draft_cache: str,
+) -> list[str]:
+    """Temporarily set main and speculative-draft KV cache precision."""
+    result = list(tokens)
+    values = {"f16": "f16", "q8": "q8_0"}
+    if main_cache != "canonical":
+        value = values[main_cache]
+        result = remove_options(result, {"-ctk", "--cache-type-k", "-ctv", "--cache-type-v"})
+        result.extend(["-ctk", value, "-ctv", value])
+    if draft_cache != "canonical":
+        value = values[draft_cache]
+        result = remove_options(result, {"-ctkd", "--cache-type-k-draft", "-ctvd", "--cache-type-v-draft"})
+        result.extend(["-ctkd", value, "-ctvd", value])
+    return result
+
+
+def kv_cache_summary(tokens: list[str]) -> str:
+    main_k = option_value(tokens, {"-ctk", "--cache-type-k"}) or "default"
+    main_v = option_value(tokens, {"-ctv", "--cache-type-v"}) or "default"
+    draft_k = option_value(tokens, {"-ctkd", "--cache-type-k-draft"}) or "default"
+    draft_v = option_value(tokens, {"-ctvd", "--cache-type-v-draft"}) or "default"
+    return f"main K/V={main_k}/{main_v}; draft K/V={draft_k}/{draft_v}"
+
+
+def force_reasoning_off(tokens: list[str], model_id: str, original_args: str) -> list[str]:
+    """Force inference mode off while leaving all non-reasoning recipe flags intact."""
+    result = set_option(list(tokens), "--reasoning", "off")
+    if model_is_qwen38(model_id, original_args):
+        template = option_value(result, {"--chat-template-file"})
+        if template and template.endswith(".jinja"):
+            template = re.sub(r"-(?:medium|low|off)\.jinja$", "-off.jinja", template)
+            if not template.endswith("-off.jinja"):
+                template = template[:-6] + "-off.jinja"
+            result = set_option(result, "--chat-template-file", template)
+        elif not template:
+            # This is the template path used by the user's Qwen3.8 launcher for
+            # the instruct/no-thinking mode.  It is harmless for the Flash-Next
+            # registry entry and makes the mode explicit rather than relying on a
+            # model-specific server default.
+            result = set_option(
+                result,
+                "--chat-template-file",
+                "/root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja",
+            )
+    return result
+
+
+def summarize_spec(tokens: list[str]) -> str:
+    method = spec_method(tokens)
+    if method == "off":
+        return "off"
+    n_max = option_value(tokens, {"--spec-draft-n-max"})
+    n_min = option_value(tokens, {"--spec-draft-n-min"})
+    draft = option_value(tokens, {"--spec-draft-model", "-md"})
+    details = [method]
+    if n_max:
+        details.append(f"n-max={n_max}")
+    if n_min:
+        details.append(f"n-min={n_min}")
+    if has_flag(tokens, "--spec-draft-adaptive"):
+        details.append("adaptive")
+    if draft:
+        details.append(Path(draft).name)
+    return " ".join(details)
+
+
+def infer_engine(tokens: list[str], backend: str) -> str:
+    """Name the actual dispatch path, not just Lemonade's generic recipe."""
+    if has_flag(tokens, "--force-ciru"):
+        return "CIRU ROCm/HIP"
+    if has_flag(tokens, "--force-rocm"):
+        return "Gaetan ROCm/HIP"
+    if has_flag(tokens, "--force-laurent"):
+        return "Laurent Vulkan"
+    if has_flag(tokens, "--force-vulkan"):
+        return "Nathan Vulkan"
+    if (backend or "").lower() == "vulkan":
+        return "Nathan Vulkan"
+    return backend or "default"
+
+
+def parse_prometheus_labels(raw: str) -> dict[str, str]:
+    labels: dict[str, str] = {}
+    for match in re.finditer(r'([A-Za-z_][A-Za-z0-9_]*)="((?:\\.|[^"\\])*)"', raw):
+        value = match.group(2)
+        try:
+            value = json.loads(f'"{value}"')
+        except Exception:
+            value = value.replace('\\"', '"').replace("\\\\", "\\")
+        labels[match.group(1)] = value
+    return labels
+
+
+def parse_prometheus_number(value: str) -> float | None:
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+class PowerSampler:
+    """Low-rate amdgpu PPT sampler; stores samples only until one request ends."""
+
+    def __init__(self, interval: float = 1.0) -> None:
+        self.interval = interval
+        self.sensor_path, self.sensor_name = self.find_sensor()
+        self.samples: list[tuple[float, float]] = []
+        self.started: float | None = None
+        self.stop_event = threading.Event()
+        self.thread: threading.Thread | None = None
+
+    @staticmethod
+    def find_sensor() -> tuple[Path | None, str]:
+        base = Path("/sys/class/drm")
+        averages = sorted(base.glob("card*/device/hwmon/hwmon*/power1_average"))
+        inputs = sorted(base.glob("card*/device/hwmon/hwmon*/power1_input"))
+        for path in [*averages, *inputs]:
+            try:
+                float(path.read_text(encoding="utf-8").strip())
+            except (OSError, ValueError):
+                continue
+            return path, path.name
+        return None, "unavailable"
+
+    def read_watts(self) -> float | None:
+        if self.sensor_path is None:
+            return None
+        try:
+            value = float(self.sensor_path.read_text(encoding="utf-8").strip()) / 1_000_000.0
+            return value if math.isfinite(value) and value >= 0 else None
+        except (OSError, ValueError):
+            return None
+
+    def record(self) -> None:
+        if self.started is None:
+            return
+        watts = self.read_watts()
+        if watts is not None:
+            self.samples.append((time.monotonic() - self.started, watts))
+
+    def run(self) -> None:
+        while not self.stop_event.wait(self.interval):
+            self.record()
+
+    def start(self) -> None:
+        self.started = time.monotonic()
+        if self.sensor_path is None:
+            return
+        self.record()
+        self.thread = threading.Thread(target=self.run, name="llm-bench-power", daemon=True)
+        self.thread.start()
+
+    def stop(self) -> dict[str, Any]:
+        if self.started is None:
+            return {"available": False, "sensor": self.sensor_name, "samples": []}
+        self.stop_event.set()
+        if self.thread is not None:
+            self.thread.join(timeout=max(1.0, self.interval + 0.5))
+        self.record()
+        return {
+            "available": self.sensor_path is not None and bool(self.samples),
+            "sensor": str(self.sensor_path) if self.sensor_path else self.sensor_name,
+            "sensor_kind": self.sensor_name,
+            "sample_interval_s": self.interval,
+            "samples": list(self.samples),
+        }
+
+
+def power_phase_summary(trace: dict[str, Any] | None, timing: dict[str, Any]) -> dict[str, Any]:
+    """Split request samples using server prompt/decode timing boundaries."""
+    trace = trace or {}
+    samples = trace.get("samples") or []
+    prompt_ms = safe_float(timing.get("prompt_ms"))
+    predicted_ms = safe_float(timing.get("predicted_ms"))
+    wall_ms = safe_float(timing.get("wall_ms"))
+    if prompt_ms is None or predicted_ms is None:
+        usable = [float(w) for _, w in samples]
+        return {
+            "available": bool(usable),
+            "sensor": trace.get("sensor", "unavailable"),
+            "sensor_kind": trace.get("sensor_kind", "unavailable"),
+            "sample_interval_s": trace.get("sample_interval_s"),
+            "sample_count": len(usable),
+            "request_mean_w": statistics.mean(usable) if usable else None,
+            "prefill_mean_w": None,
+            "prefill_samples": 0,
+            "decode_mean_w": None,
+            "decode_samples": 0,
+            "phase_method": "unavailable: response lacked prompt_ms or predicted_ms",
+        }
+
+    prompt_end = prompt_ms / 1000.0
+    request_end = (prompt_ms + predicted_ms) / 1000.0
+    if wall_ms is not None:
+        request_end = min(request_end, max(0.0, wall_ms / 1000.0))
+    prefill = [float(w) for elapsed, w in samples if 0.0 <= elapsed < prompt_end]
+    decode = [float(w) for elapsed, w in samples if prompt_end <= elapsed <= request_end]
+    request = prefill + decode
     return {
-        "wall_ms":       t_wall,
-        "ttft_ms":       timings.get("prompt_ms", 0),
-        "output_tps":    timings.get("predicted_per_second", 0),
-        "prompt_tps":    timings.get("prompt_per_second", 0),
-        "prompt_tokens": timings.get("prompt_n", body.get("tokens_evaluated", 0)),
-        "gen_tokens":    timings.get("predicted_n", body.get("tokens_predicted", 0)),
-        "draft_n":       timings.get("draft_n", 0),
-        "draft_acc":     timings.get("draft_n_accepted", 0),
+        "available": bool(request),
+        "sensor": trace.get("sensor", "unavailable"),
+        "sensor_kind": trace.get("sensor_kind", "unavailable"),
+        "sample_interval_s": trace.get("sample_interval_s"),
+        "sample_count": len(request),
+        "request_mean_w": statistics.mean(request) if request else None,
+        "prefill_mean_w": statistics.mean(prefill) if prefill else None,
+        "prefill_samples": len(prefill),
+        "decode_mean_w": statistics.mean(decode) if decode else None,
+        "decode_samples": len(decode),
+        "phase_method": "server prompt_ms/predicted_ms boundaries",
     }
 
 
-def _server_model(base_url: str) -> str:
-    try:
-        with urllib.request.urlopen(f"{base_url}/v1/models", timeout=5) as r:
-            return json.loads(r.read()).get("data", [{}])[0].get("id", "unknown")
-    except Exception:
-        return "unknown"
+class LemonadeClient:
+    def __init__(
+        self,
+        base_url: str,
+        request_timeout: float = 1800,
+        power_interval: float = 1.0,
+        power_enabled: bool = True,
+    ) -> None:
+        self.base = normalize_url(base_url)
+        self.request_timeout = request_timeout
+        self.power_interval = power_interval
+        self.power_enabled = power_enabled
+        self.last_power_trace: dict[str, Any] | None = None
+        parsed = urllib.parse.urlsplit(self.base)
+        self.origin = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, "", "", "")).rstrip("/")
+        self.metrics_url = self.origin + "/metrics"
 
+    def get(self, path: str, timeout: float | None = 30) -> dict[str, Any]:
+        return json_request(self.base + path, timeout=timeout)
 
-def _p95(vals: list) -> float:
-    if not vals:
-        return 0.0
-    s = sorted(vals)
-    return s[min(int(len(s) * 0.95), len(s) - 1)]
+    def post(self, path: str, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
+        return json_request(self.base + path, payload, self.request_timeout if timeout is None else timeout)
 
+    def health(self) -> dict[str, Any]:
+        return self.get("/health", timeout=10)
 
-def run_bench(base_url: str, prompt_sizes: list, gen_tokens: int, reps: int, verbose: bool) -> list:
-    results = []
-    total = len(prompt_sizes) * reps
-    done = 0
+    def models(self) -> list[dict[str, Any]]:
+        data = self.get("/models", timeout=30)
+        models = data.get("data", [])
+        if not isinstance(models, list):
+            raise BenchmarkError("Lemonade /models returned no model list")
+        return [m for m in models if isinstance(m, dict)]
 
-    for n_prompt in prompt_sizes:
-        prompt = _pad_prompt(n_prompt)
+    def model_options(self, model_id: str, model: dict[str, Any]) -> dict[str, Any]:
+        # The options endpoint gives the resolved recipe view when available.
+        # Fall back to /models for older Lemonade versions.
+        try:
+            encoded = urllib.parse.quote(model_id, safe="")
+            data = self.get(f"/models/{encoded}/options", timeout=30)
+        except BenchmarkError:
+            data = {}
+        effective = data.get("effective") if isinstance(data.get("effective"), dict) else {}
+        recipe_options = model.get("recipe_options") if isinstance(model.get("recipe_options"), dict) else {}
+        args = effective.get("llamacpp_args") or recipe_options.get("llamacpp_args") or ""
+        backend = effective.get("llamacpp_backend") or recipe_options.get("llamacpp_backend") or ""
+        ctx_size = effective.get("ctx_size")
+        resolved_ctx = data.get("resolved_ctx_size")
+        if resolved_ctx is None:
+            resolved_ctx = model.get("max_context_window")
+        return {
+            "model_name": model_id,
+            "recipe": model.get("recipe", ""),
+            "options_source": "effective endpoint" if effective else "model registry fallback",
+            "args": str(args),
+            "backend": str(backend),
+            "ctx_size": ctx_size,
+            "resolved_ctx_size": safe_int(resolved_ctx),
+            "merge_args": effective.get("merge_args", True),
+            "raw_effective": effective,
+            "raw_recipe_options": recipe_options,
+            "checkpoint": model.get("checkpoint"),
+            "max_context_window": model.get("max_context_window"),
+            "size_gib": model.get("size"),
+        }
 
-        rows = []
-        for rep in range(reps):
-            done += 1
-            print(f"  [{done}/{total}] ~{n_prompt}t prompt, rep {rep+1}/{reps} …", end=" ", flush=True)
-
+    def unload(self, model_id: str | None, timeout: float = 120) -> None:
+        payload = {"model_name": model_id} if model_id else {}
+        try:
+            response = self.post("/unload", payload, timeout=60)
+        except BenchmarkError as exc:
+            # Unload is idempotent for the benchmark's purposes.  A stale
+            # model-not-found response is safe to ignore.
+            if "not found" not in str(exc).lower():
+                raise
+            return
+        if response.get("status") == "error" and "not found" not in str(response).lower():
+            raise BenchmarkError(f"Lemonade unload failed: {response}")
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             try:
-                r = _request(base_url, prompt, gen_tokens)
-            except RuntimeError as e:
-                print(f"FAILED: {e}")
-                continue
+                health = self.health()
+                llm = [m for m in health.get("all_models_loaded", []) if m.get("type") == "llm"]
+                if not llm or (model_id and all(m.get("model_name") != model_id for m in llm)):
+                    return
+            except BenchmarkError:
+                pass
+            time.sleep(1)
+        raise BenchmarkError("timed out waiting for Lemonade to unload the chat model")
 
-            rows.append(r)
+    def load(
+        self,
+        model_id: str,
+        args: str,
+        backend: str,
+        merge_args: bool,
+        timeout: float,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model_name": model_id,
+            "llamacpp_args": args,
+            "merge_args": bool(merge_args),
+        }
+        if backend:
+            payload["llamacpp_backend"] = backend
+        log(f"  loading {model_id} (recipe defaults + temporary benchmark overrides) …")
+        started = time.monotonic()
+        response = self.post("/load", payload, timeout=timeout)
+        if response.get("status") == "error":
+            raise BenchmarkError(f"Lemonade load failed for {model_id}: {response}")
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            health = self.health()
+            llm = [m for m in health.get("all_models_loaded", []) if m.get("type") == "llm"]
+            for loaded in llm:
+                if loaded.get("model_name") == model_id and loaded.get("status") == "ready":
+                    log(f"  {model_id} ready in {time.monotonic() - started:.0f}s")
+                    return loaded
+            time.sleep(2)
+        raise BenchmarkError(f"timed out waiting for {model_id} to become ready")
 
-            if r["draft_n"] > 0:
-                acc_pct = 100 * r["draft_acc"] / r["draft_n"]
-                mtp_str = f"  MTP {acc_pct:.0f}% ({r['draft_acc']}/{r['draft_n']})"
-            else:
-                mtp_str = ""
-
-            if verbose:
-                print(
-                    f"TTFT {r['ttft_ms']:.0f}ms  "
-                    f"out {r['output_tps']:.1f}t/s  "
-                    f"pp {r['prompt_tps']:.1f}t/s"
-                    f"{mtp_str}  "
-                    f"({r['prompt_tokens']}p/{r['gen_tokens']}g)"
-                )
-            else:
-                print(f"TTFT {r['ttft_ms']:.0f}ms  out {r['output_tps']:.1f}t/s{mtp_str}")
-
-        if not rows:
-            continue
-
-        def _agg(key):
-            vals = [r[key] for r in rows]
-            return {"min": min(vals), "avg": statistics.mean(vals), "p95": _p95(vals), "max": max(vals)}
-
-        draft_total = sum(r["draft_n"] for r in rows)
-        draft_acc_total = sum(r["draft_acc"] for r in rows)
-
-        results.append({
-            "target_prompt_tokens": n_prompt,
-            "actual_prompt_tokens": round(statistics.mean(r["prompt_tokens"] for r in rows)),
-            "gen_tokens":           gen_tokens,
-            "reps":                 len(rows),
-            "ttft_ms":              _agg("ttft_ms"),
-            "output_tps":           _agg("output_tps"),
-            "prompt_tps":           _agg("prompt_tps"),
-            "wall_ms":              _agg("wall_ms"),
-            "mtp_acceptance_pct":   round(100 * draft_acc_total / draft_total, 1) if draft_total > 0 else None,
-        })
-
-    return results
-
-
-def print_table(results: list) -> None:
-    has_mtp = any(r["mtp_acceptance_pct"] is not None for r in results)
-    hdr = f"{'prompt':>8}  {'TTFT avg':>9} {'p95':>8}  {'out t/s avg':>11} {'max':>8}  {'pp t/s avg':>10}"
-    if has_mtp:
-        hdr += f"  {'MTP acc%':>8}"
-    print()
-    print(hdr)
-    print("─" * (len(hdr) + 2))
-    for r in results:
-        pt = r["actual_prompt_tokens"]
-        t  = r["ttft_ms"]
-        o  = r["output_tps"]
-        p  = r["prompt_tps"]
-        line = (
-            f"{pt:>8}  "
-            f"{t['avg']:>9.0f} {t['p95']:>8.0f}  "
-            f"{o['avg']:>11.1f} {o['max']:>8.1f}  "
-            f"{p['avg']:>10.1f}"
+    def tokenize(self, content: str, timeout: float = 300) -> int:
+        data = self.post(
+            "/tokenize",
+            {"content": content, "add_special": False, "parse_special": True},
+            timeout=timeout,
         )
-        if has_mtp:
-            acc = r["mtp_acceptance_pct"]
-            line += f"  {acc:>7.1f}%" if acc is not None else f"  {'—':>8}"
-        print(line)
+        count = safe_int(data.get("count"))
+        if count is not None:
+            return count
+        tokens = data.get("tokens")
+        if isinstance(tokens, list):
+            return len(tokens)
+        raise BenchmarkError(f"Lemonade /tokenize returned no count: {data}")
+
+    def chat(
+        self,
+        model_id: str,
+        system: str,
+        messages: list[dict[str, str]],
+        max_tokens: int,
+        cache_prompt: bool,
+        timeout: float | None = None,
+        measure_power: bool = False,
+    ) -> tuple[dict[str, Any], float]:
+        body = {
+            "model": model_id,
+            "messages": [{"role": "system", "content": system}, *messages],
+            "max_tokens": max_tokens,
+            "ignore_eos": True,
+            "cache_prompt": cache_prompt,
+            "timings_per_token": True,
+            "stream": False,
+        }
+        sampler = PowerSampler(self.power_interval) if measure_power and self.power_enabled else None
+        if sampler is not None:
+            sampler.start()
+        started = time.perf_counter()
+        try:
+            response = self.post("/chat/completions", body, timeout=timeout or self.request_timeout)
+        finally:
+            wall_ms = (time.perf_counter() - started) * 1000
+            self.last_power_trace = sampler.stop() if sampler is not None else None
+        return response, wall_ms
+
+    def metrics_text(self) -> str:
+        request = urllib.request.Request(self.metrics_url, method="GET")
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+
+    def spec_metrics(self, model_name: str | None = None) -> dict[str, float]:
+        raw = self.metrics_text()
+        if not raw:
+            return {}
+        wanted = {
+            "draft": (
+                "lemonade_llamacpp_spec_decode_num_draft_tokens_total",
+                "llamacpp:spec_decode_num_draft_tokens_total",
+            ),
+            "accepted": (
+                "lemonade_llamacpp_spec_decode_num_accepted_tokens_total",
+                "llamacpp:spec_decode_num_accepted_tokens_total",
+            ),
+            "drafts": (
+                "lemonade_llamacpp_spec_decode_num_drafts_total",
+                "llamacpp:spec_decode_num_drafts_total",
+            ),
+        }
+        values: dict[str, float] = {}
+        for line in raw.splitlines():
+            if not line or line.startswith("#"):
+                continue
+            match = re.match(r"^([^\s{]+)(?:\{([^}]*)\})?\s+([^\s]+)", line)
+            if not match:
+                continue
+            metric_name, labels_raw, number_raw = match.groups()
+            key = next((key for key, names in wanted.items() if metric_name in names), None)
+            if key is None:
+                continue
+            labels = parse_prometheus_labels(labels_raw or "")
+            if model_name and labels.get("model_name") not in {None, model_name}:
+                continue
+            number = parse_prometheus_number(number_raw)
+            if number is not None:
+                values[key] = values.get(key, 0.0) + number
+        return values
+
+    def stats(self) -> dict[str, Any]:
+        try:
+            return self.get("/stats", timeout=10)
+        except BenchmarkError:
+            return {}
 
 
-def main():
-    ap = argparse.ArgumentParser(
-        description="Benchmark llama-server (TTFT, output t/s, pp t/s, MTP acceptance)"
+class PromptSizer:
+    """Approximate chat-template overhead using the active model itself."""
+
+    def __init__(self, client: LemonadeClient, model_id: str, tokenize: Callable[[str], int]) -> None:
+        self.client = client
+        self.model_id = model_id
+        self.tokenize = tokenize
+        calibration_nonce = "calibration-00000000000000000000000000000000"
+        self.system = system_for(calibration_nonce)
+        try:
+            response, _ = client.chat(
+                model_id,
+                self.system,
+                [{"role": "user", "content": "x"}],
+                max_tokens=1,
+                cache_prompt=False,
+                timeout=300,
+            )
+            timings = response.get("timings", {})
+            prompt_n = safe_int(timings.get("prompt_n"))
+            if prompt_n is None:
+                prompt_n = safe_int(response.get("usage", {}).get("prompt_tokens"))
+            system_n = tokenize(self.system)
+            user_n = tokenize("x")
+            if prompt_n is None:
+                raise BenchmarkError("calibration response had no prompt token count")
+            self.chat_overhead = max(0, prompt_n - system_n - user_n)
+        except BenchmarkError:
+            # Current Lemonade reports timings.  This fallback keeps the tool
+            # usable against older wrappers while the actual prompt_n is still
+            # recorded in every result row.
+            self.chat_overhead = 24
+        log(f"  chat-template overhead estimate: {self.chat_overhead} tokens")
+
+    def content_goal(self, total_prompt_tokens: int, system: str) -> int:
+        system_n = self.tokenize(system)
+        return max(1, total_prompt_tokens - system_n - self.chat_overhead)
+
+
+def system_for(nonce: str) -> str:
+    return f"{BENCH_SYSTEM}\nCell nonce: {nonce}"
+
+
+def fit_text_to_tokens(
+    text: str,
+    target: int,
+    tokenize: Callable[[str], int],
+    tolerance: int = 8,
+) -> tuple[str, int]:
+    """Fit a prefix to a tokenizer count without assuming four chars/token."""
+    target = max(1, target)
+    if not text:
+        text = "benchmark"
+    # Grow a source if the supplied material is shorter than the target.
+    if tokenize(text) < target:
+        source = text
+        repeats = max(2, math.ceil(target * 4 / max(1, len(source))))
+        text = (source + "\n\n") * repeats
+    candidate = text
+    measured = tokenize(candidate)
+    for _ in range(6):
+        if abs(measured - target) <= tolerance:
+            return candidate, measured
+        if measured <= 0:
+            break
+        new_len = max(1, min(len(text), round(len(candidate) * target / measured)))
+        if new_len == len(candidate):
+            break
+        candidate = text[:new_len]
+        measured = tokenize(candidate)
+    # A short character binary search gets stable, close counts after the
+    # proportional pass.  Keep the longest prefix at or below the target.
+    low, high = 0, len(candidate)
+    best = ""
+    best_n = 0
+    while low <= high and high - low > 2:
+        mid = (low + high) // 2
+        value = candidate[:mid]
+        count = tokenize(value)
+        if count <= target:
+            best, best_n = value, count
+            low = mid + 1
+        else:
+            high = mid - 1
+    if best:
+        return best, best_n
+    return candidate, measured
+
+
+def repeated_task_text(task: str, prefix: str, target: int, tokenize: Callable[[str], int]) -> tuple[str, int]:
+    seed = TASK_SEEDS[task]
+    text = prefix + "\n\n" + seed
+    while tokenize(text) < target:
+        text += "\n\n" + seed
+    return fit_text_to_tokens(text, target, tokenize)
+
+
+def build_target_prompt(
+    task: str,
+    target_content_tokens: int,
+    tokenize: Callable[[str], int],
+) -> tuple[str, int]:
+    prefix = TASK_INSTRUCTIONS[task] + "\n\n"
+    return repeated_task_text(task, prefix, target_content_tokens, tokenize)
+
+
+def build_filler(
+    task: str,
+    target_content_tokens: int,
+    nonce: str,
+    tokenize: Callable[[str], int],
+) -> tuple[str, int]:
+    marker = (
+        f"This is an isolated benchmark context cell. The nonce is {nonce}. "
+        "It is intentionally unique so no earlier benchmark cell can supply a "
+        "matching prefix from the server cache.\n\n"
     )
-    ap.add_argument("-p", "--prompts", default="128,512,2048",
-                    help="Comma-separated prompt token targets (default: 128,512,2048)")
-    ap.add_argument("-n", "--gen", type=int, default=128,
-                    help="Output tokens to generate per request (default: 128)")
-    ap.add_argument("-r", "--reps", type=int, default=3,
-                    help="Repetitions per prompt size (default: 3)")
-    ap.add_argument("--url", default="http://localhost:8080",
-                    help="Server base URL (default: http://localhost:8080)")
-    ap.add_argument("-v", "--verbose", action="store_true",
-                    help="Show per-request details")
-    ap.add_argument("-o", "--output", metavar="FILE",
-                    help="Save JSON to FILE (default: auto in benchmarks dir)")
-    args = ap.parse_args()
+    seed = FILLER_SEEDS[task]
+    # Start with a generous character estimate and let the active tokenizer fit
+    # the final prefix.  The nonce is first and therefore breaks common-prefix
+    # reuse even when the body repeats.
+    repeats = max(2, math.ceil(target_content_tokens * 4.4 / len(seed)))
+    text = marker + "\n\n".join(f"Context segment {i + 1}: {seed}" for i in range(repeats))
+    return fit_text_to_tokens(text, target_content_tokens, tokenize, tolerance=16)
 
-    base_url = args.url.rstrip("/")
-    prompt_sizes = [int(x.strip()) for x in args.prompts.split(",")]
 
-    model = _server_model(base_url)
-    print(f"Server: {base_url}  model: {model}")
-    print(f"Prompts: {args.prompts} tokens  gen: {args.gen}  reps: {args.reps}")
-    print()
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def response_message(response: dict[str, Any]) -> dict[str, Any]:
+    choices = response.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise BenchmarkError(f"completion returned no choices: {response}")
+    choice = choices[0]
+    message = choice.get("message") if isinstance(choice, dict) else None
+    return message if isinstance(message, dict) else {}
+
+
+def extract_timing(response: dict[str, Any], wall_ms: float) -> dict[str, Any]:
+    timings = response.get("timings") if isinstance(response.get("timings"), dict) else {}
+    usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+    usage_details = usage.get("prompt_tokens_details") if isinstance(usage.get("prompt_tokens_details"), dict) else {}
+    prompt_n = safe_int(timings.get("prompt_n"))
+    cache_n = safe_int(timings.get("cache_n"))
+    predicted_n = safe_int(timings.get("predicted_n"))
+    if prompt_n is None:
+        total_prompt = safe_int(usage.get("prompt_tokens"))
+        cached = safe_int(usage_details.get("cached_tokens"))
+        prompt_n = total_prompt - (cached or 0) if total_prompt is not None else None
+    if cache_n is None:
+        cache_n = safe_int(usage_details.get("cached_tokens"))
+    if predicted_n is None:
+        predicted_n = safe_int(usage.get("completion_tokens"))
+    return {
+        "prompt_n": prompt_n,
+        "cache_n": cache_n,
+        "total_prompt_n": safe_int(usage.get("prompt_tokens")),
+        "predicted_n": predicted_n,
+        "prompt_ms": safe_float(timings.get("prompt_ms")),
+        "predicted_ms": safe_float(timings.get("predicted_ms")),
+        "prompt_tps": safe_float(timings.get("prompt_per_second")),
+        "predicted_tps": safe_float(timings.get("predicted_per_second")),
+        "wall_ms": wall_ms,
+        "finish_reason": (response.get("choices") or [{}])[0].get("finish_reason"),
+        "raw_draft_n": safe_int(timings.get("draft_n")),
+        "raw_draft_accepted": safe_int(timings.get("draft_n_accepted")),
+    }
+
+
+def spec_delta(before: dict[str, float], after: dict[str, float], timing: dict[str, Any]) -> dict[str, Any]:
+    draft = max(0.0, after.get("draft", 0.0) - before.get("draft", 0.0))
+    accepted = max(0.0, after.get("accepted", 0.0) - before.get("accepted", 0.0))
+    drafts = max(0.0, after.get("drafts", 0.0) - before.get("drafts", 0.0))
+    if draft == 0 and timing.get("raw_draft_n"):
+        draft = float(timing["raw_draft_n"])
+        accepted = float(timing.get("raw_draft_accepted") or 0)
+    return {
+        "draft_tokens": int(draft) if draft.is_integer() else draft,
+        "accepted_tokens": int(accepted) if accepted.is_integer() else accepted,
+        "draft_steps": int(drafts) if drafts.is_integer() else drafts,
+        "acceptance_pct": (accepted / draft * 100.0) if draft > 0 else None,
+        "metrics_available": bool(before or after),
+    }
+
+
+def warmup(client: LemonadeClient, model_id: str) -> None:
+    nonce = uuid.uuid4().hex
+    system = system_for(nonce)
+    log("  warmup (discarded) …")
+    client.chat(
+        model_id,
+        system,
+        [{"role": "user", "content": "Warm up the inference path; reply OK."}],
+        max_tokens=8,
+        cache_prompt=False,
+        timeout=300,
+    )
+
+
+def run_cell(
+    client: LemonadeClient,
+    model_id: str,
+    task: str,
+    requested_depth: int,
+    rep: int,
+    sizer: PromptSizer,
+    allow_cache_miss: bool,
+) -> dict[str, Any]:
+    nonce = uuid.uuid4().hex
+    system = system_for(nonce)
+    tokenize = client.tokenize
+    filler_info: dict[str, Any] | None = None
+    prior_messages: list[dict[str, str]] = []
+
+    if requested_depth > 0:
+        filler_goal = sizer.content_goal(requested_depth, system)
+        filler_text, filler_n = build_filler(task, filler_goal, nonce, tokenize)
+        fill_response, fill_wall_ms = client.chat(
+            model_id,
+            system,
+            [{"role": "user", "content": filler_text}],
+            max_tokens=1,
+            cache_prompt=True,
+            timeout=client.request_timeout,
+            measure_power=True,
+        )
+        fill_timing = extract_timing(fill_response, fill_wall_ms)
+        fill_power = power_phase_summary(client.last_power_trace, fill_timing)
+        fill_message = response_message(fill_response)
+        fill_content = str(fill_message.get("content") or "OK")
+        prior_messages = [
+            {"role": "user", "content": filler_text},
+            {"role": "assistant", "content": fill_content},
+        ]
+        filler_total = fill_timing.get("total_prompt_n") or fill_timing.get("prompt_n")
+        filler_info = {
+            "requested_depth": requested_depth,
+            "target_content_tokens": filler_goal,
+            "content_tokens": filler_n,
+            "timing": fill_timing,
+            "power": fill_power,
+            "actual_context_tokens": filler_total,
+            "prompt_hash": sha256_text(filler_text),
+        }
+
+    # At d0, prompt_n includes the system message.  At a deep context the
+    # system/filler prefix is already cached, so prompt_n covers only the new
+    # target user message plus its small role-marker overhead.  Size the two
+    # cases differently; otherwise a nominal PP2048 target becomes ~1970 new
+    # tokens at depth.
+    if requested_depth == 0:
+        target_goal = sizer.content_goal(PP_TARGET, system)
+    else:
+        target_goal = max(1, PP_TARGET - sizer.chat_overhead)
+    target_prompt, target_content_n = build_target_prompt(task, target_goal, tokenize)
+    before_spec = client.spec_metrics(model_id)
+    response, wall_ms = client.chat(
+        model_id,
+        system,
+        [*prior_messages, {"role": "user", "content": target_prompt}],
+        max_tokens=TG_TARGET,
+        cache_prompt=True,
+        timeout=client.request_timeout,
+        measure_power=True,
+    )
+    after_spec = client.spec_metrics(model_id)
+    timing = extract_timing(response, wall_ms)
+    timing["power"] = power_phase_summary(client.last_power_trace, timing)
+    spec = spec_delta(before_spec, after_spec, timing)
+    actual_cache = timing.get("cache_n")
+    actual_prompt = timing.get("prompt_n")
+    cache_ok: bool | None
+    if requested_depth <= 0:
+        cache_ok = actual_cache is None or actual_cache <= 32
+    elif actual_cache is None:
+        cache_ok = None
+    else:
+        expected = filler_info.get("actual_context_tokens") if filler_info else requested_depth
+        cache_ok = actual_cache >= max(1, int((expected or requested_depth) * 0.90))
+    if cache_ok is False and not allow_cache_miss:
+        raise BenchmarkError(
+            f"cache miss at d{requested_depth}: target saw cache_n={actual_cache}, "
+            f"expected roughly {filler_info.get('actual_context_tokens') if filler_info else requested_depth}; "
+            "refusing to report a misleading deep-context row"
+        )
+    record = {
+        "task": task,
+        "task_label": TASK_LABELS[task],
+        "requested_depth": requested_depth,
+        "depth_label": depth_label(requested_depth),
+        "rep": rep,
+        "nonce": nonce,
+        "target_content_tokens": target_content_n,
+        "target_prompt_hash": sha256_text(target_prompt),
+        "timing": timing,
+        "spec": spec,
+        "cache_ok": cache_ok,
+        "filler": filler_info,
+    }
+    pp = timing.get("prompt_tps")
+    tg = timing.get("predicted_tps")
+    pp_text = f"{pp:.1f}" if pp is not None else "—"
+    tg_text = f"{tg:.1f}" if tg is not None else "—"
+    cache_text = str(actual_cache) if actual_cache is not None else "?"
+    log(
+        f"    {task} {depth_label(requested_depth)} rep {rep}: "
+        f"PP {pp_text} t/s ({actual_prompt or '?'} new; cache {cache_text}) · "
+        f"TG {tg_text} t/s ({timing.get('predicted_n') or '?'} tok)"
+    )
+    return record
+
+
+def depth_label(depth: int) -> str:
+    return "d0" if depth == 0 else f"d{depth}"
+
+
+def aggregate(values: list[float | int | None]) -> dict[str, Any]:
+    clean = [float(value) for value in values if value is not None and math.isfinite(float(value))]
+    if not clean:
+        return {"n": 0, "mean": None, "sd": None, "median": None, "min": None, "max": None}
+    return {
+        "n": len(clean),
+        "mean": statistics.mean(clean),
+        "sd": statistics.stdev(clean) if len(clean) > 1 else 0.0,
+        "median": statistics.median(clean),
+        "min": min(clean),
+        "max": max(clean),
+    }
+
+
+def cell_groups(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    for cell in cells:
+        if cell.get("error"):
+            continue
+        key = (cell["task"], int(cell["requested_depth"]))
+        groups.setdefault(key, []).append(cell)
+    output: list[dict[str, Any]] = []
+    for (task, depth), rows in sorted(groups.items(), key=lambda item: (TASK_ORDER.index(item[0][0]), item[0][1])):
+        timings = [row.get("timing", {}) for row in rows]
+        specs = [row.get("spec", {}) for row in rows]
+        draft_total = sum(float(s.get("draft_tokens") or 0) for s in specs)
+        accepted_total = sum(float(s.get("accepted_tokens") or 0) for s in specs)
+        fill_pp = []
+        fill_power = []
+        target_prefill_power = []
+        target_decode_power = []
+        for row in rows:
+            filler = row.get("filler") or {}
+            fill_timing = filler.get("timing") or {}
+            fill_measurement = filler.get("power") or {}
+            if fill_timing.get("prompt_tps") is not None:
+                fill_pp.append(fill_timing["prompt_tps"])
+            if fill_measurement.get("prefill_mean_w") is not None:
+                fill_power.append(fill_measurement["prefill_mean_w"])
+            target_measurement = (row.get("timing") or {}).get("power") or {}
+            if target_measurement.get("prefill_mean_w") is not None:
+                target_prefill_power.append(target_measurement["prefill_mean_w"])
+            if target_measurement.get("decode_mean_w") is not None:
+                target_decode_power.append(target_measurement["decode_mean_w"])
+        output.append(
+            {
+                "task": task,
+                "task_label": TASK_LABELS[task],
+                "requested_depth": depth,
+                "depth_label": depth_label(depth),
+                "runs_ok": len(rows),
+                "prompt_n": aggregate([t.get("prompt_n") for t in timings]),
+                "cache_n": aggregate([t.get("cache_n") for t in timings]),
+                "total_prompt_n": aggregate([t.get("total_prompt_n") for t in timings]),
+                "predicted_n": aggregate([t.get("predicted_n") for t in timings]),
+                "prompt_tps": aggregate([t.get("prompt_tps") for t in timings]),
+                "predicted_tps": aggregate([t.get("predicted_tps") for t in timings]),
+                "fill_prompt_tps": aggregate(fill_pp),
+                "fill_power_w": aggregate(fill_power),
+                "prompt_power_w": aggregate(target_prefill_power),
+                "predicted_power_w": aggregate(target_decode_power),
+                "spec_draft_tokens": draft_total,
+                "spec_accepted_tokens": accepted_total,
+                "spec_acceptance_pct": accepted_total / draft_total * 100 if draft_total else None,
+                "cache_ok": all(row.get("cache_ok") is not False for row in rows),
+            }
+        )
+    return output
+
+
+def fmt_num(value: Any, decimals: int = 1, dash: str = "—") -> str:
+    number = safe_float(value)
+    if number is None:
+        return dash
+    if decimals == 0:
+        return str(int(round(number)))
+    return f"{number:.{decimals}f}"
+
+
+def fmt_stat(stat: dict[str, Any] | None, decimals: int = 1) -> str:
+    if not stat or stat.get("mean") is None:
+        return "—"
+    return f"{fmt_num(stat['mean'], decimals)} ± {fmt_num(stat.get('sd'), decimals)}"
+
+
+def fmt_avg_int(stat: dict[str, Any] | None) -> str:
+    if not stat or stat.get("mean") is None:
+        return "—"
+    return fmt_num(stat["mean"], 0)
+
+
+def command_output(*command: str, timeout: float = 3.0) -> str:
+    try:
+        completed = subprocess.run(
+            list(command),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        return ""
+    if completed.returncode != 0:
+        return ""
+    return "\n".join(part for part in (completed.stdout, completed.stderr) if part).strip()
+
+
+def first_line(path: str) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace").splitlines()[0].strip()
+    except (FileNotFoundError, IndexError, OSError):
+        return ""
+
+
+def report_env(name: str, default: str) -> str:
+    return os.environ.get(name, "").strip() or default
+
+
+def detect_mesa_version() -> str:
+    override = os.environ.get("LLM_BENCH_MESA_VERSION", "").strip()
+    if override:
+        return override
+    glx = command_output("glxinfo", "-B")
+    match = re.search(r"\bMesa\s+([0-9]+(?:\.[0-9]+)+)", glx)
+    if match:
+        return match.group(1)
+    rpm = command_output("rpm", "-q", "mesa-vulkan-drivers")
+    match = re.search(r"mesa-vulkan-drivers-([0-9]+(?:\.[0-9]+)+)", rpm)
+    return match.group(1) if match else "not detected"
+
+
+def collect_report_environment() -> dict[str, str]:
+    cpu = ""
+    lscpu = command_output("lscpu")
+    match = re.search(r"^Model name:\s*(.+)$", lscpu, flags=re.MULTILINE)
+    if match:
+        cpu = match.group(1).strip()
+    product = first_line("/sys/devices/virtual/dmi/id/product_name")
+    device = report_env(
+        "LLM_BENCH_DEVICE",
+        f"{cpu} / {product}".strip(" /") if cpu or product else "not detected",
+    )
+    is_zbook = "zbook ultra g1a" in product.lower()
+
+    memory_default = "128 GB LPDDR5X-8000" if is_zbook else "installed capacity detected; type/speed not recorded"
+    memory = report_env("LLM_BENCH_MEMORY", memory_default)
+    uma_default = "0.5 GB (512 MB)" if is_zbook else "not recorded"
+    uma = report_env("LLM_BENCH_UMA_SPLIT", uma_default)
+
+    tuned = command_output("tuned-adm", "active")
+    tuned_match = re.search(r"Current active profile:\s*(\S+)", tuned)
+    tuned_profile = tuned_match.group(1) if tuned_match else "not detected"
+    platform_profile = first_line("/sys/firmware/acpi/platform_profile") or "not detected"
+    governor = first_line("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor") or "not detected"
+    power = report_env(
+        "LLM_BENCH_POWER",
+        f"sustained TDP: {os.environ.get('LLM_BENCH_TDP', 'not recorded')}; "
+        f"tuned profile: {tuned_profile}; platform profile: {platform_profile}; "
+        f"CPU governor: {governor}",
+    )
+
+    cmdline = " ".join(Path("/proc/cmdline").read_text(encoding="utf-8").split()) if Path("/proc/cmdline").exists() else ""
+    params = [
+        token
+        for token in cmdline.split()
+        if token.startswith(("gttsize=", "ttm.pages_limit=", "amdgpu.gttsize=", "amd_iommu="))
+    ]
+    kernel_release = command_output("uname", "-r") or getattr(os.uname(), "release", "not detected")
+    kernel = f"{kernel_release}, amdgpu params: {', '.join(params) if params else 'none'}"
+    return {
+        "device": device,
+        "memory": memory,
+        "power": power,
+        "uma_split": uma,
+        "kernel": kernel,
+        "mesa_version": detect_mesa_version(),
+        "baseline": report_env("LLM_BENCH_BASELINE_COMMIT", "not recorded (no merge-base supplied)"),
+        "change": report_env("LLM_BENCH_CHANGE_COMMIT", "not applicable (runtime-only benchmark override)"),
+    }
+
+
+def engine_binary_path(engine: str) -> str:
+    low = engine.lower()
+    if "laurent" in low:
+        return "/opt/lemonade/llama/vulkan-laurent/bin/llama-server"
+    if "ciru" in low:
+        return "/opt/lemonade/llama/ciru/bin/llama-server"
+    if "rocm" in low:
+        return "/opt/lemonade/llama/rocm/llama-server"
+    return "/opt/lemonade/llama/vulkan/bin/llama-server-real"
+
+
+def detect_engine_build(engine: str) -> str:
+    path = engine_binary_path(engine)
+    output = command_output("podman", "exec", "lemonade", path, "--version", timeout=8.0)
+    if not output:
+        return "not detected"
+    return " ".join(output.splitlines()[:2])
+
+
+def build_description(engine: str) -> str:
+    override = os.environ.get("LLM_BENCH_BUILD_FLAGS", "").strip()
+    if override:
+        return override
+    low = engine.lower()
+    if "nathan" in low:
+        return "Nathanw1014/llama.cpp branch strix-halo-vulkan; CMake: -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release; targets llama-server llama-cli llama-bench"
+    if "laurent" in low:
+        return "LaurentZuijdwijk/llama.cpp; CMake: -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release; targets llama-server llama-cli llama-bench"
+    if "ciru" in low:
+        return "ciru-ai/Qwen3.8-Flash-CIRU-STRIX-IU4; CMake: -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1151 -DGGML_HIP_ROCWMMA_FATTN=ON -DCMAKE_BUILD_TYPE=Release"
+    if "rocm" in low:
+        return "gaetan-puleo/llama-cpp-strix-halo; CMake: -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1151 -DGGML_HIP_ROCWMMA_FATTN=ON -DCMAKE_BUILD_TYPE=Release"
+    return "not recorded"
+
+
+def infer_quant(model_id: str, checkpoint: str | None) -> str:
+    text = f"{model_id} {checkpoint or ''}"
+    patterns = (
+        "UD-Q2_K_XL", "UD-Q3_K_XL", "UD-Q4_K_XL", "UD-Q5_K_XL", "UD-Q6_K_XL", "UD-Q8_K_XL",
+        "Q2_K_XL", "Q4_K_M", "Q4_K_S", "Q4_0", "Q5_K_M", "Q6_K", "Q8_0", "IQ2_XXS", "IQ3_XXS",
+    )
+    for pattern in patterns:
+        if pattern.lower() in text.lower():
+            return pattern
+    match = re.search(r"(?:^|[-_:])((?:Q|IQ)[A-Za-z0-9_.-]+)", model_id, flags=re.IGNORECASE)
+    return match.group(1) if match else "not recorded"
+
+
+def backend_description(model: dict[str, Any], environment: dict[str, str]) -> str:
+    engine = str(model.get("engine") or model.get("backend") or "unknown")
+    if "rocm" in engine.lower():
+        hip_blocking = os.environ.get("HIP_LAUNCH_BLOCKING", "0")
+        return f"ROCm {os.environ.get('LLM_BENCH_ROCM_VERSION', 'not detected')}, HIP_LAUNCH_BLOCKING={hip_blocking} (engine: {engine})"
+    return f"Vulkan RADV, Mesa {environment.get('mesa_version', 'not detected')} (engine: {engine})"
+
+
+def render_markdown(run: dict[str, Any]) -> str:
+    protocol = run["protocol"]
+    environment = run.get("environment") or {}
+    power_monitoring = protocol.get("power_monitoring") or {}
+    if power_monitoring.get("enabled"):
+        power_text = (
+            f"mean amdgpu PPT samples every {power_monitoring.get('sample_interval_s', 1.0)} s; "
+            f"prefill/decode split by {power_monitoring.get('phase_split', 'server timings')}"
+        )
+    else:
+        power_text = "disabled"
+    lines = [
+        "## Local LLM benchmark",
+        "",
+        f"- Date: `{run['started']}`",
+        f"- Lemonade: `{run.get('lemonade_version') or 'unknown'}` at `{run['base_url']}`",
+        f"- Host: `{run.get('host', 'unknown')}`",
+        f"- Protocol: `PP≈{protocol['pp_target']}` new tokens · `TG={protocol['tg_target']}` tokens · reasoning `off`",
+        f"- Tasks: `{', '.join(protocol['tasks'])}` · context depths: `{', '.join(depth_label(x) for x in protocol['depths'])}` · runs/cell: `{protocol['runs']}`",
+        "- Cache protocol: unique nonce per cell; context is intentionally cached only from that cell's fill request into its target request; cache misses are rejected.",
+        f"- Power measurement: {power_text}; sensor `{power_monitoring.get('sensor', 'unavailable')}`; only phase means are retained.",
+        "",
+        "### Reproducibility metadata",
+        "",
+        f"- Device: `{environment.get('device', 'not recorded')}`",
+        f"- Memory: `{environment.get('memory', 'not recorded')}`",
+        f"- Power: `{environment.get('power', 'not recorded')}`",
+        f"- BIOS: `UMA split {environment.get('uma_split', 'not recorded')}`",
+        f"- Kernel: `{environment.get('kernel', 'not recorded')}`",
+        f"- Baseline: `{environment.get('baseline', 'not recorded')}`",
+        f"- Change: `{environment.get('change', 'not recorded')}`",
+        "",
+        "### Benchmark configurations",
+        "",
+    ]
+    for model in run["models"]:
+        lines.extend(
+            [
+                f"#### `{model['model_id']}`",
+                f"- Backend: `{backend_description(model, environment)}`",
+                f"- Build: `{model.get('build') or 'not recorded'}`",
+                f"- Engine build: `{model.get('engine_build') or 'not detected'}`",
+                f"- Model: `{model.get('model_reference') or model['model_id']}`, quant `{model.get('quant') or 'not recorded'}`",
+                f"- Speculation: `{model.get('spec_summary') or 'unknown'}`",
+                f"- KV cache: `{model.get('kv_summary') or 'unknown'}`",
+                f"- Options source: `{model.get('options_source') or 'unknown'}`",
+                f"- Request args: `{model['benchmark_args']}`",
+                "",
+            ]
+        )
+
+    lines.extend(["### Results", ""])
+    for model in run["models"]:
+        lines.extend(
+            [
+                f"#### `{model['model_id']}`",
+                "",
+                "| Task | Depth | PP n / cache n | Fill PP t/s | Fill W | PP t/s | PP W | TG n | TG t/s | TG W | Spec acc. | Runs |",
+                "| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        summaries = model.get("summaries", [])
+        if not summaries:
+            lines.append(f"| — | — | — | — | — | — | — | — | — | — | — | 0/{protocol['runs']} |")
+        for summary in summaries:
+            pp_n = fmt_avg_int(summary.get("prompt_n"))
+            cache_n = fmt_avg_int(summary.get("cache_n"))
+            tg_n = fmt_avg_int(summary.get("predicted_n"))
+            fill_power = fmt_stat(summary.get("fill_power_w"))
+            prompt_power = fmt_stat(summary.get("prompt_power_w"))
+            decode_power = fmt_stat(summary.get("predicted_power_w"))
+            acc = summary.get("spec_acceptance_pct")
+            acc_text = f"{acc:.1f}%" if acc is not None else "—"
+            cache_marker = "" if summary.get("cache_ok", True) else " ⚠"
+            lines.append(
+                f"| {summary['task_label']} | `{summary['depth_label']}` | `{pp_n} / {cache_n}{cache_marker}` | "
+                f"{fmt_stat(summary.get('fill_prompt_tps'))} | `{fill_power}` | `{fmt_stat(summary.get('prompt_tps'))}` | "
+                f"`{prompt_power}` | `{tg_n}` | `{fmt_stat(summary.get('predicted_tps'))}` | `{decode_power}` | "
+                f"`{acc_text}` | {summary['runs_ok']}/{protocol['runs']} |"
+            )
+        lines.append("")
+
+    lines.extend(["### Per-run detail", ""])
+    for model in run["models"]:
+        lines.extend(
+            [
+                f"#### `{model['model_id']}`",
+                "",
+                "| Task | Depth | Run | PP n | Cache n | Fill PP t/s | Fill W | PP t/s | PP W | TG n | TG t/s | TG W | Spec acc. | Status |",
+                "| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |",
+            ]
+        )
+        for cell in model.get("cells", []):
+            timing = cell.get("timing") or {}
+            filler = cell.get("filler") or {}
+            filler_timing = filler.get("timing") or {}
+            filler_power = filler.get("power") or {}
+            target_power = timing.get("power") or {}
+            spec = cell.get("spec") or {}
+            acc = spec.get("acceptance_pct")
+            acc_text = f"{acc:.1f}%" if acc is not None else "—"
+            status = "FAILED" if cell.get("error") else "ok"
+            lines.append(
+                f"| {cell.get('task_label', cell.get('task', '—'))} | `{cell.get('depth_label', '—')}` | `{cell.get('rep', '—')}` | "
+                f"{timing.get('prompt_n') or '—'} | {timing.get('cache_n') if timing.get('cache_n') is not None else '—'} | "
+                f"{fmt_num(filler_timing.get('prompt_tps'), 1)} | {fmt_num(filler_power.get('prefill_mean_w'), 1)} | "
+                f"{fmt_num(timing.get('prompt_tps'), 1)} | {fmt_num(target_power.get('prefill_mean_w'), 1)} | "
+                f"{timing.get('predicted_n') or '—'} | {fmt_num(timing.get('predicted_tps'), 1)} | "
+                f"{fmt_num(target_power.get('decode_mean_w'), 1)} | {acc_text} | {status} |"
+            )
+        lines.append("")
+
+    errors = [cell for model in run["models"] for cell in model.get("cells", []) if cell.get("error")]
+    if errors:
+        lines.extend(["### Errors", ""])
+        for cell in errors:
+            lines.append(
+                f"- `{cell.get('model_id', 'unknown')}` {cell.get('task')} {cell.get('depth_label')}: {cell['error']}"
+            )
+        lines.append("")
+    lines.append(
+        "Notes: `PP t/s` is the target request's incremental prompt throughput; `Fill PP t/s` is the separate context-construction request and is not substituted for target PP. `Fill W` is the mean amdgpu PPT during long-context construction; `PP W` and `TG W` are separate target-request prefill and decode means, split using Lemonade's server timings. Spec acceptance is weighted across successful runs when Lemonade metrics are available. Invariant hardware, build, model, backend, and runtime details appear once above each model's results."
+    )
+    return "\n".join(lines) + "\n"
+
+
+def current_llm(health: dict[str, Any]) -> list[dict[str, Any]]:
+    return [m for m in health.get("all_models_loaded", []) if m.get("type") == "llm"]
+
+
+def choose_models_interactive(models: list[dict[str, Any]]) -> list[str]:
+    print("\nRegistered Lemonade chat models:")
+    for index, model in enumerate(models, 1):
+        options = model.get("recipe_options") if isinstance(model.get("recipe_options"), dict) else {}
+        backend = options.get("llamacpp_backend") or "default"
+        try:
+            engine = infer_engine(shlex.split(str(options.get("llamacpp_args") or "")), backend)
+        except ValueError:
+            engine = backend
+        size = model.get("size")
+        size_text = f", {size:.1f} GiB" if isinstance(size, (int, float)) else ""
+        print(f"  {index:2d}. {model.get('id')}  [{engine}{size_text}]")
+    answer = input("Choose model numbers/IDs (blank = all listed): ").strip()
+    if not answer:
+        return [str(model.get("id")) for model in models if model.get("id")]
+    selected: list[str] = []
+    by_id = {str(model.get("id")): str(model.get("id")) for model in models}
+    for part in answer.split(","):
+        part = part.strip()
+        if part.isdigit() and 1 <= int(part) <= len(models):
+            model_id = str(models[int(part) - 1].get("id"))
+        else:
+            model_id = by_id.get(part, part)
+        if model_id not in selected:
+            selected.append(model_id)
+    return selected
+
+
+def interactive_value(prompt: str, default: str) -> str:
+    answer = input(f"{prompt} [{default}]: ").strip()
+    return answer or default
+
+
+def print_model_list(models: list[dict[str, Any]]) -> None:
+    for model in models:
+        options = model.get("recipe_options") if isinstance(model.get("recipe_options"), dict) else {}
+        args = options.get("llamacpp_args") or ""
+        backend = options.get("llamacpp_backend") or "default"
+        try:
+            engine = infer_engine(shlex.split(str(args)), backend)
+        except ValueError:
+            engine = backend
+        size = model.get("size")
+        size_text = f"  size={size:.1f}GiB" if isinstance(size, (int, float)) else ""
+        print(f"{model.get('id')}\tengine={engine}{size_text}\targs={'yes' if args else 'no'}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=SCRIPT_NAME,
+        description="Run a no-setup PP2048/TG182 benchmark against registered Lemonade models.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  llm-bench --models Qwen3.8-27B-Q4,Qwen3.8-27B-ROCmFP4 --suite prose --depths 0,30k,60k --runs 3
+  llm-bench --models Qwen3.6-MoE-35B-Q8 --suite code --spec off --depths d0,d60000
+  llm-bench --models Qwen3.8-27B-Q4 --spec canonical --spec-n-max 6 --runs 2
+  llm-bench --list-models
+
+The default model arguments come from Lemonade's registry.  --spec off and the
+spec-* flags are temporary request overrides; no recipe option is saved.  Use
+--spec mtp-ngram to chain native MTP with ngram-mod speculative decoding.
+""",
+    )
+    parser.add_argument("--models", type=parse_csv_models, help="comma-separated Lemonade model IDs")
+    parser.add_argument("--model", action="append", dest="model_list", help="one Lemonade model ID (repeatable)")
+    parser.add_argument("--list-models", action="store_true", help="list registered Lemonade models and exit")
+    parser.add_argument("--suite", choices=("both", "prose", "code"), help="test prose, code, or both (default: both)")
+    parser.add_argument("--tasks", type=parse_tasks, help="explicit tasks: prose,stata (legacy reading/writing aliases; overrides --suite)")
+    parser.add_argument("--depths", type=parse_depths, help="comma-separated depths such as 0,30k,60000")
+    parser.add_argument("--runs", type=int, help=f"attempted repetitions per task/depth cell (default: {DEFAULT_RUNS})")
+    parser.add_argument("--spec", default=None, help="canonical, off, mtp, mtp-ngram, dflash, or dspark (default: canonical)")
+    parser.add_argument("--spec-draft-model", help="temporary draft GGUF path when changing spec method")
+    parser.add_argument("--spec-n-max", type=int, help="temporary --spec-draft-n-max override")
+    parser.add_argument("--spec-n-min", type=int, help="temporary --spec-draft-n-min override")
+    parser.add_argument("--spec-p-min", type=float, help="temporary --spec-draft-p-min override")
+    parser.add_argument("--spec-p-split", type=float, help="temporary --spec-draft-p-split override")
+    parser.add_argument("--spec-adaptive", action="store_true", help="add --spec-draft-adaptive")
+    parser.add_argument(
+        "--kv-cache", "--kv", dest="kv_cache", choices=("canonical", "f16", "q8"), default="canonical",
+        help="temporary main KV cache precision: canonical, f16, or q8 (K and V)",
+    )
+    parser.add_argument(
+        "--draft-kv-cache", "--draft-kv", dest="draft_kv_cache", choices=("canonical", "f16", "q8"), default="canonical",
+        help="temporary speculative-draft KV precision: canonical, f16, or q8 (K and V)",
+    )
+    parser.add_argument("--backend", help="temporary backend override; omit to use Lemonade's canonical backend")
+    parser.add_argument("--extra-args", type=parse_extra_args, default=[], help="extra temporary llama-server args (shell-quoted string)")
+    parser.add_argument("--base-url", default=os.environ.get("LEM_API") or DEFAULT_BASE_URL, help="Lemonade API base URL")
+    parser.add_argument("--outdir", default=str(DEFAULT_OUTDIR), help=f"result directory (default: {DEFAULT_OUTDIR})")
+    parser.add_argument("--no-save", action="store_true", help="do not save JSON/Markdown result files")
+    parser.add_argument("--keep-loaded", action="store_true", help="leave the last benchmark model loaded")
+    parser.add_argument("--allow-cache-miss", action="store_true", help="report deep rows even if the target cache is short (not recommended)")
+    parser.add_argument("--no-warmup", action="store_true", help="skip the discarded warmup request")
+    parser.add_argument("--cooldown", type=float, default=0.0, help="seconds between cells (default: 0)")
+    parser.add_argument("--power-interval", type=float, default=1.0, help="seconds between amdgpu power samples (default: 1)")
+    parser.add_argument("--no-power", action="store_true", help="disable amdgpu power sampling")
+    parser.add_argument("--request-timeout", type=float, default=1800, help="completion timeout in seconds")
+    parser.add_argument("--load-timeout", type=float, default=3600, help="model load timeout in seconds")
+    parser.add_argument("--yes", action="store_true", help="skip the interactive preflight confirmation")
+    parser.add_argument("--dry-run", action="store_true", help="resolve models/arguments and print the plan without loading")
+    return parser
+
+
+def resolve_tasks(args: argparse.Namespace, interactive: bool) -> list[str]:
+    if args.tasks:
+        return args.tasks
+    if args.suite:
+        return {"both": ["prose", "stata"], "prose": ["prose"], "code": ["stata"]}[args.suite]
+    if interactive:
+        choice = interactive_value("Test suite (both/prose/code)", "both").lower()
+        if choice not in {"both", "prose", "code"}:
+            raise BenchmarkError("suite must be both, prose, or code")
+        return {"both": ["prose", "stata"], "prose": ["prose"], "code": ["stata"]}[choice]
+    return ["prose", "stata"]
+
+
+def resolve_depths(args: argparse.Namespace, interactive: bool) -> list[int]:
+    if args.depths:
+        return args.depths
+    if interactive:
+        return parse_depths(interactive_value("Context depths", "0,30000,60000"))
+    return list(DEFAULT_DEPTHS)
+
+
+def validate_args(args: argparse.Namespace, depths: list[int]) -> None:
+    if args.runs is not None and args.runs < 1:
+        raise BenchmarkError("--runs must be at least 1")
+    if args.cooldown < 0:
+        raise BenchmarkError("--cooldown cannot be negative")
+    if args.power_interval <= 0:
+        raise BenchmarkError("--power-interval must be positive")
+    for name in ("spec_n_max", "spec_n_min"):
+        value = getattr(args, name)
+        if value is not None and value < 1:
+            raise BenchmarkError(f"--{name.replace('_', '-')} must be positive")
+    if args.spec_p_min is not None and not 0 <= args.spec_p_min <= 1:
+        raise BenchmarkError("--spec-p-min must be between 0 and 1")
+    if args.spec_p_split is not None and not 0 <= args.spec_p_split <= 1:
+        raise BenchmarkError("--spec-p-split must be between 0 and 1")
+    if args.spec and args.spec.lower() not in {"canonical", "off", "mtp", "mtp-ngram", "dflash", "dspark"}:
+        raise BenchmarkError("--spec must be canonical, off, mtp, mtp-ngram, dflash, or dspark")
+    if (args.spec or "canonical").lower() == "off" and (
+        args.spec_draft_model is not None
+        or args.spec_n_max is not None
+        or args.spec_n_min is not None
+        or args.spec_p_min is not None
+        or args.spec_p_split is not None
+        or args.spec_adaptive
+    ):
+        raise BenchmarkError("speculative overrides cannot be combined with --spec off")
+    if max(depths, default=0) + PP_TARGET + 256 > 1_000_000:
+        raise BenchmarkError("requested context depth is implausibly large")
+
+
+def make_run_skeleton(args: argparse.Namespace, tasks: list[str], depths: list[int], runs: int) -> dict[str, Any]:
+    now = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    return {
+        "script": SCRIPT_NAME,
+        "version": SCRIPT_VERSION,
+        "started": now,
+        "base_url": normalize_url(args.base_url),
+        "host": socket.gethostname(),
+        "lemonade_version": None,
+        "prompt_version": PROMPT_VERSION,
+        "environment": collect_report_environment(),
+        "protocol": {
+            "pp_target": PP_TARGET,
+            "tg_target": TG_TARGET,
+            "reasoning": "off",
+            "tasks": tasks,
+            "depths": depths,
+            "runs": runs,
+            "spec_request": args.spec or "canonical",
+            "kv_cache": args.kv_cache,
+            "draft_kv_cache": args.draft_kv_cache,
+            "cache_prompt": True,
+            "unique_nonce_per_cell": True,
+            "power_monitoring": {
+                "enabled": not args.no_power,
+                "sample_interval_s": args.power_interval,
+                "sensor": str(PowerSampler.find_sensor()[0] or "unavailable"),
+                "phase_split": "server prompt_ms/predicted_ms boundaries",
+            },
+        },
+        "models": [],
+    }
+
+
+def resolve_model_meta(
+    client: LemonadeClient,
+    model: dict[str, Any],
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    model_id = str(model.get("id"))
+    options = client.model_options(model_id, model)
+    original_args = options["args"]
+    try:
+        tokens = shlex.split(original_args)
+    except ValueError as exc:
+        raise BenchmarkError(f"cannot parse saved args for {model_id}: {exc}") from exc
+    tokens = apply_spec_overrides(
+        tokens,
+        args.spec or "canonical",
+        args.spec_draft_model,
+        args.spec_n_max,
+        args.spec_n_min,
+        args.spec_p_min,
+        args.spec_p_split,
+        args.spec_adaptive,
+    )
+    tokens.extend(args.extra_args)
+    # Explicit KV choices override saved values and --extra-args.  Reasoning is
+    # applied afterward because the benchmark contract is unconditionally no-think.
+    tokens = apply_kv_overrides(tokens, args.kv_cache, args.draft_kv_cache)
+    tokens = force_reasoning_off(tokens, model_id, original_args)
+    backend = args.backend or options.get("backend") or ""
+    benchmark_args = shlex.join(tokens)
+    engine = infer_engine(tokens, backend)
+    model_reference = str(options.get("checkpoint") or model_id)
+    return {
+        "model_id": model_id,
+        "checkpoint": options.get("checkpoint"),
+        "model_reference": model_reference,
+        "quant": infer_quant(model_id, model_reference),
+        "size_gib": options.get("size_gib"),
+        "backend": backend,
+        "engine": engine,
+        "build": build_description(engine),
+        "engine_build": detect_engine_build(engine),
+        "canonical_backend": options.get("backend") or "",
+        "canonical_args": original_args,
+        "benchmark_args": benchmark_args,
+        "spec_summary": summarize_spec(tokens),
+        "kv_summary": kv_cache_summary(tokens),
+        "merge_args": bool(options.get("merge_args", True)),
+        "ctx_size": options.get("ctx_size"),
+        "resolved_ctx_size": options.get("resolved_ctx_size"),
+        "max_context_window": options.get("max_context_window"),
+        "options_source": options.get("options_source"),
+        "options": options,
+        "cells": [],
+        "summaries": [],
+    }
+
+
+def save_run(run: dict[str, Any], outdir: Path, started_for_name: str) -> tuple[Path, Path]:
+    outdir.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", started_for_name.replace(":", "-"))
+    json_path = outdir / f"{slug}_llm-bench.json"
+    md_path = outdir / f"{slug}_llm-bench.md"
+    markdown = render_markdown(run)
+    json_path.write_text(json.dumps(run, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    md_path.write_text(markdown, encoding="utf-8")
+    return json_path, md_path
+
+
+def print_plan(run: dict[str, Any]) -> None:
+    print("\nBenchmark plan")
+    print(f"  endpoint: {run['base_url']}")
+    print(f"  tasks: {', '.join(run['protocol']['tasks'])}")
+    print(f"  depths: {', '.join(depth_label(x) for x in run['protocol']['depths'])}")
+    print(f"  runs/cell: {run['protocol']['runs']}  PP target: {PP_TARGET}  TG target: {TG_TARGET}")
+    for model in run["models"]:
+        print(f"  model: {model['model_id']}  engine: {model.get('engine') or model['backend'] or 'default'}  spec: {model['spec_summary']}")
+        print(f"    KV cache: {model.get('kv_summary') or 'unknown'}")
+        print(f"    args: {model['benchmark_args']}")
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    interactive = not args.models and not args.model_list and not args.list_models and not args.dry_run
+    client = LemonadeClient(
+        args.base_url,
+        request_timeout=args.request_timeout,
+        power_interval=args.power_interval,
+        power_enabled=not args.no_power,
+    )
 
     try:
-        results = run_bench(base_url, prompt_sizes, args.gen, args.reps, args.verbose)
+        models = client.models()
+    except BenchmarkError as exc:
+        parser.error(str(exc))
+        return 2
+
+    # The registry can include embedding/reranking models and standalone
+    # speculative sidecars. Only primary llama.cpp chat models are candidates.
+    candidates = [
+        m
+        for m in models
+        if m.get("recipe", "llamacpp") == "llamacpp"
+        and m.get("id")
+        and not model_is_draft_only(m)
+    ]
+    if args.list_models:
+        print_model_list(candidates)
+        return 0
+    if not candidates:
+        raise BenchmarkError("no registered llama.cpp models were returned by Lemonade")
+
+    if args.models:
+        selected_ids = args.models
+    elif args.model_list:
+        selected_ids = list(dict.fromkeys(args.model_list))
+    else:
+        selected_ids = choose_models_interactive(candidates) if interactive else [str(candidates[0]["id"])]
+    if not selected_ids:
+        raise BenchmarkError("no models selected")
+
+    by_id = {str(model["id"]): model for model in candidates}
+    missing = [model_id for model_id in selected_ids if model_id not in by_id]
+    if missing:
+        available = ", ".join(sorted(by_id))
+        raise BenchmarkError(f"unknown Lemonade model(s): {', '.join(missing)}\nAvailable: {available}")
+
+    tasks = resolve_tasks(args, interactive)
+    depths = resolve_depths(args, interactive)
+    runs = args.runs or DEFAULT_RUNS
+    if interactive and args.runs is None:
+        runs = int(interactive_value("Runs per task/depth cell", str(DEFAULT_RUNS)))
+    if interactive and args.spec is None:
+        args.spec = interactive_value("Spec mode (canonical/off/mtp/mtp-ngram/dflash/dspark)", "canonical")
+    args.spec = args.spec or "canonical"
+    validate_args(args, depths)
+    if runs < 1:
+        raise BenchmarkError("runs must be at least 1")
+
+    run = make_run_skeleton(args, tasks, depths, runs)
+    run["lemonade_version"] = None
+    try:
+        health = client.health()
+        run["lemonade_version"] = health.get("version")
+    except BenchmarkError:
+        health = {}
+
+    for model_id in selected_ids:
+        meta = resolve_model_meta(client, by_id[model_id], args)
+        max_ctx = meta.get("resolved_ctx_size") or meta.get("max_context_window")
+        if max_ctx is not None and max(depths, default=0) + PP_TARGET + 256 > int(max_ctx):
+            raise BenchmarkError(
+                f"{model_id}: requested depth {max(depths)} + PP{PP_TARGET} exceeds resolved context {max_ctx}"
+            )
+        run["models"].append(meta)
+
+    print_plan(run)
+    if args.dry_run:
+        return 0
+
+    if interactive and not args.yes:
+        answer = input("Proceed? This unloads any resident Lemonade chat model and runs the selected matrix. [y/N] ").strip().lower()
+        if answer != "y":
+            log("Aborted.")
+            return 0
+
+    outdir = Path(args.outdir).expanduser()
+    outdir.mkdir(parents=True, exist_ok=True)
+    lock_file = None
+    active_model: str | None = None
+    try:
+        # Keep one global lock across all output directories so two benchmark
+        # processes cannot perturb the same Lemonade server concurrently.
+        LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+        lock_file = LOCK_PATH.open("a+")
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise BenchmarkError(f"another llm-bench process holds {LOCK_PATH}") from exc
+
+        existing_health = client.health()
+        existing = current_llm(existing_health)
+        if existing:
+            names = ", ".join(str(m.get("model_name")) for m in existing)
+            log(f"  unloading resident Lemonade chat model(s): {names}")
+            for loaded in existing:
+                client.unload(str(loaded.get("model_name")))
+
+        for model in run["models"]:
+            model_id = model["model_id"]
+            active_model = model_id
+            loaded = client.load(
+                model_id,
+                model["benchmark_args"],
+                model["backend"],
+                model["merge_args"],
+                args.load_timeout,
+            )
+            actual_options = loaded.get("recipe_options") if isinstance(loaded.get("recipe_options"), dict) else {}
+            model["loaded_health"] = {
+                "model_name": loaded.get("model_name"),
+                "checkpoint": loaded.get("checkpoint"),
+                "device": loaded.get("device"),
+                "status": loaded.get("status"),
+                "recipe_options": actual_options,
+            }
+            actual_args = str(actual_options.get("llamacpp_args") or "")
+            model["loaded_args"] = actual_args
+            if actual_args:
+                try:
+                    loaded_tokens = shlex.split(actual_args)
+                    model["loaded_spec_summary"] = summarize_spec(loaded_tokens)
+                except ValueError:
+                    model["loaded_spec_summary"] = "unparseable"
+            if not args.no_warmup:
+                warmup(client, model_id)
+            try:
+                sizer = PromptSizer(client, model_id, client.tokenize)
+            except BenchmarkError as exc:
+                raise BenchmarkError(f"{model_id}: prompt calibration failed: {exc}") from exc
+
+            total_cells = len(tasks) * len(depths) * runs
+            completed = 0
+            log(f"  running {total_cells} cells for {model_id}")
+            for task in tasks:
+                for depth in depths:
+                    for rep in range(1, runs + 1):
+                        completed += 1
+                        try:
+                            record = run_cell(
+                                client,
+                                model_id,
+                                task,
+                                depth,
+                                rep,
+                                sizer,
+                                args.allow_cache_miss,
+                            )
+                            model["cells"].append(record)
+                        except KeyboardInterrupt:
+                            raise
+                        except BenchmarkError as exc:
+                            error_record = {
+                                "model_id": model_id,
+                                "task": task,
+                                "task_label": TASK_LABELS[task],
+                                "requested_depth": depth,
+                                "depth_label": depth_label(depth),
+                                "rep": rep,
+                                "error": str(exc),
+                            }
+                            model["cells"].append(error_record)
+                            log(f"    {task} {depth_label(depth)} rep {rep}: FAILED — {exc}")
+                        if args.cooldown and completed < total_cells:
+                            time.sleep(args.cooldown)
+                    # Keep partial summaries and raw rows on disk while a long
+                    # matrix is running; an interrupted run is still useful.
+                    model["summaries"] = cell_groups(model["cells"])
+                    if not args.no_save:
+                        save_run(run, outdir, run["started"])
+            model["summaries"] = cell_groups(model["cells"])
+            if not args.keep_loaded:
+                client.unload(model_id)
+                active_model = None
+
+        markdown = render_markdown(run)
+        print("\n" + markdown)
+        if not args.no_save:
+            json_path, md_path = save_run(run, outdir, run["started"])
+            print(f"Saved JSON: {json_path}")
+            print(f"Saved Markdown: {md_path}")
+        failed_cells = sum(
+            1
+            for model in run["models"]
+            for cell in model.get("cells", [])
+            if cell.get("error")
+        )
+        if failed_cells:
+            eprint(f"{SCRIPT_NAME}: {failed_cells} benchmark cell(s) failed")
+            return 1
+        return 0
     except KeyboardInterrupt:
-        print("\nInterrupted.")
-        sys.exit(1)
-
-    print_table(results)
-
-    BENCH_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    slug = model.replace("/", "_")[:60]
-    out_path = Path(args.output) if args.output else BENCH_DIR / f"{ts}_{slug}.json"
-
-    out_path.write_text(json.dumps({
-        "timestamp": ts,
-        "model": model,
-        "server_url": base_url,
-        "config": {"gen_tokens": args.gen, "reps": args.reps},
-        "results": results,
-    }, indent=2))
-    print(f"\nSaved: {out_path}")
+        eprint("\nInterrupted; attempting to unload the active benchmark model.")
+        return 130
+    finally:
+        if active_model and not args.keep_loaded:
+            try:
+                client.unload(active_model)
+            except Exception as exc:
+                eprint(f"warning: cleanup unload failed: {exc}")
+        if lock_file is not None:
+            try:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                lock_file.close()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    except BenchmarkError as exc:
+        eprint(f"{SCRIPT_NAME}: {exc}")
+        raise SystemExit(2)

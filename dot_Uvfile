@@ -5,8 +5,8 @@
 # Stata MCP server (pinned to mcp<2 for FastMCP compatibility)
 mcp-stata --with "mcp<2"
 
-# Zotero MCP server with semantic search (chromadb/embeddings) and PyMuPDF extras
-zotero-mcp-server[semantic,pdf]
+# Samuel's tested Zotero MCP fork; update this tag only after a fork release passes tests.
+'zotero-mcp-server[semantic,pdf] @ git+https://github.com/samuelueluel/zotero-mcp.git@samuel-v0.11.0.2'
 
 # FastContext — LLM context manager
 fastcontext
