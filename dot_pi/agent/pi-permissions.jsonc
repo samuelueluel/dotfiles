@@ -28,6 +28,9 @@
     "session_ask": "allow",
     "ask_advisor": "allow",
 
+    // Safe MCP lifecycle cleanup after a completed server task.
+    "mcp_disconnect": "allow",
+
     // Namespace proxies are allowed here so permission-mode.ts can inspect
     // their forwarded {tool, args} payload and retain modes.ts' exact
     // read-only allowlist. Unknown/mutating forwarded operations remain gated.

@@ -54,6 +54,8 @@ const HEADLESS_ALLOWED_TOOLS = new Set([
   "session_search",
   "session_ask",
   "ask_advisor",
+  // Safe MCP lifecycle cleanup: release a server after a completed task.
+  "mcp_disconnect",
 ]);
 
 const SAFE_BASH_COMMANDS = new Set([
