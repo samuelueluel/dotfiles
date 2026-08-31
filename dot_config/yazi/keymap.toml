@@ -1,14 +1,14 @@
 [mgr]
 prepend_keymap = [
 	# Sort overrides to auto-switch column linemode
-	{ on = [ ",", "m" ], run = [ "sort mtime --reverse=no", "linemode mtime" ], desc = "Sort by modified time (show modified time)" },
-	{ on = [ ",", "M" ], run = [ "sort mtime --reverse=yes", "linemode mtime" ], desc = "Sort by modified time (reverse, show modified time)" },
-	{ on = [ ",", "b" ], run = [ "sort btime --reverse=no", "linemode btime" ], desc = "Sort by birth time (show birth time)" },
-	{ on = [ ",", "B" ], run = [ "sort btime --reverse=yes", "linemode btime" ], desc = "Sort by birth time (reverse, show birth time)" },
-	{ on = [ ",", "s" ], run = [ "sort size --reverse=no", "linemode size" ], desc = "Sort by size (show size)" },
-	{ on = [ ",", "S" ], run = [ "sort size --reverse=yes", "linemode size" ], desc = "Sort by size (reverse, show size)" },
-	{ on = [ ",", "a" ], run = [ "sort alphabetical --reverse=no", "linemode mtime" ], desc = "Sort alphabetically (show modified time)" },
-	{ on = [ ",", "A" ], run = [ "sort alphabetical --reverse=yes", "linemode mtime" ], desc = "Sort alphabetically (reverse, show modified time)" },
+	{ on = [ ",", "m" ], run = [ "sort mtime --reverse=no", "linemode mtime" ], desc = "Modified (newest)" },
+	{ on = [ ",", "M" ], run = [ "sort mtime --reverse=yes", "linemode mtime" ], desc = "Modified (oldest)" },
+	{ on = [ ",", "b" ], run = [ "sort btime --reverse=no", "linemode btime" ], desc = "Birth (newest)" },
+	{ on = [ ",", "B" ], run = [ "sort btime --reverse=yes", "linemode btime" ], desc = "Birth (oldest)" },
+	{ on = [ ",", "s" ], run = [ "sort size --reverse=no", "linemode size" ], desc = "Size (smallest)" },
+	{ on = [ ",", "S" ], run = [ "sort size --reverse=yes", "linemode size" ], desc = "Size (largest)" },
+	{ on = [ ",", "a" ], run = [ "sort alphabetical --reverse=no", "linemode mtime" ], desc = "Alphabetical (A-Z)" },
+	{ on = [ ",", "A" ], run = [ "sort alphabetical --reverse=yes", "linemode mtime" ], desc = "Alphabetical (Z-A)" },
 
 	{ on = "<C-Space>", run = "cd --interactive", desc = "Change directory interactively" },
 { on = "<C-f>", run = "plugin fzf-nav", desc = "Fuzzy jump (fzf)" },

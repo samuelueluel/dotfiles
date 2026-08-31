@@ -4,19 +4,19 @@ linemode = "mtime"
 
 [opener]
 edit = [
-  { run = 'zed --new "$@"', desc = "Zed", orphan = true },
+  { run = 'zed %s', desc = "Zed", orphan = true },
 ]
 view_image = [
-  { run = 'swayimg "$@"', desc = "swayimg", orphan = true },
+  { run = 'swayimg %s', desc = "swayimg", orphan = true },
 ]
 view_pdf = [
-  { run = 'flatpak run org.kde.okular "$@"', desc = "Okular", orphan = true },
+  { run = 'flatpak run org.kde.okular %s', desc = "Okular", orphan = true },
 ]
 open = [
-  { run = 'xdg-open "$1"', desc = "xdg-open", orphan = true },
+  { run = 'xdg-open %s1', desc = "xdg-open", orphan = true },
 ]
 extract = [
-  { run = 'ouch d -y "$@"', desc = "Extract here with ouch", for = "unix" },
+  { run = 'ouch d -y %s', desc = "Extract here with ouch", for = "unix" },
 ]
 
 

@@ -1,9 +1,21 @@
 {
-  "enabled": true,
-  "provider": "openai-codex",
-  "model": "gpt-5.6-sol",
-  "maxUsesPerRun": 4,
-  "maxTokens": 16384,
-  "reasoning": "medium",
-  "maxContextMessages": 20
+  "executor": "openai-codex/gpt-5.6-luna",
+  "advisor": "openai-codex/gpt-5.6-sol",
+  "executorEffort": "max",
+  "advisorEffort": "medium",
+  "gateFailureMode": "block-tool",
+  "advisorGitContext": "full",
+  "advisorCustomInvocation": "the task involves empirical economics or data work (Stata/Python/R), where Samuel's stated specifications, estimators, standard errors, sample restrictions, variable definitions, tables, figures, and evidence of correctness need scrutiny; distinguish correctness evidence from code that merely ran and diagnose concrete failures rather than reciting generic procedure",
+  "alwaysOn": true,
+  "advisorPlanGate": true,
+  "advisorFailureGate": true,
+  "advisorCompletionGate": true,
+  "advisorAutoLoopGate": true,
+  "advisorSessionSummary": false,
+  "advisorRedactSecrets": true,
+  "advisorTrackedFileContent": false,
+  "advisorUntrackedContent": false,
+  "showUsageDetails": true,
+  "showUsageFooter": false,
+  "simpleMode": false
 }

@@ -28,40 +28,57 @@
       "source": "npm:pi-agent-extensions",
       "extensions": [
         "extensions/answer/index.ts",
-        "extensions/ask-user/index.ts",
         "extensions/btw/index.ts",
         "extensions/files/index.ts",
-        "extensions/handoff/index.ts",
         "extensions/loop/index.ts",
-        "extensions/notify/index.ts",
-        "extensions/sessions/index.ts",
-        "extensions/todos/index.ts"
+        "extensions/notify/index.ts"
       ]
-    },
-    {
-      "source": "npm:pi-markdown-preview"
     },
     {
       "source": "npm:pi-web-access"
     },
-    "extensions/pi-tool-display",
+    "npm:pi-tool-display",
+    "npm:pi-ask-user",
+    "npm:pi-sessions",
+    "npm:pi-permission-system",
+    {
+      "source": "npm:pi-advisor-flow@0.5.0",
+      "extensions": []
+    },
     "npm:@tintinweb/pi-subagents",
-    "extensions/pi-advisor",
-    "local-packages/pi-agent-beautify"
+    "local-packages/pi-agent-beautify",
+    "npm:pi-markdown-preview",
+    "npm:@juicesharp/rpiv-todo@2.8.0"
   ],
   "extensions": [
     "extensions/agent-title.ts",
     "extensions/session-state.ts",
     "extensions/subagent-profile.ts",
-    "extensions/modes.ts",
-    "extensions/powerline-footer.ts"
+    "extensions/advisor-current-model.ts",
+    "extensions/permission-mode.ts",
+    "extensions/powerline-footer.ts",
+    "extensions/todo-reminders.ts"
   ],
-  "lastChangelogVersion": "0.84.2",
+  "lastChangelogVersion": "0.84.3",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,
     "keepRecentTokens": 40000
+  },
+  "sessions": {
+    "messaging": {
+      "enable": false
+    },
+    "subagents": {
+      "enable": false
+    },
+    "handoff": {
+      "enable": true
+    },
+    "autoTitle": {
+      "enable": true
+    }
   }
 }

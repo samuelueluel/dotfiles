@@ -18,7 +18,6 @@ class PowerlineFooter implements Component {
 	private lastModelShort = "unknown";
 	private lastContextInfo = "";
 	private lastCostInfo = "";
-	private lastSessionName = "";
 	private gitStatusExtras: string = "";
 
 	constructor(tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider, ctx: ExtensionContext) {
@@ -141,10 +140,6 @@ class PowerlineFooter implements Component {
 		return { contextInfo: this.lastContextInfo, costInfo: this.lastCostInfo };
 	}
 
-	private getSessionName(): string {
-		try { this.lastSessionName = this.ctx.sessionManager.getSessionName() ?? ""; } catch {}
-		return this.lastSessionName;
-	}
 
 	private fitToWidth(line: string, width: number): string {
 		if (width <= 0) return "";
@@ -210,16 +205,14 @@ class PowerlineFooter implements Component {
 
 		const date = new Date();
 		const currentTime = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-		const sessionName = this.getSessionName();
-		const sessionInfo = sessionName ? `${GLOBE}[${sessionName}]${RESET} ` : "";
-
-		let left  = `${sessionInfo}${BOLD}${TURQUOISE} ${shortDir}${RESET}${gitInfo}`;
+		let left  = `${BOLD}${TURQUOISE} ${shortDir}${RESET}${gitInfo}`;
 		const right = `${contextInfo}`;
 
 		const statuses = this.footerData.getExtensionStatuses();
 		if (statuses.size > 0) {
 			const parts: string[] = [];
-			for (const [, text] of statuses) {
+			for (const [key, text] of statuses) {
+				if (key === "advisor-nudge" || key === "pi-permission-system") continue;
 				if (text) parts.push(text);
 			}
 			if (parts.length > 0) left += ` ${GRAY}|${RESET} ${parts.join(" ")}`;

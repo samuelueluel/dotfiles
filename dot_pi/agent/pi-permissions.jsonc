@@ -1,0 +1,166 @@
+{
+  "$schema": "https://raw.githubusercontent.com/MasuRii/pi-permission-system/main/schemas/permissions.schema.json",
+  "defaultPolicy": {
+    "tools": "ask",
+    "bash": "ask",
+    "mcp": "ask",
+    "skills": "ask",
+    "special": "ask"
+  },
+  "tools": {
+    // Core read-only tools from the former modes.ts policy.
+    "read": "allow",
+    "grep": "allow",
+    "find": "allow",
+    "ls": "allow",
+    "web_search": "allow",
+    "fetch_content": "allow",
+    "get_search_content": "allow",
+    "source_check": "allow",
+    "preview_export": "allow",
+    "ask_user": "allow",
+    "answer": "allow",
+    "todo": "allow",
+    "signal_loop_success": "allow",
+
+    // Read-only session/advisor surfaces.
+    "session_search": "allow",
+    "session_ask": "allow",
+    "ask_advisor": "allow",
+
+    // Namespace proxies are allowed here so permission-mode.ts can inspect
+    // their forwarded {tool, args} payload and retain modes.ts' exact
+    // read-only allowlist. Unknown/mutating forwarded operations remain gated.
+    "mcp__turbovault": "allow",
+    "mcp__zotero": "allow",
+    "mcp__*": "allow",
+
+    // Read-only direct TurboVault tools carried over from modes.ts.
+    "turbovault_get_vault_context": "allow",
+    "turbovault_read_note": "allow",
+    "turbovault_get_backlinks": "allow",
+    "turbovault_get_forward_links": "allow",
+    "turbovault_get_related_notes": "allow",
+    "turbovault_get_hub_notes": "allow",
+    "turbovault_quick_health_check": "allow",
+    "turbovault_get_broken_links": "allow",
+    "turbovault_search": "allow",
+    "turbovault_advanced_search": "allow",
+    "turbovault_search_by_frontmatter": "allow",
+    "turbovault_inspect_frontmatter": "allow",
+    "turbovault_query_frontmatter_sql": "allow",
+    "turbovault_list_templates": "allow",
+    "turbovault_get_notes_info": "allow",
+    "turbovault_suggest_links": "allow",
+    "turbovault_semantic_search": "allow",
+
+    // Read-only direct Zotero tools carried over from modes.ts.
+    "zotero_zotero_get_annotations": "allow",
+    "zotero_zotero_get_notes": "allow",
+    "zotero_zotero_get_page_layout": "allow",
+    "zotero_zotero_get_item_metadata": "allow",
+    "zotero_zotero_get_item_fulltext": "allow",
+    "zotero_zotero_get_attachment_path": "allow",
+    "zotero_zotero_get_collections": "allow",
+    "zotero_zotero_get_collection_items": "allow",
+    "zotero_zotero_get_item_children": "allow",
+    "zotero_zotero_get_tags": "allow",
+    "zotero_zotero_list_libraries": "allow",
+    "zotero_zotero_get_recent": "allow",
+    "zotero_zotero_get_collection_hubs": "allow",
+    "zotero_zotero_get_paper_lineage": "allow",
+    "zotero_zotero_find_connected_papers": "allow",
+    "zotero_zotero_audit_references": "allow",
+    "zotero_zotero_read_pdf_pages": "allow",
+    "zotero_zotero_search_references": "allow",
+    "zotero_zotero_search_items": "allow",
+    "zotero_zotero_resolve_exact_source": "allow",
+    "zotero_zotero_search_by_tag": "allow",
+    "zotero_zotero_search_by_citation_key": "allow",
+    "zotero_zotero_advanced_search": "allow",
+    "zotero_zotero_semantic_search": "allow",
+    "zotero_zotero_get_search_database_status": "allow",
+    "zotero_zotero_synthesize_annotations": "allow",
+    "zotero_zotero_export_bibliography": "allow",
+    "zotero_zotero_search_collections": "allow",
+    "zotero_zotero_get_pdf_outline": "allow",
+    "zotero_read_zotero_collections": "allow",
+
+    // Direct MCP tool names are also inspected by permission-mode.ts. Keep
+    // the policy layer from prompting a second time for those calls.
+    "turbovault_*": "allow",
+    "zotero_*": "allow"
+  },
+  "bash": {
+    // permission-mode.ts preserves the former structured manual/headless
+    // Bash guard. Do not change this to a broad allow if that shim is removed.
+    "*": "allow"
+  },
+  "mcp": {
+    "mcp_status": "allow",
+    "mcp_list": "allow",
+    "mcp_search": "allow",
+    "mcp_describe": "allow",
+
+    // Exact read-only proxy targets from the former modes.ts policy.
+    "turbovault_get_vault_context": "allow",
+    "turbovault_read_note": "allow",
+    "turbovault_get_backlinks": "allow",
+    "turbovault_get_forward_links": "allow",
+    "turbovault_get_related_notes": "allow",
+    "turbovault_get_hub_notes": "allow",
+    "turbovault_quick_health_check": "allow",
+    "turbovault_get_broken_links": "allow",
+    "turbovault_search": "allow",
+    "turbovault_advanced_search": "allow",
+    "turbovault_search_by_frontmatter": "allow",
+    "turbovault_inspect_frontmatter": "allow",
+    "turbovault_query_frontmatter_sql": "allow",
+    "turbovault_list_templates": "allow",
+    "turbovault_get_notes_info": "allow",
+    "turbovault_suggest_links": "allow",
+    "turbovault_semantic_search": "allow",
+    "zotero_zotero_get_annotations": "allow",
+    "zotero_zotero_get_notes": "allow",
+    "zotero_zotero_get_page_layout": "allow",
+    "zotero_zotero_get_item_metadata": "allow",
+    "zotero_zotero_get_item_fulltext": "allow",
+    "zotero_zotero_get_attachment_path": "allow",
+    "zotero_zotero_get_collections": "allow",
+    "zotero_zotero_get_collection_items": "allow",
+    "zotero_zotero_get_item_children": "allow",
+    "zotero_zotero_get_tags": "allow",
+    "zotero_zotero_list_libraries": "allow",
+    "zotero_zotero_get_recent": "allow",
+    "zotero_zotero_get_collection_hubs": "allow",
+    "zotero_zotero_get_paper_lineage": "allow",
+    "zotero_zotero_find_connected_papers": "allow",
+    "zotero_zotero_audit_references": "allow",
+    "zotero_zotero_read_pdf_pages": "allow",
+    "zotero_zotero_search_references": "allow",
+    "zotero_zotero_search_items": "allow",
+    "zotero_zotero_resolve_exact_source": "allow",
+    "zotero_zotero_search_by_tag": "allow",
+    "zotero_zotero_search_by_citation_key": "allow",
+    "zotero_zotero_advanced_search": "allow",
+    "zotero_zotero_semantic_search": "allow",
+    "zotero_zotero_get_search_database_status": "allow",
+    "zotero_zotero_synthesize_annotations": "allow",
+    "zotero_zotero_export_bibliography": "allow",
+    "zotero_zotero_search_collections": "allow",
+    "zotero_zotero_get_pdf_outline": "allow",
+    "zotero_read_zotero_collections": "allow",
+    // Generic mcp calls are fail-closed by permission-mode.ts, which retains
+    // the old read-only classification and CPTR headless block.
+    "*": "allow"
+  },
+  // Skills are trusted local resources and must not prompt before they can
+  // provide the instructions Pi was configured to use.
+  "skills": {
+    "*": "allow"
+  },
+  "special": {
+    // Preserve a stronger external-path boundary than the old modes.ts code.
+    "external_directory": "ask"
+  }
+}
