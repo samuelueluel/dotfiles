@@ -41,25 +41,25 @@
     "npm:pi-ask-user",
     "npm:pi-sessions",
     "npm:pi-permission-system",
-    {
-      "source": "npm:pi-advisor-flow@0.5.0",
-      "extensions": []
-    },
     "npm:@tintinweb/pi-subagents",
     "local-packages/pi-agent-beautify",
     "npm:pi-markdown-preview",
-    "npm:@juicesharp/rpiv-todo@2.8.0"
+    "npm:@juicesharp/rpiv-todo@2.8.0",
+    {
+      "source": "npm:@kennyfrc/pi-system-reminders@0.2.0",
+      "extensions": []
+    },
+    "npm:@juicesharp/rpiv-advisor@2.8.0"
   ],
   "extensions": [
     "extensions/agent-title.ts",
     "extensions/session-state.ts",
     "extensions/subagent-profile.ts",
-    "extensions/advisor-current-model.ts",
     "extensions/permission-mode.ts",
     "extensions/powerline-footer.ts",
     "extensions/todo-reminders.ts"
   ],
-  "lastChangelogVersion": "0.84.3",
+  "lastChangelogVersion": "0.84.4",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "compaction": {

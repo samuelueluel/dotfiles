@@ -1,54 +1,88 @@
+import { registerReminder } from "@kennyfrc/pi-system-reminders";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+	assistantAppearsToAwaitUserInput,
+	extractLatestTodoSnapshot,
+	readTodoReminderConfig,
+	renderTodoReminder,
+	TodoReminderTracker,
+} from "../lib/todo-reminder-logic.js";
 
-const DRIFT_TOOL_THRESHOLD = Number(process.env.PI_TODO_DRIFT_THRESHOLD) || 15;
+export const TODO_REMINDER_ID = "todo-drift-guard";
+
+function detailsFromToolResult(result: unknown): unknown {
+	if (!result || typeof result !== "object") return undefined;
+	return (result as { details?: unknown }).details;
+}
 
 export default function todoRemindersExtension(pi: ExtensionAPI): void {
-  let toolCountSinceLastTodo = 0;
-  let hasCreatedTodos = false;
+	const tracker = new TodoReminderTracker(readTodoReminderConfig());
 
-  pi.on("session_start", () => {
-    toolCountSinceLastTodo = 0;
-    hasCreatedTodos = false;
-  });
+	const restoreFromBranch = (
+		ctx: { sessionManager: { getBranch(): Iterable<unknown> } },
+		options?: { resetCycle?: boolean },
+	): void => {
+		tracker.restore(extractLatestTodoSnapshot(ctx.sessionManager.getBranch()), options);
+	};
 
-  pi.on("tool_call", (event: any) => {
-    if (event.toolName === "todo") {
-      toolCountSinceLastTodo = 0;
-      hasCreatedTodos = true;
-    } else {
-      toolCountSinceLastTodo++;
-    }
-  });
+	pi.on("session_start", (_event, ctx) => {
+		restoreFromBranch(ctx, { resetCycle: true });
+	});
 
-  // Transient context injection: fires at turn start ONLY if >= DRIFT_TOOL_THRESHOLD tools have run without todo interaction
-  pi.on("context", async (event: any) => {
-    if (!event?.messages || event.messages.length === 0) return;
+	pi.on("session_compact", (_event, ctx) => {
+		restoreFromBranch(ctx, { resetCycle: false });
+	});
 
-    const tail = event.messages[event.messages.length - 1];
-    // Only fire on turn start (when tail is a user message)
-    if (tail?.role !== "user") return;
+	pi.on("session_tree", (_event, ctx) => {
+		restoreFromBranch(ctx, { resetCycle: false });
+	});
 
-    if (hasCreatedTodos && toolCountSinceLastTodo >= DRIFT_TOOL_THRESHOLD) {
-      const reminderText =
-        `<system_reminder>\n` +
-        `<reminder type="todo-guard">\n` +
-        `[Todo Alignment Check] You have executed ${toolCountSinceLastTodo} tool actions since last interacting with \`todo\`. ` +
-        `Verify that your current actions directly advance your active task in \`todo\` and that you are not caught in an unnecessary rabbit hole. ` +
-        `Continue with your current step, or update your \`todo\` plan if the scope has changed.\n` +
-        `</reminder>\n` +
-        `</system_reminder>`;
+	// A request cycle starts when Pi begins an agent run. Preserve the action
+	// counter across user turns, but bound reminders per cycle.
+	pi.on("agent_start", () => {
+		tracker.resetRequestCycle();
+	});
 
-      const reminderMessage = {
-        role: "custom",
-        customType: "pi-system-reminders",
-        content: [{ type: "text", text: reminderText }],
-        display: false,
-        timestamp: Date.now(),
-      };
+	// Count completed tool executions, not preflight attempts. In particular,
+	// reducer errors from rpiv-todo are in-band details.error values, while
+	// blocked/failed non-todo calls should not advance the drift counter.
+	pi.on("tool_execution_end", (event: any) => {
+		if (event.toolName === "todo") {
+			tracker.observeTodoResult(detailsFromToolResult(event.result), event.isError === true);
+			return;
+		}
 
-      const messages = [...event.messages];
-      messages.splice(messages.length - 1, 0, reminderMessage);
-      return { messages };
-    }
-  });
+		if (event.isError !== true) tracker.observeSuccessfulAction();
+	});
+
+	// This is deliberately a bounded, non-continuing completion check. It is
+	// delivered on the next provider call (normally the next user prompt) rather
+	// than automatically starting another run and risking a continuation loop.
+	pi.on("agent_settled", (_event, ctx) => {
+		let hasPendingMessages = false;
+		let awaitingUserInput = false;
+		try {
+			hasPendingMessages = ctx.hasPendingMessages();
+			awaitingUserInput = assistantAppearsToAwaitUserInput(ctx.sessionManager.getBranch());
+		} catch {
+			// A stale or minimal context should not make the guard fail closed into
+			// an automatic continuation. The transient reminder remains optional.
+			return;
+		}
+		tracker.markSettled({ hasPendingMessages, awaitingUserInput });
+	});
+
+	// The package owns transient context placement and the call:every clock. The
+	// tracker owns state, cadence, and caps; returning null is a no-op.
+	registerReminder(pi, {
+		id: TODO_REMINDER_ID,
+		label: "todo-guard",
+		lifetime: "transient",
+		on: "call:every",
+		priority: 65,
+		content: () => {
+			const payload = tracker.consumeReminder();
+			return payload ? renderTodoReminder(payload) : null;
+		},
+	});
 }

@@ -35,18 +35,6 @@
     "size": 97.1,
     "suggested": true
   },
-  "Ling-3.0-Flash-Q5": {
-    "checkpoints": {
-      "main": "bloomer010/Ling-3.0-flash-GGUF:Ling-3.0-flash-Q5_K_M.gguf"
-    },
-    "labels": [
-      "custom",
-      "tool-calling"
-    ],
-    "recipe": "llamacpp",
-    "size": 85.2,
-    "suggested": true
-  },
   "Qwen3.6-Dense-27B-Q4": {
     "checkpoints": {
       "main": "unsloth/Qwen3.6-27B-MTP-GGUF:UD-Q4_K_XL",

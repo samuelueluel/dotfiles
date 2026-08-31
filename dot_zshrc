@@ -885,8 +885,7 @@ _pi_pick_local_model() {
     "tiel-q8      Tiel Coder 35B A3B  Q8" \
     "dsv4fl-q2    DeepSeek V4 Flash Q2" \
     "dsv4fl-q2k   DeepSeek V4 Flash Q2_K_XL" \
-    "dsv4fl-q3    DeepSeek V4 Flash Q3" \
-    "ling3fl-q5   Ling 3.0 Flash Q5_K_M") || return 1
+    "dsv4fl-q3    DeepSeek V4 Flash Q3") || return 1
   case "${choice%%[ ]*}" in
     dense38-q4)  print -r -- "Qwen3.8-27B-Q4" ;;
     dense38-q6)  print -r -- "Qwen3.8-27B-Q6" ;;
@@ -900,7 +899,6 @@ _pi_pick_local_model() {
     dsv4fl-q2)   print -r -- "DeepSeek-V4-Flash-Q2" ;;
     dsv4fl-q2k)  print -r -- "DeepSeek-V4-Flash-Q2K" ;;
     dsv4fl-q3)   print -r -- "DeepSeek-V4-Flash-Q3" ;;
-    ling3fl-q5)  print -r -- "Ling-3.0-Flash-Q5" ;;
     *) return 1 ;;
   esac
 }

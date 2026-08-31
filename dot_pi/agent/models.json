@@ -269,13 +269,6 @@
           "maxTokens": 131072
         },
         {
-          "id": "Ling-3.0-Flash-Q5",
-          "name": "Ling 3.0 Flash Q5_K_M (Lemonade Vulkan)",
-          "reasoning": true,
-          "contextWindow": 262144,
-          "maxTokens": 131072
-        },
-        {
           "id": "UD-Q4_K_XL",
           "name": "Qwen3.8 Flash Next Q4 (Nathan Vulkan, mmap lazy, vision)",
           "reasoning": true,
@@ -297,6 +290,28 @@
           "maxTokens": 131072
         }
       ]
+    },
+    "openai-codex": {
+      "modelOverrides": {
+        "gpt-5.4": {
+          "contextWindow": 1050000
+        },
+        "gpt-5.4-mini": {
+          "contextWindow": 1050000
+        },
+        "gpt-5.5": {
+          "contextWindow": 1050000
+        },
+        "gpt-5.6-luna": {
+          "contextWindow": 1050000
+        },
+        "gpt-5.6-sol": {
+          "contextWindow": 1050000
+        },
+        "gpt-5.6-terra": {
+          "contextWindow": 1050000
+        }
+      }
     }
   }
 }
