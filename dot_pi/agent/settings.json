@@ -30,8 +30,7 @@
         "extensions/answer/index.ts",
         "extensions/btw/index.ts",
         "extensions/files/index.ts",
-        "extensions/loop/index.ts",
-        "extensions/notify/index.ts"
+        "extensions/loop/index.ts"
       ]
     },
     {
