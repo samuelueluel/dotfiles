@@ -873,18 +873,18 @@ lem-unload() {
 
 _pi_pick_local_model() {
   local choice
-  choice=$(gum choose --header "select model  (Lemonade · one loads at a time)" \
-    "dense38-q4   Qwen3.8 Dense 27B  Q4" \
-    "dense38-q6   Qwen3.8 Dense 27B  Q6" \
-    "dense38-fp4  Qwen3.8 Dense 27B  ROCmFP4" \
-    "flash38-ciru Qwen3.8 Flash CIRU IU4" \
-    "flash38-next Qwen3.8 Flash Next Q4" \
-    "flash38-fp4  Qwen3.8 Flash Next ROCmFP4" \
-    "moe-q8       Qwen3.6 MoE 35B    Q8" \
-    "tiel-q8      Tiel Coder 35B A3B  Q8" \
-    "dsv4fl-q2    DeepSeek V4 Flash Q2" \
-    "dsv4fl-q2k   DeepSeek V4 Flash Q2_K_XL" \
-    "dsv4fl-q3    DeepSeek V4 Flash Q3") || return 1
+  choice=$(gum choose --header "select model" \
+    "dense38-q4   Qwen3.8 Dense 27B | Q4" \
+    "dense38-q6   Qwen3.8 Dense 27B | Q6" \
+    "dense38-fp4  Qwen3.8 Dense 27B | ROCmFP4" \
+    "flash38-ciru Qwen3.8 Flash | CIRU IU4" \
+    "flash38-next Qwen3.8 Flash Next | Q4" \
+    "flash38-fp4  Qwen3.8 Flash Next | ROCmFP4" \
+    "moe-q8       Qwen3.6 MoE 35B | Q8" \
+    "tiel-q8      Tiel Coder 35B A3B | Q8" \
+    "dsv4fl-q2    DeepSeek V4 Flash | Q2" \
+    "dsv4fl-q2k   DeepSeek V4 Flash | Q2_K_XL" \
+    "dsv4fl-q3    DeepSeek V4 Flash | Q3") || return 1
   case "${choice%%[ ]*}" in
     dense38-q4)  print -r -- "Qwen3.8-27B-Q4" ;;
     dense38-q6)  print -r -- "Qwen3.8-27B-Q6" ;;

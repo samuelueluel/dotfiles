@@ -77,9 +77,9 @@ case "$id" in
     pi_thinking_level="max"
     args+=" --force-ciru --ple-sidecar /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/ple --ple-cache-mib 4096 --cache-prompt --cache-ram 8192 --cache-idle-slots --ctx-checkpoints 32 --checkpoint-min-step 8192 -ngl all -sm none --fit off -b 2048 -ub 512 --parallel 1 -t 8 -tb 8 -fa on --cont-batching --reasoning on"
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on   native MTP" \
-      "on   native MTP" \
-      "off  base model") || exit 1
+    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
+      "on  MTP" \
+      "off  Base") || exit 1
     case "${mtp%%[ ]*}" in
       on)
         args+=" --spec-type draft-mtp --spec-draft-model /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/mtp/Qwen3.8-Flash-CIRU-STRIX-IU4-MTP-Q8_0.gguf --spec-draft-n-max 3 --spec-draft-p-min 0.75 --spec-draft-p-split 0.10 -ctkd q8_0 -ctvd q8_0"
@@ -90,9 +90,9 @@ case "$id" in
     esac
 
     args+=" $QWEN38_FLASH_SAMPLING"
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || exit 1
+    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
+      "f16  F16" \
+      "q8   Q8_0") || exit 1
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;
@@ -105,9 +105,9 @@ case "$id" in
     pi_thinking_level="max"
     args+=" --force-laurent --fit off -b 2048 -ub 512 -ngl 99 -fa on --reasoning on"
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on   adaptive native MTP" \
-      "on   adaptive native MTP" \
-      "off  base model") || exit 1
+    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
+      "on  MTP" \
+      "off  Base") || exit 1
     case "${mtp%%[ ]*}" in
       on)
         ensure_qwen38_flash_fp4_mtp
@@ -120,10 +120,10 @@ case "$id" in
 
     args+=" $QWEN38_FLASH_SAMPLING"
     effort=$(gum choose --header "thinking / reasoning effort" \
-      "xhigh   deep reasoning (Pi cptr max; default)" \
-      "medium  balanced reasoning" \
-      "low     fast / concise reasoning" \
-      "off     instruct mode (no thinking)") || exit 1
+      "xhigh  Xhigh" \
+      "medium Medium" \
+      "low    Low" \
+      "off    Off") || exit 1
     case "${effort%%[ ]*}" in
       xhigh)
         pi_thinking_level="max"
@@ -143,9 +143,9 @@ case "$id" in
         ;;
     esac
 
-    kv=$(gum choose --header "KV cache quantization" --selected "q8" \
-      "q8   Q8_0 (recommended; saves RAM)" \
-      "f16  F16 (more RAM)") || exit 1
+    kv=$(gum choose --header "KV cache quantization" --selected "q8   Q8_0" \
+      "q8   Q8_0" \
+      "f16  F16") || exit 1
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;
@@ -159,9 +159,9 @@ case "$id" in
     pi_thinking_level="max"
     args+=" --force-vulkan --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on   native MTP" \
-      "on   native MTP" \
-      "off  base model") || exit 1
+    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
+      "on  MTP" \
+      "off  Base") || exit 1
     case "${mtp%%[ ]*}" in
       on)
         args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_MTP --spec-draft-n-max 3 --spec-draft-p-min 0.75"
@@ -172,10 +172,10 @@ case "$id" in
     esac
 
     effort=$(gum choose --header "thinking / reasoning effort" \
-      "xhigh   deep reasoning (Pi cptr max; default)" \
-      "medium  balanced reasoning" \
-      "low     fast / concise reasoning" \
-      "off     instruct mode (no thinking)") || exit 1
+      "xhigh  Xhigh" \
+      "medium Medium" \
+      "low    Low" \
+      "off    Off") || exit 1
     case "${effort%%[ ]*}" in
       xhigh)
         pi_thinking_level="max"
@@ -195,9 +195,9 @@ case "$id" in
         ;;
     esac
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || exit 1
+    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
+      "f16  F16" \
+      "q8   Q8_0") || exit 1
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;
@@ -210,9 +210,9 @@ case "$id" in
     pi_thinking_level="max"
     args+=" --force-vulkan --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on"
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on   native MTP" \
-      "on   native MTP" \
-      "off  base model") || exit 1
+    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
+      "on  MTP" \
+      "off  Base") || exit 1
     case "${mtp%%[ ]*}" in
       on)
         args+=" --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75"
@@ -222,19 +222,19 @@ case "$id" in
         ;;
     esac
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || exit 1
+    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
+      "f16  F16" \
+      "q8   Q8_0") || exit 1
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;
     esac
     ;;
   Qwen3.8-*)
-    mtp=$(gum choose --header "speculative decoding" --selected "dflash2" \
-      "dflash2  block-diffusion drafter (needs draft GGUF, ~1.5x MTP)" \
-      "on       MTP (built-in draft, no extra model)" \
-      "off") || exit 1
+    mtp=$(gum choose --header "speculative decoding" --selected "dflash2  DFlash2" \
+      "dflash2  DFlash2" \
+      "on       MTP" \
+      "off      None") || exit 1
     case "${mtp%%[ ]*}" in
       dflash2)
         if [[ "$id" == *"ROCmFP4"* ]]; then
@@ -253,10 +253,10 @@ case "$id" in
     esac
 
     effort=$(gum choose --header "thinking / reasoning effort" \
-      "xhigh   deep reasoning (Pi cptr max; default)" \
-      "medium  balanced reasoning" \
-      "low     fast / concise reasoning" \
-      "off     instruct mode (no thinking)") || exit 1
+      "xhigh  Xhigh" \
+      "medium Medium" \
+      "low    Low" \
+      "off    Off") || exit 1
     case "${effort%%[ ]*}" in
       xhigh)
         pi_thinking_level="max"
@@ -276,35 +276,39 @@ case "$id" in
         ;;
     esac
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || exit 1
+    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
+      "f16  F16" \
+      "q8   Q8_0") || exit 1
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;
     esac
     ;;
   DeepSeek-*)
-    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || exit 1
-    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
+      "on  MTP" \
+      "off  None") || exit 1
+    [[ "${mtp%%[ ]*}" == "off" ]] && args+=" --spec-type none"
     args+=" $DS4FLASH_SAMPLING"
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || exit 1
+    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
+      "f16  F16" \
+      "q8   Q8_0") || exit 1
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;
     esac
     ;;
   Qwen3.6-MoE-*)
-    mtp=$(gum choose --header "speculative decoding" --selected "on" "on" "off") || exit 1
-    [[ "$mtp" == "off" ]] && args+=" --spec-type none"
+    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
+      "on  MTP" \
+      "off  None") || exit 1
+    [[ "${mtp%%[ ]*}" == "off" ]] && args+=" --spec-type none"
     args+=" $QWEN_SAMPLING"
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16" \
-      "f16  default (unquantized f16)" \
-      "q8   Q8 kv cache (saves RAM)") || exit 1
+    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
+      "f16  F16" \
+      "q8   Q8_0") || exit 1
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;

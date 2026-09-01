@@ -207,77 +207,77 @@
       "models": [
         {
           "id": "Qwen3.6-MoE-35B-Q8",
-          "name": "Qwen3.6 MoE 35B Q8 (Lemonade)",
+          "name": "Qwen3.6 MoE 35B | Q8",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
         },
         {
           "id": "Tiel-Coder-35B-A3B-MTP-Q8",
-          "name": "Tiel Coder 35B A3B Q8 (Nathan Vulkan, MTP)",
+          "name": "Tiel Coder 35B A3B | Q8",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
         },
         {
           "id": "DeepSeek-V4-Flash-Q2",
-          "name": "DeepSeek V4 Flash Q2 (MoE 90GB)",
+          "name": "DeepSeek V4 Flash | Q2",
           "reasoning": true,
           "contextWindow": 131072,
           "maxTokens": 131072
         },
         {
           "id": "DeepSeek-V4-Flash-Q3",
-          "name": "DeepSeek V4 Flash Q3 (MoE 104GB)",
+          "name": "DeepSeek V4 Flash | Q3",
           "reasoning": true,
           "contextWindow": 131072,
           "maxTokens": 131072
         },
         {
           "id": "DeepSeek-V4-Flash-Q2K",
-          "name": "DeepSeek V4 Flash Q2_K_XL (MoE 97GB)",
+          "name": "DeepSeek V4 Flash | Q2_K_XL",
           "reasoning": true,
           "contextWindow": 131072,
           "maxTokens": 131072
         },
         {
           "id": "Qwen3.8-27B-Q4",
-          "name": "Qwen3.8 Dense 27B Q4 (Vulkan)",
+          "name": "Qwen3.8 Dense 27B | Q4",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
         },
         {
           "id": "Qwen3.8-27B-Q6",
-          "name": "Qwen3.8 Dense 27B Q6 (Vulkan)",
+          "name": "Qwen3.8 Dense 27B | Q6",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
         },
         {
           "id": "Qwen3.8-27B-ROCmFP4",
-          "name": "Qwen3.8 Dense 27B ROCmFP4 (Laurent Vulkan)",
+          "name": "Qwen3.8 Dense 27B | ROCmFP4",
           "reasoning": true,
           "contextWindow": 131072,
           "maxTokens": 131072
         },
         {
           "id": "UD-Q4_K_XL",
-          "name": "Qwen3.8 Flash Next Q4 (Nathan Vulkan, mmap lazy, vision)",
+          "name": "Qwen3.8 Flash Next | Q4",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
         },
         {
           "id": "Qwen3.8-Flash-Next-ROCmFP4",
-          "name": "Qwen3.8 Flash Next ROCmFP4 imatrix (Laurent Vulkan, RAM, adaptive MTP)",
+          "name": "Qwen3.8 Flash Next | ROCmFP4",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
         },
         {
           "id": "Qwen3.8-Flash-CIRU-STRIX-IU4",
-          "name": "Qwen3.8 Flash CIRU IU4 (ROCm HIP, PLE NVMe Sidecar, MTP)",
+          "name": "Qwen3.8 Flash | CIRU IU4",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
