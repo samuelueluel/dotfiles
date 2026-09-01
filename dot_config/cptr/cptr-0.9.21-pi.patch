@@ -1,6 +1,6 @@
 --- cptr/utils/agents/pi.py
 +++ cptr/utils/agents/pi.py
-@@ -6,8 +6,10 @@
+@@ -6,8 +6,10 @@ import asyncio
  import codecs
  import collections
  import json
@@ -11,7 +11,7 @@
  from typing import Any, AsyncIterator
  
  from cptr.utils.agents.attachments import PreparedAgentAttachments
-@@ -22,20 +24,80 @@
+@@ -22,20 +24,80 @@ from cptr.utils.agents.events import (
  )
  
  
@@ -101,7 +101,7 @@
  
  
  def _message_text(messages: list[dict[str, Any]], system_prompt: str, resumed: bool) -> str:
-@@ -59,7 +121,10 @@
+@@ -59,7 +121,10 @@ def _message_text(messages: list[dict[str, Any]], system_prompt: str, resumed: b
      return "\n\n".join(parts)
  
  
@@ -113,7 +113,7 @@
      event_type = event.get("type")
      if event_type == "message_update":
          delta = event.get("assistantMessageEvent")
-@@ -76,10 +141,10 @@
+@@ -76,10 +141,10 @@ def translate_event(event: dict[str, Any]) -> AgentEvent | None:
          call_id = event.get("toolCallId")
          if not isinstance(call_id, str) or not call_id:
              return None
@@ -127,7 +127,7 @@
      elif event_type == "tool_execution_end":
          call_id = event.get("toolCallId")
          if not isinstance(call_id, str) or not call_id:
-@@ -87,18 +152,28 @@
+@@ -87,18 +152,28 @@ def translate_event(event: dict[str, Any]) -> AgentEvent | None:
          return AgentToolUpdate(
              call_id,
              "failed" if event.get("isError") else "completed",
@@ -158,7 +158,7 @@
      previous = sent.get(call_id, "")
      replace = not full.startswith(previous)
      delta = full if replace else full[len(previous) :]
-@@ -108,9 +183,7 @@
+@@ -108,9 +183,7 @@ def tool_output_delta(event: dict[str, Any], sent: dict[str, str]) -> AgentToolO
      return AgentToolOutputDelta(
          call_id,
          delta,
@@ -169,7 +169,7 @@
          replace,
      )
  
-@@ -118,11 +191,19 @@
+@@ -118,11 +191,19 @@ def tool_output_delta(event: dict[str, Any], sent: dict[str, str]) -> AgentToolO
  class PiRpcClient:
      """Small stdio client for ``pi --mode rpc``."""
  
@@ -190,20 +190,28 @@
          self.proc: asyncio.subprocess.Process | None = None
          self.reader_task: asyncio.Task[None] | None = None
          self.stderr_task: asyncio.Task[None] | None = None
-@@ -133,6 +214,8 @@
+@@ -133,6 +214,10 @@ class PiRpcClient:
  
      async def start(self) -> None:
          args = ["--mode", "rpc"]
++        if self.env.get("PI_CPTR_HEADLESS") == "1":
++            args.extend(["--exclude-tools", _CPTR_HEADLESS_EXCLUDED_TOOLS])
 +        for path in self.append_system_prompt_paths:
 +            args.extend(["--append-system-prompt", path])
          if self.model and self.model != "default":
              args.extend(["--model", self.model])
          self.proc = await asyncio.create_subprocess_exec(
-@@ -238,6 +321,25 @@
+@@ -238,6 +323,31 @@ class PiRpcClient:
          )
  
  
 +_COMPLETION_METADATA_TIMEOUT = 5.0
++
++# cptr-pi-headless-tool-filter-v1
++_CPTR_HEADLESS_EXCLUDED_TOOLS = (
++    "ask_user,write,edit,powershell,session_handoff,mcp_disconnect,Agent,"
++    "get_subagent_result,steer_subagent,SubagentWorkflow,mcpScript"
++)
 +
 +
 +async def _best_effort_completion_request(
@@ -225,7 +233,7 @@
  async def run_pi_agent(
      *,
      profile: dict[str, Any],
-@@ -252,7 +354,14 @@
+@@ -252,7 +362,14 @@ async def run_pi_agent(
      env = os.environ.copy()
      if profile.get("home"):
          env["HOME"] = os.path.expanduser(str(profile["home"]))
@@ -241,7 +249,7 @@
      session_file = (resume_state or {}).get("session_file")
      resumed = isinstance(session_file, str) and bool(session_file)
  
-@@ -260,6 +369,17 @@
+@@ -260,6 +377,17 @@ async def run_pi_agent(
          await client.start()
          if resumed:
              await client.request("switch_session", {"sessionPath": session_file})
@@ -259,7 +267,7 @@
          images = [
              {"type": "image", "data": image.base64, "mimeType": image.mime_type}
              for image in attachments.images
-@@ -273,8 +393,9 @@
+@@ -273,8 +401,9 @@ async def run_pi_agent(
          )
  
          sent: dict[str, str] = {}
@@ -270,7 +278,7 @@
              if event.get("type") == "process_exited":
                  yield AgentError(client.error_detail(str(event.get("message") or "Pi exited")))
                  return
-@@ -286,33 +407,48 @@
+@@ -286,33 +415,48 @@ async def run_pi_agent(
                  )
                  return
              if event.get("type") == "tool_execution_update":
@@ -331,7 +339,7 @@
          raise
 --- cptr/routers/gateway.py
 +++ cptr/routers/gateway.py
-@@ -26,13 +26,14 @@
+@@ -26,13 +26,14 @@ import uuid
  from pathlib import Path
  
  from fastapi import APIRouter, HTTPException, Request
@@ -347,7 +355,7 @@
  
  logger = logging.getLogger(__name__)
  
-@@ -44,7 +45,6 @@
+@@ -44,7 +45,6 @@ OWUI_CHAT_ID_HEADER = "X-OpenWebUI-Chat-Id"
  OWUI_MESSAGE_ID_HEADER = "X-OpenWebUI-Message-Id"
  OWUI_TASK_HEADER = "X-OpenWebUI-Task"
  
@@ -355,7 +363,7 @@
  # ── API key management ───────────────────────────────────────
  
  
-@@ -62,15 +62,137 @@
+@@ -62,15 +62,137 @@ def _hash_key(raw: str) -> str:
      return hashlib.sha256(raw.encode()).hexdigest()
  
  
@@ -496,7 +504,7 @@
  
  
  async def _authenticate(request: Request) -> str:
-@@ -126,7 +248,9 @@
+@@ -126,7 +248,9 @@ async def list_models(request: Request):
                  "object": "model",
                  "created": ws.created_at or int(time.time()),
                  "owned_by": "cptr",
@@ -507,7 +515,7 @@
                  # Extra metadata for cptr
                  "cptr_workspace": ws.path,
              }
-@@ -147,7 +271,8 @@
+@@ -147,7 +271,8 @@ class ChatCompletionRequest(BaseModel):
      model: str
      messages: list[dict]
      stream: bool = False
@@ -517,7 +525,7 @@
      temperature: float | None = None
      max_tokens: int | None = None
      top_p: float | None = None
-@@ -216,7 +341,7 @@
+@@ -216,7 +341,7 @@ async def create_chat_completion(request: Request, body: ChatCompletionRequest):
  
      if body.stream:
          return StreamingResponse(
@@ -526,7 +534,7 @@
              media_type="text/event-stream",
              headers={
                  "Cache-Control": "no-cache",
-@@ -226,7 +351,7 @@
+@@ -226,7 +351,7 @@ async def create_chat_completion(request: Request, body: ChatCompletionRequest):
          )
      else:
          # Non-streaming: collect all text, return as single response
@@ -535,7 +543,7 @@
          return {
              "id": completion_id,
              "object": "chat.completion",
-@@ -237,11 +362,7 @@
+@@ -237,11 +362,7 @@ async def create_chat_completion(request: Request, body: ChatCompletionRequest):
                  "message": {"role": "assistant", "content": full_text},
                  "finish_reason": "stop",
              }],
@@ -548,7 +556,7 @@
          }
  
  
-@@ -392,6 +513,7 @@
+@@ -392,6 +513,7 @@ async def _stream(
      completion_id: str,
      created: int,
      model: str,
@@ -556,13 +564,23 @@
  ):
      """Translate queue events → OpenAI SSE chunks."""
  
-@@ -411,149 +533,167 @@
+@@ -411,149 +533,167 @@ async def _stream(
          }
          return f"data: {json.dumps(data)}\n\n"
  
 -    # Initial chunk with role
 -    yield _chunk({"role": "assistant", "content": ""})
--
++    def _usage_chunk(usage: dict) -> str:
++        data = {
++            "id": completion_id,
++            "object": "chat.completion.chunk",
++            "created": created,
++            "model": model,
++            "choices": [],
++            "usage": usage,
++        }
++        return f"data: {json.dumps(data)}\n\n"
+ 
 -    while True:
 -        try:
 -            event = await asyncio.wait_for(queue.get(), timeout=300)
@@ -603,27 +621,19 @@
 -            yield _chunk({}, "stop")
 -            yield "data: [DONE]\n\n"
 -            return
-+    def _usage_chunk(usage: dict) -> str:
-+        data = {
-+            "id": completion_id,
-+            "object": "chat.completion.chunk",
-+            "created": created,
-+            "model": model,
-+            "choices": [],
-+            "usage": usage,
-+        }
-+        return f"data: {json.dumps(data)}\n\n"
- 
+-
 -        # Other output types are persisted in cptr's DB and visible in its sidebar.
+-
+-
+-async def _collect(queue: asyncio.Queue) -> str:
+-    """Collect all text from the queue for non-streaming mode."""
 +    try:
 +        # Initial chunk with role
 +        yield _chunk({"role": "assistant", "content": ""})
- 
++
 +        while True:
 +            event = await queue.get()
- 
--async def _collect(queue: asyncio.Queue) -> str:
--    """Collect all text from the queue for non-streaming mode."""
++
 +            if event is None:
 +                # Sentinel: stream complete
 +                yield _chunk({}, "stop")
@@ -734,13 +744,13 @@
      model_id: str,
 -) -> dict | None:
 -    """Detect OWUI utility tasks and proxy them directly to the LLM.
-+) -> dict | JSONResponse | None:
-+    """Proxy explicit Open WebUI utility tasks without creating an agent chat.
- 
+-
 -    Detection priority:
 -      1. X-OpenWebUI-Task header (set via custom header template {{TASK}})
 -      2. Message content pattern matching (fallback)
--
++) -> dict | JSONResponse | None:
++    """Proxy explicit Open WebUI utility tasks without creating an agent chat.
+ 
 -    Returns a response dict if this is a utility task, or None if it should
 -    go through the normal agentic loop.
 +    Utility requests must carry the configured task header. Prompt-text
@@ -758,14 +768,14 @@
 -
 -    # 2. Message content pattern matching (fallback)
 -    if not body.messages:
--        return None
--
--    last_msg = body.messages[-1]
--    content = last_msg.get("content", "") if isinstance(last_msg, dict) else ""
--    if not isinstance(content, str):
 +    if not task_header:
          return None
  
+-    last_msg = body.messages[-1]
+-    content = last_msg.get("content", "") if isinstance(last_msg, dict) else ""
+-    if not isinstance(content, str):
+-        return None
+-
 -    is_utility = any(pattern in content for pattern in _UTILITY_PATTERNS)
 -    if not is_utility:
 -        return None
@@ -832,7 +842,7 @@
          result = await chat_completion(
              provider=provider,
              base_url=base_url,
-@@ -562,9 +702,25 @@
+@@ -562,9 +702,25 @@ async def _proxy_to_llm(
              messages=body.messages,
              max_tokens=200,
          )
@@ -861,7 +871,7 @@
  
      completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
      return {
-@@ -574,14 +730,10 @@
+@@ -574,14 +730,10 @@ async def _proxy_to_llm(
          "model": body.model,
          "choices": [{
              "index": 0,
@@ -878,7 +888,7 @@
      }
  
  
-@@ -729,6 +881,20 @@
+@@ -729,6 +881,20 @@ async def _ensure_chat(
                      meta.get("client_chat_id") == client_chat_id
                      or meta.get("owui_chat_id") == client_chat_id
                  ):
@@ -899,7 +909,7 @@
                      return chat.id
  
      # Create a new chat
-@@ -742,7 +908,8 @@
+@@ -742,7 +908,8 @@ async def _ensure_chat(
              title = first_user.strip() or title
  
      meta = {
@@ -911,7 +921,7 @@
      if client_chat_id:
 --- cptr/utils/chat_task.py
 +++ cptr/utils/chat_task.py
-@@ -416,13 +416,31 @@
+@@ -416,13 +416,31 @@ def start_task(
      asyncio.create_task(emit_active())
  
  
@@ -949,7 +959,7 @@
  
  
  def is_running(message_id: str) -> bool:
-@@ -441,6 +459,36 @@
+@@ -441,6 +459,36 @@ def get_active_chat_ids() -> set[str]:
      return {cid for mid, cid in _task_chat.items() if mid in _tasks and not _tasks[mid].done()}
  
  
@@ -986,7 +996,7 @@
  def _plain_message_text(content) -> str:
      if isinstance(content, list):
          return " ".join(
-@@ -1410,9 +1458,13 @@
+@@ -1410,9 +1458,13 @@ async def run_chat_task(
                  if "error" in data:
                      await output_queue.put({"type": "error", "message": data["error"]})
                  else:
@@ -1002,7 +1012,7 @@
          """Emit done=True enriched with chat title and content preview."""
          try:
              chat_obj = await Chat.get_by_id(chat_id)
-@@ -1425,13 +1477,16 @@
+@@ -1425,13 +1477,16 @@ async def run_chat_task(
              await clear_active_tasks(chat_id, user_id, message_id)
          except Exception:
              logger.debug("[task %s] clear_active_tasks failed", message_id[:8], exc_info=True)
@@ -1026,7 +1036,7 @@
  
      event_workspace = (
          {"id": workspace, "name": workspace.rstrip("/").rsplit("/", 1)[-1]} if workspace else None
-@@ -1526,7 +1581,7 @@
+@@ -1526,7 +1581,7 @@ async def run_chat_task(
              "profile_id": agent_target.profile_id,
              "agent": agent_target.agent,
              "model": agent_target.model,
@@ -1035,7 +1045,7 @@
              "updated_at": now_ms(),
          }
          meta["agent_sessions"] = sessions
-@@ -1593,7 +1648,14 @@
+@@ -1593,7 +1648,14 @@ async def run_chat_task(
              if isinstance(sessions, dict):
                  candidate = sessions.get(agent_target.profile_id)
                  if isinstance(candidate, dict):
@@ -1051,7 +1061,23 @@
  
          runners = {
              "codex": run_codex_agent,
-@@ -1794,16 +1856,17 @@
+@@ -1716,10 +1778,14 @@ async def run_chat_task(
+                         ),
+                         None,
+                     )
++                    # cptr-pi-final-tool-output-v1: progress updates may precede
++                    # the tool's authoritative final result. Preserve progress only
++                    # when the final event has no textual output; otherwise replace
++                    # it so the model receives the actual result.
+                     if (
+                         existing_output
+                         and existing_output.get("output")
+-                        and capped_event_output is not None
++                        and not event.output
+                     ):
+                         _sync_state()
+                         continue
+@@ -1794,16 +1860,17 @@ async def run_chat_task(
                  flushed_item = _flush_text()
                  if flushed_item:
                      await emit(output=flushed_item)
@@ -1071,7 +1097,7 @@
                  preview = content[:300] if content else ""
                  await publish_event(
                      EVENTS.CHAT_FINISHED,
-@@ -2362,7 +2425,7 @@
+@@ -2362,7 +2429,7 @@ async def run_chat_task(
                              done=True,
                          )
                          _task_state.pop(message_id, None)
@@ -1082,7 +1108,7 @@
                              EVENTS.CHAT_FINISHED,
 --- cptr/utils/context.py
 +++ cptr/utils/context.py
-@@ -73,22 +73,91 @@
+@@ -73,22 +73,91 @@ def build_context_usage(tokens: int, *, threshold: int | None = None) -> dict:
  
  
  def normalize_usage(usage: dict | None) -> dict | None:

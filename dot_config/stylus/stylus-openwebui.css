@@ -312,7 +312,6 @@ code {
 
 /* Chat input */
 #chat-input,
-#chat-input *,
 textarea,
 input,
 select {
@@ -331,10 +330,6 @@ input::placeholder {
 #chat-container .bg-linear-to-t {
     background-color: var(--gb-bg-alt) !important;
     padding-top: 0.6rem;
-}
-
-.base.enter.svelte-ug60r4 {
-    background-color: var(--gb-surface) !important;
 }
 
 /* Send button */
@@ -512,4 +507,89 @@ nav:has(#navbar-bg-gradient-to-b) * {
     display: none !important;
     background: none !important;
     background-image: none !important;
+}
+
+/* Open WebUI 0.11.3 refinements */
+
+/* Stop-generation button */
+.app button[aria-label="Stop"] {
+    background-color: var(--gb-red) !important;
+    color: var(--gb-bg) !important;
+    border: 1px solid var(--gb-red) !important;
+}
+
+.app button[aria-label="Stop"]:hover {
+    background-color: var(--gb-orange) !important;
+}
+
+.app button[aria-label="Stop"] svg,
+.app button[aria-label="Stop"] svg path {
+    color: var(--gb-bg) !important;
+    fill: var(--gb-bg) !important;
+    stroke: var(--gb-bg) !important;
+}
+
+.app button[aria-label="Stop"]:focus-visible {
+    outline: 2px solid var(--gb-blue) !important;
+    outline-offset: 2px;
+}
+
+/* Active response cursor */
+#response-content-container
+span.inline-block.animate-pulse[class*="bg-gray-"] {
+    width: 0.1875rem !important;
+    height: 1.05em !important;
+    opacity: 1;
+    transform-origin: bottom;
+    animation: gruvbox-working-cursor 1.1s ease-in-out infinite !important;
+}
+
+@keyframes gruvbox-working-cursor {
+    0%,
+    100% {
+        background-color: var(--gb-blue);
+        opacity: 0.65;
+        transform: scaleY(0.85);
+        box-shadow: none;
+    }
+
+    50% {
+        background-color: var(--gb-orange);
+        opacity: 1;
+        transform: scaleY(1.08);
+        box-shadow: 0 0 0.25rem rgba(175, 58, 3, 0.4);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #response-content-container
+    span.inline-block.animate-pulse[class*="bg-gray-"] {
+        background-color: var(--gb-blue) !important;
+        opacity: 1;
+        transform: none;
+        animation: none !important;
+    }
+}
+
+/* CPTR tool-call labels */
+#response-content-container
+p:has(> strong:first-child + code)
+> strong:has(+ code) {
+    color: var(--gb-blue) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.015em;
+}
+
+/* Unified Gruvbox chat-input surface */
+#message-input-container {
+    background: var(--gb-surface) !important;
+    border: 1px solid var(--gb-border) !important;
+    background-clip: padding-box !important;
+}
+
+#message-input-container #chat-input-container,
+#message-input-container #chat-input,
+#message-input-container #chat-input .ProseMirror,
+#message-input-container #chat-input .ProseMirror > p {
+    background: transparent !important;
 }

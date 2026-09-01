@@ -34,7 +34,8 @@ All vault operations at `~/Dropbox/Sam-Obsidian-Vault/` **must** use TurboVault 
 
 Split vault operations by purpose to prevent KV cache pollution:
 
-1. **Discovery (Result Sets $\to$ Research Subagent):**
-   - Delegate operations that return match lists or graph traversals (`search`, `advanced_search`, `semantic_search`, `get_backlinks`, `get_related_notes`, `query_frontmatter_sql`, `get_broken_links`) to `invoke_subagent` (`TypeName: "research"`).
+1. **Broad Discovery (Unknown Result Sets):**
+   - In regular Pi, use the current read-only `Explore` agent only for genuinely broad, unknown result sets such as `search`, `advanced_search`, `semantic_search`, `get_backlinks`, `get_related_notes`, `query_frontmatter_sql`, or `get_broken_links`.
+   - Known paths, notes already read, and small bounded searches stay inline in the main session. In CPTR/headless mode, subagents are unavailable, so permitted vault discovery stays inline.
 2. **Working-Set Reads (Main Session Inline):**
    - Call `turbovault_read_note` directly in the main session when reading specific working files being actively analyzed, quoted, or edited.

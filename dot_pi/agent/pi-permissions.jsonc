@@ -26,10 +26,7 @@
     // Read-only session/advisor surfaces.
     "session_search": "allow",
     "session_ask": "allow",
-    "ask_advisor": "allow",
-
-    // Safe MCP lifecycle cleanup after a completed server task.
-    "mcp_disconnect": "allow",
+    "advisor": "allow",
 
     // Namespace proxies are allowed here so permission-mode.ts can inspect
     // their forwarded {tool, args} payload and retain modes.ts' exact
@@ -163,7 +160,10 @@
     "*": "allow"
   },
   "special": {
-    // Preserve a stronger external-path boundary than the old modes.ts code.
-    "external_directory": "ask"
+    // Home is readable by the filesystem MCP; its container mount enforces
+    // read-only access outside the dedicated Open WebUI write folder.
+    "external_directory": "ask",
+    "external_directory:/var/home/samuel": "allow",
+    "external_directory:/var/home/samuel/*": "allow"
   }
 }

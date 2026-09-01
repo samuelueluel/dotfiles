@@ -1,6 +1,7 @@
 # Theme
 theme = Gruvbox Light
-background = #f2e5bc
+# light0_hard (high contrast). previous: light0_soft = #f2e5bc
+background = #f9f5d7
 cursor-style = block
 shell-integration-features = no-cursor
 env = GHOSTTY_PROFILE=write

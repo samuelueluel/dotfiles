@@ -50,7 +50,7 @@ from typing import Any, Callable
 
 
 SCRIPT_NAME = "llm-bench"
-SCRIPT_VERSION = "2.2"
+SCRIPT_VERSION = "2.3"
 DEFAULT_BASE_URL = "http://127.0.0.1:13305/api/v1"
 DEFAULT_OUTDIR = Path.home() / ".local/share/ramalama/benchmarks"
 LOCK_PATH = DEFAULT_OUTDIR / "llm-bench.lock"
@@ -429,6 +429,23 @@ SPEC_FLAG_NAMES = {
     "--speculative",
 }
 
+# These paths are inside the Lemonade container, not on the host.  They mirror
+# the launcher profile in lem-load-model for models whose registry recipe does
+# not carry the external MTP sidecar by default.
+EXTERNAL_MTP_PROFILES: dict[str, dict[str, Any]] = {
+    "UD-Q4_K_XL": {
+        "draft_model": "/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf",
+        "n_max": 3,
+        "p_min": 0.75,
+    },
+}
+
+# Models in this set contain their MTP layers in the target GGUF and therefore
+# do not need --spec-draft-model when switching from an off registry recipe.
+EMBEDDED_MTP_MODELS = {
+    "Tiel-Coder-35B-A3B-MTP-Q8",
+}
+
 
 def spec_method(tokens: list[str]) -> str:
     value = option_value(tokens, {"--spec-type"})
@@ -447,6 +464,7 @@ def spec_method(tokens: list[str]) -> str:
 
 
 def apply_spec_overrides(
+    model_id: str,
     tokens: list[str],
     requested: str,
     draft_model: str | None,
@@ -458,6 +476,29 @@ def apply_spec_overrides(
 ) -> list[str]:
     requested = requested.lower()
     current = spec_method(tokens)
+    profile = EXTERNAL_MTP_PROFILES.get(model_id)
+    canonical_draft = option_value(tokens, {"--spec-draft-model", "-md"})
+
+    # An explicit MTP request should be safe to use from the command line.  If
+    # the registry recipe is off, fill only the missing Flash Next profile
+    # values; explicit CLI values always win.  Other off->MTP transitions need
+    # an explicit compatible draft unless the target GGUF embeds MTP layers.
+    if requested in {"mtp", "mtp-ngram"} and current != requested:
+        if draft_model is None:
+            draft_model = canonical_draft
+        if profile:
+            if draft_model is None:
+                draft_model = str(profile["draft_model"])
+            if n_max is None:
+                n_max = int(profile["n_max"])
+            if p_min is None:
+                p_min = float(profile["p_min"])
+        if current == "off" and draft_model is None and model_id not in EMBEDDED_MTP_MODELS:
+            raise BenchmarkError(
+                f"{model_id}: --spec {requested} requires --spec-draft-model <path> "
+                "because its registry recipe is off and no compatible MTP profile is known"
+            )
+
     if requested == "canonical":
         result = list(tokens)
     elif requested == "off":
@@ -1674,9 +1715,12 @@ Examples:
   llm-bench --models Qwen3.8-27B-Q4 --spec canonical --spec-n-max 6 --runs 2
   llm-bench --list-models
 
-The default model arguments come from Lemonade's registry.  --spec off and the
-spec-* flags are temporary request overrides; no recipe option is saved.  Use
---spec mtp-ngram to chain native MTP with ngram-mod speculative decoding.
+The default model arguments come from Lemonade's registry.  --spec canonical
+preserves the live registry recipe; it does not use lem-load-model's interactive
+launcher defaults.  --spec off and the spec-* flags are temporary request
+overrides; no recipe option is saved.  Use --spec mtp-ngram to chain native MTP
+with ngram-mod speculative decoding.  Flash Next's external MTP profile is
+selected automatically by --spec mtp when no compatible draft is supplied.
 """,
     )
     parser.add_argument("--models", type=parse_csv_models, help="comma-separated Lemonade model IDs")
@@ -1686,7 +1730,10 @@ spec-* flags are temporary request overrides; no recipe option is saved.  Use
     parser.add_argument("--tasks", type=parse_tasks, help="explicit tasks: prose,stata (legacy reading/writing aliases; overrides --suite)")
     parser.add_argument("--depths", type=parse_depths, help="comma-separated depths such as 0,30k,60000")
     parser.add_argument("--runs", type=int, help=f"attempted repetitions per task/depth cell (default: {DEFAULT_RUNS})")
-    parser.add_argument("--spec", default=None, help="canonical, off, mtp, mtp-ngram, dflash, or dspark (default: canonical)")
+    parser.add_argument(
+        "--spec", default=None,
+        help="registry canonical, off, mtp, mtp-ngram, dflash, or dspark (default: canonical)",
+    )
     parser.add_argument("--spec-draft-model", help="temporary draft GGUF path when changing spec method")
     parser.add_argument("--spec-n-max", type=int, help="temporary --spec-draft-n-max override")
     parser.add_argument("--spec-n-min", type=int, help="temporary --spec-draft-n-min override")
@@ -1817,6 +1864,7 @@ def resolve_model_meta(
     except ValueError as exc:
         raise BenchmarkError(f"cannot parse saved args for {model_id}: {exc}") from exc
     tokens = apply_spec_overrides(
+        model_id,
         tokens,
         args.spec or "canonical",
         args.spec_draft_model,

@@ -9,7 +9,7 @@ description: Manage notes, documents, and folder organization in Samuel's Obsidi
 
 - **TurboVault MCP Only:** All vault operations at `~/Dropbox/Sam-Obsidian-Vault/` **must** use `turbovault` MCP tools with descriptive `commit_message` parameters. **Never use raw shell commands (`cat`, `grep`, `sed`, `find`, `ls`) on vault notes.**
 - **Context Hygiene & Subagent Delegation:**
-  - **Discovery (Search / Backlinks / SQL / Graph):** Delegate result-set operations (`turbovault_search`, `turbovault_query_frontmatter_sql`, `get_backlinks`, etc.) to `invoke_subagent` (`TypeName: "research"`) to protect main KV cache.
+  - **Broad Discovery (Search / Backlinks / SQL / Graph):** In regular Pi, use the current read-only `Explore` agent only for genuinely broad, unknown result sets. Known paths, notes already read, and small bounded searches stay **inline in the main session**. In CPTR/headless mode, subagents are unavailable, so permitted vault discovery stays inline.
   - **Working-Set Reads:** `turbovault_read_note` on known paths stays **inline in the main session**.
 - **Note Naming:** `Title-Case-With-Hyphens.md` (no spaces/symbols). Literature: `Author-Year-Slug.md`. Logs/Memories: `Topic-Slug.md` or `YYYY-MM-DD-slug.md`.
 - **Headings & Numbering:** Filename serves as note title. Start note body directly at `H1` (`#`). **Never alter or remove existing heading numbers** (managed by Obsidian Number Headings plugin); write plain text for new headings.

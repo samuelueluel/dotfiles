@@ -17,6 +17,7 @@
     "text": "#3c3836",
     "muted": "#665c54",
     "dim": "#928374",
+    "userBox": "#ebdbb2",
     "toolPendingBg": "#a8bebd",
     "toolSuccessBg": "#b0c5c4",
     "toolErrorBg": "#eccfc8"
@@ -34,7 +35,7 @@
     "text": "",
     "thinkingText": "muted",
     "selectedBg": "selected",
-    "userMessageBg": "selected",
+    "userMessageBg": "userBox",
     "userMessageText": "",
     "customMessageBg": "toolPendingBg",
     "customMessageText": "",

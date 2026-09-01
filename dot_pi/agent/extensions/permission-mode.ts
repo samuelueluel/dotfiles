@@ -47,15 +47,12 @@ const HEADLESS_ALLOWED_TOOLS = new Set([
   "get_search_content",
   "source_check",
   "preview_export",
-  "ask_user",
   "answer",
   "todo",
   "signal_loop_success",
   "session_search",
   "session_ask",
-  "ask_advisor",
-  // Safe MCP lifecycle cleanup: release a server after a completed task.
-  "mcp_disconnect",
+  "advisor",
 ]);
 
 const SAFE_BASH_COMMANDS = new Set([
@@ -637,6 +634,13 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     // The permission package refreshes its config during lifecycle events. Keep
     // its in-memory yolo state aligned with this window before its handler runs.
     synchronizeModeWithBackend(ctx);
+
+    // Open WebUI's filesystem MCP uses direct, server-prefixed tools when
+    // directTools is enabled. The MCP server enforces its exposed-directory
+    // boundary; CPTR only needs to let those names reach the server.
+    if (CPTR_HEADLESS && isScopedFilesystemOperation(event.toolName)) {
+      return {};
+    }
 
     if (isMcpToolCall(event.toolName)) {
       // The generic mcp tool's status/list/search/describe/connect forms are

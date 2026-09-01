@@ -1,10 +1,10 @@
 # MCP filesystem server for Open WebUI/Pi — lets the headless client read/edit
-# files inside one explicitly shared folder.
+# files in Samuel's home directory.
 #
-# Security model: only OpenWebUI-Access-Folder is mounted into the container and
-# exposed as the filesystem server root. The server cannot see the rest of
-# Samuel's home directory. Published on 127.0.0.1 only — nothing on the LAN
-# can reach it.
+# Security model: the whole home directory is mounted read-only, with one nested
+# writable folder for Open WebUI-created files. The server can see home files,
+# but the OS refuses writes anywhere except that writable folder. Published on
+# 127.0.0.1 only — nothing on the LAN can reach it.
 #
 # Endpoint for Open WebUI (Admin Settings -> External Tools):
 #   Type: MCP (Streamable HTTP)
@@ -19,10 +19,11 @@ Wants=network-online.target
 ContainerName=mcp-filesystem
 Image=docker.io/supercorp/supergateway:latest
 PublishPort=127.0.0.1:8000:8000
+Volume=%h:%h:ro
 Volume=/var/home/samuel/OpenWebUI-Access-Folder:/var/home/samuel/OpenWebUI-Access-Folder:rw
 SecurityLabelDisable=true
 Entrypoint=/bin/sh
-Exec=-c 'cd /usr/local/lib/node_modules/supergateway && npm install @modelcontextprotocol/sdk@latest --no-audit --no-fund --loglevel=error >/dev/null 2>&1; exec supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /var/home/samuel/OpenWebUI-Access-Folder" --outputTransport streamableHttp --port 8000 --streamableHttpPath /mcp'
+Exec=-c 'cd /usr/local/lib/node_modules/supergateway && npm install @modelcontextprotocol/sdk@latest --no-audit --no-fund --loglevel=error >/dev/null 2>&1; exec supergateway --stdio "npx -y @modelcontextprotocol/server-filesystem /var/home/samuel" --outputTransport streamableHttp --port 8000 --streamableHttpPath /mcp'
 AutoUpdate=registry
 
 [Service]
