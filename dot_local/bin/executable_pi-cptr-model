@@ -21,7 +21,6 @@ Usage:
 
 Examples:
   pi-cptr-model
-  pi-cptr-model use local/Qwen3.6-MoE-35B-Q4
   pi-cptr-model use openrouter-us/anthropic/claude-opus-4.8
 
 Local selections first run the shared Lemonade gum loader used by pi/beta.

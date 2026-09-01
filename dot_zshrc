@@ -880,7 +880,6 @@ _pi_pick_local_model() {
     "flash38-ciru Qwen3.8 Flash CIRU IU4" \
     "flash38-next Qwen3.8 Flash Next Q4" \
     "flash38-fp4  Qwen3.8 Flash Next ROCmFP4" \
-    "moe-q4       Qwen3.6 MoE 35B    Q4" \
     "moe-q8       Qwen3.6 MoE 35B    Q8" \
     "tiel-q8      Tiel Coder 35B A3B  Q8" \
     "dsv4fl-q2    DeepSeek V4 Flash Q2" \
@@ -893,7 +892,6 @@ _pi_pick_local_model() {
     flash38-next) print -r -- "UD-Q4_K_XL" ;;
     flash38-fp4)  print -r -- "Qwen3.8-Flash-Next-ROCmFP4" ;;
     dense38-fp4) print -r -- "Qwen3.8-27B-ROCmFP4" ;;
-    moe-q4)      print -r -- "Qwen3.6-MoE-35B-Q4" ;;
     moe-q8)      print -r -- "Qwen3.6-MoE-35B-Q8" ;;
     tiel-q8)     print -r -- "Tiel-Coder-35B-A3B-MTP-Q8" ;;
     dsv4fl-q2)   print -r -- "DeepSeek-V4-Flash-Q2" ;;

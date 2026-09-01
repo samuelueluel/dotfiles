@@ -80,21 +80,6 @@
     "size": 34.2,
     "suggested": true
   },
-  "Qwen3.6-MoE-35B-Q4": {
-    "checkpoints": {
-      "main": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL",
-      "mmproj": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:mmproj-BF16.gguf"
-    },
-    "labels": [
-      "custom",
-      "mtp",
-      "vision",
-      "tool-calling"
-    ],
-    "recipe": "llamacpp",
-    "size": 22.1,
-    "suggested": true
-  },
   "Qwen3.6-MoE-35B-Q8": {
     "checkpoints": {
       "main": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL",
