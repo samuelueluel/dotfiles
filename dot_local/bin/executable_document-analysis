@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""Chezmoi-installed launcher for the tracked document-analysis helper."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+package_dir = Path(__file__).resolve().parent.parent / "share" / "document-analysis"
+sys.path.insert(0, str(package_dir))
+
+from document_analysis import main  # noqa: E402
+
+raise SystemExit(main())
