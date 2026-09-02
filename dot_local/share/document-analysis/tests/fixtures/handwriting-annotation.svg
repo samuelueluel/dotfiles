@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+<rect width="1200" height="1600" fill="white"/>
+<text x="90" y="120" font-family="sans-serif" font-size="48" font-weight="bold">HANDWRITING AND ANNOTATION FIXTURE</text>
+<text x="90" y="210" font-family="sans-serif" font-size="32">Typed paragraph: The renewal date is shown above the margin note.</text>
+<text x="90" y="280" font-family="sans-serif" font-size="32">Typed paragraph: This page tests visual separation of print and markup.</text>
+<rect x="90" y="390" width="800" height="430" fill="#fafafa" stroke="#555" stroke-width="3"/>
+<text x="125" y="470" font-family="sans-serif" font-size="32">Printed clause: renewal date 2027-04-15</text>
+<text x="125" y="540" font-family="sans-serif" font-size="32">Printed clause: notice period 30 days</text>
+<text x="170" y="690" font-family="cursive" font-style="italic" font-size="46" fill="#173f9b">check this date?</text>
+<path d="M710 660 C860 560 930 450 1030 390" fill="none" stroke="#c21f39" stroke-width="8"/>
+<path d="M1030 390 L990 400 M1030 390 L1010 430" fill="none" stroke="#c21f39" stroke-width="8"/>
+<ellipse cx="360" cy="470" rx="270" ry="55" fill="none" stroke="#c21f39" stroke-width="7"/>
+<text x="930" y="520" font-family="cursive" font-style="italic" font-size="34" fill="#c21f39" transform="rotate(-12 930 520)">margin note</text>
+<text x="100" y="1040" font-family="sans-serif" font-size="30">The handwritten-style strings are synthetic and are not signatures.</text>
+</svg>

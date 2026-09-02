@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+<rect width="1200" height="1600" fill="white"/>
+<text x="90" y="120" font-family="sans-serif" font-size="50" font-weight="bold">FORM FIXTURE: Election form</text>
+<text x="90" y="200" font-family="sans-serif" font-size="32">Synthetic form for checkbox and signature detection.</text>
+<text x="120" y="370" font-family="sans-serif" font-size="34">Name:</text><line x1="280" y1="380" x2="1000" y2="380" stroke="black" stroke-width="3"/><text x="300" y="365" font-family="sans-serif" font-size="30">Test Person</text>
+<text x="120" y="560" font-family="sans-serif" font-size="34">Select one:</text>
+<rect x="150" y="650" width="55" height="55" fill="white" stroke="black" stroke-width="5"/><path d="M160 677 L175 695 L198 658" fill="none" stroke="black" stroke-width="8"/><text x="250" y="692" font-family="sans-serif" font-size="34">Accept</text>
+<rect x="150" y="790" width="55" height="55" fill="white" stroke="black" stroke-width="5"/><text x="250" y="832" font-family="sans-serif" font-size="34">Decline</text>
+<text x="120" y="1060" font-family="sans-serif" font-size="34">Signature:</text><line x1="340" y1="1070" x2="1000" y2="1070" stroke="black" stroke-width="3"/><text x="400" y="1045" font-family="cursive" font-style="italic" font-size="38">A. Rivera</text>
+<rect x="120" y="1210" width="880" height="170" fill="#f1f1f1" stroke="#555" stroke-width="3"/><text x="155" y="1280" font-family="sans-serif" font-size="30">For office use only</text><text x="155" y="1330" font-family="sans-serif" font-size="26">Do not infer any value from this synthetic fixture.</text>
+</svg>

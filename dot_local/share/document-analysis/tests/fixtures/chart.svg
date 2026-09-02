@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+<rect width="1200" height="1600" fill="white"/>
+<text x="90" y="110" font-family="sans-serif" font-size="46" font-weight="bold">CHART FIXTURE: Quarterly totals</text>
+<text x="90" y="170" font-family="sans-serif" font-size="28">Synthetic test page; printed values are intentionally known.</text>
+<line x1="170" y1="1320" x2="1080" y2="1320" stroke="black" stroke-width="5"/>
+<line x1="170" y1="360" x2="170" y2="1320" stroke="black" stroke-width="5"/>
+<line x1="170" y1="1080" x2="1080" y2="1080" stroke="#cccccc"/>
+<line x1="170" y1="840" x2="1080" y2="840" stroke="#cccccc"/>
+<line x1="170" y1="600" x2="1080" y2="600" stroke="#cccccc"/>
+<text x="105" y="1330" font-family="sans-serif" font-size="26">0</text>
+<text x="85" y="1090" font-family="sans-serif" font-size="26">50</text>
+<text x="70" y="850" font-family="sans-serif" font-size="26">100</text>
+<text x="70" y="610" font-family="sans-serif" font-size="26">150</text>
+<text x="70" y="370" font-family="sans-serif" font-size="26">200</text>
+<rect x="260" y="744" width="120" height="576" fill="#2878c8"/><rect x="470" y="648" width="120" height="672" fill="#2878c8"/><rect x="680" y="888" width="120" height="432" fill="#2878c8"/><rect x="890" y="552" width="120" height="768" fill="#2878c8"/>
+<text x="285" y="1375" font-family="sans-serif" font-size="30">Q1</text><text x="495" y="1375" font-family="sans-serif" font-size="30">Q2</text><text x="705" y="1375" font-family="sans-serif" font-size="30">Q3</text><text x="915" y="1375" font-family="sans-serif" font-size="30">Q4</text>
+<text x="520" y="1480" font-family="sans-serif" font-size="30">Quarter</text><text x="35" y="900" font-family="sans-serif" font-size="30" transform="rotate(-90 35 900)">Total units</text>
+<rect x="850" y="190" width="30" height="30" fill="#2878c8"/><text x="895" y="216" font-family="sans-serif" font-size="28">Actual</text>
+</svg>
