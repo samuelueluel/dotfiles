@@ -23,6 +23,17 @@
     "todo": "allow",
     "signal_loop_success": "allow",
 
+    // Exact private-document bridge tools. No wildcard is intentional: the
+    // bridge validates job IDs, routes, sessions, and destructive confirmation.
+    "document_analysis_list": "allow",
+    "document_analysis_status": "allow",
+    "document_analysis_attach": "allow",
+    "document_analysis_show": "allow",
+    "document_analysis_ingest": "allow",
+    "document_analysis_enrich": "allow",
+    "document_analysis_archive": "allow",
+    "document_analysis_delete": "allow",
+
     // Read-only session/advisor surfaces.
     "session_search": "allow",
     "session_ask": "allow",

@@ -1,5 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { cleanupSessionRuntime } from "../lib/session-runtime.js";
+import { documentRootAccess, routeFor } from "../lib/document-analysis-bridge-logic.ts";
+import { DOCUMENT_ANALYSIS_TOOL_NAMES } from "../lib/document-analysis-bridge-policy.ts";
 
 /**
  * Compatibility layer for the old modes.ts extension.
@@ -53,6 +55,10 @@ const HEADLESS_ALLOWED_TOOLS = new Set([
   "session_search",
   "session_ask",
   "advisor",
+  // Fixed, local-only document-analysis bridge tools. These are deliberately
+  // exact names; arbitrary shell commands and unknown extension tools remain
+  // blocked in CPTR headless mode.
+  ...DOCUMENT_ANALYSIS_TOOL_NAMES,
 ]);
 
 const SAFE_BASH_COMMANDS = new Set([
@@ -634,6 +640,23 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     // The permission package refreshes its config during lifecycle events. Keep
     // its in-memory yolo state aligned with this window before its handler runs.
     synchronizeModeWithBackend(ctx);
+
+    // Cloud/unknown routes must not bypass the private-document bridge through
+    // built-in reads, Bash, or the broad folder-scoped filesystem MCP. The
+    // OS/container boundary remains separate; this is a Pi policy guard.
+    const nonLocalHeadless = CPTR_HEADLESS && routeFor(ctx).classification !== "local";
+    if (nonLocalHeadless && event.toolName === "bash") {
+      return {
+        block: true,
+        reason: "Open WebUI Pi policy blocks all Bash commands on non-local or unknown routes; use an explicitly local route.",
+      };
+    }
+    if (nonLocalHeadless && documentRootAccess(event.toolName, event.input, ctx.cwd)) {
+      return {
+        block: true,
+        reason: "Open WebUI Pi policy blocks document-analysis paths on non-local or unknown routes; use an explicitly local route.",
+      };
+    }
 
     // Open WebUI's filesystem MCP uses direct, server-prefixed tools when
     // directTools is enabled. The MCP server enforces its exposed-directory
