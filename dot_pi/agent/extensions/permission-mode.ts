@@ -44,9 +44,9 @@ const HEADLESS_ALLOWED_TOOLS = new Set([
   "session_search",
   "session_ask",
   "advisor",
-  // Fixed, local-only document-analysis bridge tools. These are deliberately
-  // exact names; arbitrary shell commands and unknown extension tools remain
-  // blocked in CPTR headless mode.
+  // Fixed document-analysis bridge tools. The bridge separately requires a known
+  // route; these exact names do not grant arbitrary shell commands or unknown
+  // extension tools in CPTR headless mode.
   ...DOCUMENT_ANALYSIS_TOOL_NAMES,
 ]);
 
@@ -448,7 +448,7 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     if (nonLocalHeadless && documentRootAccess(event.toolName, event.input, ctx.cwd)) {
       return {
         block: true,
-        reason: "Open WebUI Pi policy blocks document-analysis paths on non-local or unknown routes; use an explicitly local route.",
+        reason: "Open WebUI Pi policy blocks direct document-analysis paths on cloud or unknown routes; use the exact document-analysis bridge tools.",
       };
     }
 

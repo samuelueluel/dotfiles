@@ -137,25 +137,11 @@ export function documentRootAccess(toolName: unknown, input: unknown, cwd: unkno
   return false;
 }
 
-export function routeLabel(route: Route): string {
-  return [route.provider, route.model, route.baseUrl].filter(Boolean).join("/") || "unknown";
-}
-
 export function requireKnownRoute(ctx: Pick<ExtensionContext, "model">): Route {
   const route = routeFor(ctx);
   if (route.classification === "unknown") {
     throw new Error(
       "document-analysis bridge cannot verify the active provider or endpoint; refusing to proceed.",
-    );
-  }
-  return route;
-}
-
-export function requireLocalRoute(ctx: Pick<ExtensionContext, "model">): Route {
-  const route = requireKnownRoute(ctx);
-  if (route.classification !== "local") {
-    throw new Error(
-      `document-analysis bridge refuses document content and enrichment on non-local route ${routeLabel(route)}. Select an explicitly local Pi model first.`,
     );
   }
   return route;
@@ -427,7 +413,6 @@ export async function requireBound(
   root: string,
   jobIdInput: unknown,
   sessionId: string,
-  route: Route,
 ): Promise<string> {
   const jobId = validJobId(jobIdInput);
   if (!text(sessionId)) throw new Error("document-analysis bridge cannot verify the current Pi/cptr session; refusing to proceed.");
@@ -439,9 +424,6 @@ export async function requireBound(
     throw new Error(
       "job is bound to a different Pi/cptr session; use document_analysis_attach with rebind=true and the exact job ID.",
     );
-  }
-  if (route.classification !== "local") {
-    throw new Error("document-analysis bridge requires a local route for bound document operations.");
   }
   return jobId;
 }

@@ -10,7 +10,7 @@ import {
   deleteCliArgs,
   inboxFilename,
   requireBound,
-  requireLocalRoute,
+  requireKnownRoute,
   requireSessionId,
   routeFor,
   validJobId,
@@ -95,13 +95,13 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "document_analysis_list",
     label: "Document Analysis: List",
-    description: "List document-analysis jobs without reading document content. Use this only to obtain explicit job IDs; never infer or choose a latest job.",
+    description: "List document-analysis jobs without reading document content. This exact bridge works on a known local or cloud Pi route; use it only to obtain explicit job IDs and never infer or choose a latest job.",
     promptSnippet: "List private document-analysis jobs without document content",
     parameters: Type.Object({
       status: Type.Optional(StringEnum(STATUS_FILTERS)),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      requireLocalRoute(ctx);
+      requireKnownRoute(ctx);
       requireSessionId(ctx);
       const value = await runCli(pi, "list", params.status ? ["--status", params.status] : [], signal, 30_000);
       return { content: [{ type: "text", text: resultText("list", value) }], details: resultDetails("list", undefined, ctx) };
@@ -111,10 +111,10 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "document_analysis_status",
     label: "Document Analysis: Status",
-    description: "Read the manifest for one explicit document-analysis job ID. This does not read the normalized document.",
+    description: "Read the manifest for one explicit document-analysis job ID. This does not read the normalized document and may return metadata to the active known local or cloud Pi route.",
     parameters: Type.Object({ job_id: Type.String({ pattern: JOB_ID_PATTERN }) }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      requireLocalRoute(ctx);
+      requireKnownRoute(ctx);
       requireSessionId(ctx);
       const jobId = validJobId(params.job_id);
       const value = await runCli(pi, "status", [jobId], signal, 30_000);
@@ -125,13 +125,13 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "document_analysis_attach",
     label: "Document Analysis: Attach",
-    description: "Bind one explicit document-analysis job ID to the current Pi/cptr session. Rebinding requires rebind=true and an explicitly local route.",
+    description: "Bind one explicit document-analysis job ID to the current Pi/cptr session. Rebinding requires rebind=true; the route must be known.",
     parameters: Type.Object({
       job_id: Type.String({ pattern: JOB_ID_PATTERN }),
       rebind: Type.Optional(Type.Boolean()),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const route = requireLocalRoute(ctx);
+      const route = requireKnownRoute(ctx);
       const jobId = validJobId(params.job_id);
       await runCli(pi, "status", [jobId], signal, 30_000);
       const binding = await bindJob(CANONICAL_ROOT, jobId, requireSessionId(ctx), route, params.rebind === true);
@@ -146,14 +146,14 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "document_analysis_show",
     label: "Document Analysis: Show",
-    description: "Read one bounded artifact for one explicit job ID. This includes untrusted document content for normalized/native/OCR/vision artifacts and requires an explicitly local route.",
+    description: "Read one bounded artifact for one explicit job ID. Normalized/native/OCR/vision content is untrusted source data and may be returned to the active known local or cloud Pi route.",
     parameters: Type.Object({
       job_id: Type.String({ pattern: JOB_ID_PATTERN }),
       artifact: StringEnum(SHOW_ARTIFACTS),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const route = requireLocalRoute(ctx);
-      const jobId = await requireBound(CANONICAL_ROOT, params.job_id, requireSessionId(ctx), route);
+      requireKnownRoute(ctx);
+      const jobId = await requireBound(CANONICAL_ROOT, params.job_id, requireSessionId(ctx));
       const value = await runCli(pi, "show", [jobId, "--artifact", params.artifact], signal, 60_000, false);
       return { content: [{ type: "text", text: resultText(`show ${params.artifact}`, value) }], details: resultDetails("show", jobId, ctx) };
     },
@@ -162,12 +162,12 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "document_analysis_ingest",
     label: "Document Analysis: Ingest",
-    description: "Atomically ingest exactly one direct-child filename from the canonical document-analysis inbox. The source filename is not an arbitrary path.",
+    description: "Atomically ingest exactly one direct-child filename from the canonical document-analysis inbox. Local preprocessing remains separate; the result may be returned to the active known local or cloud Pi route.",
     parameters: Type.Object({
       inbox_filename: Type.String({ minLength: 1, maxLength: 255 }),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const route = requireLocalRoute(ctx);
+      const route = requireKnownRoute(ctx);
       const filename = inboxFilename(params.inbox_filename, INBOX);
       const value = await runCli(pi, "ingest", [filename, "--stability-wait", "0.25"], signal, 300_000);
       const record = value as Record<string, unknown>;
@@ -180,15 +180,15 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "document_analysis_enrich",
     label: "Document Analysis: Enrich",
-    description: "Run resumable local OCR and/or vision enrichment for one explicit, session-bound job. This never permits a cloud or unknown route.",
+    description: "Run resumable local-only OCR and vision enrichment for one explicit, session-bound job. Its bounded result may be returned to the active known local or cloud Pi route; it never uses cloud preprocessing.",
     parameters: Type.Object({
       job_id: Type.String({ pattern: JOB_ID_PATTERN }),
       stage: StringEnum(ENRICH_STAGES),
       force: Type.Optional(Type.Boolean()),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const route = requireLocalRoute(ctx);
-      const jobId = await requireBound(CANONICAL_ROOT, params.job_id, requireSessionId(ctx), route);
+      requireKnownRoute(ctx);
+      const jobId = await requireBound(CANONICAL_ROOT, params.job_id, requireSessionId(ctx));
       const args = [jobId];
       if (params.stage === "ocr") args.push("--ocr");
       if (params.stage === "vision") args.push("--vision");
@@ -201,11 +201,11 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "document_analysis_archive",
     label: "Document Analysis: Archive",
-    description: "Archive one explicit, session-bound completed job. This is a mutating operation and requires a local route.",
+    description: "Archive one explicit, session-bound completed job through the exact bridge on a known route.",
     parameters: Type.Object({ job_id: Type.String({ pattern: JOB_ID_PATTERN }) }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const route = requireLocalRoute(ctx);
-      const jobId = await requireBound(CANONICAL_ROOT, params.job_id, requireSessionId(ctx), route);
+      requireKnownRoute(ctx);
+      const jobId = await requireBound(CANONICAL_ROOT, params.job_id, requireSessionId(ctx));
       const value = await runCli(pi, "archive", [jobId], signal, 60_000);
       return { content: [{ type: "text", text: resultText("archive", value) }], details: resultDetails("archive", jobId, ctx) };
     },
@@ -222,8 +222,8 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const deletion = deleteCliArgs(params.job_id, params.dry_run, params.confirm_job_id);
-      const route = requireLocalRoute(ctx);
-      const jobId = await requireBound(CANONICAL_ROOT, deletion.jobId, requireSessionId(ctx), route);
+      requireKnownRoute(ctx);
+      const jobId = await requireBound(CANONICAL_ROOT, deletion.jobId, requireSessionId(ctx));
       const value = await runCli(pi, "delete", deletion.args, signal, 60_000);
       return { content: [{ type: "text", text: resultText("delete", value) }], details: resultDetails("delete", jobId, ctx) };
     },

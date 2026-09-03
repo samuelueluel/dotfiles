@@ -49,9 +49,9 @@ test("classifies local, loopback, cloud, and unknown routes conservatively", () 
   );
   assert.equal(bridgeLogic.routeFor({ model: {} }).classification, "unknown");
   assert.throws(() => bridgeLogic.requireKnownRoute({ model: {} }), /cannot verify/);
-  assert.throws(
-    () => bridgeLogic.requireLocalRoute({ model: { provider: "openai", baseUrl: "https://api.openai.com/v1" } }),
-    /non-local route/,
+  assert.deepEqual(
+    bridgeLogic.requireKnownRoute({ model: { provider: "openai", baseUrl: "https://api.openai.com/v1" } }),
+    { classification: "nonlocal", provider: "openai", model: null, baseUrl: "https://api.openai.com/v1" },
   );
 });
 
@@ -135,7 +135,7 @@ test("binds jobs atomically and rejects session mismatches, duplicates, and syml
     await mkdir(join(root, "jobs", jobId, "analysis"), { recursive: true });
     const first = await bridgeLogic.bindJob(root, jobId, "session-a", localRoute);
     assert.deepEqual(first, { jobId, sessionId: "session-a", rebound: false });
-    assert.equal(await bridgeLogic.requireBound(root, jobId, "session-a", localRoute), jobId);
+    assert.equal(await bridgeLogic.requireBound(root, jobId, "session-a"), jobId);
     assert.equal((await readdir(join(root, "jobs", jobId, "analysis"))).length, 1);
     const binding = JSON.parse(await readFile(join(root, "jobs", jobId, "analysis", "cptr-session.json"), "utf8"));
     assert.deepEqual(
@@ -144,7 +144,7 @@ test("binds jobs atomically and rejects session mismatches, duplicates, and syml
     );
 
     await assert.rejects(
-      bridgeLogic.requireBound(root, jobId, "session-b", localRoute),
+      bridgeLogic.requireBound(root, jobId, "session-b"),
       /different Pi\/cptr session/,
     );
     await assert.rejects(
@@ -243,14 +243,14 @@ export default function (pi) {
       try { await tools.get("document_analysis_list").execute("cloud-list", {}, undefined, undefined, cloud); } catch (error) { cloudListBlocked = String(error).includes("non-local route"); }
       let cloudStatusBlocked = false;
       try { await tools.get("document_analysis_status").execute("cloud-status", { job_id: "job-123" }, undefined, undefined, cloud); } catch (error) { cloudStatusBlocked = String(error).includes("non-local route"); }
-      let cloudBlocked = false;
+      let cloudArtifactRouteBlocked = false;
       try {
         await tools.get("document_analysis_show").execute("cloud-call", { job_id: "job-123", artifact: "normalized" }, undefined, undefined, {
           model: { provider: "local", id: "spoofed", baseUrl: "https://cloud.example/v1" },
           sessionManager: { getSessionId: () => "harness-session" },
         });
       } catch (error) {
-        cloudBlocked = String(error).includes("non-local route");
+        cloudArtifactRouteBlocked = String(error).includes("non-local route");
       }
       let invalidIngestBlocked = false;
       try {
@@ -281,7 +281,7 @@ export default function (pi) {
         status_ok: Boolean(status && list),
         cloudListBlocked,
         cloudStatusBlocked,
-        cloudBlocked,
+        cloudArtifactRouteBlocked,
         invalidIngestBlocked,
         deleteConfirmationBlocked,
         readGuarded: Boolean(readGuard?.block),
@@ -342,9 +342,9 @@ export default function (pi) {
 
   assert.deepEqual(result.names, [...bridgePolicy.DOCUMENT_ANALYSIS_TOOL_NAMES].sort());
   assert.equal(result.status_ok, true);
-  assert.equal(result.cloudListBlocked, true);
-  assert.equal(result.cloudStatusBlocked, true);
-  assert.equal(result.cloudBlocked, true);
+  assert.equal(result.cloudListBlocked, false);
+  assert.equal(result.cloudStatusBlocked, false);
+  assert.equal(result.cloudArtifactRouteBlocked, false);
   assert.equal(result.invalidIngestBlocked, true);
   assert.equal(result.deleteConfirmationBlocked, true);
   assert.equal(result.readGuarded, true);
@@ -355,5 +355,7 @@ export default function (pi) {
   assert.deepEqual(result.calls, [
     { command: "/var/home/samuel/.local/bin/document-analysis", args: ["--root", "/var/home/samuel/OpenWebUI-Access-Folder/document-analysis", "status", "job-123"] },
     { command: "/var/home/samuel/.local/bin/document-analysis", args: ["--root", "/var/home/samuel/OpenWebUI-Access-Folder/document-analysis", "list", "--status", "ready"] },
+    { command: "/var/home/samuel/.local/bin/document-analysis", args: ["--root", "/var/home/samuel/OpenWebUI-Access-Folder/document-analysis", "list"] },
+    { command: "/var/home/samuel/.local/bin/document-analysis", args: ["--root", "/var/home/samuel/OpenWebUI-Access-Folder/document-analysis", "status", "job-123"] },
   ]);
 });
