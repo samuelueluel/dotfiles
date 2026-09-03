@@ -50,7 +50,7 @@ from typing import Any, Callable
 
 
 SCRIPT_NAME = "llm-bench"
-SCRIPT_VERSION = "2.3"
+SCRIPT_VERSION = "2.4"
 DEFAULT_BASE_URL = "http://127.0.0.1:13305/api/v1"
 DEFAULT_OUTDIR = Path.home() / ".local/share/ramalama/benchmarks"
 LOCK_PATH = DEFAULT_OUTDIR / "llm-bench.lock"
@@ -1530,112 +1530,86 @@ def render_markdown(run: dict[str, Any]) -> str:
     protocol = run["protocol"]
     environment = run.get("environment") or {}
     power_monitoring = protocol.get("power_monitoring") or {}
+    tasks = protocol.get("tasks") or []
+    task_labels = [TASK_LABELS.get(task, task) for task in tasks]
+    depth_text = ", ".join(depth_label(x) for x in protocol.get("depths", [])) or "none"
     if power_monitoring.get("enabled"):
         power_text = (
-            f"mean amdgpu PPT samples every {power_monitoring.get('sample_interval_s', 1.0)} s; "
-            f"prefill/decode split by {power_monitoring.get('phase_split', 'server timings')}"
+            f"amdgpu PPT every {power_monitoring.get('sample_interval_s', 1.0)} s; "
+            f"phase split by {power_monitoring.get('phase_split', 'server timings')}"
         )
     else:
         power_text = "disabled"
+
     lines = [
         "## Local LLM benchmark",
         "",
-        f"- Date: `{run['started']}`",
-        f"- Lemonade: `{run.get('lemonade_version') or 'unknown'}` at `{run['base_url']}`",
-        f"- Host: `{run.get('host', 'unknown')}`",
-        f"- Protocol: `PP≈{protocol['pp_target']}` new tokens · `TG={protocol['tg_target']}` tokens · reasoning `off`",
-        f"- Tasks: `{', '.join(protocol['tasks'])}` · context depths: `{', '.join(depth_label(x) for x in protocol['depths'])}` · runs/cell: `{protocol['runs']}`",
-        "- Cache protocol: unique nonce per cell; context is intentionally cached only from that cell's fill request into its target request; cache misses are rejected.",
-        f"- Power measurement: {power_text}; sensor `{power_monitoring.get('sensor', 'unavailable')}`; only phase means are retained.",
+        "### Run",
         "",
-        "### Reproducibility metadata",
+        f"- Date: `{run.get('started', 'unknown')}` · Lemonade `{run.get('lemonade_version') or 'unknown'}` at `{run.get('base_url', 'unknown')}` · host `{run.get('host', 'unknown')}`",
+        f"- Protocol: `PP≈{protocol.get('pp_target', '—')}` new · `TG={protocol.get('tg_target', '—')}` · reasoning `off` · tasks `{', '.join(task_labels) or 'none'}` · depths `{depth_text}` · runs/cell `{protocol.get('runs', '—')}`",
+        "- Cache: unique nonce per cell; deep target cache hits required.",
+        f"- Hardware: `{environment.get('device', 'not recorded')}` · memory `{environment.get('memory', 'not recorded')}` · UMA `{environment.get('uma_split', 'not recorded')}`",
+        f"- Kernel: `{environment.get('kernel', 'not recorded')}` · power `{environment.get('power', 'not recorded')}`",
+        f"- Power sampling: {power_text}; sensor `{power_monitoring.get('sensor', 'unavailable')}`",
+        f"- Commits: baseline `{environment.get('baseline', 'not recorded')}` · change `{environment.get('change', 'not recorded')}`",
         "",
-        f"- Device: `{environment.get('device', 'not recorded')}`",
-        f"- Memory: `{environment.get('memory', 'not recorded')}`",
-        f"- Power: `{environment.get('power', 'not recorded')}`",
-        f"- BIOS: `UMA split {environment.get('uma_split', 'not recorded')}`",
-        f"- Kernel: `{environment.get('kernel', 'not recorded')}`",
-        f"- Baseline: `{environment.get('baseline', 'not recorded')}`",
-        f"- Change: `{environment.get('change', 'not recorded')}`",
-        "",
-        "### Benchmark configurations",
+        "### Results",
         "",
     ]
+
+    single_task = len(tasks) == 1
     for model in run["models"]:
+        model_heading = f"#### `{model['model_id']}`"
+        if single_task:
+            model_heading += f" · {task_labels[0]}"
         lines.extend(
             [
-                f"#### `{model['model_id']}`",
-                f"- Backend: `{backend_description(model, environment)}`",
-                f"- Build: `{model.get('build') or 'not recorded'}`",
-                f"- Engine build: `{model.get('engine_build') or 'not detected'}`",
-                f"- Model: `{model.get('model_reference') or model['model_id']}`, quant `{model.get('quant') or 'not recorded'}`",
+                model_heading,
+                "",
+                f"- Model: `{model.get('model_reference') or model['model_id']}` · quant `{model.get('quant') or 'not recorded'}`",
+                f"- Runtime: engine `{model.get('engine') or model.get('backend') or 'unknown'}` · backend `{backend_description(model, environment)}` · build `{model.get('engine_build') or 'not detected'}`",
                 f"- Speculation: `{model.get('spec_summary') or 'unknown'}`",
-                f"- KV cache: `{model.get('kv_summary') or 'unknown'}`",
-                f"- Options source: `{model.get('options_source') or 'unknown'}`",
-                f"- Request args: `{model['benchmark_args']}`",
+                f"- KV cache: `{model.get('kv_summary') or 'unknown'}` · options `{model.get('options_source') or 'unknown'}`",
+                f"- Flags: `{model.get('benchmark_args') or 'not recorded'}`",
                 "",
             ]
         )
 
-    lines.extend(["### Results", ""])
-    for model in run["models"]:
-        lines.extend(
-            [
-                f"#### `{model['model_id']}`",
-                "",
-                "| Task | Depth | PP n / cache n | Fill PP t/s | Fill W | PP t/s | PP W | TG n | TG t/s | TG W | Spec acc. | Runs |",
-                "| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-            ]
-        )
+        if single_task:
+            lines.extend(
+                [
+                    "| Depth | PP t/s | TG t/s | Spec. acceptance | Runs |",
+                    "| ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "| Task | Depth | PP t/s | TG t/s | Spec. acceptance | Runs |",
+                    "| :--- | ---: | ---: | ---: | ---: | ---: |",
+                ]
+            )
+
         summaries = model.get("summaries", [])
         if not summaries:
-            lines.append(f"| — | — | — | — | — | — | — | — | — | — | — | 0/{protocol['runs']} |")
+            if single_task:
+                lines.append(f"| — | — | — | — | 0/{protocol.get('runs', '—')} |")
+            else:
+                lines.append(f"| — | — | — | — | — | 0/{protocol.get('runs', '—')} |")
         for summary in summaries:
-            pp_n = fmt_avg_int(summary.get("prompt_n"))
-            cache_n = fmt_avg_int(summary.get("cache_n"))
-            tg_n = fmt_avg_int(summary.get("predicted_n"))
-            fill_power = fmt_stat(summary.get("fill_power_w"))
-            prompt_power = fmt_stat(summary.get("prompt_power_w"))
-            decode_power = fmt_stat(summary.get("predicted_power_w"))
             acc = summary.get("spec_acceptance_pct")
             acc_text = f"{acc:.1f}%" if acc is not None else "—"
-            cache_marker = "" if summary.get("cache_ok", True) else " ⚠"
-            lines.append(
-                f"| {summary['task_label']} | `{summary['depth_label']}` | `{pp_n} / {cache_n}{cache_marker}` | "
-                f"{fmt_stat(summary.get('fill_prompt_tps'))} | `{fill_power}` | `{fmt_stat(summary.get('prompt_tps'))}` | "
-                f"`{prompt_power}` | `{tg_n}` | `{fmt_stat(summary.get('predicted_tps'))}` | `{decode_power}` | "
-                f"`{acc_text}` | {summary['runs_ok']}/{protocol['runs']} |"
-            )
-        lines.append("")
-
-    lines.extend(["### Per-run detail", ""])
-    for model in run["models"]:
-        lines.extend(
-            [
-                f"#### `{model['model_id']}`",
-                "",
-                "| Task | Depth | Run | PP n | Cache n | Fill PP t/s | Fill W | PP t/s | PP W | TG n | TG t/s | TG W | Spec acc. | Status |",
-                "| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |",
+            row = [
+                f"`{summary['depth_label']}`",
+                fmt_stat(summary.get("prompt_tps")),
+                fmt_stat(summary.get("predicted_tps")),
+                acc_text,
+                f"{summary['runs_ok']}/{protocol.get('runs', '—')}",
             ]
-        )
-        for cell in model.get("cells", []):
-            timing = cell.get("timing") or {}
-            filler = cell.get("filler") or {}
-            filler_timing = filler.get("timing") or {}
-            filler_power = filler.get("power") or {}
-            target_power = timing.get("power") or {}
-            spec = cell.get("spec") or {}
-            acc = spec.get("acceptance_pct")
-            acc_text = f"{acc:.1f}%" if acc is not None else "—"
-            status = "FAILED" if cell.get("error") else "ok"
-            lines.append(
-                f"| {cell.get('task_label', cell.get('task', '—'))} | `{cell.get('depth_label', '—')}` | `{cell.get('rep', '—')}` | "
-                f"{timing.get('prompt_n') or '—'} | {timing.get('cache_n') if timing.get('cache_n') is not None else '—'} | "
-                f"{fmt_num(filler_timing.get('prompt_tps'), 1)} | {fmt_num(filler_power.get('prefill_mean_w'), 1)} | "
-                f"{fmt_num(timing.get('prompt_tps'), 1)} | {fmt_num(target_power.get('prefill_mean_w'), 1)} | "
-                f"{timing.get('predicted_n') or '—'} | {fmt_num(timing.get('predicted_tps'), 1)} | "
-                f"{fmt_num(target_power.get('decode_mean_w'), 1)} | {acc_text} | {status} |"
-            )
+            if not single_task:
+                row.insert(0, summary.get("task_label", summary.get("task", "—")))
+            lines.append("| " + " | ".join(row) + " |")
         lines.append("")
 
     errors = [cell for model in run["models"] for cell in model.get("cells", []) if cell.get("error")]
@@ -1646,9 +1620,7 @@ def render_markdown(run: dict[str, Any]) -> str:
                 f"- `{cell.get('model_id', 'unknown')}` {cell.get('task')} {cell.get('depth_label')}: {cell['error']}"
             )
         lines.append("")
-    lines.append(
-        "Notes: `PP t/s` is the target request's incremental prompt throughput; `Fill PP t/s` is the separate context-construction request and is not substituted for target PP. `Fill W` is the mean amdgpu PPT during long-context construction; `PP W` and `TG W` are separate target-request prefill and decode means, split using Lemonade's server timings. Spec acceptance is weighted across successful runs when Lemonade metrics are available. Invariant hardware, build, model, backend, and runtime details appear once above each model's results."
-    )
+    lines.append("Detailed token counts, cache checks, fill throughput, power phase means, and per-run records remain in the companion JSON report.")
     return "\n".join(lines) + "\n"
 
 

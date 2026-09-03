@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-TARGET="$1"
-[ -z "$TARGET" ] && exit 0
+[ $# -eq 0 ] && exit 0
 
 OBSIDIAN_JSON="${HOME}/.var/app/md.obsidian.Obsidian/config/obsidian/obsidian.json"
 VAULT_DIR=$(python3 -c "
@@ -13,12 +12,19 @@ print(open_vault['path'])
 [ -z "$VAULT_DIR" ] && VAULT_DIR="{{ .obsidian.vault_path }}"
 VAULT_NAME=$(basename "$VAULT_DIR")
 
-[[ "$TARGET" != /* ]] && TARGET="$VAULT_DIR/$TARGET"
-REL_PATH="${TARGET#$VAULT_DIR/}"
-
 if obsidian files total >/dev/null 2>&1; then
-    obsidian open "path=$REL_PATH" newtab
+    for TARGET in "$@"; do
+        [ -z "$TARGET" ] && continue
+        [[ "$TARGET" != /* ]] && TARGET="$VAULT_DIR/$TARGET"
+        REL_PATH="${TARGET#$VAULT_DIR/}"
+        obsidian open "path=$REL_PATH" newtab
+    done
 else
-    echo "$REL_PATH" > /tmp/tv-obsidian-pending
+    : > /tmp/tv-obsidian-pending
+    for TARGET in "$@"; do
+        [ -z "$TARGET" ] && continue
+        [[ "$TARGET" != /* ]] && TARGET="$VAULT_DIR/$TARGET"
+        echo "${TARGET#$VAULT_DIR/}" >> /tmp/tv-obsidian-pending
+    done
     niri msg action spawn -- {{ .chezmoi.homeDir }}/.local/bin/tv-obsidian-launcher.sh
 fi

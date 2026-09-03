@@ -32,7 +32,7 @@
         "production"
       ],
       "lifecycle": "lazy",
-      "directTools": true,
+      "directTools": false,
       "includeTools": [
         "turbovault_read_note",
         "turbovault_write_note",
@@ -65,6 +65,7 @@
     "zotero": {
       "url": "http://127.0.0.1:13308/mcp",
       "lifecycle": "lazy",
+      "directTools": false,
       "excludeTools": [
         "zotero_search",
         "zotero_fetch"

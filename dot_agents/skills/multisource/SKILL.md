@@ -7,6 +7,19 @@ description: Synthesize answers across multiple Zotero sources into a unified sy
 
 Manual utility skill. Invoked **only** on explicit request (`"use multisource"` or `/skill:multisource`). Never apply by default for simple single-source queries.
 
+## Request-Routing & Synthesis Playbook
+
+```text
+MULTISOURCE PIPELINE
+│
+├─ 1. Broad Retrieval ────────→ zotero_semantic_search (limit ~10 hits)
+│                                └─ Group by itemKey; pick best chunk per work (Rerank > 0)
+├─ 2. Tier 1: Unified Synthesis → 1–2 paragraphs answering prompt directly
+│                                └─ Inline canonical tokens ({Author Year, p. X})
+├─ 3. Tier 2: Evidence Silos ───→ Top 3–6 distinct sources with metadata & unique role
+└─ 4. Conflict / Divergence ────→ Explicitly isolate competing assumptions or specs
+```
+
 ## Output Contract: One Answer, Two Tiers
 
 Never answer the question multiple times. Structure the response strictly in two tiers:
@@ -35,7 +48,7 @@ If sources conflict or present differing specifications/assumptions, explicitly 
 
 ## Search & Assembly Workflow
 
-1. **Broad Semantic Search:** Execute `zotero_zotero_semantic_search` (limit ~10; scoped to `collection=<KEY>` if applicable).
+1. **Broad Semantic Search:** Execute `zotero_semantic_search` (limit ~10; scoped to `collection=<KEY>` if applicable).
 2. **Group & Deduplicate:** Group passages by distinct item key; select the single best-matching passage per work.
 3. **Direct Escalation:** If definitions or numbers are truncated in snippets, grep sidecars or run `get_item_fulltext` before synthesizing.
 4. **Assemble Output:** Produce Tier 1 synthesis $\to$ Tier 2 source silos $\to$ divergence notes.

@@ -5,6 +5,21 @@ description: Manage MPD playback and queues with mpc/rmpc, and handle music meta
 
 # Music Management: MPD, `mpc`, `rmpc`, and Beets
 
+## CPTR / Headless Limitation
+
+CPTR's conservative headless Bash policy does not allow `mpc`, `rmpc`, or interactive `music-onboard`. Use CPTR for explanatory guidance only; perform playback, queue, tagging, and onboarding through regular Pi or a host terminal, and report blocked commands without claiming they ran.
+
+## Request-Routing Playbook
+
+```text
+REQUEST
+├─ Playback & Status Inspection ──→ mpc status / mpc current / mpc playlist (non-mutating)
+├─ Playback & Queue Control    ──→ mpc toggle / next / prev / insert / add (NEVER clear unless asked)
+├─ Search & Taste Query        ──→ mpc search artist/album / ~/.config/music/ manifest queries
+├─ Tag Surgery & Fixes         ──→ references/scripts.md (Dry-run first; ID3v2.4 multi-value TCON)
+└─ Album Onboarding & Beets    ──→ references/beets-and-onboarding.md (music-onboard; interactive only)
+```
+
 ## Architecture & Tool Split
 
 - **MPD (`mpd`):** Music server daemon and database. Do not restart or reconfigure unless explicitly requested.
@@ -65,10 +80,8 @@ rmpc remote keybind "<KEY>"
   - `~/.config/music/rym_collection_genres.csv`: Snapshot of Samuel's 720+ rated releases with star ratings and release URLs for taste grounding (4.0, 4.5, and 5.0 star tiers).
 - **Player State & Ratings:** Active library ratings remain tracked via live MPD `grouping` tags (`R: 5`, `R: 4.5`, `R: 4`, `Unrated`, etc.).
 
-
 ## Progressive Disclosure & Reference Routing
 
 - **Metadata Fields, Grouping, RYM Querying & Filter Grammar:** Tag mappings, canonical grouping order, RYM CSV query recipes, and verified MPD filter syntax $\to$ [references/tagging-taxonomy.md](references/tagging-taxonomy.md).
 - **Custom `music-*` Scripts & Tag Surgery:** Bulk tag edits, separator repairs, cover art fixes, and format conversion $\to$ [references/scripts.md](references/scripts.md).
 - **Album Onboarding & Beets Operations:** `music-onboard` pipeline, Beets configuration, ReplayGain, and metadata sync $\to$ [references/beets-and-onboarding.md](references/beets-and-onboarding.md).
-

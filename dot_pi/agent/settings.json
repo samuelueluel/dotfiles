@@ -42,7 +42,6 @@
     "npm:pi-permission-system",
     "npm:@tintinweb/pi-subagents",
     "local-packages/pi-agent-beautify",
-    "npm:pi-markdown-preview",
     "npm:@juicesharp/rpiv-todo@2.8.0",
     {
       "source": "npm:@kennyfrc/pi-system-reminders@0.2.0",

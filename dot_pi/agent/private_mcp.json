@@ -7,20 +7,6 @@
       ],
       "disabled": true
     },
-    "stata": {
-      "command": "uvx",
-      "args": [
-        "--with",
-        "mcp<2.0.0",
-        "mcp-stata"
-      ],
-      "lifecycle": "lazy",
-      "disabled": true,
-      "env": {
-        "STATA_PATH": "/usr/local/stata19/stata-mp",
-        "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"
-      }
-    },
     "turbovault": {
       "command": "turbovault",
       "args": [
@@ -32,7 +18,7 @@
         "production"
       ],
       "lifecycle": "lazy",
-      "directTools": true,
+      "directTools": false,
       "includeTools": [
         "turbovault_read_note",
         "turbovault_write_note",
@@ -74,6 +60,7 @@
     "zotero": {
       "url": "http://127.0.0.1:13308/mcp",
       "lifecycle": "lazy",
+      "directTools": false,
       "excludeTools": [
         "zotero_search",
         "zotero_fetch"

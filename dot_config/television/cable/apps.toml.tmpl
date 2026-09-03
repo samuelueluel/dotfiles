@@ -21,8 +21,17 @@ command = "{{ .chezmoi.homeDir }}/.local/bin/tv-preview-app.py '{}'"
 
 [keybindings]
 enter = "actions:app-launch"
+alt-space = "actions:app-launch"
+ctrl-c = "actions:copy"
 
 [actions.app-launch]
-description = "Launch application"
-command = "niri msg action spawn -- gio launch '{split:;:1}'"
+description = "Launch application(s)"
+command = "bash -c 'while IFS=\";\" read -r name path; do [ -n \"$path\" ] && niri msg action spawn -- gio launch \"$path\"; done <<< \"$1\"' -- \"{strip_ansi}\""
 mode = "execute"
+separator = "\n"
+
+[actions.copy]
+description = "Copy desktop file path(s)"
+command = "bash -c 'while IFS=\";\" read -r name path; do [ -n \"$path\" ] && echo \"$path\"; done <<< \"$1\" | wl-copy' -- \"{strip_ansi}\""
+mode = "fork"
+separator = "\n"

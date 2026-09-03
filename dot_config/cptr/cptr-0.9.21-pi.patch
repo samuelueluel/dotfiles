@@ -11,7 +11,7 @@
  from typing import Any, AsyncIterator
  
  from cptr.utils.agents.attachments import PreparedAgentAttachments
-@@ -22,20 +24,80 @@ from cptr.utils.agents.events import (
+@@ -22,20 +24,101 @@ from cptr.utils.agents.events import (
  )
  
  
@@ -48,6 +48,27 @@
 +        Path(workspace) / ".pi" / "CPTR_APPEND_SYSTEM.md",
 +    )
 +    return [str(path) for path in candidates if path.is_file()]
++
++
++def _cptr_headless_skill_paths(env: dict[str, str]) -> list[str]:
++    """Return the same non-Stata user skill set used by regular Pi."""
++    # cptr-pi-skill-filter-v3
++    home = Path(env.get("HOME") or os.path.expanduser("~"))
++    roots = (
++        home / ".agents" / "skills",
++        home / ".pi" / "agent" / "skills",
++    )
++    excluded = {"auto", "mode", "manual"}
++    paths: list[str] = []
++    for root in roots:
++        try:
++            candidates = sorted(root.iterdir(), key=lambda path: path.name)
++        except OSError:
++            continue
++        for path in candidates:
++            if path.is_dir() and path.name not in excluded and not path.name.startswith("stata"):
++                paths.append(str(path))
++    return paths
 +
 +
  def _content_text(value: Any) -> str:
@@ -101,7 +122,7 @@
  
  
  def _message_text(messages: list[dict[str, Any]], system_prompt: str, resumed: bool) -> str:
-@@ -59,7 +121,10 @@ def _message_text(messages: list[dict[str, Any]], system_prompt: str, resumed: b
+@@ -59,7 +142,10 @@ def _message_text(messages: list[dict[str, Any]], system_prompt: str, resumed: b
      return "\n\n".join(parts)
  
  
@@ -113,7 +134,7 @@
      event_type = event.get("type")
      if event_type == "message_update":
          delta = event.get("assistantMessageEvent")
-@@ -76,10 +141,10 @@ def translate_event(event: dict[str, Any]) -> AgentEvent | None:
+@@ -76,10 +162,10 @@ def translate_event(event: dict[str, Any]) -> AgentEvent | None:
          call_id = event.get("toolCallId")
          if not isinstance(call_id, str) or not call_id:
              return None
@@ -127,7 +148,7 @@
      elif event_type == "tool_execution_end":
          call_id = event.get("toolCallId")
          if not isinstance(call_id, str) or not call_id:
-@@ -87,18 +152,28 @@ def translate_event(event: dict[str, Any]) -> AgentEvent | None:
+@@ -87,18 +173,28 @@ def translate_event(event: dict[str, Any]) -> AgentEvent | None:
          return AgentToolUpdate(
              call_id,
              "failed" if event.get("isError") else "completed",
@@ -158,7 +179,7 @@
      previous = sent.get(call_id, "")
      replace = not full.startswith(previous)
      delta = full if replace else full[len(previous) :]
-@@ -108,9 +183,7 @@ def tool_output_delta(event: dict[str, Any], sent: dict[str, str]) -> AgentToolO
+@@ -108,9 +204,7 @@ def tool_output_delta(event: dict[str, Any], sent: dict[str, str]) -> AgentToolO
      return AgentToolOutputDelta(
          call_id,
          delta,
@@ -169,7 +190,7 @@
          replace,
      )
  
-@@ -118,11 +191,19 @@ def tool_output_delta(event: dict[str, Any], sent: dict[str, str]) -> AgentToolO
+@@ -118,11 +212,19 @@ def tool_output_delta(event: dict[str, Any], sent: dict[str, str]) -> AgentToolO
  class PiRpcClient:
      """Small stdio client for ``pi --mode rpc``."""
  
@@ -190,18 +211,21 @@
          self.proc: asyncio.subprocess.Process | None = None
          self.reader_task: asyncio.Task[None] | None = None
          self.stderr_task: asyncio.Task[None] | None = None
-@@ -133,6 +214,10 @@ class PiRpcClient:
+@@ -133,6 +235,13 @@ class PiRpcClient:
  
      async def start(self) -> None:
          args = ["--mode", "rpc"]
 +        if self.env.get("PI_CPTR_HEADLESS") == "1":
 +            args.extend(["--exclude-tools", _CPTR_HEADLESS_EXCLUDED_TOOLS])
++            args.append("--no-skills")
++            for path in _cptr_headless_skill_paths(self.env):
++                args.extend(["--skill", path])
 +        for path in self.append_system_prompt_paths:
 +            args.extend(["--append-system-prompt", path])
          if self.model and self.model != "default":
              args.extend(["--model", self.model])
          self.proc = await asyncio.create_subprocess_exec(
-@@ -238,6 +323,31 @@ class PiRpcClient:
+@@ -238,6 +344,31 @@ class PiRpcClient:
          )
  
  
@@ -233,7 +257,7 @@
  async def run_pi_agent(
      *,
      profile: dict[str, Any],
-@@ -252,7 +362,14 @@ async def run_pi_agent(
+@@ -252,7 +383,14 @@ async def run_pi_agent(
      env = os.environ.copy()
      if profile.get("home"):
          env["HOME"] = os.path.expanduser(str(profile["home"]))
@@ -249,7 +273,7 @@
      session_file = (resume_state or {}).get("session_file")
      resumed = isinstance(session_file, str) and bool(session_file)
  
-@@ -260,6 +377,17 @@ async def run_pi_agent(
+@@ -260,6 +398,17 @@ async def run_pi_agent(
          await client.start()
          if resumed:
              await client.request("switch_session", {"sessionPath": session_file})
@@ -267,7 +291,7 @@
          images = [
              {"type": "image", "data": image.base64, "mimeType": image.mime_type}
              for image in attachments.images
-@@ -273,8 +401,9 @@ async def run_pi_agent(
+@@ -273,8 +422,9 @@ async def run_pi_agent(
          )
  
          sent: dict[str, str] = {}
@@ -278,7 +302,7 @@
              if event.get("type") == "process_exited":
                  yield AgentError(client.error_detail(str(event.get("message") or "Pi exited")))
                  return
-@@ -286,33 +415,48 @@ async def run_pi_agent(
+@@ -286,33 +436,48 @@ async def run_pi_agent(
                  )
                  return
              if event.get("type") == "tool_execution_update":
@@ -1209,3 +1233,31 @@
      return normalized
  
  
+--- cptr/utils/skills.py
++++ cptr/utils/skills.py
+@@ -70,6 +70,13 @@
+ # Directories to skip during scanning
+ _SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv"}
+-
++
++
++def _cptr_headless_skips_skill(path: Path) -> bool:
++    # cptr-pi-skill-filter-v3
++    return os.environ.get("PI_CPTR_HEADLESS") == "1" and (
++        path.name.startswith("stata") or path.name in {"auto", "mode", "manual"}
++    )
++
+ # Max scan limits (per spec recommendation)
+ _MAX_SCAN_DEPTH = 4
+ _MAX_SCAN_DIRS = 2000
+@@ -350,3 +357,8 @@
+-
+-            if not item.is_dir() or item.name in _SKIP_DIRS or item.name.startswith("."):
++
++            if (
++                not item.is_dir()
++                or item.name in _SKIP_DIRS
++                or item.name.startswith(".")
++                or _cptr_headless_skips_skill(item)
++            ):
+                 continue

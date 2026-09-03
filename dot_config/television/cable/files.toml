@@ -36,5 +36,6 @@ separator = "\n"
 
 [actions.copy]
 description = "Copy to clipboard (full path)"
-command = "printf '%s' \"{strip_ansi}\" | sed 's|^~/|/var/home/samuel/|' | wl-copy"
+command = "printf '%s\n' \"{strip_ansi}\" | sed 's|^~/|/var/home/samuel/|' | wl-copy"
 mode = "fork"
+separator = "\n"

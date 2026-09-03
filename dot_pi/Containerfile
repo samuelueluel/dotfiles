@@ -17,7 +17,7 @@ ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
 COPY dot_Brewfile-container /tmp/Brewfile
 RUN brew bundle --file=/tmp/Brewfile --jobs=1
 
-RUN npm install -g pi-mcp-adapter pi-agent-extensions pi-web-access pi-markdown-preview
+RUN npm install -g pi-mcp-adapter pi-agent-extensions pi-web-access
 
 # tmux config loaded by the launch wrappers (podman run --entrypoint tmux ... -f /etc/pi-tmux.conf).
 # tmux daemonizes its server, which double-forks and reparents to PID 1 (tini). Without this,

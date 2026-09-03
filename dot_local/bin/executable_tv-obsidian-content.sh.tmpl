@@ -35,30 +35,33 @@ output=$(
        --preview-border=thick \
        --input-header="Results: $query" \
        --layout=portrait \
-       --expect="ctrl-p;ctrl-c"
+       --expect="ctrl-p;ctrl-c;ctrl-y"
 )
 
 [ -z "$output" ] && exit 0
 
-if [ $(echo "$output" | wc -l) -gt 1 ]; then
-    key=$(echo "$output" | head -n 1)
-    selected=$(echo "$output" | tail -n 1)
+first_line=$(echo "$output" | head -n 1)
+if [[ "$first_line" == "ctrl-p" || "$first_line" == "ctrl-c" || "$first_line" == "ctrl-y" ]]; then
+    key="$first_line"
+    selected=$(echo "$output" | tail -n +2)
 else
     key="enter"
     selected="$output"
 fi
 
+[ -z "$selected" ] && exit 0
+
 if [ "$key" = "ctrl-p" ]; then
-    printf "%s/%s" "$VAULT_DIR" "$selected" | wl-copy
+    printf "%s\n" "$selected" | sed "s|^|$VAULT_DIR/|" | wl-copy
     exit 0
 elif [ "$key" = "ctrl-c" ]; then
-    printf "%s" "$selected" | wl-copy
+    printf "%s\n" "$selected" | wl-copy
+    exit 0
+elif [ "$key" = "ctrl-y" ]; then
+    paths=$(printf "%s\n" "$selected" | tr '\n' ' ')
+    printf "read %s\n" "$paths" | wl-copy
     exit 0
 fi
 
-if obsidian files total >/dev/null 2>&1; then
-    obsidian open "path=$selected" newtab
-else
-    echo "$selected" > /tmp/tv-obsidian-pending
-    niri msg action spawn -- {{ .chezmoi.homeDir }}/.local/bin/tv-obsidian-launcher.sh
-fi
+mapfile -t items <<< "$selected"
+"{{ .chezmoi.homeDir }}/.local/bin/tv-action-obsidian.sh" "${items[@]}"

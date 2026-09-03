@@ -1,10 +1,16 @@
 #!/bin/bash
 # Used by television files channel to open files with appropriate apps
+zed_files=()
 for f in "$@"; do
+    [ -z "$f" ] && continue
     p=$(sed "s|^~/|/var/home/samuel/|" <<< "$f")
     if [[ "$p" == *.pdf ]]; then
         systemd-run --user --no-block flatpak run org.kde.okular "$p"
     else
-        zed "$p"
+        zed_files+=("$p")
     fi
 done
+
+if [ ${#zed_files[@]} -gt 0 ]; then
+    zed "${zed_files[@]}"
+fi

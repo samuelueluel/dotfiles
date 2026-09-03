@@ -212,6 +212,8 @@ SPINE_COLOR = ("#6E3840", 1.00)  # spine column background (chimayo red)
 WS_RING_COLOR = ("#DA9E8A", 1.00)  # focused-workspace ring (turquoise)
 SPINE_LINE_COLOR = ("#96E050", 1.00)  # faint vertical accent through the spine column
 TAG_DOT_COLOR = ("#96E050", 1.00)  # color of dots / dots with numbers on window tiles (chamisa)
+TILE_OUTLINE_WIDTH = 2  # px, gypsum outline thickness
+TILE_OUTLINE_COLOR = ("#E2D8D0", 1.00)  # tile outline ring (gypsum)
 
 # Timing
 FADE_MS = 50  # fade-in/out duration in ms (quick to stay unobtrusive)
@@ -228,6 +230,23 @@ def _c(color):
     if alpha >= 1.0:
         return f"rgb({r}, {g}, {b})"
     return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+# Tile shadows: intense multi-layer black drop shadow + outer black containment rim + gypsum outline (drawn last so it stays on top in GTK4)
+TILE_SHADOW = (
+    "0 9px 18px 3px rgba(0, 0, 0, 0.94), "
+    "0 4px 9px 2px rgba(0, 0, 0, 1.0), "
+    "0 0 5px 1px rgb(0, 0, 0), "
+    f"0 0 0 {TILE_OUTLINE_WIDTH + 2}px rgb(0, 0, 0), "
+    f"0 0 0 {TILE_OUTLINE_WIDTH}px {_c(TILE_OUTLINE_COLOR)}"
+)
+STACKED_TILE_SHADOW = (
+    "0 7px 13px 2px rgba(0, 0, 0, 0.94), "
+    "0 3px 6px 1px rgba(0, 0, 0, 1.0), "
+    "0 0 4px 1px rgb(0, 0, 0), "
+    "0 0 0 3.5px rgb(0, 0, 0), "
+    f"0 0 0 2px {_c(TILE_OUTLINE_COLOR)}"
+)
 
 
 # --- .desktop icon cache (pre-scanned in background thread above) ---
@@ -1411,7 +1430,7 @@ window {{
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
+    box-shadow: {TILE_SHADOW};
 }}
 
 .minimap-tile-spine {{
@@ -1419,7 +1438,7 @@ window {{
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
+    box-shadow: {TILE_SHADOW};
 }}
 
 .minimap-tile-workspace {{
@@ -1427,7 +1446,7 @@ window {{
     border-radius: {UNFOCUSED_TILE_RADIUS};
     padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: inset 0 0 0 {BORDER_WIDTH}px #DA9E8A, 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
+    box-shadow: {TILE_SHADOW}, inset 0 0 0 {BORDER_WIDTH}px #DA9E8A;
 }}
 
 .minimap-tile-focused {{
@@ -1435,7 +1454,7 @@ window {{
     border-radius: {"24px" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
     padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: inset 0 0 0 {BORDER_WIDTH}px {_c(FOCUS_RING_COLOR)}, 0 0 0 2px rgb(0, 0, 0), 0 4px 12px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.95);
+    box-shadow: {TILE_SHADOW}, inset 0 0 0 {BORDER_WIDTH}px {_c(FOCUS_RING_COLOR)};
 }}
 
 .minimap-tile-urgent {{
@@ -1443,7 +1462,7 @@ window {{
     border-radius: {"24px" if FOCUS_RING_CIRCLE else f"{TILE_BORDER_RADIUS}px"};
     padding: {TILE_PAD + BORDER_WIDTH}px;
     background-color: {_c(INACTIVE_FILL_COLOR)};
-    box-shadow: inset 0 0 0 {BORDER_WIDTH}px #FF5555, 0 0 0 2px rgb(0, 0, 0), 0 4px 14px rgba(255, 85, 85, 0.95);
+    box-shadow: 0 4px 16px rgba(255, 85, 85, 0.95), 0 0 0 {TILE_OUTLINE_WIDTH + 2}px rgb(0, 0, 0), 0 0 0 {TILE_OUTLINE_WIDTH}px {_c(TILE_OUTLINE_COLOR)}, inset 0 0 0 {BORDER_WIDTH}px #FF5555;
 }}
 
 .minimap-empty {{
@@ -1457,21 +1476,21 @@ window {{
     border: none;
     border-radius: 8px;
     padding: 4px;
-    box-shadow: 0 0 0 2px rgb(0, 0, 0), 0 3px 6px rgba(0, 0, 0, 0.95), 0 6px 12px rgba(0, 0, 0, 0.95);
+    box-shadow: {STACKED_TILE_SHADOW};
 }}
 
 .minimap-tile-workspace.minimap-stacked {{
     border: none;
     border-radius: 8px;
     padding: 4px;
-    box-shadow: inset 0 0 0 4px #DA9E8A, 0 0 0 2px rgb(0, 0, 0), 0 3px 6px rgba(0, 0, 0, 0.95), 0 6px 12px rgba(0, 0, 0, 0.95);
+    box-shadow: {STACKED_TILE_SHADOW}, inset 0 0 0 4px #DA9E8A;
 }}
 
 .minimap-tile-focused.minimap-stacked {{
     border: none;
     border-radius: 8px;
     padding: 4px;
-    box-shadow: inset 0 0 0 4px {_c(FOCUS_RING_COLOR)}, 0 0 0 2px rgb(0, 0, 0), 0 3px 6px rgba(0, 0, 0, 0.95), 0 6px 12px rgba(0, 0, 0, 0.95);
+    box-shadow: {STACKED_TILE_SHADOW}, inset 0 0 0 4px {_c(FOCUS_RING_COLOR)};
 }}
 
 .minimap-column.minimap-col-stacked,

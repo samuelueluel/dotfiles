@@ -22,10 +22,12 @@ ctrl-c = "actions:copy"
 
 [actions.open]
 description = "Open in Yazi"
-command = "bash -c 'p=$(sed \"s|^~/|/var/home/samuel/|\" <<< \"$1\"); /usr/bin/niri msg action spawn -- /usr/bin/kitty -e /usr/bin/yazi \"$p\"' -- \"{strip_ansi}\""
+command = "/var/home/samuel/.local/bin/tv-open-yazi.sh \"{strip_ansi}\""
 mode = "execute"
+separator = "\n"
 
 [actions.copy]
 description = "Copy to clipboard (full path)"
-command = "printf '%s' \"{strip_ansi}\" | sed 's|^~/|/var/home/samuel/|' | wl-copy"
+command = "printf '%s\n' \"{strip_ansi}\" | sed 's|^~/|/var/home/samuel/|' | wl-copy"
 mode = "fork"
+separator = "\n"

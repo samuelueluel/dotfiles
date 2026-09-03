@@ -26,18 +26,28 @@ enter = "actions:obsidian-open"
 alt-space = "actions:obsidian-open"
 ctrl-c = "actions:copy"
 ctrl-p = "actions:copy-absolute"
+ctrl-y = "actions:copy-pi-prompt"
 
 [actions.obsidian-open]
 description = "Open in Obsidian (New Tab)"
-command = "{{ .chezmoi.homeDir }}/.local/bin/tv-action-obsidian.sh \"{strip_ansi}\""
+command = "bash -c '{{ .chezmoi.homeDir }}/.local/bin/tv-action-obsidian.sh \"$@\"' -- {split:\\n:..|map:{strip_ansi|append:'|prepend:'}|join: }"
 mode = "execute"
+separator = "\n"
 
 [actions.copy]
-description = "Copy to clipboard (stripped)"
-command = "printf '%s' \"{strip_ansi}\" | wl-copy"
+description = "Copy relative path(s) to clipboard"
+command = "printf '%s\n' \"{strip_ansi}\" | wl-copy"
 mode = "fork"
+separator = "\n"
 
 [actions.copy-absolute]
-description = "Copy absolute path to clipboard"
-command = "printf '%s/%s' \"{{ .obsidian.vault_path }}\" \"{strip_ansi}\" | wl-copy"
+description = "Copy absolute path(s) to clipboard"
+command = "printf '%s\n' \"{strip_ansi}\" | sed 's|^|{{ .obsidian.vault_path }}/|' | wl-copy"
 mode = "fork"
+separator = "\n"
+
+[actions.copy-pi-prompt]
+description = "Copy as 'read <paths>' prompt for Pi"
+command = "bash -c 'paths=$(printf \"%s\\n\" \"$1\" | tr \"\\n\" \" \"); printf \"read %s\\n\" \"$paths\" | wl-copy' -- \"{strip_ansi}\""
+mode = "fork"
+separator = "\n"

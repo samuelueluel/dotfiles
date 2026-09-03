@@ -879,6 +879,7 @@ _pi_pick_local_model() {
     "dense38-fp4  Qwen3.8 Dense 27B | ROCmFP4" \
     "flash38-ciru Qwen3.8 Flash | CIRU IU4" \
     "flash38-next Qwen3.8 Flash Next | Q4" \
+    "flash38-myhacsint Qwen3.8 Flash Next | Q4 + shared MTP" \
     "flash38-fp4  Qwen3.8 Flash Next | ROCmFP4" \
     "moe-q8       Qwen3.6 MoE 35B | Q8" \
     "tiel-q8      Tiel Coder 35B A3B | Q8" \
@@ -890,6 +891,7 @@ _pi_pick_local_model() {
     dense38-q6)  print -r -- "Qwen3.8-27B-Q6" ;;
     flash38-ciru) print -r -- "Qwen3.8-Flash-CIRU-STRIX-IU4" ;;
     flash38-next) print -r -- "UD-Q4_K_XL" ;;
+    flash38-myhacsint) print -r -- "Qwen3.8-Flash-Next-Myhacsint-Q4" ;;
     flash38-fp4)  print -r -- "Qwen3.8-Flash-Next-ROCmFP4" ;;
     dense38-fp4) print -r -- "Qwen3.8-27B-ROCmFP4" ;;
     moe-q8)      print -r -- "Qwen3.6-MoE-35B-Q8" ;;
