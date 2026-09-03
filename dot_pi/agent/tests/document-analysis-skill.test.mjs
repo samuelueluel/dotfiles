@@ -18,7 +18,8 @@ test("document-analysis skill mandates automatic full enrichment", () => {
 });
 
 test("document-analysis skill permits pihat artifact interaction but keeps preprocessing local", () => {
-  assert.match(skill, /pihat.*bounded.*OCR.*visual artifacts/s);
+  assert.match(skill, /pihat.*complete normalized, OCR.*visual artifacts/s);
+  assert.match(skill, /does not silently truncate output/);
   assert.match(skill, /pipeline is strictly local/);
   assert.match(skill, /never use cloud processing as fallback/);
 });

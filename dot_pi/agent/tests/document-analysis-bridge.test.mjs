@@ -215,6 +215,7 @@ export default function (pi) {
   const tools = new Map();
   const calls = [];
   const toolCallHandlers = [];
+  const largeList = JSON.stringify({ payload: "x".repeat(60 * 1024) + "BRIDGE_LARGE_PAYLOAD_TAIL" });
   const fakePi = {
     registerTool(definition) { tools.set(definition.name, definition); },
     on(name, handler) { if (name === "tool_call") toolCallHandlers.push(handler); },
@@ -222,7 +223,8 @@ export default function (pi) {
     async exec(...args) {
       calls.push(args);
       const operation = args[1][2];
-      return { code: 0, stdout: operation === "status" ? "{}\\n" : "[]\\n", stderr: "" };
+      const stdout = operation === "status" ? "{}\\n" : operation === "list" ? largeList + "\\n" : "[]\\n";
+      return { code: 0, stdout, stderr: "" };
     },
   };
   bridge(fakePi);
@@ -235,6 +237,10 @@ export default function (pi) {
       };
       const status = await tools.get("document_analysis_status").execute("status-call", { job_id: "job-123" }, undefined, undefined, local);
       const list = await tools.get("document_analysis_list").execute("list-call", { status: "ready" }, undefined, undefined, local);
+      const listText = list.content?.[0]?.text ?? "";
+      const largeArtifactTail = listText.includes("BRIDGE_LARGE_PAYLOAD_TAIL");
+      const largeArtifactTruncated = listText.includes("[Bridge output truncated at 48 KiB.]");
+      const largeArtifactTextLength = Buffer.byteLength(listText, "utf8");
       const cloud = {
         model: { provider: "openai", id: "cloud-model", baseUrl: "https://cloud.example/v1" },
         sessionManager: { getSessionId: () => "harness-session" },
@@ -279,6 +285,9 @@ export default function (pi) {
         names: [...tools.keys()].sort(),
         calls: calls.map(([command, args]) => ({ command, args })),
         status_ok: Boolean(status && list),
+        largeArtifactTail,
+        largeArtifactTruncated,
+        largeArtifactTextLength,
         cloudListBlocked,
         cloudStatusBlocked,
         cloudArtifactRouteBlocked,
@@ -342,6 +351,9 @@ export default function (pi) {
 
   assert.deepEqual(result.names, [...bridgePolicy.DOCUMENT_ANALYSIS_TOOL_NAMES].sort());
   assert.equal(result.status_ok, true);
+  assert.equal(result.largeArtifactTail, true);
+  assert.equal(result.largeArtifactTruncated, false);
+  assert.ok(result.largeArtifactTextLength > 48 * 1024);
   assert.equal(result.cloudListBlocked, false);
   assert.equal(result.cloudStatusBlocked, false);
   assert.equal(result.cloudArtifactRouteBlocked, false);
