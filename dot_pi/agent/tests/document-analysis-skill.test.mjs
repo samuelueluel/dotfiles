@@ -1,9 +1,21 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 
-const skillPath = resolve(new URL("../../../dot_agents/skills/document-analysis/SKILL.md", import.meta.url).pathname);
+const skillPathCandidates = [
+  resolve(new URL("../../../dot_agents/skills/document-analysis/SKILL.md", import.meta.url).pathname),
+  resolve(new URL("../../../.agents/skills/document-analysis/SKILL.md", import.meta.url).pathname),
+];
+let skillPath;
+for (const candidate of skillPathCandidates) {
+  try {
+    await access(candidate);
+    skillPath = candidate;
+    break;
+  } catch {}
+}
+assert.ok(skillPath, "document-analysis skill not found in source or deployed layout");
 const skill = await readFile(skillPath, "utf8");
 
 test("document-analysis skill mandates automatic full enrichment", () => {

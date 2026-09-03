@@ -12,10 +12,11 @@ disable-model-invocation: true
 2. **Thematic Anchoring (No Append-Sprawl, No Restless Churn):** Never append new bullets to the bottom of a section or file as an afterthought. Slot updates directly into the specific existing rule, step, or table row governing that concept. Leave surrounding unaffected text untouched.
 3. **Pre-Flight RFC Gate for Structural Overhauls (Tier 3):** If an edit alters section hierarchy, rewrites decision tree topology, or overhauls multi-paragraph explanations, the agent MUST present a high-level proposal and receive Samuel's explicit conversational approval BEFORE generating any diff.
 4. **Zero Invariant Regression:** Never weaken, soften, or remove existing "Never do X" negative invariants unless Samuel explicitly commands it.
-5. **Vault Syntax Isolation:** Strictly ban Obsidian highlight syntax (`~={color}...=~`). All skills use standard GitHub Markdown.
-6. **Interactive Diff Approval:** Always present a clean unified diff in chat and wait for Samuel's confirmation before writing files.
-7. **Chezmoi Synchronization:** Every modified skill file must be captured with `chezmoi add <path>`.
-8. **CPTR / Headless Limitation:** CPTR can inspect and draft diffs but cannot write skill files or run `chezmoi add`; use regular Pi to apply an approved diff and never claim persistence when blocked.
+5. **No Rule Offloading:** Never offload governing rules, negative invariants, or output formatting constraints to `references/`. References are strictly for data catalogs, schemas, script code, and deep troubleshooting manuals.
+6. **Vault Syntax Isolation:** Strictly ban Obsidian highlight syntax (`~={color}...=~`). All skills use standard GitHub Markdown.
+7. **Interactive Diff Approval:** Always present a clean unified diff in chat and wait for Samuel's confirmation before writing files.
+8. **Chezmoi Synchronization:** Every modified skill file must be captured with `chezmoi add <path>`.
+9. **CPTR / Headless Limitation:** CPTR can inspect and draft diffs but cannot write skill files or run `chezmoi add`; use regular Pi to apply an approved diff and never claim persistence when blocked.
 
 ## Request-Routing Playbook
 

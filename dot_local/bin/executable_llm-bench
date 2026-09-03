@@ -611,8 +611,6 @@ def summarize_spec(tokens: list[str]) -> str:
 
 def infer_engine(tokens: list[str], backend: str) -> str:
     """Name the actual dispatch path, not just Lemonade's generic recipe."""
-    if has_flag(tokens, "--force-ciru"):
-        return "CIRU ROCm/HIP"
     if has_flag(tokens, "--force-rocm"):
         return "Gaetan ROCm/HIP"
     if has_flag(tokens, "--force-laurent"):
@@ -1474,8 +1472,6 @@ def engine_binary_path(engine: str) -> str:
     low = engine.lower()
     if "laurent" in low:
         return "/opt/lemonade/llama/vulkan-laurent/bin/llama-server"
-    if "ciru" in low:
-        return "/opt/lemonade/llama/ciru/bin/llama-server"
     if "rocm" in low:
         return "/opt/lemonade/llama/rocm/llama-server"
     return "/opt/lemonade/llama/vulkan/bin/llama-server-real"
@@ -1498,8 +1494,6 @@ def build_description(engine: str) -> str:
         return "Nathanw1014/llama.cpp branch strix-halo-vulkan; CMake: -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release; targets llama-server llama-cli llama-bench"
     if "laurent" in low:
         return "LaurentZuijdwijk/llama.cpp; CMake: -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release; targets llama-server llama-cli llama-bench"
-    if "ciru" in low:
-        return "ciru-ai/Qwen3.8-Flash-CIRU-STRIX-IU4; CMake: -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1151 -DGGML_HIP_ROCWMMA_FATTN=ON -DCMAKE_BUILD_TYPE=Release"
     if "rocm" in low:
         return "gaetan-puleo/llama-cpp-strix-halo; CMake: -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1151 -DGGML_HIP_ROCWMMA_FATTN=ON -DCMAKE_BUILD_TYPE=Release"
     return "not recorded"

@@ -4,7 +4,7 @@
 
 ## 1. Headings & Note Titles
 
-- **Title Rule:** The filename acts as the note's title. Start the note body directly at `H1` (`#`). Do not repeat the filename as a top-level heading.
+- **Title Rule:** The filename acts as the note's title (rendered automatically by Obsidian). Start the note body directly at `H1` (`#`) with the first content section (e.g., `# Overview`). Never repeat the note title or filename as a top-level heading.
 - **Number Headings Plugin:** Headings are numbered automatically.
   - **Editing existing notes:** **Never remove, strip, or alter existing heading numbers** (e.g., `# 1.`, `## 2.1.`).
   - **Creating new headings:** Write plain titles (e.g., `## Methodology`) and allow the plugin to manage numbering.

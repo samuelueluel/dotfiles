@@ -184,15 +184,15 @@ MINIMAP_WIDTH = (
 ICON_SIZE = 43  # px, app icon size, 48
 CELL_PAD = 6  # px, outer margin around each tile (space outside the ring)
 TILE_PAD = 3  # px, inner padding between icon and the ring
-COL_SPACING = 4  # px, horizontal gap between columns (adjusted for CELL_PAD)
-TILE_SPACING = 0  # px, vertical gap between tiles in a column (adjusted for CELL_PAD)
+COL_SPACING = 6  # px, horizontal gap between columns (adjusted for CELL_PAD)
+TILE_SPACING = 2  # px, vertical gap between tiles in a column (adjusted for CELL_PAD)
 WS_SPACING = 3  # px, vertical gap between workspaces (adjusted for CELL_PAD)
 
 # Borders & radii
 BORDER_WIDTH = 7  # px, highlight ring around focused/active tiles
 OUTER_BORDER_WIDTH = 1  # px, border around the whole minimap panel
 OUTER_BORDER_RADIUS = 9  # px, corner rounding of the outer panel
-TILE_BORDER_RADIUS = 5  # px, corner rounding of tiles and columns (focused workspace)
+TILE_BORDER_RADIUS = 3  # px, corner rounding of tiles and columns (focused workspace)
 UNFOCUSED_TILE_RADIUS = "24px"  # border-radius for tiles/columns in non-focused workspaces (24px = squircle/near-circle, prevents shadow bug)
 UNFOCUSED_TILE_PAD = TILE_PAD + 4  # extra padding for circular tiles so the icon clears the circle boundary
 FOCUS_RING_CIRCLE = (

@@ -1,4 +1,7 @@
 {
+  "settings": {
+    "toolResultRendering": "boxed"
+  },
   "mcpServers": {
     "searxng": {
       "command": "/var/home/samuel/.agents/mcp/searxng/venv/bin/python3",

@@ -94,20 +94,6 @@
     "size": 14.3,
     "suggested": true
   },
-  "Qwen3.8-Flash-CIRU-STRIX-IU4": {
-    "checkpoints": {
-      "main": "jcbtc/Qwen3.8-Flash-CIRU-STRIX-IU4:Qwen3.8-Flash-CIRU-STRIX-IU4.gguf"
-    },
-    "labels": [
-      "custom",
-      "ciru",
-      "mtp",
-      "tool-calling"
-    ],
-    "recipe": "llamacpp",
-    "size": 126.6,
-    "suggested": true
-  },
   "Qwen3.8-Flash-Next-ROCmFP4": {
     "checkpoints": {
       "main": "agentionai/Qwen3.8-Flash-Next-ROCmFP4-FAST-imatrix-GGUF:Qwen3.8-Flash-Next-ROCmFP4-FAST-v2-ple16.gguf",

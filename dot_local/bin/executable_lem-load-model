@@ -11,10 +11,6 @@ QWEN38_FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 --presence
 DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
 QWEN38_FLASH_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf"
-QWEN38_FLASH_SHARED_MTP="/root/.cache/huggingface/qwen3.8-flash-next/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf"
-QWEN38_FLASH_SHARED_MTP_URL="https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/main/MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf?download=true"
-QWEN38_FLASH_SHARED_MTP_SIZE=2786568256
-QWEN38_FLASH_SHARED_MTP_SHA256="5ff54097406a905cf3a724c709124ceb0e3e10235ee862298969e91c96fa96e6"
 QWEN38_FLASH_FP4_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf"
 QWEN38_FLASH_FP4_MTP_URL="https://huggingface.co/agentionai/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST-GGUF/resolve/main/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf?download=true"
 QWEN38_FLASH_FP4_MTP_SIZE=2444519296
@@ -34,36 +30,6 @@ EOF
 die() {
   printf 'lem-load-model: %s\n' "$*" >&2
   exit 1
-}
-
-ensure_qwen38_flash_shared_mtp() {
-  local cache_root target part size hash
-  cache_root=$(podman volume inspect --format '{{.Mountpoint}}' lemonade26-v108-cache 2>/dev/null || true)
-  [[ -n "$cache_root" ]] || cache_root="$HOME/.local/share/containers/storage/volumes/lemonade26-v108-cache/_data"
-  target="$cache_root/qwen3.8-flash-next/$(basename "$QWEN38_FLASH_SHARED_MTP")"
-  part="$target.part"
-
-  size=$(stat -c '%s' "$target" 2>/dev/null || echo 0)
-  if [[ "$size" == "$QWEN38_FLASH_SHARED_MTP_SIZE" ]]; then
-    hash=$(sha256sum "$target" | awk '{print $1}')
-    [[ "$hash" == "$QWEN38_FLASH_SHARED_MTP_SHA256" ]] && return 0
-  fi
-
-  mkdir -p "$(dirname "$target")"
-  if [[ -f "$target" && ! -f "$part" ]]; then
-    mv -f "$target" "$part"
-  fi
-
-  gum spin --show-output --title "downloading shared Q8_0 MTP sidecar (2.60 GiB)" -- \
-    curl -fL --retry 5 --retry-delay 3 --retry-connrefused --continue-at - \
-      -o "$part" "$QWEN38_FLASH_SHARED_MTP_URL" \
-    || die "shared Q8_0 MTP sidecar download failed"
-
-  size=$(stat -c '%s' "$part" 2>/dev/null || echo 0)
-  hash=$(sha256sum "$part" | awk '{print $1}')
-  [[ "$size" == "$QWEN38_FLASH_SHARED_MTP_SIZE" && "$hash" == "$QWEN38_FLASH_SHARED_MTP_SHA256" ]] \
-    || die "shared Q8_0 MTP sidecar failed size/hash validation"
-  mv -f "$part" "$target"
 }
 
 ensure_qwen38_flash_fp4_mtp() {
@@ -104,34 +70,6 @@ args=""
 pi_thinking_level=""
 fixed_parallel=0
 case "$id" in
-  Qwen3.8-Flash-CIRU-*|*CIRU*)
-    # Qwen3.8-Flash-CIRU is a custom-runtime build with exact FP8 PLE paged from NVMe
-    # via CIRUPLE1 sidecar, native IU4 WMMA on gfx1151, and Q8_0 MTP draft.
-    fixed_parallel=1
-    pi_thinking_level="max"
-    args+=" --force-ciru --ple-sidecar /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/ple --ple-cache-mib 4096 --cache-prompt --cache-ram 8192 --cache-idle-slots --ctx-checkpoints 32 --checkpoint-min-step 8192 -ngl all -sm none --fit off -b 2048 -ub 512 --parallel 1 -t 8 -tb 8 -fa on --cont-batching --reasoning on"
-
-    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
-      "on  MTP" \
-      "off  Base") || exit 1
-    case "${mtp%%[ ]*}" in
-      on)
-        args+=" --spec-type draft-mtp --spec-draft-model /root/.cache/huggingface/Qwen3.8-Flash-CIRU-STRIX-IU4/mtp/Qwen3.8-Flash-CIRU-STRIX-IU4-MTP-Q8_0.gguf --spec-draft-n-max 3 --spec-draft-p-min 0.75 --spec-draft-p-split 0.10 -ctkd q8_0 -ctvd q8_0"
-        ;;
-      off)
-        args+=" --spec-type none"
-        ;;
-    esac
-
-    args+=" $QWEN38_FLASH_SAMPLING"
-    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
-      "f16  F16" \
-      "q8   Q8_0") || exit 1
-    case "${kv%%[ ]*}" in
-      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
-    ;;
   Qwen3.8-Flash-Next-ROCmFP4*)
     # Agention's per-head ROCmFP4-FAST imatrix GGUF. This is not the
     # Nathan Q4_K_XL file: Laurent's qwen4exp-rocmfpx Vulkan engine is required.
@@ -183,59 +121,6 @@ case "$id" in
     case "${kv%%[ ]*}" in
       q8) args+=" -ctk q8_0 -ctv q8_0" ;;
       f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
-    ;;
-  Qwen3.8-Flash-Next-Myhacsint-*)
-    # myhacsint's latest Qwen4Exp production snapshot. Keep the existing
-    # Unsloth UD-Q4_K_XL target unchanged and use the official shared Q8_0
-    # MTP sidecar; the target and sidecar are never grafted or repacked.
-    fixed_parallel=1
-    pi_thinking_level="max"
-    ensure_qwen38_flash_shared_mtp
-    args+=" --force-myhacsint -ngl 999 -fa 1 -b 2048 -ub 2048 --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit on --reasoning on"
-
-    mtp=$(gum choose --header "speculative decoding" --selected "on  adaptive shared MTP" \
-      "on  adaptive shared MTP" \
-      "off Base") || exit 1
-    case "${mtp%%[ ]*}" in
-      on)
-        args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_SHARED_MTP --n-gpu-layers-draft 999 --spec-draft-adaptive --spec-draft-n-min 0 --spec-draft-n-max 7 --spec-draft-p-min 0.75"
-        ;;
-      off)
-        args+=" --spec-type none"
-        ;;
-    esac
-
-    effort=$(gum choose --header "thinking / reasoning effort" \
-      "xhigh  Xhigh" \
-      "medium Medium" \
-      "low    Low" \
-      "off    Off") || exit 1
-    case "${effort%%[ ]*}" in
-      xhigh)
-        pi_thinking_level="max"
-        args+=" $QWEN38_FLASH_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja"
-        ;;
-      medium)
-        pi_thinking_level="medium"
-        args+=" $QWEN38_FLASH_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-medium.jinja"
-        ;;
-      low)
-        pi_thinking_level="low"
-        args+=" $QWEN38_FLASH_SAMPLING --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-low.jinja"
-        ;;
-      off)
-        pi_thinking_level="off"
-        args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
-        ;;
-    esac
-
-    kv=$(gum choose --header "KV cache quantization" --selected "q8   Q8_0" \
-      "q8   Q8_0" \
-      "f16  F16") || exit 1
-    case "${kv%%[ ]*}" in
-      q8) args+=" --cache-type-k q8_0 --cache-type-v q8_0" ;;
-      f16) args+=" --cache-type-k f16 --cache-type-v f16" ;;
     esac
     ;;
   UD-Q4_K_XL|Qwen3.8-Flash-Next-*)

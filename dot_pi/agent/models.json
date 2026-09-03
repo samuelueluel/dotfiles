@@ -274,13 +274,6 @@
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
-        },
-        {
-          "id": "Qwen3.8-Flash-CIRU-STRIX-IU4",
-          "name": "Qwen3.8 Flash | CIRU IU4",
-          "reasoning": true,
-          "contextWindow": 262144,
-          "maxTokens": 131072
         }
       ]
     },

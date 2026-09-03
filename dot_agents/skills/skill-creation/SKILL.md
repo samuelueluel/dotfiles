@@ -16,8 +16,8 @@ High-performance skills serve as deterministic scaffolding over stochastic model
 
 1. **Description as Air Traffic Controller:** The frontmatter `description:` is the **only** text visible to the model during global skill discovery. It must include exact trigger phrases, keywords, CLI aliases, and file patterns.
 2. **Request-Routing Decision Trees:** Visual top-down ASCII trees at the top of `SKILL.md` anchor attention and enforce an `if/elif/else` mental model across multi-intent skills.
-3. **Explicit Negative Invariants ("Do NOT"):** Clearly stated non-negotiable boundaries ("Never use raw shell tools on vault notes", "Never guess regression specifications") that prune hallucinatory shortcuts.
-4. **Fast-Path Line Budget (~120–150 lines):** `SKILL.md` is the always-loaded fast path. Keep it dense and operational; offload deep edge cases and manuals to `references/`.
+3. **Explicit Negative Invariants ("Do NOT"):** Clearly stated non-negotiable boundaries ("Never use raw shell tools on vault notes", "Never guess regression specifications") that prune hallucinatory shortcuts. **All** negative invariants, behavioral boundaries, and output/syntax rules must reside directly in `SKILL.md`, never hidden in `references/`.
+4. **Fast-Path Line Budget (~120–150 lines):** `SKILL.md` is the always-loaded fast path. Keep it dense and operational; offload deep edge cases, encyclopedic tables, and manuals to `references/`. Avoid premature starvation—never strip governing rules just to make `SKILL.md` artificially small.
 5. **Deterministic Script Offloading:** Replace fragile, multi-step shell generation with standalone scripts in `scripts/` or `~/.local/bin/` to save tokens and eliminate syntax errors.
 6. **Evergreen Verification (No Snapshots):** Teach commands to inspect live system state (`chezmoi status`, `query_frontmatter_sql`), never bake static counts or dates into instructions. Enforce read-before-write checks.
 
@@ -93,7 +93,11 @@ The frontmatter description is the discovery gate:
 
 Split deep material into a `references/` folder when:
 - `SKILL.md` approaches ~120–150 lines.
-- Material covers complex schemas, multi-table references, deep CLI flags, or secondary failure recovery.
+- Material covers encyclopedic catalogs, extensive schemas, multi-table references, deep CLI manuals, or secondary failure recovery.
+
+### The Invariant vs. Reference Boundary:
+- **Rules Stay in `SKILL.md`:** 100% of negative invariants, safety boundaries ("Never do X"), and output formatting/syntax requirements (e.g. indentation, title conventions) must live in `SKILL.md`. Agents only load `SKILL.md` by default; any rule banished exclusively to `references/` is invisible during ordinary execution.
+- **Catalogs Go to `references/`:** Deep lookup tables, taxonomies, full script code, and rare troubleshooting walkthroughs. References provide *data and manuals*, never *governing constraints*.
 
 ### Reference File Standards:
 1. **The Header Contract:** Every reference file must open with an H1 title followed immediately by a bold trigger block on line 3:
@@ -119,6 +123,7 @@ Split deep material into a `references/` folder when:
 
 - [ ] Description includes explicit trigger phrasing ("Use when...")
 - [ ] Non-negotiable rules section contains hard negative invariants ("Never do X")
+- [ ] 100% of negative invariants, safety boundaries, and output formatting rules reside in `SKILL.md` (never hidden in `references/`)
 - [ ] Multi-intent skills (3+ routes) include an ASCII Request-Routing Playbook tree
 - [ ] Decision tree is top-down, acyclic, and wrapped in ` ```text `
 - [ ] Fast-path `SKILL.md` fits within ~120–150 lines
