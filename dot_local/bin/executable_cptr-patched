@@ -23,7 +23,7 @@ utility_sentinel='cptr-pi-utility-errors-v1'
 tool_display_sentinel='cptr-pi-tool-display-v1'
 workspace_display_sentinel='cptr-pi-workspace-display-v1'
 append_layer_sentinel='cptr-pi-append-layer-v1'
-headless_tool_filter_sentinel='cptr-pi-headless-tool-filter-v1'
+headless_tool_filter_sentinel='cptr-pi-headless-tool-filter-v2'
 final_tool_output_sentinel='cptr-pi-final-tool-output-v1'
 skill_filter_sentinel='cptr-pi-skill-filter-v3'
 if ! grep -q "$pi_sentinel" "$site_packages/cptr/utils/agents/pi.py" \

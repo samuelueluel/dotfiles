@@ -192,7 +192,7 @@ WS_SPACING = 3  # px, vertical gap between workspaces (adjusted for CELL_PAD)
 BORDER_WIDTH = 7  # px, highlight ring around focused/active tiles
 OUTER_BORDER_WIDTH = 1  # px, border around the whole minimap panel
 OUTER_BORDER_RADIUS = 9  # px, corner rounding of the outer panel
-TILE_BORDER_RADIUS = 3  # px, corner rounding of tiles and columns (focused workspace)
+TILE_BORDER_RADIUS = 1  # px, corner rounding of tiles and columns (focused workspace)
 UNFOCUSED_TILE_RADIUS = "24px"  # border-radius for tiles/columns in non-focused workspaces (24px = squircle/near-circle, prevents shadow bug)
 UNFOCUSED_TILE_PAD = TILE_PAD + 4  # extra padding for circular tiles so the icon clears the circle boundary
 FOCUS_RING_CIRCLE = (

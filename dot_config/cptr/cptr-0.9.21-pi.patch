@@ -225,16 +225,17 @@
          if self.model and self.model != "default":
              args.extend(["--model", self.model])
          self.proc = await asyncio.create_subprocess_exec(
-@@ -238,6 +344,31 @@ class PiRpcClient:
+@@ -238,6 +344,32 @@ class PiRpcClient:
          )
  
  
 +_COMPLETION_METADATA_TIMEOUT = 5.0
 +
-+# cptr-pi-headless-tool-filter-v1
++# cptr-pi-headless-tool-filter-v2
 +_CPTR_HEADLESS_EXCLUDED_TOOLS = (
 +    "ask_user,write,edit,powershell,session_handoff,mcp_disconnect,Agent,"
-+    "get_subagent_result,steer_subagent,SubagentWorkflow,mcpScript"
++    "get_subagent_result,steer_subagent,SubagentWorkflow,mcpScript,"
++    "session_search,session_ask"
 +)
 +
 +

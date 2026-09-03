@@ -34,9 +34,10 @@
     "document_analysis_archive": "allow",
     "document_analysis_delete": "allow",
 
-    // Read-only session/advisor surfaces.
-    "session_search": "allow",
-    "session_ask": "allow",
+    // Both pi-sessions transcript tools are disabled and denied here as
+    // defense in depth; the remaining session UI is not a model tool.
+    "session_search": "deny",
+    "session_ask": "deny",
     "advisor": "allow",
 
     // Namespace proxies are allowed here so permission-mode.ts can inspect

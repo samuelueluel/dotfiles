@@ -41,8 +41,6 @@ const HEADLESS_ALLOWED_TOOLS = new Set([
   "answer",
   "todo",
   "signal_loop_success",
-  "session_search",
-  "session_ask",
   "advisor",
   // Fixed document-analysis bridge tools. The bridge separately requires a known
   // route; these exact names do not grant arbitrary shell commands or unknown
