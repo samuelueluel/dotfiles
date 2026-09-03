@@ -23,3 +23,10 @@ test("document-analysis skill permits pihat artifact interaction but keeps prepr
   assert.match(skill, /pipeline is strictly local/);
   assert.match(skill, /never use cloud processing as fallback/);
 });
+
+test("document-analysis skill distinguishes native and formula OCR routing", () => {
+  assert.match(skill, /Image-only PDFs therefore send every page through MinerU/);
+  assert.match(skill, /mixed PDFs send only weak pages unless `--force` is used/);
+  assert.match(skill, /formula detection and formula-to-LaTeX recognition/);
+  assert.match(skill, /`ocr: not_needed` means ordinary OCR was skipped, not that formula fidelity was verified/);
+});

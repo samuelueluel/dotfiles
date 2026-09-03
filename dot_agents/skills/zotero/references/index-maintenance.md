@@ -30,6 +30,10 @@ zotero-sidecar.sh embed   <COLLECTION_KEY...>         # Stage 3: Chunk + embed i
 zotero-sidecar.sh reembed <COLLECTION_KEY...>         # Delete Chroma chunks first, then re-index
 ```
 
+### Formula handling
+
+Zotero's MinerU sidecar creator uses `-m txt` for native-text PDFs. This skips ordinary prose OCR but still runs enabled formula detection and UniMERNet formula recognition, so detected equations are emitted as LaTeX in the Markdown sidecar. Scanned PDFs use the OCR path; both paths intend the same equation representation. Do not infer missing formula recognition from `-m txt` alone.
+
 ### Dynamic Batch Enumeration
 Always derive missing items dynamically from live SQLite membership rather than static notes:
 ```python
