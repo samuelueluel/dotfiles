@@ -5,8 +5,9 @@
 ## Worker Prompt Template
 
 ```
-You are an extraction worker for item <KEY> (<title>). Below is the FULL text of
-the source (route: <mineru_sidecar|pdf_text_layer>). Read all of it.
+You are an extraction worker for item <KEY> (<title>). The full source text is
+at <source_path> (route: <mineru_sidecar|pdf_text_layer>, fidelity: <high|low>) —
+read all of it there; the orchestrator does not inline large sources.
 
 Inclusion rule: <RULE>
 
@@ -46,12 +47,18 @@ Rules:
   qualifying_evidence=false. examined_in_full is always true.
 - Do not report bibliography/reference-list entries as findings.
 - Do not estimate numbers obscured or absent from the text; flag them instead.
-
-[full source text below]
-<source>
-...
-</source>
+- If the source content clearly does not match the item's title or type, still
+  produce the packet honestly, but say so in notes as a probable sidecar
+  misassignment (title–content mismatch).
 ```
+
+## Orchestrator Notes
+
+- Workers never invoke the spine. The orchestrator parses each returned
+  wrapper, writes the packet, and submits serially — the spine has no file
+  locking, so concurrent submissions would race the manifest.
+- Spawn workers with generous turn budgets (10–12 turns): large sidecars need
+  several reads plus a second omission pass.
 
 ## Validation Contract (`zotero-extract submit`)
 
@@ -70,6 +77,14 @@ Rules:
 1. `VALIDATION FAILED` → re-brief the worker with the exact violation list; the worker re-copies quotes from the provided source text.
 2. Two consecutive failed submits on one item → `zotero-extract mark RUNDIR KEY failed --reason "<violation summary>"`.
 3. Never weaken the schema, drop the omission pass, or trim quotes to force acceptance.
+
+Truncated or unparsable worker output (e.g. a turn-limit cutoff) is handled like
+a validation failure: resume the worker and require complete re-emission of the
+wrapper — never splice, repair, or hand-complete a partial packet. Recurring
+quote-failure classes observed in practice: silent OCR repair (the worker
+normalizes garble the source really contains) and LaTeX/spacing artifact drift
+(`$10\%$` vs `$10 \%$`). Name the class in the re-brief and demand
+character-for-character re-copying with all artifacts intact.
 
 ## Escalation & Failure Catalog
 

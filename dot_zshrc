@@ -910,8 +910,35 @@ _lem_preload() {
   command lem-load-model "$@"
 }
 
+# The subagents extension applies maxConcurrent from ~/.pi/agent/subagents.json
+# at session start and never reads PI_SUBAGENTS_MAX_CONCURRENT, so launchers
+# write the file (single key; all other keys preserved) AND export the var.
+# Concurrent sessions snapshot at their own startup, so last-launch-wins only
+# affects sessions started afterward.
+_pi_subagent_concurrency() {
+  local n="$1"
+  export PI_SUBAGENTS_MAX_CONCURRENT="$n"
+  python3 - "$HOME/.pi/agent/subagents.json" "$n" <<'PY'
+import json, sys
+path, n = sys.argv[1], int(sys.argv[2])
+try:
+    with open(path) as f:
+        cfg = json.load(f)
+except Exception:
+    cfg = {}
+cfg["maxConcurrent"] = n
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2)
+    f.write("\n")
+PY
+}
+
 pi() {
-  export PI_SUBAGENTS_MAX_CONCURRENT=1
+  local subagents_n
+  subagents_n=$(gum choose --header "pi · subagent concurrency" \
+    "1   sequential workers" \
+    "2   parallel workers") || return 1
+  _pi_subagent_concurrency "${subagents_n%%[ ]*}"
   _pi_nonstata_skills
   _pi_theme_args
 
@@ -962,7 +989,7 @@ pi() {
 }
 
 pihat() {
-  export PI_SUBAGENTS_MAX_CONCURRENT=4
+  _pi_subagent_concurrency 4
   _pi_nonstata_skills
   _pi_theme_args
 
@@ -1015,7 +1042,11 @@ pihat() {
 }
 
 beta() {
-  export PI_SUBAGENTS_MAX_CONCURRENT=1
+  local subagents_n
+  subagents_n=$(gum choose --header "beta · subagent concurrency" \
+    "1   sequential workers" \
+    "2   parallel workers") || return 1
+  _pi_subagent_concurrency "${subagents_n%%[ ]*}"
   _pi_stata_skills
   _pi_theme_args
   local target="${1:-$PWD}" abs_target
@@ -1045,7 +1076,7 @@ beta() {
 }
 
 betahat() {
-  export PI_SUBAGENTS_MAX_CONCURRENT=4
+  _pi_subagent_concurrency 4
   _pi_stata_skills
   _pi_theme_args
 
