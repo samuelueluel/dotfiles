@@ -14,7 +14,7 @@ disable-model-invocation: true
 4. **Zero Invariant Regression:** Never weaken, soften, or remove existing "Never do X" negative invariants unless Samuel explicitly commands it.
 5. **No Rule Offloading:** Never offload governing rules, negative invariants, or output formatting constraints to `references/`. References are strictly for data catalogs, schemas, script code, and deep troubleshooting manuals.
 6. **Vault Syntax Isolation:** Never use Obsidian highlight syntax as styling in skill prose, dotfiles, commits, or terminal output. A literal backtick-quoted or fenced example is allowed only when documenting required vault-note output, as specified by `skill-creation`. All other skill documentation uses standard GitHub Markdown.
-7. **Interactive Diff Approval:** Always present a clean unified diff in chat and wait for Samuel's confirmation before writing files.
+7. **Direct Execution & Concise Summary:** For Tier 1 and Tier 2 updates, apply edits directly via file tools, stage with chezmoi, and report a concise bullet summary of what changed and why. Never hand-type simulated unified diffs in chat. If Samuel requests a diff or verification is required, display a real terminal `git diff` from `~/dotfiles`.
 8. **Chezmoi Synchronization:** Every modified skill file must be captured with `chezmoi add <path>`.
 9. **CPTR / Headless Limitation:** CPTR can inspect and draft diffs but cannot write skill files or run `chezmoi add`; use regular Pi to apply an approved diff and never claim persistence when blocked.
 
@@ -57,17 +57,17 @@ REQUEST INTENT
 - Identify the exact line or list item governing the behavior.
 - Slot the update in-place. Do not rephrase adjacent sentences or reorder unaffected blocks.
 - Verify that `SKILL.md` remains within the ~120–150 line budget.
-- Present the minimal unified diff for confirmation.
+- Apply the edit directly, stage with `chezmoi add`, and report a concise 2–3 bullet summary. Display terminal `git diff` only on explicit request.
 
 ### Tier 2: Progressive Reference Offload
 - When adding a detailed schema, complex CLI table, or deep troubleshooting run that would push `SKILL.md` past ~120–150 lines:
 - Keep a concise 1–2 line pointer with trigger phrasing in `SKILL.md` under `## Progressive Disclosure & Reference Routing`.
 - Create or update a single-purpose `references/<theme>.md` file.
 - Enforce the Header Contract on line 3: `**Load this file when** [triggers]`.
-- Present the diff for confirmation.
+- Apply the changes, stage with `chezmoi add`, and report a concise summary.
 
 ### Tier 3: Extensive Structural Refactor (Two-Phase Gated)
-- **Phase 1 (The Pre-Flight RFC):** Before touching any files or generating diffs, pause execution and present this conversational brief:
+- **Phase 1 (The Pre-Flight RFC):** Before touching any files or making structural changes, pause execution and present this conversational brief:
   ```markdown
   ### Proposed Refactor Plan: <skill-name>
   - **Motive:** [Why the overhaul is needed: line budget breach, taxonomy drift, contradictory rules]
@@ -75,13 +75,13 @@ REQUEST INTENT
   - **Invariants Preserved:** [Explicit list of "Never do X" rules that remain untouched]
   *Shall I proceed to draft this structural refactor?*
   ```
-- **Phase 2 (Diff Generation):** Only after Samuel approves the proposal in chat, generate the unified diff, audit against `skill-creation`, and await final apply confirmation.
+- **Phase 2 (Execution & Git Diff Verification):** Only after Samuel approves the proposal in chat, apply the structural changes, stage with `chezmoi add`, audit against `skill-creation`, and display the actual terminal `git diff` from `~/dotfiles` for final verification.
 
 ## Audit & Application Checklist
 
 - [ ] Edits slotted into thematic anchors (zero append-sprawl)
 - [ ] Surrounding unaffected text preserved verbatim (zero restless churn)
-- [ ] If Tier 3: Phase 1 RFC proposal was approved in conversation before drafting diff
+- [ ] If Tier 3: Phase 1 RFC proposal was approved in conversation before applying changes
 - [ ] All `skill-creation` checklist items passed (no Obsidian highlight syntax used as styling; documented literal examples allowed, under line budget)
-- [ ] Clean unified diff presented and approved by Samuel
+- [ ] Concise change summary provided (or real terminal `git diff` displayed for Tier 3 / on request)
 - [ ] Synchronized to Chezmoi (`chezmoi add ~/.agents/skills/<skill>/...`)

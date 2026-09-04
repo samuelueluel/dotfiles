@@ -8,13 +8,33 @@ import { isSafeBashCommand } from "../lib/bash-policy.ts";
  * Compatibility layer for the old modes.ts extension.
  *
  * pi-permission-system owns tool/path/MCP/skill permissions. This extension
- * keeps only the two session modes Samuel uses: manual and auto. Manual mode
- * also retains the old conservative Bash guard because pi-permission-system's
- * bash rules are wildcard-based and cannot safely express the old structured
- * read-only parser.
+ * keeps the three session modes Samuel uses: manual, autoask, and auto.
+ * Manual mode also retains the old conservative Bash guard because
+ * pi-permission-system's bash rules are wildcard-based and cannot safely
+ * express the old structured read-only parser.
  */
 
-type Mode = "manual" | "auto";
+export type Mode = "manual" | "autoask" | "auto";
+
+export const AUTO_MODE_GUIDANCE = [
+  "AUTO mode overrides general or bundled skill instructions that require `ask_user`.",
+  "AUTO mode is non-interactive: do not call `ask_user` or ask the user a question in chat.",
+  "When a choice is needed, make the safest reversible assumption, state it briefly, and continue.",
+  "If no safe continuation exists, stop and report the specific blocker instead of waiting for user input.",
+].join("\n");
+
+export const AUTO_MODE_BLOCK_REASON = [
+  "AUTO mode is non-interactive.",
+  "Do not retry `ask_user` or ask conversationally.",
+  "Make the safest reversible assumption and continue.",
+  "If no safe continuation exists, stop and report the blocker.",
+].join(" ");
+
+const ASK_USER_TOOL_NAME = "ask_user";
+
+function isAutomaticMode(mode: Mode): boolean {
+  return mode !== "manual";
+}
 
 type PermissionSystemRuntime = {
   getYoloMode?: () => boolean;
@@ -182,7 +202,7 @@ function permissionRuntime(): PermissionSystemRuntime | undefined {
 
 function requestedStartupMode(): Mode | undefined {
   const requested = process.env.PI_DEFAULT_MODE?.trim().toLowerCase();
-  if (requested === "auto" || requested === "manual") return requested;
+  if (requested === "auto" || requested === "autoask" || requested === "manual") return requested;
   if (process.argv.includes("-a") || process.argv.includes("--approve")) return "auto";
   return undefined;
 }
@@ -294,9 +314,8 @@ function isReadOnlyMcpCall(toolName: string, input: unknown): boolean {
 
 function setStatus(ctx: ExtensionContext, mode: Mode): void {
   if (!ctx.hasUI) return;
-  const label = mode === "auto" ? "auto" : "manual";
-  const color = mode === "auto" ? "success" : "muted";
-  ctx.ui.setStatus("modes-ext", ctx.ui.theme.fg(color, `mode: ${label}`));
+  const color = mode === "manual" ? "muted" : "success";
+  ctx.ui.setStatus("modes-ext", ctx.ui.theme.fg(color, `mode: ${mode}`));
 }
 
 function notify(ctx: ExtensionContext, message: string, level: "error" | "info" | "success"): void {
@@ -306,13 +325,37 @@ function notify(ctx: ExtensionContext, message: string, level: "error" | "info" 
 export default function permissionModeExtension(pi: ExtensionAPI): void {
   let currentMode: Mode = "manual";
   let sessionModeOverride: Mode | undefined;
+  // Track only whether ask_user was active before entering auto mode. This
+  // restores the prior policy-filtered state without re-enabling a tool that
+  // was already hidden by another policy.
+  let askUserWasActiveBeforeAuto: boolean | undefined;
+
+  const synchronizeAskUserToolVisibility = (): void => {
+    const activeTools = pi.getActiveTools();
+
+    if (currentMode === "auto") {
+      if (askUserWasActiveBeforeAuto === undefined) {
+        askUserWasActiveBeforeAuto = activeTools.includes(ASK_USER_TOOL_NAME);
+      }
+
+      if (activeTools.includes(ASK_USER_TOOL_NAME)) {
+        pi.setActiveTools(activeTools.filter((toolName) => toolName !== ASK_USER_TOOL_NAME));
+      }
+      return;
+    }
+
+    if (askUserWasActiveBeforeAuto === true && !activeTools.includes(ASK_USER_TOOL_NAME)) {
+      pi.setActiveTools([...activeTools, ASK_USER_TOOL_NAME]);
+    }
+    askUserWasActiveBeforeAuto = undefined;
+  };
 
   const synchronizeModeWithBackend = (ctx: ExtensionContext): void => {
     const runtime = permissionRuntime();
     if (!runtime?.getYoloMode) return;
 
     if (sessionModeOverride) {
-      const enabled = sessionModeOverride === "auto";
+      const enabled = isAutomaticMode(sessionModeOverride);
       if (runtime.getYoloMode() !== enabled) {
         const result = runtime.setYoloMode?.(enabled, {
           persist: false,
@@ -342,7 +385,7 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
 
   const applyMode = (mode: Mode, ctx: ExtensionContext): boolean => {
     const runtime = permissionRuntime();
-    const result = runtime?.setYoloMode?.(mode === "auto", {
+    const result = runtime?.setYoloMode?.(isAutomaticMode(mode), {
       persist: false,
       source: "permission-mode",
     });
@@ -359,19 +402,26 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
 
     sessionModeOverride = mode;
     currentMode = mode;
+    synchronizeAskUserToolVisibility();
     setStatus(ctx, mode);
-    notify(ctx, `Switched to ${mode} mode`, mode === "auto" ? "success" : "info");
+    const message = mode === "auto"
+      ? "Switched to auto mode (non-interactive)"
+      : mode === "autoask"
+        ? "Switched to autoask mode (automatic permissions; questions allowed)"
+        : "Switched to manual mode";
+    notify(ctx, message, mode === "manual" ? "info" : "success");
     return true;
   };
 
   pi.on("session_start", async (_event, ctx) => {
-    // /auto and /manual are session-local. A new/reloaded session starts from
-    // the backend's local snapshot unless the process was launched explicitly
-    // with -a/--approve or PI_DEFAULT_MODE.
+    // /manual, /autoask, and /auto are session-local. A new/reloaded session
+    // starts from the backend's local snapshot unless the process was launched
+    // explicitly with -a/--approve or PI_DEFAULT_MODE.
     sessionModeOverride = requestedStartupMode();
     currentMode = sessionModeOverride
       ?? (permissionRuntime()?.getYoloMode?.() === true ? "auto" : "manual");
     synchronizeModeWithBackend(ctx);
+    synchronizeAskUserToolVisibility();
   });
 
   // pi-permission-system refreshes its extension config during this lifecycle.
@@ -383,15 +433,28 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     const requested = requestedStartupMode();
     if (requested) sessionModeOverride = requested;
     synchronizeModeWithBackend(ctx);
+    synchronizeAskUserToolVisibility();
     // Let later package handlers refresh first, then reapply an explicit mode.
-    setTimeout(() => synchronizeModeWithBackend(ctx), 0);
+    setTimeout(() => {
+      synchronizeModeWithBackend(ctx);
+      synchronizeAskUserToolVisibility();
+    }, 0);
   });
 
-  pi.on("before_agent_start", async (_event, ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
     synchronizeModeWithBackend(ctx);
+    synchronizeAskUserToolVisibility();
     // pi-permission-system refreshes its config in its own handler. Reapply
     // after that handler so the next tool call sees this window's mode.
-    setTimeout(() => synchronizeModeWithBackend(ctx), 0);
+    setTimeout(() => {
+      synchronizeModeWithBackend(ctx);
+      synchronizeAskUserToolVisibility();
+    }, 0);
+
+    if (currentMode === "auto") {
+      return { systemPrompt: `${event.systemPrompt}\n\n${AUTO_MODE_GUIDANCE}` };
+    }
+    return {};
   });
 
   pi.on("session_shutdown", async (event) => {
@@ -406,9 +469,16 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("auto", {
-    description: "Switch to auto permission mode for this session",
+    description: "Switch to non-interactive auto mode for this session",
     handler: async (_args, ctx) => {
       applyMode("auto", ctx);
+    },
+  });
+
+  pi.registerCommand("autoask", {
+    description: "Switch to auto permission mode while allowing user questions",
+    handler: async (_args, ctx) => {
+      applyMode("autoask", ctx);
     },
   });
 
@@ -417,7 +487,7 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     handler: async (args, ctx) => {
       synchronizeModeWithBackend(ctx);
       const requested = args.trim().toLowerCase();
-      if (requested === "manual" || requested === "auto") {
+      if (requested === "manual" || requested === "autoask" || requested === "auto") {
         applyMode(requested, ctx);
         return;
       }
@@ -432,6 +502,12 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     // The permission package refreshes its config during lifecycle events. Keep
     // its in-memory yolo state aligned with this window before its handler runs.
     synchronizeModeWithBackend(ctx);
+
+    // Tool visibility is the primary guard. This second check handles stale
+    // model context, forged calls, and calls already queued before /auto.
+    if (currentMode === "auto" && event.toolName === ASK_USER_TOOL_NAME) {
+      return { block: true, reason: AUTO_MODE_BLOCK_REASON };
+    }
 
     // Cloud/unknown routes must not bypass the private-document bridge through
     // built-in reads, Bash, or the broad folder-scoped filesystem MCP. The
@@ -477,13 +553,24 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
         }
       }
       if (isReadOnlyMcpCall(event.toolName, event.input)) return {};
+
+      // Explore subagents are strictly read-only: hard-block mutating MCP operations
+      // regardless of active permission mode (manual, autoask, or auto).
+      const isExplore = ctx.getSystemPrompt?.()?.includes("STRICT READ-ONLY SEARCH SPECIALIST");
+      if (isExplore) {
+        return {
+          block: true,
+          reason: `Explore subagents are strictly read-only: mutating MCP operation '${operation || event.toolName}' is blocked.`,
+        };
+      }
+
       if (CPTR_HEADLESS) {
         return {
           block: true,
           reason: "Open WebUI Pi policy blocks non-read-only MCP operations.",
         };
       }
-      if (currentMode === "auto") return {};
+      if (isAutomaticMode(currentMode)) return {};
       if (!ctx.hasUI) {
         return {
           block: true,
@@ -525,7 +612,7 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
       };
     }
 
-    if (currentMode === "auto" || isSafeBashCommand(command)) return {};
+    if (isAutomaticMode(currentMode) || isSafeBashCommand(command)) return {};
 
     if (!ctx.hasUI) {
       return {

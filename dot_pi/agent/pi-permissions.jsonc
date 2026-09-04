@@ -18,6 +18,7 @@
     "get_search_content": "allow",
     "source_check": "allow",
     "preview_export": "allow",
+    // Manual and autoask may use interactive decisions; /auto blocks this tool.
     "ask_user": "allow",
     "answer": "allow",
     "todo": "allow",

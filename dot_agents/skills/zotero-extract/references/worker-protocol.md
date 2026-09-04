@@ -57,8 +57,10 @@ Rules:
 - Workers never invoke the spine. The orchestrator parses each returned
   wrapper, writes the packet, and submits serially — the spine has no file
   locking, so concurrent submissions would race the manifest.
-- Spawn workers with generous turn budgets (10–12 turns): large sidecars need
-  several reads plus a second omission pass.
+- Dispatch workers as `Explore` subagents (`subagent_type: "Explore"`) with
+  generous turn budgets (10–12 turns): large sidecars need several reads plus a
+  second omission pass. Explore runs with `prompt_mode: replace`, giving each
+  paper a clean, isolated context.
 
 ## Validation Contract (`zotero-extract submit`)
 

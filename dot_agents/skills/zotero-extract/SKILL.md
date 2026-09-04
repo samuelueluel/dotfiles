@@ -1,9 +1,9 @@
 ---
-name: zotero-exhaustive-extraction
+name: zotero-extract
 description: Recall-led exhaustive extraction over a named Zotero collection using the zotero-extract spine. Use when Samuel asks for ALL papers, every item, complete coverage, or an audit of a collection ("extract every estimate in <collection>", "audit the collection for X", "which papers in <collection> report Y") — never for ordinary topical questions. Workers read full documents and emit validated evidence packets; a coverage manifest tracks every item to a terminal state.
 ---
 
-# Zotero Exhaustive Collection Extraction
+# Zotero Extract
 
 ## Non-Negotiable Rules
 
@@ -15,7 +15,9 @@ description: Recall-led exhaustive extraction over a named Zotero collection usi
 - No cloud OCR, no cloud embedding, no downloads. pihat receiving sidecar text is Samuel's standing permission; preprocessing stays local.
 - Sources that fail closed are escalated, never forced: multi-PDF ambiguity, oversized sources, scanned PDFs.
 - Never reprocess a terminal item; interrupted runs resume from `pending`.
-- Worker delegation may never exceed the session's configured subagent concurrency, and no concurrency number may be hardcoded.
+- Never run full collection extraction in local pi/beta; full runs belong strictly in pihat/betahat to utilize 4-worker cloud concurrency. Local pi/beta is strictly sequential (1 worker) and reserved for smoke tests.
+- Dispatch workers strictly as `Explore` subagents (`subagent_type: "Explore"`, `max_turns: 10–12`); workers must never mutate files or invoke the extraction spine directly.
+- Worker delegation follows `PI_SUBAGENTS_MAX_CONCURRENT` as exported by the launcher; never hardcode a concurrency override.
 - Identity, verification, adjudication, and synthesis stay in the main session.
 
 ## Request-Routing Playbook
@@ -53,7 +55,9 @@ Mode contracts: ordinary Zotero search answers from best-supported passages — 
 ## Worker Delegation & Concurrency
 
 - Worker turns may delegate to subagents in **both tiers** — for context isolation, not speed: each paper's full text lives in a disposable child context, never in main-session history.
-- Concurrency is bounded by `PI_SUBAGENTS_MAX_CONCURRENT` exactly as the launcher sets it (4 on pihat/betahat; 1–2 on pi/beta per Samuel's launch choice). Never override it and never hardcode a number — cloud multi-fan-out falls out of launcher config.
+- Concurrency is bounded by `PI_SUBAGENTS_MAX_CONCURRENT` exactly as the launcher sets it: `pihat`/`betahat` exports 4 workers for parallel fan-out; `pi`/`beta` exports 1 worker (strictly sequential).
+- Full collection extraction runs should be executed in `pihat`/`betahat` to leverage the 4-worker cloud concurrency; local `pi`/`beta` is strictly sequential and reserved for smoke tests or small subsets.
+- Workers are dispatched as `Explore` subagents (`subagent_type: "Explore"`, `max_turns: 10–12`), providing read-only source access and complete context isolation without polluting orchestrator history.
 - The worker model inherits the session model by default; same-model homogeneity is required within a run, and the packet `worker` field records provenance.
 - The main session retains enumeration, submits, escalations, adjudication/reduce, synthesis, and all interaction with Samuel.
 

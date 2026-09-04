@@ -278,6 +278,43 @@
       ]
     },
     "openai-codex": {
+      "models": [
+        {
+          "id": "gpt-5.6-luna-fast",
+          "name": "GPT-5.6 Luna (Fast)",
+          "api": "openai-codex-responses",
+          "baseUrl": "https://chatgpt.com/backend-api",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {
+            "input": 0.2,
+            "output": 1.2,
+            "cacheRead": 0.02,
+            "cacheWrite": 0.25,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 0.4,
+                "output": 1.8,
+                "cacheRead": 0.04,
+                "cacheWrite": 0.5
+              }
+            ]
+          },
+          "contextWindow": 1050000,
+          "maxTokens": 128000,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": "low"
+          },
+          "compat": {
+            "supportsOpenAIGrammarTools": true,
+            "supportsAdditionalTools": true,
+            "supportsToolSearch": true
+          }
+        }
+      ],
       "modelOverrides": {
         "gpt-5.4": {
           "contextWindow": 1050000

@@ -2,7 +2,7 @@
 """zotero-extract — deterministic spine for exhaustive collection extraction.
 
 This is the deterministic-code tier of the exhaustive extraction workflow
-(see the zotero-exhaustive-extraction skill). It never runs a model. It:
+(see the zotero-extract skill). It never runs a model. It:
 
   1. enumerates a Zotero collection subtree via the local API (or a supplied
      item list), deduplicating items filed in several subcollections,
