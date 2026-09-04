@@ -363,6 +363,7 @@ pi-safe-1() {
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
+    -v "$HOME/zotero-extraction-runs":"$HOME/zotero-extraction-runs" \
     -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
     -v "$HOME/.cache/uv":"$HOME/.cache/uv" \
     ${XDG_RUNTIME_DIR:+-v} ${XDG_RUNTIME_DIR:+/run/user/1000/pulse/native:/run/user/1000/pulse/native} \
@@ -516,6 +517,7 @@ pi-safe-stata-1() {
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
     -v "$HOME/.agents":"$HOME/.agents":ro \
+    -v "$HOME/zotero-extraction-runs":"$HOME/zotero-extraction-runs" \
     -v /usr/local/stata19:/usr/local/stata19:ro \
         -v "$HOME/.local/share/uv":"$HOME/.local/share/uv" \
     -v "$HOME/.cache/uv":"$HOME/.cache/uv" \

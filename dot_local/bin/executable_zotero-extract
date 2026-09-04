@@ -1,0 +1,739 @@
+#!/usr/bin/env python3
+"""zotero-extract — deterministic spine for exhaustive collection extraction.
+
+This is the deterministic-code tier of the exhaustive extraction workflow
+(see the zotero-exhaustive-extraction skill). It never runs a model. It:
+
+  1. enumerates a Zotero collection subtree via the local API (or a supplied
+     item list), deduplicating items filed in several subcollections,
+  2. resolves each item's text source (MinerU sidecar preferred, PDF text
+     layer as the lower-fidelity fallback; ambiguous or oversized sources
+     fail closed),
+  3. validates worker evidence packets (schema + verbatim-quote-at-source
+     checks) and tracks terminal states in a coverage manifest.
+
+Every model-facing step — reading sidecars into context, extraction, omission
+passes, adjudication, synthesis — belongs to the agent session (pihat or pi),
+not to this script.
+
+Usage:
+  zotero-extract init --collection KEY --rule "TEXT" | --rule-file PATH
+                      --outdir DIR [--name NAME] [--items-file FILE]
+  zotero-extract source RUNDIR KEY
+  zotero-extract pending RUNDIR [--limit N]
+  zotero-extract submit RUNDIR PACKET.json
+  zotero-extract mark RUNDIR KEY STATE --reason TEXT
+      (STATE = excluded | unreadable | failed | escalated)
+  zotero-extract status RUNDIR
+  zotero-extract manifest RUNDIR [--json]
+  zotero-extract worklist RUNDIR
+
+Environment:
+  ZOTERO_LOCAL_API             default http://127.0.0.1:23119/api/users/0
+  ZOTERO_MINERU_SIDECAR_DIR    default ~/.config/zotero-mcp/mineru-sidecars
+  ZOTERO_STORAGE_DIR           default ~/Zotero/storage
+  ZOTERO_EXTRACT_MAX_SOURCE_CHARS  default 400000; sources above this are
+                               escalated (unit processing not yet implemented)
+
+Run directory layout:
+  RUNDIR/manifest.json     coverage manifest (authoritative state)
+  RUNDIR/config.json       collection, inclusion rule, created timestamp
+  RUNDIR/packets/KEY.json  accepted evidence packets
+  RUNDIR/sources/KEY.txt   text-layer extractions (script-produced)
+
+Exit codes: 0 ok, 1 validation/operational error, 2 usage error.
+"""
+
+import argparse
+import hashlib
+import html
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import unicodedata
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+PROG = "zotero-extract"
+MANIFEST_VERSION = 1
+PACKET_VERSION = 1
+PAGE_SIZE = 100
+PAGE_CAP = 50000
+
+TERMINAL_STATES = ("processed", "excluded", "unreadable", "failed", "escalated")
+MARK_STATES = ("excluded", "unreadable", "failed", "escalated")
+NON_PARENT_TYPES = {"attachment", "note", "annotation"}
+RECORD_KINDS = ("finding", "definition", "method", "estimate", "qualification")
+CONFIDENCES = ("high", "medium", "low")
+MIN_QUOTE_CHARS = 20
+
+ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\uFEFF\u00ad"))
+
+
+def api_base():
+    return os.environ.get("ZOTERO_LOCAL_API", "http://127.0.0.1:23119/api/users/0").rstrip("/")
+
+
+def sidecar_dir():
+    return Path(os.environ.get(
+        "ZOTERO_MINERU_SIDECAR_DIR",
+        str(Path.home() / ".config" / "zotero-mcp" / "mineru-sidecars")))
+
+
+def storage_dir():
+    return Path(os.environ.get("ZOTERO_STORAGE_DIR", str(Path.home() / "Zotero" / "storage")))
+
+
+def max_source_chars():
+    try:
+        return int(os.environ.get("ZOTERO_EXTRACT_MAX_SOURCE_CHARS", "400000"))
+    except ValueError:
+        return 400000
+
+
+def now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def norm(s):
+    """Whitespace/encoding-insensitive form for quote containment checks."""
+    s = unicodedata.normalize("NFC", s).translate(ZERO_WIDTH)
+    return " ".join(s.split())
+
+
+def clean_title(s):
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", s or "Untitled")).split()) or "Untitled"
+
+
+def die(msg, code=1):
+    print(f"{PROG}: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def http_get_json(url):
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        die(f"Zotero local API request failed: {url}\n"
+            f"  {e}\n  Is Zotero Desktop running with the local API enabled? "
+            f"(Or pass --items-file to init.)")
+
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def sidecar_for(key):
+    """Return the sidecar path if a non-empty sidecar exists, else None."""
+    p = sidecar_dir() / f"{key}.md"
+    try:
+        if p.is_file() and p.read_text(encoding="utf-8", errors="replace").strip():
+            return p
+    except OSError:
+        return None
+    return None
+
+
+def atomic_json(path, obj):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(obj, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def load_run(rundir):
+    rundir = Path(rundir)
+    manifest = rundir / "manifest.json"
+    config = rundir / "config.json"
+    if not manifest.is_file() or not config.is_file():
+        die(f"not a run directory (missing manifest.json/config.json): {rundir}")
+    try:
+        with open(manifest, encoding="utf-8") as f:
+            m = json.load(f)
+        with open(config, encoding="utf-8") as f:
+            c = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        die(f"cannot read run state in {rundir}: {e}")
+    return rundir, m, c
+
+
+def save_manifest(rundir, m):
+    atomic_json(Path(rundir) / "manifest.json", m)
+
+
+def find_item(m, key):
+    return next((e for e in m["items"] if e["item_key"] == key), None)
+
+
+def item_entry(order, key, title, item_type, date):
+    sc = sidecar_for(key)
+    entry = {
+        "item_key": key,
+        "title": clean_title(title),
+        "item_type": item_type or "unknown",
+        "date": date or "",
+        "order": order,
+        "state": "pending",
+        "reason": None,
+        "extraction_route": None,
+        "route_fidelity": None,
+        "source_path": None,
+        "source_sha256": None,
+        "packet": None,
+        "records": 0,
+        "updated_at": now(),
+    }
+    if sc is not None:
+        entry["extraction_route"] = "mineru_sidecar"
+        entry["route_fidelity"] = "high"
+        entry["source_path"] = str(sc)
+        entry["source_sha256"] = sha256_file(sc)
+    return entry
+
+
+# ---------------------------------------------------------------- fetching
+
+def _paged(url):
+    """GET a Zotero local API list endpoint, paginating by short page."""
+    out, start = [], 0
+    while True:
+        sep = "&" if "?" in url else "?"
+        page = http_get_json(f"{url}{sep}format=json&limit={PAGE_SIZE}&start={start}")
+        if not isinstance(page, list):
+            die(f"unexpected API response (expected a list): {url}")
+        out.extend(page)
+        if len(page) < PAGE_SIZE or len(out) >= PAGE_CAP:
+            break
+        start += PAGE_SIZE
+    return out
+
+
+def fetch_collection_subtree(collection_key):
+    """Return (name, scope_keys) for a collection plus its nested subcollections."""
+    base = api_base()
+    coll = http_get_json(f"{base}/collections/{collection_key}?format=json")
+    name = (coll.get("data") or {}).get("name") or collection_key
+    children = {}
+    for c in _paged(f"{base}/collections"):
+        parent = (c.get("data") or {}).get("parentCollection") or ""
+        children.setdefault(parent, []).append(c["key"])
+    scope, stack = [], [collection_key]
+    while stack:
+        k = stack.pop()
+        scope.append(k)
+        stack.extend(children.get(k, []))
+    return name, scope
+
+
+def fetch_collection_items(scope_keys):
+    """Fetch parent items across the scope, deduped by item key (first wins)."""
+    items, seen = [], set()
+    for sk in scope_keys:
+        for it in _paged(f"{api_base()}/collections/{sk}/items?itemType=-attachment"):
+            k = it.get("key")
+            if k and k not in seen:
+                seen.add(k)
+                items.append(it)
+    return items
+
+
+def resolve_pdf_paths(item_key):
+    """Resolve ALL PDF attachment paths for a parent item (ambiguity is the
+    caller's problem — silently choosing one would corrupt the source route)."""
+    base = api_base()
+    children = http_get_json(f"{base}/items/{item_key}/children?format=json")
+    paths = []
+    for ch in children or []:
+        data = ch.get("data", {})
+        if (data.get("itemType") == "attachment"
+                and data.get("contentType") == "application/pdf"):
+            path = data.get("path")
+            if not path:
+                continue
+            if path.startswith("attachments:"):
+                cand = storage_dir() / ch["key"] / path.split(":", 1)[1]
+            elif path.startswith("/"):
+                cand = Path(path)
+            else:
+                continue
+            if cand.is_file():
+                paths.append(cand)
+    return paths
+
+
+# ---------------------------------------------------------------- init
+
+def cmd_init(args):
+    outdir = Path(args.outdir)
+    if outdir.exists() and any(outdir.iterdir()):
+        die(f"run directory already exists and is not empty: {outdir}")
+
+    if bool(args.rule) == bool(args.rule_file):
+        die("provide exactly one of --rule or --rule-file")
+    if args.rule_file:
+        try:
+            rule = Path(args.rule_file).read_text(encoding="utf-8").strip()
+        except OSError as e:
+            die(f"cannot read --rule-file {args.rule_file}: {e}")
+    else:
+        rule = args.rule.strip()
+    if not rule:
+        die("inclusion rule is empty — the rule governs what workers extract")
+
+    if args.items_file:
+        try:
+            raw = json.loads(Path(args.items_file).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            die(f"cannot read --items-file {args.items_file}: {e}")
+        raw_items = [{"key": it["key"],
+                      "title": it.get("title", "Untitled"),
+                      "itemType": it.get("itemType", "unknown"),
+                      "date": it.get("date", "")} for it in raw]
+        coll_name = args.name or "from-items-file"
+        n_subcolls = 0
+    else:
+        if not args.name:
+            die("--name is required when enumerating from the Zotero local API")
+        coll_name, scope = fetch_collection_subtree(args.collection)
+        raw_items = fetch_collection_items(scope)
+        n_subcolls = len(scope) - 1
+
+    entries, seen = [], set()
+    for it in raw_items:
+        key = it.get("key")
+        data = it.get("data", it)
+        itype = data.get("itemType") or it.get("itemType") or "unknown"
+        if not key or key in seen or itype in NON_PARENT_TYPES:
+            continue
+        seen.add(key)
+        entries.append(item_entry(len(entries), key,
+                                  data.get("title") or it.get("title", "Untitled"),
+                                  itype, data.get("date") or it.get("date", "")))
+    if not entries:
+        die("no eligible parent items found (nothing to extract)")
+
+    config = {
+        "run_created": now(),
+        "collection_key": args.collection,
+        "collection_name": coll_name,
+        "subcollections_included": n_subcolls,
+        "inclusion_rule": rule,
+        "items_file": args.items_file,
+        "max_source_chars": max_source_chars(),
+    }
+    manifest = {
+        "manifest_version": MANIFEST_VERSION,
+        "collection_key": args.collection,
+        "collection_name": coll_name,
+        "inclusion_rule": rule,
+        "items": entries,
+    }
+    outdir.mkdir(parents=True, exist_ok=True)
+    (outdir / "packets").mkdir(exist_ok=True)
+    (outdir / "sources").mkdir(exist_ok=True)
+    atomic_json(outdir / "config.json", config)
+    atomic_json(outdir / "manifest.json", manifest)
+
+    n_sidecar = sum(1 for e in entries if e["extraction_route"] == "mineru_sidecar")
+    print(f"Run initialized: {outdir}")
+    print(f"  collection : {coll_name} ({args.collection})"
+          + (f" — including {n_subcolls} subcollection(s)" if n_subcolls else ""))
+    print(f"  items      : {len(entries)} parent items (deduplicated)")
+    print(f"  sidecar    : {n_sidecar}  (pdf_text_layer fallback: {len(entries) - n_sidecar})")
+    print(f"  rule       : {rule}")
+
+
+# ---------------------------------------------------------------- source
+
+def cmd_source(rundir, key):
+    rundir, m, _ = load_run(rundir)
+    it = find_item(m, key)
+    if it is None:
+        die(f"item {key} is not part of this run")
+    if it["state"] != "pending":
+        die(f"item {key} is not pending (state: {it['state']})")
+
+    def escalate(reason):
+        it["state"] = "escalated"
+        it["reason"] = reason
+        it["updated_at"] = now()
+        save_manifest(rundir, m)
+
+    if it["extraction_route"] == "mineru_sidecar":
+        path = Path(it["source_path"])
+        if not path.is_file():
+            escalate(f"sidecar disappeared mid-run: {path}")
+            die(f"sidecar vanished: {path}")
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if len(text) > max_source_chars():
+            escalate(f"oversized_source: {len(text)} chars exceeds "
+                     f"{max_source_chars()}; unit processing not yet implemented")
+            die(f"sidecar for {key} is oversized ({len(text)} chars); "
+                f"marked escalated")
+        h = sha256_file(path)
+        if h != it["source_sha256"]:
+            it["source_sha256"] = h
+            it["updated_at"] = now()
+            save_manifest(rundir, m)
+            print(f"{PROG}: note: sidecar changed since init; hash refreshed ({key})",
+                  file=sys.stderr)
+        print(json.dumps({"item_key": key, "extraction_route": "mineru_sidecar",
+                          "route_fidelity": "high", "source_path": str(path),
+                          "source_sha256": h}))
+        return
+
+    # text-layer fallback: resolve linked PDF(s), extract once, cache
+    src = rundir / "sources" / f"{key}.txt"
+    if not src.is_file():
+        paths = resolve_pdf_paths(key)
+        if not paths:
+            it["state"] = "unreadable"
+            it["reason"] = "no_pdf: no PDF attachment resolvable"
+            it["updated_at"] = now()
+            save_manifest(rundir, m)
+            die(f"no PDF attachment for {key}; marked unreadable")
+        if len(paths) > 1:
+            escalate(f"multiple_pdf_attachments: {len(paths)} candidate PDFs "
+                     f"({', '.join(p.name for p in paths[:3])}); needs human selection")
+            die(f"item {key} has {len(paths)} PDF attachments; ambiguous text "
+                f"source — marked escalated")
+        if shutil.which("pdftotext") is None:
+            escalate("no_text_extractor: pdftotext not installed")
+            die("pdftotext not installed; marked unreadable")
+        proc = subprocess.run(["pdftotext", "-enc", "UTF-8", str(paths[0]), str(src)],
+                              capture_output=True, text=True)
+        if proc.returncode != 0 or not src.exists():
+            src.unlink(missing_ok=True)
+            escalate(f"text_extraction_failed: {proc.stderr.strip()[:200]}")
+            die(f"pdftotext failed for {key}: {proc.stderr.strip()[:200]}")
+        text = src.read_text(encoding="utf-8", errors="replace")
+        if not text.strip():
+            src.unlink(missing_ok=True)
+            escalate("no_text_layer: PDF has no extractable text layer")
+            die(f"PDF for {key} has no text layer (scanned?); marked escalated — "
+                f"candidate for local sidecar creation")
+        if len(text) > max_source_chars():
+            src.unlink(missing_ok=True)
+            escalate(f"oversized_source: {len(text)} chars exceeds "
+                     f"{max_source_chars()}; unit processing not yet implemented")
+            die(f"extracted text for {key} is oversized ({len(text)} chars); "
+                f"marked escalated")
+
+    it["extraction_route"] = "pdf_text_layer"
+    it["route_fidelity"] = "low"
+    it["source_path"] = str(src)
+    it["source_sha256"] = sha256_file(src)
+    it["updated_at"] = now()
+    save_manifest(rundir, m)
+    print(json.dumps({"item_key": key, "extraction_route": "pdf_text_layer",
+                      "route_fidelity": "low", "source_path": str(src),
+                      "source_sha256": it["source_sha256"]}))
+
+
+# ---------------------------------------------------------------- pending
+
+def cmd_pending(rundir, limit):
+    _, m, _ = load_run(rundir)
+    pending = [e for e in m["items"] if e["state"] == "pending"]
+    pending.sort(key=lambda e: e["order"])
+    for e in pending[:limit]:
+        print(json.dumps({
+            "item_key": e["item_key"], "title": e["title"],
+            "item_type": e["item_type"],
+            "extraction_route": e["extraction_route"],
+            "route_fidelity": e["route_fidelity"],
+            "source_path": e["source_path"],
+        }))
+    print(f"# pending: {len(pending)} / {len(m['items'])}", file=sys.stderr)
+
+
+# ---------------------------------------------------------------- submit
+
+def cmd_submit(rundir, packet_path):
+    rundir, m, c = load_run(rundir)
+    try:
+        pkt = json.loads(Path(packet_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        die(f"cannot read packet {packet_path}: {e}")
+
+    errors = []
+
+    def err(msg):
+        errors.append(msg)
+
+    key = pkt.get("item_key")
+    it = find_item(m, key)
+    if it is None:
+        die(f"packet item_key {key!r} is not part of this run")
+    if it["state"] != "pending":
+        die(f"item {key} is not pending (state: {it['state']}); packet rejected")
+
+    if pkt.get("packet_version") != PACKET_VERSION:
+        err(f"packet_version must be {PACKET_VERSION}")
+    if pkt.get("inclusion_rule") != c["inclusion_rule"]:
+        err("inclusion_rule does not match this run's rule (stale or cross-run packet?)")
+    if pkt.get("extraction_route") != it["extraction_route"]:
+        err(f"extraction_route {pkt.get('extraction_route')!r} != manifest route "
+            f"{it['extraction_route']!r}; run 'source {key}' first")
+    if pkt.get("route_fidelity") != it["route_fidelity"]:
+        err(f"route_fidelity {pkt.get('route_fidelity')!r} != manifest fidelity "
+            f"{it['route_fidelity']!r}")
+
+    src_path = it.get("source_path")
+    declared_path = (pkt.get("source") or {}).get("path")
+    if not src_path or not Path(src_path).is_file():
+        err("no source text on file; run 'source' for this item first")
+    else:
+        if declared_path != src_path:
+            err(f"source.path {declared_path!r} != manifest source {src_path!r}")
+        current_hash = sha256_file(src_path)
+        declared = (pkt.get("source") or {}).get("sha256")
+        if declared != current_hash:
+            err("source.sha256 does not match current source file "
+                "(stale packet or source changed mid-run)")
+        if it.get("source_sha256") and declared != it["source_sha256"]:
+            err("source.sha256 does not match the manifest's recorded hash")
+
+    worker = pkt.get("worker")
+    if worker is not None and not isinstance(worker, str):
+        err("worker must be a string (provider/model provenance)")
+
+    records = pkt.get("records")
+    if not isinstance(records, list):
+        err("records must be a list")
+        records = []
+
+    src_text = norm(Path(src_path).read_text(encoding="utf-8", errors="replace")
+                    ) if src_path and Path(src_path).is_file() else ""
+
+    for i, rec in enumerate(records):
+        label = f"records[{i}]"
+        if not isinstance(rec, dict):
+            err(f"{label}: not an object")
+            continue
+        if rec.get("kind") not in RECORD_KINDS:
+            err(f"{label}.kind must be one of {RECORD_KINDS}")
+        quote = rec.get("quote") or ""
+        if len(norm(quote)) < MIN_QUOTE_CHARS:
+            err(f"{label}.quote too short (< {MIN_QUOTE_CHARS} normalized chars)")
+        elif src_text and norm(quote) not in src_text:
+            err(f"{label}.quote not found verbatim in source — copy the quote "
+                f"exactly from the provided source text")
+        anchor = rec.get("anchor")
+        if not isinstance(anchor, dict):
+            err(f"{label}.anchor must be an object (page/section/table, any nullable)")
+        else:
+            sec = anchor.get("section")
+            if isinstance(sec, str) and sec.strip() and src_text \
+                    and norm(sec) not in src_text:
+                print(f"{PROG}: warning: {label}.anchor.section not found in source text",
+                      file=sys.stderr)
+        if rec.get("confidence") not in CONFIDENCES:
+            err(f"{label}.confidence must be one of {CONFIDENCES}")
+        if not isinstance(rec.get("ambiguous", False), bool):
+            err(f"{label}.ambiguous must be a boolean")
+
+    omission = pkt.get("omission_pass") or {}
+    if omission.get("performed") is not True:
+        err("omission_pass.performed must be true — the second pass is mandatory")
+
+    negative = pkt.get("negative_result") or {}
+    if negative.get("examined_in_full") is not True:
+        err("negative_result.examined_in_full must be true for every packet")
+    if bool(records) != bool(negative.get("qualifying_evidence")):
+        err("negative_result.qualifying_evidence must be true iff records is "
+            "non-empty (an empty packet is a negative finding, not a shrug)")
+
+    if errors:
+        print(f"VALIDATION FAILED for {key}:", file=sys.stderr)
+        for e in errors:
+            print(f"  - {e}", file=sys.stderr)
+        sys.exit(1)
+
+    dest = rundir / "packets" / f"{key}.json"
+    atomic_json(dest, pkt)
+    it["state"] = "processed"
+    it["reason"] = None
+    it["packet"] = str(dest)
+    it["records"] = len(records)
+    it["updated_at"] = now()
+    save_manifest(rundir, m)
+
+    counts = counts_by_state(m)
+    print(f"accepted {key}: {len(records)} record(s) -> {dest}")
+    print("  " + " · ".join(f"{s} {counts[s]}" for s in ("processed", "pending",
+                                                         "excluded", "unreadable",
+                                                         "failed", "escalated")))
+
+
+# ---------------------------------------------------------------- mark
+
+def cmd_mark(rundir, key, state, reason):
+    if state not in MARK_STATES:
+        die(f"state must be one of {MARK_STATES}", code=2)
+    if not reason or not reason.strip():
+        die(f"--reason is required when marking an item {state}")
+    rundir, m, _ = load_run(rundir)
+    it = find_item(m, key)
+    if it is None:
+        die(f"item {key} is not part of this run")
+    if it["state"] == "processed":
+        die(f"item {key} is already processed; refused")
+    it["state"] = state
+    it["reason"] = reason.strip()
+    it["updated_at"] = now()
+    save_manifest(rundir, m)
+    print(f"marked {key}: {state} ({it['reason']})")
+
+
+# ---------------------------------------------------------------- reporting
+
+def counts_by_state(m):
+    counts = {s: 0 for s in ("processed", "pending", "excluded", "unreadable",
+                             "failed", "escalated")}
+    for e in m["items"]:
+        counts[e["state"]] = counts.get(e["state"], 0) + 1
+    return counts
+
+
+def cmd_status(rundir):
+    _, m, _ = load_run(rundir)
+    counts = counts_by_state(m)
+    total = len(m["items"])
+    print(f"Run: {rundir}")
+    print(f"  collection : {m['collection_name']} ({m['collection_key']})")
+    print(f"  items      : {total}")
+    print("  " + " · ".join(f"{s} {counts[s]}" for s in counts))
+    pending = [e for e in m["items"] if e["state"] == "pending"]
+    if pending:
+        preview = ", ".join(e["item_key"] for e in pending[:12])
+        more = f" … +{len(pending) - 12}" if len(pending) > 12 else ""
+        print(f"  next up    : {preview}{more}")
+    if total and counts["pending"] == 0:
+        print("  run is COMPLETE — every item reached a terminal state")
+
+
+def cmd_manifest(rundir, as_json):
+    rundir, m, _ = load_run(rundir)
+    if as_json:
+        print(json.dumps(m, indent=2, ensure_ascii=False))
+        return
+    counts = counts_by_state(m)
+    print(f"Coverage manifest — {m['collection_name']} ({m['collection_key']})")
+    print(f"Inclusion rule: {m['inclusion_rule']}")
+    print("Counts: " + " · ".join(f"{s} {counts[s]}" for s in counts))
+    print()
+    for state in ("processed", "excluded", "unreadable", "failed", "escalated", "pending"):
+        rows = [e for e in m["items"] if e["state"] == state]
+        if not rows:
+            continue
+        print(f"## {state} ({len(rows)})")
+        for e in rows:
+            bits = [e["item_key"], f"[{e['extraction_route'] or '?'}]"]
+            if state == "processed":
+                bits.append(f"{e['records']} rec")
+            if e.get("reason"):
+                bits.append(f"({e['reason']})")
+            bits.append(e["title"][:70])
+            print("  " + " | ".join(bits))
+        print()
+
+
+def cmd_worklist(rundir):
+    """Items worth a local sidecar-creation pass before/after judging results."""
+    _, m, _ = load_run(rundir)
+    lowfi = [e for e in m["items"]
+             if e["state"] == "processed" and e["extraction_route"] == "pdf_text_layer"]
+    flagged = [e for e in m["items"]
+               if e["state"] in ("unreadable", "escalated")]
+    if not lowfi and not flagged:
+        print("worklist empty — no text-layer-only or flagged items")
+        return
+    if lowfi:
+        print("# processed from PDF text layer (lower fidelity; consider "
+              "`zotero-sidecar.sh create KEY` then re-run):")
+        for e in lowfi:
+            print(f"  {e['item_key']}  {e['title'][:70]}")
+    if flagged:
+        print("# flagged during the run:")
+        for e in flagged:
+            print(f"  {e['item_key']}  [{e['state']}] ({e['reason']})  {e['title'][:60]}")
+
+
+# ---------------------------------------------------------------- main
+
+def main():
+    ap = argparse.ArgumentParser(prog=PROG, description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("init", help="create a run: enumerate + resolve routes")
+    p.add_argument("--collection", required=True)
+    p.add_argument("--name", help="collection display name (required with local API)")
+    p.add_argument("--rule", help="inclusion rule text for workers")
+    p.add_argument("--rule-file", help="file holding the inclusion rule (for long rules)")
+    p.add_argument("--outdir", required=True)
+    p.add_argument("--items-file", help="JSON item list instead of the local API (offline/testing)")
+    p.set_defaults(fn=lambda a: cmd_init(a))
+
+    p = sub.add_parser("source", help="resolve/print the text source for one item")
+    p.add_argument("rundir")
+    p.add_argument("key")
+    p.set_defaults(fn=lambda a: cmd_source(a.rundir, a.key))
+
+    p = sub.add_parser("pending", help="list pending items as JSON lines")
+    p.add_argument("rundir")
+    p.add_argument("--limit", type=int, default=10)
+    p.set_defaults(fn=lambda a: cmd_pending(a.rundir, a.limit))
+
+    p = sub.add_parser("submit", help="validate an evidence packet; mark processed")
+    p.add_argument("rundir")
+    p.add_argument("packet")
+    p.set_defaults(fn=lambda a: cmd_submit(a.rundir, a.packet))
+
+    p = sub.add_parser("mark", help="mark a terminal non-success state")
+    p.add_argument("rundir")
+    p.add_argument("key")
+    p.add_argument("state", choices=MARK_STATES)
+    p.add_argument("--reason", required=True)
+    p.set_defaults(fn=lambda a: cmd_mark(a.rundir, a.key, a.state, a.reason))
+
+    p = sub.add_parser("status", help="counts + next-up summary")
+    p.add_argument("rundir")
+    p.set_defaults(fn=lambda a: cmd_status(a.rundir))
+
+    p = sub.add_parser("manifest", help="coverage manifest (human or --json)")
+    p.add_argument("rundir")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=lambda a: cmd_manifest(a.rundir, a.json))
+
+    p = sub.add_parser("worklist", help="items worth local sidecar creation")
+    p.add_argument("rundir")
+    p.set_defaults(fn=lambda a: cmd_worklist(a.rundir))
+
+    args = ap.parse_args()
+    args.fn(args)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except BrokenPipeError:
+        sys.exit(0)
