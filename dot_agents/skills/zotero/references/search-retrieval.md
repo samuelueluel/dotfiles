@@ -1,20 +1,6 @@
 # Search, Retrieval & Citation Graph Routing
 
-**Load this file when** choosing search tools, routing citation queries, navigating the citation graph, handling external references, or verifying empirical claims.
-
-## Fast Query Router
-
-| Query Objective | First Tool | Notes |
-|---|---|---|
-| Substantive findings, mechanisms, estimates, equations, robustness | `zotero_semantic_search` | Uses hybrid RAG + reranker. Set `collection=<KEY>` to scope. |
-| Exact DOI/title in bibliographies; raw reference entry; "which local items cite X?" | `zotero_search_bibliography_entries` | Reads the evidence layer (raw bibliography strings). |
-| **Exact Citation Counts** ("how many times is X cited?", "most-cited work in collection") | `zotero_search_bibliography_entries` | Count distinct citing items per target identity. **Do not read exact totals from `zotero_rank_works_by_inbound_citations`**. |
-| Specific paper/item identity | `zotero_resolve_exact_source` | Metadata-only exact/ambiguous/absent resolver; related records are separate and no semantic fallback is used. |
-| Known library metadata / citekey lookup | `zotero_search_items`, `zotero_search_items_advanced`, or citekey lookup | Direct Zotero database lookups after identity resolution or for ordinary discovery. |
-| Leading collection anchors / most-cited ranking | `zotero_rank_works_by_inbound_citations` | Fast ranking by inbound graph edges; counts are directional/approximate. |
-| Direct cited / citing neighbors of a paper | `zotero_get_citation_neighbors` | Traverses direct graph connections; pass `depth=1`. Other depths are rejected because multi-hop traversal is not implemented. |
-| Local papers sharing references with a seed | `zotero_find_bibliographically_coupled_papers` | Bibliographic coupling on resolved outgoing references. |
-| Citation parsing & resolution coverage audit | `zotero_get_reference_index_status` | Reports resolution rates across parsed sidecars. |
+**Load this file when** handling exact-source edge cases, semantic filters, difficult comparisons, citation counts, external references, or citation-graph scopes.
 
 ## Exact-Source Identity Obligation
 
@@ -142,82 +128,21 @@ Search candidate DOIs or title/author strings in `zotero_search_bibliography_ent
   - `zotero_search_bibliography_entries(collection_key=...)` filters citing sources by direct collection membership only.
 - **Bibliographic Coupling (`zotero_find_bibliographically_coupled_papers`):** Couples on **resolved** outgoing citations. If a seed paper has few resolved outgoing references (e.g., older citations without DOIs), results may be empty. Fall back to citing papers via `zotero_get_citation_neighbors` or semantic search on key terms.
 
-## Adaptive Bounded RAG Workflow
+## Difficult Comparisons and Superlatives
 
-Use this default for substantive questions, especially “which paper?”, superlatives, and collection-scoped comparisons. Agentic follow-up is encouraged when it resolves a material uncertainty; open-ended accumulation is not.
+Use this section only after the core bounded RAG workflow exposes a concrete comparability or candidate-recall problem.
 
-### 1. Discover
+### Comparability
 
-Run a task-oriented `zotero_semantic_search`, normally with `limit=5–8` and `collection=<KEY>`. Keep positive-`Rerank`, non-`REF` passages that actually concern the requested claim.
+For plausible leaders, establish the dimensions required by the question—commonly outcome, sign, unit, treatment dose, geography, horizon, and specification. Rank only sufficiently comparable estimates. If estimands differ, name a truthful dimension such as “largest reported nearby-spillover percentage” rather than asserting a universal winner.
 
-Do not assume the first result is the answer, but do not treat every returned paper as requiring inspection. Form a provisional answer from the passages and identify what could overturn it.
+### Bounded candidate recall
 
-### 2. Choose the next action from the evidence gap
+Semantic top-k retrieval is not proof of exhaustive recall. When a missed candidate could plausibly change a collection-wide superlative, run one orthogonal collection-scoped metadata or lexical search over discriminating title or abstract terms. Union plausible candidates with the semantic shortlist. Enumerate the collection only when targeted discovery leaves a concrete completeness problem or the user requests an audit.
 
-Before each follow-up, determine internally:
+### Verification and stopping
 
-- **Current answer:** What does the evidence presently support?
-- **Material uncertainty:** What missing fact could change or substantially qualify that answer?
-- **Cheapest reliable retrieval:** Which tool resolves that fact with the least irrelevant output?
-
-This is a task-neutral control check, not a required table or user-visible ledger. Different questions require different evidence states.
-
-Appropriate follow-ups include:
-
-- a materially different semantic query when the first query missed a needed concept, estimate, mechanism, or specification;
-- a page read when an exact number or table context needs verification;
-- an outline only when the relevant page is unknown;
-- targeted known-item sidecar extraction when page retrieval is unavailable or malformed;
-- one orthogonal lexical/metadata recall check when a collection-wide superlative makes candidate recall consequential;
-- full text only when bounded extraction cannot recover necessary context or the user requests comprehensive reading.
-
-Every follow-up must address the named material uncertainty. Do not issue near-duplicate searches, inspect every candidate symmetrically, or collect background that cannot affect the answer.
-
-### 3. Handle comparisons and superlatives
-
-For plausible leaders, establish the dimensions needed by the question—commonly outcome, sign, unit, treatment dose, geography, horizon, and specification. These are comparison prompts, not a universal schema.
-
-Rank only sufficiently comparable estimates. If estimands differ, identify a truthful dimension such as “largest reported nearby-spillover percentage” rather than asserting a universal winner.
-
-For collection-wide superlatives, semantic top-k retrieval is not proof of exhaustive recall. When a missed candidate could plausibly change the answer, run one cheap orthogonal check such as a simple collection-scoped `search_items(..., qmode='everything')` or `zotero_search_items_advanced` over discriminating title/abstract terms. Union its plausible candidates with the semantic shortlist. Enumerate the collection only if targeted discovery still leaves a concrete completeness problem or the user requests an audit.
-
-### 4. Verify, reassess, and stop
-
-Verify the exact winning claim and only those challengers necessary to justify or qualify it. After each retrieval, reassess whether a material uncertainty remains.
-
-Stop when:
-
-- the requested claim is directly supported;
-- units, context, attribution, and any ranking dimension are verified;
-- plausible challengers exposed by bounded discovery have been resolved;
-- remaining incompatibilities are disclosed; and
-- another call is unlikely to change the answer.
-
-Two consecutive follow-ups that reveal no new plausible candidate or answer-changing evidence are a strong signal to stop. This is a diagnostic, not a mandatory allowance. Retrieval failure may justify a different route; mere curiosity does not.
-
-Fetch metadata only for sources that will appear in the answer, then use `citation-integrity` tokens with the truthful retrieval route. A collection scope defines the retrieval corpus, not study geography: `Detroit-Paper` may validly return Chicago or Saginaw studies unless the user separately requests Detroit-only evidence.
-
-### Minimal superlative example
-
-For “Within Detroit-Paper, what paper finds the largest demolition effect on crime?” a typical path is:
-
-1. Scoped semantic discovery for demolition, crime, effect size, and spatial context.
-2. Provisional comparison of plausible leaders.
-3. One orthogonal collection-scoped lexical check if candidate recall could change the ranking.
-4. Exact page or targeted sidecar verification for the winner and a plausible challenger.
-5. Final metadata for cited sources, then a dimension-qualified answer.
-
-This is an example, not a call quota. Skip unnecessary stages; add a justified follow-up when a material evidence gap remains.
-
-### Calls to avoid in ordinary RAG
-
-- `zotero_list_collection_items` merely to claim exhaustiveness without a concrete unresolved recall problem.
-- `zotero_get_semantic_index_status` unless semantic search reports readiness/service failure.
-- `get_pdf_outline` when the relevant page/table is already exposed.
-- `zotero_get_item_fulltext` when a passage, page, or precise sidecar window is sufficient.
-- Parsing MCP temporary/spill files; narrow the MCP request or use the known-item fallback instead.
-- Graph tools unless the question concerns citations/relationships or explicitly requests expansion beyond semantic seeds.
-- `advisor`; ordinary Zotero RAG is governed by this skill and `citation-integrity`.
+Verify the winning claim and only the challengers needed to justify or qualify it. Stop when the requested comparison is supported, units and context are verified, plausible challengers from bounded discovery are resolved, remaining incompatibilities are disclosed, and another call is unlikely to change the answer. Fetch metadata only for sources that will appear in the answer.
 
 ## Topic-Conditioned Graph Discovery
 
@@ -226,11 +151,8 @@ When the task genuinely asks for structural neighbors or broader topical explora
 2. **Expand Graph:** Run citation-neighbor or bibliographic-coupling tools on selected seeds with an explicit scope.
 3. **Extract Evidence:** Return to semantic passages or direct pages for substantive claims; graph edges do not prove findings.
 
-## Query Construction & Evidence Hygiene
+## Query Construction
 
 - Use task-oriented search phrases rather than bare keywords.
-- Include author/year or title tokens when targeting known papers (DCR headers are indexed).
-- Treat `Rerank` as the relevance gate; never cite a semantic match without it.
-- Reject `REF`/bibliography chunks for substantive evidence.
-- Verify empirical numbers against exact passages or direct pages per `citation-integrity`.
-- Metadata labels (`itemType`, `source_group`, canonical tags) describe the source and never substitute for claim evidence.
+- Include author/year or title tokens when targeting known papers because DCR headers are indexed.
+- For substantive claims, return to the core fast path and apply `citation-integrity`; metadata and graph output never substitute for passage or page evidence.

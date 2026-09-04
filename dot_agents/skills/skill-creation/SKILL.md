@@ -15,9 +15,9 @@ CPTR can inspect and draft skill changes but cannot write `~/.agents/skills/`, r
 High-performance skills serve as deterministic scaffolding over stochastic models. Every skill must embody six architectural pillars:
 
 1. **Description as Air Traffic Controller:** The frontmatter `description:` is the **only** text visible to the model during global skill discovery. It must include exact trigger phrases, keywords, CLI aliases, and file patterns.
-2. **Request-Routing Decision Trees:** Visual top-down ASCII trees at the top of `SKILL.md` anchor attention and enforce an `if/elif/else` mental model across multi-intent skills.
+2. **Request-Routing Decision Trees:** Visual top-down ASCII trees at the top of `SKILL.md` anchor attention and enforce an `if/elif/else` mental model across multi-intent skills. Use one canonical dispatch index; workflow sections add details rather than repeat the same route map.
 3. **Explicit Negative Invariants ("Do NOT"):** Clearly stated non-negotiable boundaries ("Never use raw shell tools on vault notes", "Never guess regression specifications") that prune hallucinatory shortcuts. **All** negative invariants, behavioral boundaries, and output/syntax rules must reside directly in `SKILL.md`, never hidden in `references/`.
-4. **Fast-Path Line Budget (~120–150 lines):** `SKILL.md` is the always-loaded fast path. Keep it dense and operational; offload deep edge cases, encyclopedic tables, and manuals to `references/`. Avoid premature starvation—never strip governing rules just to make `SKILL.md` artificially small.
+4. **Fast-Path Cognitive Budget (~120–150 lines):** `SKILL.md` is the always-loaded fast path. Treat the line budget as a ceiling, not a measure of clarity. Keep it compact, scannable, and operational; eliminate repeated guidance and long compound bullets before offloading deep edge cases, encyclopedic tables, and manuals to `references/`. Preserve complexity only when it changes routing, tool or evidence requirements, stopping behavior, or safety. Optimize for the least capable intended model, and never strip governing rules merely to make `SKILL.md` smaller.
 5. **Deterministic Script Offloading:** Replace fragile, multi-step shell generation with standalone scripts in `scripts/` or `~/.local/bin/` to save tokens and eliminate syntax errors.
 6. **Evergreen Verification (No Snapshots):** Teach commands to inspect live system state (`chezmoi status`, `query_frontmatter_sql`), never bake static counts or dates into instructions. Enforce read-before-write checks.
 
@@ -42,6 +42,7 @@ When a skill handles **3 or more distinct sub-intents, sub-modes, or caller doma
 - **Fenced Monospaced Block:** Always wrap in ` ```text ` to preserve structural whitespace.
 - **Strict Top-Down Hierarchy:** Use box characters (`├─`, `└─`, `│`, `──→`). Never use diagonal lines, cycles, or backwards loops.
 - **Trigger-to-Action Mapping:** Left side defines the user phrase or caller context; right side names the target mode and primary tool call.
+- **Single Canonical Router:** Do not repeat the same dispatch map in another tree or table. Add another router only when it answers a genuinely different routing question.
 - **Dual Coding (Index + Manual):** The tree acts as the routing index; the numbered sections below define the exact parameter and invariant specifications.
 
 ## SKILL.md Template
@@ -91,7 +92,7 @@ The frontmatter description is the discovery gate:
 
 ## Progressive Disclosure (`references/`)
 
-Split deep material into a `references/` folder when:
+First eliminate redundant explanations and give each governing rule one canonical home. Then split deep material into a `references/` folder when:
 - `SKILL.md` approaches ~120–150 lines.
 - Material covers encyclopedic catalogs, extensive schemas, multi-table references, deep CLI manuals, or secondary failure recovery.
 
@@ -116,8 +117,8 @@ Split deep material into a `references/` folder when:
 
 ## Markdown Standards & Vault Syntax Isolation
 
-- **Standard Markdown Everywhere Outside the Vault:** Skills (`SKILL.md`), reference docs, dotfiles, scripts, and chat responses must strictly use standard GitHub-Flavored Markdown (`**bold**`, `*italic*`, code fences, lists).
-- **Vault Syntax Isolation:** The highlight syntax (`~={green}...=~`, `~={magenta}...=~`) is an Obsidian-only CSS/plugin extension that ONLY works inside notes in `~/Dropbox/Sam-Obsidian-Vault/`. **Never leak Obsidian highlight syntax into skills, dotfiles, git commits, or terminal output.** Outside Obsidian, it fails to render and displays as broken raw punctuation.
+- **Standard Markdown for Documentation:** Format skill prose, reference docs, dotfiles, scripts, and chat responses with GitHub-Flavored Markdown (`**bold**`, `*italic*`, code fences, lists).
+- **Vault Syntax Isolation:** The highlight syntax (`~={green}...=~`, `~={magenta}...=~`) works only inside notes in `~/Dropbox/Sam-Obsidian-Vault/`. Never use it to style skill prose, dotfiles, commits, or terminal output. Literal code examples are allowed only when a skill or reference explicitly documents vault syntax.
 
 ## Review Checklist
 
@@ -126,8 +127,10 @@ Split deep material into a `references/` folder when:
 - [ ] 100% of negative invariants, safety boundaries, and output formatting rules reside in `SKILL.md` (never hidden in `references/`)
 - [ ] Multi-intent skills (3+ routes) include an ASCII Request-Routing Playbook tree
 - [ ] Decision tree is top-down, acyclic, and wrapped in ` ```text `
+- [ ] Each rule has one canonical home; the same dispatch map is not repeated
 - [ ] Fast-path `SKILL.md` fits within ~120–150 lines
-- [ ] Uses standard Markdown; strictly NO Obsidian highlight syntax (`~={color}...=~`) in skill files
+- [ ] A model can identify the route, next action, forbidden shortcuts, stopping condition, and required output without reconciling repeated instructions
+- [ ] Uses standard Markdown for skill prose; literal Obsidian highlight syntax appears only in code when documenting vault behavior
 - [ ] Complex multi-line shell logic offloaded to scripts
 - [ ] Deep edge cases split into self-describing `references/` files
 - [ ] No time-sensitive state snapshots or dates baked into instructions

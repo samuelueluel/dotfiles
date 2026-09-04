@@ -24,7 +24,7 @@ Samuel's library uses a strictly controlled grouping taxonomy:
 When normalized, grouping values are deduplicated and ordered as follows:
 1. `[Priority]`
 2. Ratings `R:` (reverse lexical order: `R: 5`, `R: 4.5`, ..., `R: 2.5`)
-3. `Unrated` $\to$ `Overrated` $\to$ `Underrated` $\to$ `<500 ratings` $\to$ `FL` $\to$ `Wall`
+3. `Unrated` → `Overrated` → `Underrated` → `<500 ratings` → `FL` → `Wall`
 4. Custom/other values (alphabetical)
 
 ## MPD Search Forms

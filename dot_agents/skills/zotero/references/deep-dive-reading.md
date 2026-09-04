@@ -51,7 +51,7 @@ When synthesizing full arguments or writing literature reviews:
 
 ## Scanned PDFs vs. Sidecars
 
-For native text-layer PDFs, prefer `zotero_read_pdf_pages` when exact page context or a numerical/table claim must be verified. Switch to the OCR-processed sidecar when page extraction reports no text layer, is malformed or truncated, or a precise known-item window is substantially cheaper than loading broad text. Use page layout tools only when visual structure itself matters. Always label the route that actually supplied the evidence.
+For native text-layer PDFs, prefer `zotero_read_pdf_pages` when exact page context or a numerical/table claim must be verified. Switch to the OCR-processed sidecar when page extraction reports no text layer, is malformed or truncated, or a precise known-item window is substantially cheaper than loading broad text. Use page layout tools only when visual structure itself matters. Track the actual evidence route internally; format tokens according to `citation-integrity` and disclose weaker-than-page evidence in prose.
 
 ## Batch Extraction Across Papers
 

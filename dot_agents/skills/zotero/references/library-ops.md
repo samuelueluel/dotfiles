@@ -23,15 +23,9 @@ Generate formatted citations via `zotero_export_bibliography`:
 - `style`: CSL style identifier (e.g., `"apa"`, `"chicago-author-date"`, `"modern-language-association"`, `"ieee"`). Ignored for `"bibtex"`.
 - `item_keys` / `collection_key`: Scope queries explicitly. Avoid unconstrained whole-library exports.
 
-## Search Tool Selector
+## Mutation Target Lookup
 
-| Objective | MCP Tool |
-|---|---|
-| Conceptual / topical exploration | `zotero_semantic_search(query, collection=<KEY>)` |
-| Known author / title text fragment | `zotero_search_items(query)` |
-| Tagged items | `zotero_search_items_by_tag(tag)` |
-| Filtered metadata queries | `zotero_search_items_advanced(conditions, join_mode)` |
-| Full collection contents | `zotero_list_collection_items(collection_key)` |
+Resolve the exact target before changing library data. Use `zotero_find_item_by_citation_key` for a Better BibTeX key, `zotero_search_items` for a known author/title fragment, `zotero_search_items_by_tag` for tags, or `zotero_search_items_advanced` for filtered metadata. Semantic search may discover candidates but cannot bind an ambiguous mutation target.
 
 `zotero_search_items_by_tag` ANDs list entries, accepts `OR`/`||` within one entry, and uses a leading `-` for exclusion; its default `item_type="-attachment"` excludes attachments. Metadata search and `get_item_metadata` reflect successful API tag writes immediately. Semantic tag filters instead read the local SQLite snapshot and may remain stale until Zotero Desktop closes and its WAL checkpoints.
 

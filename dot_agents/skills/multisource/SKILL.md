@@ -51,7 +51,7 @@ If sources conflict or present differing specifications/assumptions, explicitly 
 1. **Broad Semantic Search:** Execute `zotero_semantic_search` (limit ~10; scoped to `collection=<KEY>` if applicable).
 2. **Group & Deduplicate:** Group passages by distinct item key; select the single best-matching passage per work.
 3. **Direct Escalation:** If definitions or numbers are truncated in snippets, grep sidecars or run `get_item_fulltext` before synthesizing.
-4. **Assemble Output:** Produce Tier 1 synthesis $\to$ Tier 2 source silos $\to$ divergence notes.
+4. **Assemble Output:** Produce Tier 1 synthesis → Tier 2 source silos → divergence notes.
 
 ## Anti-Patterns
 

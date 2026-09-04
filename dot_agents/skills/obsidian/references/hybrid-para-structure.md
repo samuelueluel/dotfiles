@@ -32,13 +32,6 @@ Top-level folders use strict two-digit zero-padded numeric prefixes for determin
 
 ## 4. Lifecycle Rules & Transitions
 
-- **Project Completion $\to$ Archive:** When a project in `10_Projects/<Project-Name>` finishes, move the entire project folder to `90_Archive/<Project-Name>` via `turbovault_move_note` or `turbovault_batch_execute`.
+- **Project Completion → Archive:** When a project in `10_Projects/<Project-Name>` finishes, move the entire project folder to `90_Archive/<Project-Name>` via `turbovault_move_note` or `turbovault_batch_execute`.
 - **Inbox Triage:** Unprocessed notes in `00_Inbox/` or `30_Personal/Personal-Inbox/` must be triaged into permanent homes in `10_Projects/`, `20_Library/`, or `30_Personal/`.
 - **Literature vs. Projects:** Literature reviews and theory summaries belong in `20_Library/`. Only active manuscripts being drafted belong in `10_Projects/`.
-
-## 5. Agent Memories Protocol (`02_Memories/`)
-
-- **Trigger:** When Samuel says *"remember this"* or *"save this"*.
-- **Target:** `~/Dropbox/Sam-Obsidian-Vault/02_Memories/<Topic-Slug>.md` (or `YYYY-MM-DD-slug.md`).
-- **Append Rule:** If a note on that topic exists, append new information rather than creating a duplicate.
-- **Epistemic Status:** Historical captures / scratchwork; verify against current system state.

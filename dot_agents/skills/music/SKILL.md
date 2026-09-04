@@ -82,6 +82,6 @@ rmpc remote keybind "<KEY>"
 
 ## Progressive Disclosure & Reference Routing
 
-- **Metadata Fields, Grouping, RYM Querying & Filter Grammar:** Tag mappings, canonical grouping order, RYM CSV query recipes, and verified MPD filter syntax $\to$ [references/tagging-taxonomy.md](references/tagging-taxonomy.md).
-- **Custom `music-*` Scripts & Tag Surgery:** Bulk tag edits, separator repairs, cover art fixes, and format conversion $\to$ [references/scripts.md](references/scripts.md).
-- **Album Onboarding & Beets Operations:** `music-onboard` pipeline, Beets configuration, ReplayGain, and metadata sync $\to$ [references/beets-and-onboarding.md](references/beets-and-onboarding.md).
+- **Metadata Fields, Grouping, RYM Querying & Filter Grammar:** Tag mappings, canonical grouping order, RYM CSV query recipes, and verified MPD filter syntax → [references/tagging-taxonomy.md](references/tagging-taxonomy.md).
+- **Custom `music-*` Scripts & Tag Surgery:** Bulk tag edits, separator repairs, cover art fixes, and format conversion → [references/scripts.md](references/scripts.md).
+- **Album Onboarding & Beets Operations:** `music-onboard` pipeline, Beets configuration, ReplayGain, and metadata sync → [references/beets-and-onboarding.md](references/beets-and-onboarding.md).

@@ -7,7 +7,7 @@
 | Collection | Key | Description |
 |---|---|---|
 | Detroit-Paper | `TRGBCDX5` | Empirical project literature |
-| Mathematics | `C8JGJRG7` | Math & statistics course materials/books |
+| Mathematics | `C8JGJRG7` | Mathematical proofs, measure-theoretic probability & formal foundations |
 | Methods | `2QWMWY2P` | Econometrics, causal inference & PhD methods |
 | Programming | `YKQ7724G` | Stata/Python/R technical docs & manuals |
 | Theory | `YKHC4X8Y` | Economic theory literature |
