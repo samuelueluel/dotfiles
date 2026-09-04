@@ -25,7 +25,7 @@ Use when verifying empirical numbers, resolving truncated snippets, or operating
   - `{Author Year, item KEY, p. X; itemType/source_group; canonical tags if present}`
   - `{Author Year, item KEY, § heading; itemType/source_group; canonical tags if present}` (when exact page numbers are unmapped)
   - `{Author Year, item KEY, p. X if mapped, lines X–Y; itemType/source_group; canonical tags if present}`
-  - Tokens never display route labels (`zotero_read_pdf_pages`, `zotero_get_item_fulltext`, `mineru_sidecar`); the location fields carry the audit trail.
+  - Substantive content tokens never display internal route labels (`zotero_read_pdf_pages`, `zotero_get_item_fulltext`, `mineru_sidecar`); the location fields carry the audit trail. Identity, bibliography, and graph audit tokens use the explicit operation labels shown in their canonical formats below.
 - **Rules:**
   - Quote or paraphrase only text actually returned by the read route or sidecar extraction used.
   - Prefer page reads (`zotero_read_pdf_pages`) for paper-grade numerical claims when page extraction is reliable.

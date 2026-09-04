@@ -21,11 +21,11 @@ MATERIAL CLAIM
 → check that the chosen route is permitted to support this claim
 → isolate the claim to its own source; comparisons require separate evidence per clause
 → verify value, unit, sign, specification, attribution, and horizon when applicable
-→ attach a canonical token naming the actual item, route, and source classification
+→ attach a canonical token naming the actual item, evidence location/type, and source classification
 → if the contract fails: retrieve stronger evidence, qualify/mark UNVERIFIED, or omit
 ```
 
-Hard boundaries: resolver output proves identity/scope, reference search proves bibliography occurrence, graph tools prove returned structure, and metadata proves descriptive facts. None of those routes proves a paper's substantive findings. Semantic evidence requires raw `Rerank > 0` and a non-`REF` passage; direct evidence must genuinely come from a truthful read route, but tokens never display the route label.
+Hard boundaries: resolver output proves identity/scope, reference search proves bibliography occurrence, graph tools prove returned structure, and metadata proves descriptive facts. None of those routes proves a paper's substantive findings. Semantic evidence requires raw `Rerank > 0` and a non-`REF` passage; direct evidence must genuinely come from a truthful read route. Substantive content tokens omit internal route labels; identity, bibliography, and graph audit tokens use the explicit operation labels defined below.
 
 ## Scope & Non-Negotiable Rules
 
@@ -40,7 +40,7 @@ Enforce this skill for every Zotero-grounded claim, including casual chat and li
 7. **External Reference Constraints:** `ext:*` nodes are metadata-only without outgoing references. Never infer source findings from an external citation. Check library metadata before asserting absence.
 8. **Explicit Failure Reporting:** State "No evidence found in the library" or "Unverified" rather than hallucinating from memory.
 9. **Source Metadata in Tokens:** Every cited local Zotero source must carry its verified native `itemType` and derived `source_group`; also include canonical `review:*` and `type:*` tags when present. Retrieve metadata only for final cited sources. These labels describe/filter the source and never prove the claim.
-10. **True Internal Route, Unlabeled Tokens:** Every claim must genuinely originate from a permitted retrieval route (`zotero_semantic_search`, `zotero_read_pdf_pages`, `zotero_get_item_fulltext`, or `mineru_sidecar`); sidecar, shell, or other local output must never be passed off as a page read, and the vague legacy label `direct PDF` remains banned internally. Evidence tokens do **not** display route names — the location (`passage N/M`, `p. X`, `lines X–Y`, `Rerank`) carries the audit trail. When a claim rests on weaker-than-page evidence, disclose that in prose, not in the token.
+10. **True Internal Route, Context-Specific Token Labels:** Every claim must genuinely originate from a permitted retrieval route (`zotero_semantic_search`, `zotero_read_pdf_pages`, `zotero_get_item_fulltext`, or `mineru_sidecar`); sidecar, shell, or other local output must never be passed off as a page read, and the vague legacy label `direct PDF` remains banned internally. Substantive content tokens do **not** display internal route names—the location (`passage N/M`, `p. X`, `lines X–Y`, `Rerank`) carries the audit trail. Identity, bibliography, and graph audit tokens use the explicit operation labels specified in the canonical-token table. When a claim rests on weaker-than-page evidence, disclose that in prose, not in the token.
 11. **Resolver Is an Identity Gate:** Treat `zotero_resolve_exact_source` as metadata identity and collection-scope evidence only. An `exact` result permits retrieval from its returned `item_key` but does not support a finding; `ambiguous` and `absent` results support only the reported identity boundary or conflict. Never use `related_matches` as substantive evidence or silently replace the requested source with one of them.
 
 ## Evidence Router & Canonical Tokens

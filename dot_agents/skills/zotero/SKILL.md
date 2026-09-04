@@ -7,7 +7,7 @@ description: Manages Samuel's local Zotero library through MCP, including collec
 
 ## Non-Negotiable Rules
 
-- Keep Zotero work in the main session; never delegate it to subagents.
+- Keep Zotero work in the main session; never delegate it to subagents. Carve-out: mechanical extraction workers under the zotero-exhaustive-extraction skill may delegate, subject to the session's configured subagent concurrency — identity, verification, adjudication, and synthesis stay in the main session.
 - For claims about source content, load and follow `~/.agents/skills/citation-integrity/SKILL.md`.
 - Ordinary literature questions are MCP-first. Pi exposes tools with one literal `zotero_*` prefix; never parse MCP transport or spill files with shell commands.
 - Do not call `advisor` for ordinary Zotero RAG. This skill and `citation-integrity` govern retrieval.
@@ -64,7 +64,7 @@ Do not infer source absence from failed semantic retrieval. Detailed identity an
 ### Do Not Do These by Default
 
 - Do not preflight `zotero_get_semantic_index_status`; use it only after a readiness or index error.
-- Do not enumerate a collection merely to feel exhaustive. Inventory only when completeness is requested or bounded discovery leaves a concrete recall problem.
+- Do not enumerate a collection merely to feel exhaustive. Inventory only when completeness is requested or bounded discovery leaves a concrete recall problem — for "all/every/complete/audit" collection requests, route to the zotero-exhaustive-extraction skill.
 - Do not call graph tools unless the question concerns relationships or deliberately expands identified seeds.
 - Do not read outlines, full text, or every candidate “just in case.”
 - If MCP output is oversized, narrow the request or use a known-item fallback; never shell-parse the gateway's temporary result file.

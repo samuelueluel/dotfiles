@@ -1,6 +1,6 @@
 ---
 name: skill-creation
-description: Create new agent skills with proper structure, progressive disclosure, request-routing playbooks, and negative invariants. Use when user wants to create, write, or build a new skill.
+description: Creates new agent skills with proper structure, progressive disclosure, request-routing playbooks, and negative invariants. Use when the user asks to "create a skill", "write a skill", or "build a new skill".
 disable-model-invocation: true
 ---
 
@@ -39,7 +39,7 @@ skill-name/
 When a skill handles **3 or more distinct sub-intents, sub-modes, or caller domains** (e.g. read vs. write vs. search vs. prune, or `pi` vs. `beta`), open `SKILL.md` directly under the title with a fenced ASCII decision tree under `## Request-Routing Playbook`.
 
 ### Decision Tree Rules:
-- **Fenced Monospaced Block:** Always wrap in ` ```text ` to preserve structural whitespace.
+- **Fenced Monospaced Block:** Always wrap in a fenced `text` code block to preserve structural whitespace.
 - **Strict Top-Down Hierarchy:** Use box characters (`├─`, `└─`, `│`, `──→`). Never use diagonal lines, cycles, or backwards loops.
 - **Trigger-to-Action Mapping:** Left side defines the user phrase or caller context; right side names the target mode and primary tool call.
 - **Single Canonical Router:** Do not repeat the same dispatch map in another tree or table. Add another router only when it answers a genuinely different routing question.
@@ -107,7 +107,7 @@ First eliminate redundant explanations and give each governing rule one canonica
 
    **Load this file when** [specific failure mode, advanced operation, schema lookup, or edge case].
    ```
-   *Why:* When an agent loads a reference file via `view_file`, this opening line provides immediate visual and attentional confirmation that it landed on the correct document.
+   *Why:* When an agent loads a reference file via `read`, this opening line provides immediate visual and attentional confirmation that it landed on the correct document.
 2. **Thematic Cohesion (One File Per Theme):** Create focused, single-purpose references (e.g., `references/troubleshooting.md`, `references/schemas.md`, `references/api-tables.md`). Never create catch-all `misc.md` or `notes.md` files.
 3. **Pointer Phrasing in `SKILL.md`:** Never list bare markdown links. In `SKILL.md`, under `## Progressive Disclosure & Reference Routing`, pair every link with an explicit condition:
    - *Good:* `- If page extraction fails, tables are malformed, or OCR is unreadable, load [deep-dive reading](references/deep-dive-reading.md).`
@@ -126,7 +126,7 @@ First eliminate redundant explanations and give each governing rule one canonica
 - [ ] Non-negotiable rules section contains hard negative invariants ("Never do X")
 - [ ] 100% of negative invariants, safety boundaries, and output formatting rules reside in `SKILL.md` (never hidden in `references/`)
 - [ ] Multi-intent skills (3+ routes) include an ASCII Request-Routing Playbook tree
-- [ ] Decision tree is top-down, acyclic, and wrapped in ` ```text `
+- [ ] Decision tree is top-down, acyclic, and wrapped in a fenced `text` code block
 - [ ] Each rule has one canonical home; the same dispatch map is not repeated
 - [ ] Fast-path `SKILL.md` fits within ~120–150 lines
 - [ ] A model can identify the route, next action, forbidden shortcuts, stopping condition, and required output without reconciling repeated instructions

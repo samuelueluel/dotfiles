@@ -1,6 +1,6 @@
 ---
 name: skill-update
-description: Refactor, improve, check, or update existing agent skills while silently enforcing skill-creation standards. Use when user asks to "check", "review", "update", "refine", or asks if an existing skill needs maintenance or fixes.
+description: Maintains and refactors existing agent skills while silently enforcing skill-creation standards. Use when the user asks to "check", "review", "update", "refine", or asks whether an existing skill needs maintenance or fixes.
 disable-model-invocation: true
 ---
 
@@ -13,7 +13,7 @@ disable-model-invocation: true
 3. **Pre-Flight RFC Gate for Structural Overhauls (Tier 3):** If an edit alters section hierarchy, rewrites decision tree topology, or overhauls multi-paragraph explanations, the agent MUST present a high-level proposal and receive Samuel's explicit conversational approval BEFORE generating any diff.
 4. **Zero Invariant Regression:** Never weaken, soften, or remove existing "Never do X" negative invariants unless Samuel explicitly commands it.
 5. **No Rule Offloading:** Never offload governing rules, negative invariants, or output formatting constraints to `references/`. References are strictly for data catalogs, schemas, script code, and deep troubleshooting manuals.
-6. **Vault Syntax Isolation:** Strictly ban Obsidian highlight syntax (`~={color}...=~`). All skills use standard GitHub Markdown.
+6. **Vault Syntax Isolation:** Never use Obsidian highlight syntax as styling in skill prose, dotfiles, commits, or terminal output. A literal backtick-quoted or fenced example is allowed only when documenting required vault-note output, as specified by `skill-creation`. All other skill documentation uses standard GitHub Markdown.
 7. **Interactive Diff Approval:** Always present a clean unified diff in chat and wait for Samuel's confirmation before writing files.
 8. **Chezmoi Synchronization:** Every modified skill file must be captured with `chezmoi add <path>`.
 9. **CPTR / Headless Limitation:** CPTR can inspect and draft diffs but cannot write skill files or run `chezmoi add`; use regular Pi to apply an approved diff and never claim persistence when blocked.
@@ -53,7 +53,7 @@ REQUEST INTENT
 - Report status in chat. Never mutate files during a health check.
 
 ### Tier 1: Surgical In-Place Update (Default)
-- Read target `SKILL.md` (or the affected `references/<file>.md`) via `view_file`.
+- Read target `SKILL.md` (or the affected `references/<file>.md`) via `read`.
 - Identify the exact line or list item governing the behavior.
 - Slot the update in-place. Do not rephrase adjacent sentences or reorder unaffected blocks.
 - Verify that `SKILL.md` remains within the ~120–150 line budget.
@@ -82,6 +82,6 @@ REQUEST INTENT
 - [ ] Edits slotted into thematic anchors (zero append-sprawl)
 - [ ] Surrounding unaffected text preserved verbatim (zero restless churn)
 - [ ] If Tier 3: Phase 1 RFC proposal was approved in conversation before drafting diff
-- [ ] All `skill-creation` checklist items passed (no Obsidian `~={}=~`, under line budget)
+- [ ] All `skill-creation` checklist items passed (no Obsidian highlight syntax used as styling; documented literal examples allowed, under line budget)
 - [ ] Clean unified diff presented and approved by Samuel
 - [ ] Synchronized to Chezmoi (`chezmoi add ~/.agents/skills/<skill>/...`)

@@ -1,6 +1,7 @@
 ---
 name: multisource
-description: Synthesize answers across multiple Zotero sources into a unified synthesis and per-source evidence blocks. Use only when explicitly invoked via "use multisource" or "/skill:multisource".
+description: Synthesizes answers across multiple Zotero sources into a unified synthesis and per-source evidence blocks. Use only when explicitly invoked via "use multisource" or "/skill:multisource".
+disable-model-invocation: true
 ---
 
 # Multisource Synthesis
@@ -15,8 +16,8 @@ MULTISOURCE PIPELINE
 ├─ 1. Broad Retrieval ────────→ zotero_semantic_search (limit ~10 hits)
 │                                └─ Group by itemKey; pick best chunk per work (Rerank > 0)
 ├─ 2. Tier 1: Unified Synthesis → 1–2 paragraphs answering prompt directly
-│                                └─ Inline canonical tokens ({Author Year, p. X})
-├─ 3. Tier 2: Evidence Silos ───→ Top 3–6 distinct sources with metadata & unique role
+│                                └─ Inline full canonical tokens per citation-integrity
+├─ 3. Tier 2: Evidence Silos ───→ 3–6 distinct sources when available
 └─ 4. Conflict / Divergence ────→ Explicitly isolate competing assumptions or specs
 ```
 
@@ -27,13 +28,13 @@ Never answer the question multiple times. Structure the response strictly in two
 ### Tier 1 — Unified Synthesis (1–2 Paragraphs)
 - **Direct Synthesis:** Answer the question directly by synthesizing across retrieved sources.
 - **Consensus & Divergence:** Highlight points of agreement, differences in formal rigor (e.g., applied vs. measure-theoretic), and competing assumptions.
-- **Ordering:** Order sources according to `02_Memories/Zotero-RAG-Source-Preferences.md`.
+- **Ordering:** Read `02_Memories/Zotero-RAG-Source-Preferences.md` via `turbovault_read_note` before ordering Tier 1 sources; do not use raw filesystem access.
 - **Citations:** Inline-cite all substantive claims using canonical brace tokens per `citation-integrity`.
 
-### Tier 2 — Per-Source Evidence Silos (Top 3–6 Distinct Sources)
-Group hits by distinct item key (collapsing duplicate chunks per paper). For each distinct source, provide:
+### Tier 2 — Per-Source Evidence Silos (3–6 Distinct Sources When Available)
+Group hits by distinct item key (collapsing duplicate chunks per paper). Use all qualifying sources when fewer than three qualify; never pad with weak or irrelevant works. For each distinct source, provide:
 1. **Metadata Line:** `Author (Year) — Title [Key: <KEY>]`
-2. **Matched Evidence:** Concise quote or paraphrase with `{Author Year, passage N/M, p. X, Rerank +S}`.
+2. **Matched Evidence:** Concise quote or paraphrase with `{Author Year, item KEY, passage N/M, p. X, Rerank +S; itemType/source_group; canonical tags if present}`.
 3. **Unique Contribution:** One line stating its role (e.g., *formal definition*, *empirical intuition*, *tower property proof*, *applied estimator*).
 4. **Confidence:** Explicitly report raw `Rerank` score; flag negative/weak scores.
 
@@ -43,14 +44,13 @@ If sources conflict or present differing specifications/assumptions, explicitly 
 ## Grounding & Source Selection
 
 - **Citation Discipline:** Strictly follow `~/.agents/skills/citation-integrity/SKILL.md` for token formats, number verification, `Rerank` gating, and cross-paper isolation.
-- **Preference Mapping:** Consult `02_Memories/Zotero-RAG-Source-Preferences.md` to prioritize preferred source keys in Tier 1.
-- **Echo-Chamber Guard:** Always include at least one alternative framing or perspective; do not select only confirmation sources.
+- **Echo-Chamber Guard:** Include at least one alternative framing or perspective when relevant evidence is available; otherwise state that no credible alternative was found. Never invent or pad an alternative.
 
 ## Search & Assembly Workflow
 
 1. **Broad Semantic Search:** Execute `zotero_semantic_search` (limit ~10; scoped to `collection=<KEY>` if applicable).
 2. **Group & Deduplicate:** Group passages by distinct item key; select the single best-matching passage per work.
-3. **Direct Escalation:** If definitions or numbers are truncated in snippets, grep sidecars or run `get_item_fulltext` before synthesizing.
+3. **Direct Escalation:** If definitions or numbers are truncated in snippets, grep sidecars or run `zotero_get_item_fulltext` before synthesizing.
 4. **Assemble Output:** Produce Tier 1 synthesis → Tier 2 source silos → divergence notes.
 
 ## Anti-Patterns

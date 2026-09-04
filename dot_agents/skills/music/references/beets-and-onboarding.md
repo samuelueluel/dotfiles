@@ -8,7 +8,7 @@
 music-onboard "/path/to/Downloads/Album Folder"
 ```
 
-`music-onboard` is an interactive, mutating script with **no dry-run mode**. Run only upon explicit request.
+`music-onboard` is an interactive, mutating script with **no dry-run mode**; the core skill's explicit-request invariant governs live use.
 
 ### Pipeline Execution Steps:
 1. **Audio Conversion:** Converts M4A/WAV/FLAC to V0 MP3 and deletes source files upon success.

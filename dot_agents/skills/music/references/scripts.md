@@ -2,13 +2,12 @@
 
 **Load this file when** editing audio tags, fixing multi-value separators, repairing cover art, or converting audio formats.
 
-## Safety Invariants
+## Script Scope and Capabilities
 
 - **Default Library:** `~/Music/mp3-library` (bulk scripts respect `MUSIC_DIR`).
-- **Dry-Run Gating:** Always run `--dry-run` first to preview affected paths and track counts.
-- **Audio Formats:** `tag_utils.py` supports MP3 and FLAC only. M4A/OGG/OPUS/AAC files will cause operations to abort.
-- **Scope:** Provide explicit album/directory paths for targeted work. Never omit `MUSIC_DIR` for bulk operations unless targeting the primary library.
-- **Cache Refresh:** Run `mpc -w update` after applying approved metadata changes.
+- `tag_utils.py` operates on MP3 and FLAC; unsupported formats cause operations to abort.
+- The examples use explicit album/directory paths; bulk commands honor `MUSIC_DIR`.
+- Approved metadata changes can be followed by `mpc -w update`.
 
 ## Tag Editing Scripts
 
@@ -20,7 +19,7 @@ music-set-tags "/path/to/album" \
   --genres "Chamber Folk" "Ambient Pop" \
   --dry-run
 ```
-*Convention:* Always provide canonical **RateYourMusic Primary & Secondary Genres** in Title Case (e.g. `"Slowcore"` `"Post-Rock"` `"Midwest Emo"`).
+*Genre examples:* The commands below use canonical **RateYourMusic Primary & Secondary Genres** in Title Case (e.g. `"Slowcore"` `"Post-Rock"` `"Midwest Emo"`).
 
 ### `music-add-tag`
 Recursively appends grouping or canonical RYM genre tags without overwriting existing tags:
@@ -63,14 +62,14 @@ Splits single grouping/genre tags containing `; ` into separate tag entries:
 ```bash
 MUSIC_DIR="/path/to/tree" music-fix-multivalue --dry-run
 ```
-*Warning:* Does not implement `--help`. Never invoke with `--help`.
+*Note:* This script does not implement `--help`; the core skill's no-help invariant governs its use.
 
 ### `music-fix-separators-legacy`
 Bash utility for MP3 files; converts legacy ` / ` separators to `; ` in ID3 `TIT1` and `TCON`:
 ```bash
 MUSIC_DIR="/path/to/tree" music-fix-separators-legacy --dry-run
 ```
-*Warning:* Does not implement `--help`. If running both fixes, run `music-fix-separators-legacy` before `music-fix-multivalue`.
+*Note:* These scripts do not implement `--help`. When both repairs are needed, the documented sequence is `music-fix-separators-legacy` before `music-fix-multivalue`; the core skill's separator-order invariant governs the sequence.
 
 ## Cover Art Utilities
 
@@ -86,7 +85,7 @@ music-extract-covers "/path/to/tree" --dry-run
 
 Recursively converts all M4A files in `MUSIC_DIR` to FLAC using ffmpeg, overwrites targets (`-y`), and deletes source M4A files:
 ```bash
-# Always preview first
+# Preview command
 MUSIC_DIR="/path/to/tree" /usr/bin/python3 "$HOME/.local/bin/music-m4a-to-flac" --dry-run
 ```
-*Requirement:* Requires explicit user authorization and a recent backup before live runs.
+*Note:* Live conversion overwrites targets and deletes source M4A files; the core skill's authorization and backup invariant governs live use.

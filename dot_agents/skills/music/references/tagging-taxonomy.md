@@ -17,7 +17,7 @@
 
 Samuel's library uses a strictly controlled grouping taxonomy:
 - `[Priority]`
-- Ratings: `R: 5`, `R: 4.5`, `R: 4`, `R: 3.5`, `R: 3`, `R: 2.5` *(Note: use `R: 5`, never `R: 5.0`)*
+- Ratings: `R: 5`, `R: 4.5`, `R: 4`, `R: 3.5`, `R: 3`, `R: 2.5` *(Canonical rating form: `R: 5`.)*
 - Flags: `Unrated`, `Overrated`, `Underrated`, `<500 ratings`, `FL`, `Wall`
 
 ### Canonical Sort Order (`tag_utils.normalize_grouping`)
@@ -44,9 +44,9 @@ mpc searchadd artist "Artist" album "Album"
 mpc findadd artist "Artist" album "Album"
 ```
 
-## MPD Filter Grammar (MPD 0.24 Verified)
+## MPD Filter Grammar
 
-MPD filter expressions require explicit parentheses around each clause and sub-expression:
+The core skill's filter-syntax invariant governs these expressions; the examples below show the supported forms. If filter behavior is version-sensitive, inspect `mpd --version` before relying on them:
 
 ```bash
 # Multiple tag match (AND)
@@ -62,9 +62,9 @@ mpc search '((grouping == "<500 ratings") AND (grouping =~ "^R: (4([.]5)?|5)$"))
 mpc search '(!(grouping == "Overrated"))'
 ```
 
-### Grammar Limitations & Rules
-- **No `OR` operator:** `OR` is unsupported and causes `MPD error: 'AND' expected`. Use regex (`=~`) or separate queries.
-- **No numeric comparisons:** Expressions like `date >= "1990"` fail. Use `starts_with` or regex.
+### Grammar Limitations
+- **Logical operator support:** The grammar accepts `AND` but not `OR`; regex (`=~`) or separate queries express alternatives.
+- **Date predicates:** Numeric comparisons such as `date >= "1990"` are unsupported; use `starts_with` or regex.
 - **Multiple Tag Values:** Separate `(grouping == "...")` clauses can match distinct multi-value tags on the same track.
 
 ## Common Queue Recipes
@@ -80,7 +80,7 @@ mpc searchadd artist "Artist Name" album "Album Name"
 mpc searchadd '((grouping == "[Priority]") AND (grouping == "Unrated"))'
 mpc shuffle
 
-# Replace queue and start playback (explicit request only)
+# Replace queue and start playback (destructive example)
 mpc clear && mpc searchadd '((genre == "Art Rock") AND (date starts_with "199"))' && mpc play
 ```
 
@@ -89,17 +89,17 @@ mpc clear && mpc searchadd '((genre == "Art Rock") AND (date starts_with "199"))
 RateYourMusic (RYM) is Samuel's official gold-standard genre taxonomy across the entire library.
 
 ### Tagging Rules & Conventions
-1. **Canonical Primary & Secondary Genres:** Always use official RateYourMusic genre nomenclature with strict Title Case and standard hyphenation:
+1. **Canonical Primary & Secondary Genres:** The tagging convention uses official RateYourMusic genre nomenclature with strict Title Case and standard hyphenation:
    - Examples: `Slowcore`, `Midwest Emo`, `Shibuya-kei`, `Chamber Folk`, `Atmospheric Black Metal`, `Neo-Psychedelia`, `Glitch Pop`, `Alt-Country`, `Art Pop`, `Math Rock`, `Singer-Songwriter`, `Post-Rock`.
 2. **Multi-Value Tag Storage:**
-   - Genres must be written as discrete array items in `tag_utils.set_values(audio, 'genres', ['Genre 1', 'Genre 2'])`.
-   - Never write flattened strings with embedded semicolons into a single tag frame.
-3. **Library Manifest:** `~/.config/music/library_rym_genres_manifest.csv` holds the complete, verified mapping for all 1,376+ albums in `~/Music/mp3-library`.
+   - Genres are written as discrete array items in `tag_utils.set_values(audio, 'genres', ['Genre 1', 'Genre 2'])`.
+   - Flattened strings with embedded semicolons are not the target tag format.
+3. **Library Manifest:** `~/.config/music/library_rym_genres_manifest.csv` provides the verified mapping for the current library.
 
 ## RateYourMusic Datasets & References
 
-- **Library-Wide RYM Manifest:** `~/.config/music/library_rym_genres_manifest.csv` (1,376 albums mapped to canonical RYM genres).
-- **Rated Collection Snapshot:** `~/.config/music/rym_collection_genres.csv` (720+ rated releases with star ratings and URLs for taste grounding across 4.0★, 4.5★, and 5.0★ tiers).
+- **Library-Wide RYM Manifest:** `~/.config/music/library_rym_genres_manifest.csv` (current mappings to canonical RYM genres).
+- **Rated Collection:** `~/.config/music/rym_collection_genres.csv` (current rated releases with star ratings and URLs for taste grounding).
 
 ### Quick Query Patterns
 
@@ -116,7 +116,7 @@ slowcore_albums = [
 ]
 ```
 
-### CLI One-Liner (Search Snapshot)
+### CLI One-Liner (Rated Release Query)
 ```bash
 python3 -c '
 import csv
