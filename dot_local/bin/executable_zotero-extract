@@ -378,6 +378,8 @@ def cmd_source(rundir, key):
 
     if it["extraction_route"] == "mineru_sidecar":
         path = Path(it["source_path"])
+        if not path.is_absolute():
+            path = Path(rundir) / path
         if not path.is_file():
             escalate(f"sidecar disappeared mid-run: {path}")
             die(f"sidecar vanished: {path}")
@@ -497,13 +499,17 @@ def cmd_submit(rundir, packet_path):
             f"{it['route_fidelity']!r}")
 
     src_path = it.get("source_path")
+    src_file = None
+    if src_path:
+        p = Path(src_path)
+        src_file = p if p.is_absolute() else Path(rundir) / p
     declared_path = (pkt.get("source") or {}).get("path")
-    if not src_path or not Path(src_path).is_file():
+    if not src_file or not src_file.is_file():
         err("no source text on file; run 'source' for this item first")
     else:
         if declared_path != src_path:
             err(f"source.path {declared_path!r} != manifest source {src_path!r}")
-        current_hash = sha256_file(src_path)
+        current_hash = sha256_file(src_file)
         declared = (pkt.get("source") or {}).get("sha256")
         if declared != current_hash:
             err("source.sha256 does not match current source file "
@@ -520,8 +526,8 @@ def cmd_submit(rundir, packet_path):
         err("records must be a list")
         records = []
 
-    src_text = norm(Path(src_path).read_text(encoding="utf-8", errors="replace")
-                    ) if src_path and Path(src_path).is_file() else ""
+    src_text = norm(src_file.read_text(encoding="utf-8", errors="replace")
+                    ) if src_file and src_file.is_file() else ""
 
     for i, rec in enumerate(records):
         label = f"records[{i}]"
