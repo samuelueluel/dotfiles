@@ -25,6 +25,10 @@ if [ "$app_id" = "com.mitchellh.ghostty" ]; then
     case "$title" in
         pi|pihat)     pat='^pi-safe-[0-9]'  ;;
         beta|betahat) pat='^pi-safe-stata-' ;;
+        "Music Agent")
+            tmux kill-session -t music-agent >/dev/null 2>&1
+            pat=''
+            ;;
         *)            pat=''                ;;
     esac
     if [ -n "$pat" ]; then

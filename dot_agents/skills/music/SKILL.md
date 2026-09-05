@@ -41,6 +41,7 @@ REQUEST
 - **Destructive Conversion:** `music-m4a-to-flac` requires explicit user authorization, a recent backup, and a `--dry-run` preview before live use.
 - **Separator Repair Order:** If both legacy separator and multivalue repairs are needed, run `music-fix-separators-legacy` before `music-fix-multivalue`.
 - **Rating Syntax:** Use `R: 5`, never `R: 5.0`.
+- **Inclusive Tag Matching:** Requests for albums or tracks “with,” “having,” or “tagged” `X` mean `X` must be present; additional grouping/tag values remain allowed. Require an exclusive match only when the user says “only,” “exclusively,” or explicitly excludes another value.
 - **MPD Filter Syntax:** Filter expressions require explicit parentheses around each clause and sub-expression; `OR` and numeric comparisons are unsupported. When filter behavior is version-sensitive, inspect `mpd --version`.
 
 ## Quick Playback & Queue Cheatsheet

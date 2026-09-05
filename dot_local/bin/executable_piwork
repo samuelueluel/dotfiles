@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-pif - Pi Folders & Conversation Stash Manager
-Manages project folders for Pi CLI sessions (~/.pi/agent/folders/)
+piwork - Pi Workspaces & Conversation Stash Manager
+Manages workspace folders for Pi CLI sessions (~/.pi/agent/folders/)
 """
 
 import sys
@@ -35,45 +35,43 @@ def parse_session_meta(file_path):
     }
     try:
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-            line_count = 0
             for line in f:
-                line_count += 1
                 if not line.strip():
                     continue
-                try:
-                    entry = json.loads(line)
-                except Exception:
-                    continue
-
-                etype = entry.get("type")
-                if etype == "session":
-                    meta["id"] = entry.get("id", "")
-                    meta["cwd"] = entry.get("cwd", "")
-                elif etype == "session_info":
-                    if entry.get("name"):
-                        meta["name"] = entry.get("name").strip()
-                elif etype == "message":
-                    msg = entry.get("message", {})
+                if '"session_info"' in line:
+                    try:
+                        entry = json.loads(line)
+                        if entry.get("type") == "session_info" and entry.get("name"):
+                            meta["name"] = entry.get("name").strip()
+                    except Exception:
+                        pass
+                elif '"session"' in line and '"type":"session"' in line:
+                    try:
+                        entry = json.loads(line)
+                        if entry.get("type") == "session":
+                            meta["id"] = entry.get("id", "")
+                            meta["cwd"] = entry.get("cwd", "")
+                    except Exception:
+                        pass
+                elif '"role":"user"' in line:
                     meta["turn_count"] += 1
-                    if msg.get("role") == "user" and not meta["first_prompt"]:
-                        content = msg.get("content", [])
-                        if isinstance(content, list):
-                            for part in content:
-                                if isinstance(part, dict) and part.get("type") == "text":
-                                    meta["first_prompt"] = part.get("text", "").strip().replace("\n", " ")
-                                    break
-                                elif isinstance(part, str):
-                                    meta["first_prompt"] = part.strip().replace("\n", " ")
-                                    break
-                        elif isinstance(content, str):
-                            meta["first_prompt"] = content.strip().replace("\n", " ")
-
-                if line_count > 60 and meta["first_prompt"] and meta["name"]:
-                    break
+                    if not meta["first_prompt"]:
+                        try:
+                            entry = json.loads(line)
+                            if entry.get("type") == "message":
+                                c = entry.get("message", {}).get("content", "")
+                                if isinstance(c, list) and c and isinstance(c[0], dict):
+                                    meta["first_prompt"] = c[0].get("text", "").strip().replace("\n", " ")
+                                elif isinstance(c, str):
+                                    meta["first_prompt"] = c.strip().replace("\n", " ")
+                        except Exception:
+                            pass
+                elif '"role":"assistant"' in line:
+                    meta["turn_count"] += 1
     except Exception:
         pass
 
-    display_title = meta["name"] if meta["name"] else (meta["first_prompt"][:65] if meta["first_prompt"] else "Untitled conversation")
+    display_title = meta["name"] if meta["name"] else (meta["first_prompt"] if meta["first_prompt"] else "Untitled conversation")
     meta["title"] = display_title
     return meta
 
@@ -109,12 +107,14 @@ def get_sessions_in_folder(folder_name):
     metas.sort(key=lambda x: x["mtime"], reverse=True)
     return metas
 
-def get_unfiled_sessions(limit=50):
+def get_unfiled_sessions(limit=None):
     if not os.path.isdir(UNFILED_DIR):
         return []
     files = glob.glob(os.path.join(UNFILED_DIR, "*.jsonl"))
     files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
-    metas = [parse_session_meta(f) for f in files[:limit]]
+    if limit:
+        files = files[:limit]
+    metas = [parse_session_meta(f) for f in files]
     return metas
 
 def gum_choose(options, header="Choose:", limit=1, no_limit=False, selected=None):
@@ -151,7 +151,7 @@ def cmd_list():
 
     print(f"\033[1;36mPi Conversation Folders\033[0m (~/.pi/agent/folders/)\n")
     if not folders:
-        print("  No folders created yet. Run 'pif stash' to stash a conversation into a folder.")
+        print("  No workspaces created yet. Run 'piwork stash' to stash a conversation into a workspace.")
     else:
         for f in folders:
             print(f"  \033[1;32m📁 {f['name']:<20}\033[0m \033[2m({f['count']} conversations)\033[0m")
@@ -170,7 +170,7 @@ def cmd_stash(session_path=None, target_folder=None):
         path_map = {}
         for s in unfiled:
             rel_time = format_relative_time(s["mtime"])
-            label = f"{rel_time:<10} │ {s['title'][:55]}"
+            label = f"{rel_time:<10} │ {s['title']}"
             options.append(label)
             path_map[label] = s["path"]
 
@@ -208,7 +208,7 @@ def cmd_stash(session_path=None, target_folder=None):
 
 def cmd_organize():
     ensure_dirs()
-    unfiled = get_unfiled_sessions(limit=40)
+    unfiled = get_unfiled_sessions()
     if not unfiled:
         print("No unfiled conversations found.")
         return
@@ -217,7 +217,7 @@ def cmd_organize():
     path_map = {}
     for s in unfiled:
         rel_time = format_relative_time(s["mtime"])
-        label = f"{rel_time:<10} │ {s['title'][:55]}"
+        label = f"{rel_time:<10} │ {s['title']}"
         options.append(label)
         path_map[label] = s["path"]
 
@@ -283,30 +283,147 @@ def cmd_rename():
     os.rename(src, dst)
     print(f"\033[1;32m✓ Renamed folder '{chosen}' → '{new_name.strip()}'\033[0m")
 
+def resolve_stata_project_dir(hint_folder=None, hint_cwd=None):
+    home = os.path.realpath(os.path.expanduser("~"))
+    candidates = []
+
+    # 1. If hint_cwd is provided, exists, and is not home
+    if hint_cwd:
+        real_cwd = os.path.realpath(os.path.expanduser(hint_cwd))
+        if real_cwd != home and os.path.isdir(real_cwd):
+            candidates.append(real_cwd)
+
+    # 2. Check current working directory if not home
+    cur_dir = os.path.realpath(os.getcwd())
+    if cur_dir != home and os.path.isdir(cur_dir) and cur_dir not in candidates:
+        candidates.append(cur_dir)
+
+    # 3. Check ~/Dropbox/Research-2026/
+    research_dir = os.path.realpath(os.path.expanduser("~/Dropbox/Research-2026"))
+    if hint_folder and hint_folder != "Unfiled":
+        cand = os.path.join(research_dir, hint_folder)
+        if os.path.isdir(cand) and cand not in candidates:
+            candidates.append(cand)
+
+    if os.path.isdir(research_dir):
+        for item in sorted(os.listdir(research_dir)):
+            full = os.path.join(research_dir, item)
+            if os.path.isdir(full) and not item.startswith(".") and full not in candidates:
+                candidates.append(full)
+
+    # 4. ~/ado
+    ado_dir = os.path.realpath(os.path.expanduser("~/ado"))
+    if os.path.isdir(ado_dir) and ado_dir not in candidates:
+        candidates.append(ado_dir)
+
+    custom_label = "📁 Enter custom directory path..."
+    options = [c.replace(home, "~") for c in candidates] + [custom_label]
+
+    chosen = gum_choose(options, header="Stata Project Directory (write-isolated sandbox):")
+    if not chosen:
+        return None
+
+    if chosen == custom_label:
+        val = gum_input(header="Enter project directory path:", placeholder="~/Dropbox/Research-2026/...")
+        if not val:
+            return None
+        chosen = val.strip()
+
+    resolved = os.path.realpath(os.path.expanduser(chosen))
+    if resolved == home:
+        print("\033[1;31mError: Stata sandbox cannot mount entire home directory. Write access must be scoped to a project folder.\033[0m")
+        return resolve_stata_project_dir(hint_folder, hint_cwd)
+
+    if not os.path.exists(resolved):
+        confirm = gum_choose(["Yes, create directory", "No, cancel"], header=f"Directory '{chosen}' does not exist. Create it?")
+        if confirm == "Yes, create directory":
+            os.makedirs(resolved, exist_ok=True)
+        else:
+            return None
+
+    return resolved
+
 def cmd_new(folder_name=None, remaining_args=None):
     ensure_dirs()
     if not folder_name:
         folders = [f["name"] for f in get_folders()]
-        folder_options = ["+ New Folder..."] + folders
+        folder_options = ["Unfiled"] + folders + ["+ New Folder..."]
         chosen = gum_choose(folder_options, header="Start new chat in folder:")
         if not chosen:
             return
         if chosen == "+ New Folder...":
-            folder_name = gum_input(header="New folder name:")
+            folder_name = gum_input(header="New folder name:", placeholder="e.g. Economics, System")
             if not folder_name:
                 return
+            folder_name = folder_name.strip()
         else:
             folder_name = chosen
 
-    folder_dir = os.path.join(FOLDERS_DIR, folder_name)
-    os.makedirs(folder_dir, exist_ok=True)
-
-    args = ["pi", "--session-dir", folder_dir]
+    # Check for agent override in remaining_args
+    target_agent = None
+    passthrough_args = []
     if remaining_args:
-        args.extend(remaining_args)
+        i = 0
+        while i < len(remaining_args):
+            arg = remaining_args[i]
+            if arg in ("--agent", "-a") and i + 1 < len(remaining_args):
+                target_agent = remaining_args[i + 1].lower()
+                i += 2
+                continue
+            elif arg in ("--pihat", "-H"):
+                target_agent = "pihat"
+            elif arg in ("--pi", "-p"):
+                target_agent = "pi"
+            elif arg in ("--betahat",):
+                target_agent = "betahat"
+            elif arg in ("--beta", "-b"):
+                target_agent = "beta"
+            else:
+                passthrough_args.append(arg)
+            i += 1
 
-    print(f"\033[1;36mStarting new Pi conversation in folder '{folder_name}'...\033[0m")
-    os.execvp("pi", args)
+    if not target_agent:
+        agent_options = [
+            "pihat    · Cloud frontier (GPT-5.6 Luna / Claude / DeepSeek)",
+            "pi       · Local models (Qwen / DeepSeek / Mistral)",
+            "betahat  · Stata container (Cloud frontier)",
+            "beta     · Stata container (Local models)",
+        ]
+        prompt_header = f"Launch agent in '{folder_name}':"
+        chosen_agent_line = gum_choose(agent_options, header=prompt_header)
+        if not chosen_agent_line:
+            print("Cancelled.")
+            return
+        target_agent = chosen_agent_line.split()[0]
+
+    # Determine session dir
+    session_arg = ""
+    if folder_name != "Unfiled":
+        folder_dir = os.path.join(FOLDERS_DIR, folder_name)
+        os.makedirs(folder_dir, exist_ok=True)
+        session_arg = f"--session-dir '{folder_dir}'"
+
+    extra_args = " " + " ".join(f"'{a}'" for a in passthrough_args) if passthrough_args else ""
+
+    if target_agent in ("betahat", "beta"):
+        project_dir = resolve_stata_project_dir(hint_folder=folder_name)
+        if not project_dir:
+            print("Cancelled.")
+            return
+        cmd_str = f"{target_agent} '{project_dir}'"
+        if session_arg:
+            cmd_str += f" {session_arg}"
+        if extra_args:
+            cmd_str += extra_args
+    else:
+        cmd_str = f"{target_agent}"
+        if session_arg:
+            cmd_str += f" {session_arg}"
+        if extra_args:
+            cmd_str += extra_args
+
+    print(f"\033[1;36mStarting new {target_agent} conversation in '{folder_name}'...\033[0m")
+    os.execvp("zsh", ["zsh", "-ic", cmd_str])
 
 def cmd_resume(folder_name=None, remaining_args=None):
     ensure_dirs()
@@ -330,6 +447,27 @@ def cmd_resume(folder_name=None, remaining_args=None):
 
     print(f"\033[1;36mResuming latest conversation in folder '{folder_name}'...\033[0m")
     os.execvp("pi", args)
+
+def cmd_resume_beta(session_path, agent="beta"):
+    if not os.path.exists(session_path):
+        print(f"Error: Session '{session_path}' not found.")
+        return
+    meta = parse_session_meta(session_path)
+    cwd = meta.get("cwd", "")
+    home = os.path.realpath(os.path.expanduser("~"))
+    if cwd and os.path.isdir(cwd) and os.path.realpath(cwd) != home:
+        project_dir = cwd
+    else:
+        parent = os.path.dirname(session_path)
+        hint = os.path.basename(parent) if parent != UNFILED_DIR else None
+        project_dir = resolve_stata_project_dir(hint_folder=hint, hint_cwd=cwd)
+        if not project_dir:
+            print("Cancelled.")
+            return
+
+    cmd_str = f"{agent} '{project_dir}' --session '{session_path}'"
+    print(f"\033[1;36mResuming session with {agent} in '{project_dir}'...\033[0m")
+    os.execvp("zsh", ["zsh", "-ic", cmd_str])
 
 def cmd_browse():
     folders = get_folders()
@@ -355,7 +493,7 @@ def cmd_browse():
         sessions = get_sessions_in_folder(folder_name)
     else:
         folder_name = "Unfiled"
-        sessions = get_unfiled_sessions(limit=30)
+        sessions = get_unfiled_sessions()
 
     if not sessions:
         print(f"No conversations in '{folder_name}'.")
@@ -365,7 +503,7 @@ def cmd_browse():
     sess_map = {}
     for s in sessions:
         rel_time = format_relative_time(s["mtime"])
-        label = f"{rel_time:<10} │ {s['title'][:55]}"
+        label = f"{rel_time:<10} │ {s['title']}"
         sess_options.append(label)
         sess_map[label] = s
 
@@ -377,7 +515,8 @@ def cmd_browse():
     action_options = [
         "▶ Resume with pi (local)",
         "▶ Resume with pihat (cloud)",
-        "▶ Resume with beta (Stata container)",
+        "▶ Resume with betahat (Stata container + cloud)",
+        "▶ Resume with beta (Stata container + local)",
         "📁 Move to another folder",
         "🗑️ Delete conversation"
     ]
@@ -386,11 +525,13 @@ def cmd_browse():
         return
 
     if "Resume with pi (" in action:
-        os.execvp("pi", ["pi", "--session", s["path"]])
+        os.execvp("zsh", ["zsh", "-ic", f"pi --session '{s['path']}'"])
     elif "Resume with pihat" in action:
         os.execvp("zsh", ["zsh", "-ic", f"pihat --session '{s['path']}'"])
+    elif "Resume with betahat" in action:
+        cmd_resume_beta(s["path"], agent="betahat")
     elif "Resume with beta" in action:
-        os.execvp("zsh", ["zsh", "-ic", f"beta --session '{s['path']}'"])
+        cmd_resume_beta(s["path"], agent="beta")
     elif "Move to another folder" in action:
         cmd_stash(s["path"])
     elif "Delete conversation" in action:
@@ -421,25 +562,31 @@ def main():
     elif subcmd in ("resume", "continue", "-c"):
         folder = sys.argv[2] if len(sys.argv) > 2 else None
         cmd_resume(folder, sys.argv[3:] if len(sys.argv) > 3 else None)
+    elif subcmd == "resume-beta":
+        target = sys.argv[2] if len(sys.argv) > 2 else None
+        cmd_resume_beta(target, agent="beta")
+    elif subcmd == "resume-betahat":
+        target = sys.argv[2] if len(sys.argv) > 2 else None
+        cmd_resume_beta(target, agent="betahat")
     elif subcmd in ("browse", "ui"):
         cmd_browse()
     elif subcmd in ("help", "--help", "-h"):
-        print("Usage: pif [command] [args]")
+        print("Usage: piwork [command] [args]")
         print("\nCommands:")
-        print("  pif                Open interactive dashboard (browse folders & sessions)")
-        print("  pif stash          Stash recent unfiled conversation into a folder")
-        print("  pif organize       Batch-stash multiple conversations into a folder")
-        print("  pif list           List all folders and conversation counts")
-        print("  pif new <folder>   Start a brand new conversation in a folder")
-        print("  pif resume <folder>Resume latest conversation in a folder")
-        print("  pif rename         Rename an existing folder")
-        print("  pif help           Show this help message")
+        print("  piwork                Open interactive dashboard (browse workspaces & sessions)")
+        print("  piwork stash          Stash recent unfiled conversation into a workspace")
+        print("  piwork organize       Batch-stash multiple conversations into a workspace")
+        print("  piwork list           List all workspaces and conversation counts")
+        print("  piwork new <folder>   Start a brand new conversation in a workspace (pi/pihat/beta/betahat)")
+        print("  piwork resume <folder>Resume latest conversation in a workspace")
+        print("  piwork rename         Rename an existing workspace folder")
+        print("  piwork help           Show this help message")
     else:
         folders = [f["name"].lower() for f in get_folders()]
         if subcmd in folders:
             cmd_resume(sys.argv[1], sys.argv[2:])
         else:
-            print(f"Unknown command: {subcmd}. Run 'pif help' for usage.")
+            print(f"Unknown command: {subcmd}. Run 'piwork help' for usage.")
 
 if __name__ == "__main__":
     main()

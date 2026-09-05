@@ -52,8 +52,15 @@
 - Logs: Greetd (login) follow | journalctl -f -u greetd
 - Logs: User units | journalctl --user -n 100
 - Logs: Boot performance blame | systemd-analyze blame
-
 - AI: Rebuild Pi container image | pi-rebuild
+- AI: Piwork dashboard (browse workspaces) | piwork
+- AI: Piwork stash recent chat into workspace | piwork stash
+- AI: Piwork batch-triage unfiled chats | piwork organize
+- AI: Piwork list workspace folders & counts | piwork list
+- AI: Piwork start new chat in workspace | piwork new
+- AI: Piwork resume latest chat in workspace | piwork resume
+- AI: Piwork rename workspace folder | piwork rename
+- AI: Open Pi Workspaces in Television | tv "Workspaces (Pi)"
 
 - AI: Select cptr Pi model (gum menu) | pi-cptr-model
 - AI: Show selected cptr Pi model | pi-cptr-model show
