@@ -1,0 +1,61 @@
+[metadata]
+name = "Pi Folders"
+description = "Browse and resume Pi conversations by project folder"
+
+[source]
+command = "/var/home/samuel/.local/bin/tv-pi-folders.py list"
+display = "{split:\t:0}"
+output = "{split:\t:1}"
+ansi = true
+
+[ui]
+orientation = "landscape"
+
+[ui.preview_panel]
+size = 60
+scrollbar = true
+word_wrap = true
+border_type = "thick"
+hidden = false
+
+[preview]
+command = "/var/home/samuel/.local/bin/tv-pi-folders.py preview '{split:\t:1}'"
+
+[keybindings]
+enter = "actions:open"
+alt-space = "actions:open"
+ctrl-n = "actions:new"
+ctrl-b = "actions:beta"
+ctrl-h = "actions:pihat"
+ctrl-m = "actions:move"
+ctrl-r = "actions:rename"
+
+[actions.open]
+description = "Resume conversation or open folder"
+command = "/var/home/samuel/.local/bin/tv-pi-folders.py action open '{split:\t:1}'"
+mode = "execute"
+
+[actions.new]
+description = "New conversation in folder"
+command = "/var/home/samuel/.local/bin/tv-pi-folders.py action new '{split:\t:1}'"
+mode = "execute"
+
+[actions.beta]
+description = "Resume with beta (Stata container)"
+command = "/var/home/samuel/.local/bin/tv-pi-folders.py action beta '{split:\t:1}'"
+mode = "execute"
+
+[actions.pihat]
+description = "Resume with pihat (cloud models)"
+command = "/var/home/samuel/.local/bin/tv-pi-folders.py action pihat '{split:\t:1}'"
+mode = "execute"
+
+[actions.move]
+description = "Move/stash conversation to another folder"
+command = "/var/home/samuel/.local/bin/tv-pi-folders.py action move '{split:\t:1}'"
+mode = "execute"
+
+[actions.rename]
+description = "Rename folder"
+command = "/var/home/samuel/.local/bin/tv-pi-folders.py action rename '{split:\t:1}'"
+mode = "execute"

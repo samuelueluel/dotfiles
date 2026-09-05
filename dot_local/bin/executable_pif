@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+"""
+pif - Pi Folders & Conversation Stash Manager
+Manages project folders for Pi CLI sessions (~/.pi/agent/folders/)
+"""
+
+import sys
+import os
+import glob
+import json
+import shutil
+import subprocess
+import time
+from datetime import datetime
+from pathlib import Path
+
+FOLDERS_DIR = os.path.expanduser("~/.pi/agent/folders")
+UNFILED_DIR = os.path.expanduser("~/.pi/agent/sessions/--var-home-samuel--")
+
+def ensure_dirs():
+    os.makedirs(FOLDERS_DIR, exist_ok=True)
+    os.makedirs(UNFILED_DIR, exist_ok=True)
+
+def parse_session_meta(file_path):
+    """Fast extraction of metadata from a session JSONL file."""
+    meta = {
+        "path": file_path,
+        "filename": os.path.basename(file_path),
+        "mtime": os.path.getmtime(file_path),
+        "id": "",
+        "cwd": "",
+        "name": "",
+        "first_prompt": "",
+        "turn_count": 0,
+    }
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            line_count = 0
+            for line in f:
+                line_count += 1
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                except Exception:
+                    continue
+
+                etype = entry.get("type")
+                if etype == "session":
+                    meta["id"] = entry.get("id", "")
+                    meta["cwd"] = entry.get("cwd", "")
+                elif etype == "session_info":
+                    if entry.get("name"):
+                        meta["name"] = entry.get("name").strip()
+                elif etype == "message":
+                    msg = entry.get("message", {})
+                    meta["turn_count"] += 1
+                    if msg.get("role") == "user" and not meta["first_prompt"]:
+                        content = msg.get("content", [])
+                        if isinstance(content, list):
+                            for part in content:
+                                if isinstance(part, dict) and part.get("type") == "text":
+                                    meta["first_prompt"] = part.get("text", "").strip().replace("\n", " ")
+                                    break
+                                elif isinstance(part, str):
+                                    meta["first_prompt"] = part.strip().replace("\n", " ")
+                                    break
+                        elif isinstance(content, str):
+                            meta["first_prompt"] = content.strip().replace("\n", " ")
+
+                if line_count > 60 and meta["first_prompt"] and meta["name"]:
+                    break
+    except Exception:
+        pass
+
+    display_title = meta["name"] if meta["name"] else (meta["first_prompt"][:65] if meta["first_prompt"] else "Untitled conversation")
+    meta["title"] = display_title
+    return meta
+
+def format_relative_time(mtime):
+    diff = time.time() - mtime
+    if diff < 60:
+        return "just now"
+    if diff < 3600:
+        return f"{int(diff // 60)}m ago"
+    if diff < 86400:
+        return f"{int(diff // 3600)}h ago"
+    if diff < 86400 * 7:
+        return f"{int(diff // 86400)}d ago"
+    dt = datetime.fromtimestamp(mtime)
+    return dt.strftime("%b %d")
+
+def get_folders():
+    ensure_dirs()
+    folders = []
+    for item in sorted(os.listdir(FOLDERS_DIR)):
+        full_path = os.path.join(FOLDERS_DIR, item)
+        if os.path.isdir(full_path) and not item.startswith("."):
+            count = len(glob.glob(os.path.join(full_path, "*.jsonl")))
+            folders.append({"name": item, "path": full_path, "count": count})
+    return folders
+
+def get_sessions_in_folder(folder_name):
+    folder_path = os.path.join(FOLDERS_DIR, folder_name)
+    if not os.path.isdir(folder_path):
+        return []
+    files = glob.glob(os.path.join(folder_path, "*.jsonl"))
+    metas = [parse_session_meta(f) for f in files]
+    metas.sort(key=lambda x: x["mtime"], reverse=True)
+    return metas
+
+def get_unfiled_sessions(limit=50):
+    if not os.path.isdir(UNFILED_DIR):
+        return []
+    files = glob.glob(os.path.join(UNFILED_DIR, "*.jsonl"))
+    files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
+    metas = [parse_session_meta(f) for f in files[:limit]]
+    return metas
+
+def gum_choose(options, header="Choose:", limit=1, no_limit=False, selected=None):
+    cmd = ["gum", "choose", f"--header={header}"]
+    if no_limit:
+        cmd.append("--no-limit")
+    elif limit:
+        cmd.append(f"--limit={limit}")
+    if selected:
+        cmd.append(f"--selected={selected}")
+
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    stdout, _ = p.communicate(input="\n".join(options))
+    if p.returncode != 0:
+        return [] if no_limit else None
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if no_limit:
+        return lines
+    return lines[0] if lines else None
+
+def gum_input(header="Input:", placeholder=""):
+    cmd = ["gum", "input", f"--header={header}", f"--placeholder={placeholder}"]
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+    stdout, _ = p.communicate()
+    if p.returncode != 0:
+        return None
+    return stdout.strip()
+
+# --- CLI COMMANDS ---
+
+def cmd_list():
+    folders = get_folders()
+    unfiled_count = len(glob.glob(os.path.join(UNFILED_DIR, "*.jsonl")))
+
+    print(f"\033[1;36mPi Conversation Folders\033[0m (~/.pi/agent/folders/)\n")
+    if not folders:
+        print("  No folders created yet. Run 'pif stash' to stash a conversation into a folder.")
+    else:
+        for f in folders:
+            print(f"  \033[1;32m📁 {f['name']:<20}\033[0m \033[2m({f['count']} conversations)\033[0m")
+
+    print(f"\n  \033[1;33m📥 Unfiled (Home)\033[0m      \033[2m({unfiled_count} conversations)\033[0m\n")
+
+def cmd_stash(session_path=None, target_folder=None):
+    ensure_dirs()
+    if not session_path:
+        unfiled = get_unfiled_sessions(limit=15)
+        if not unfiled:
+            print("No unfiled conversations found in home session directory.")
+            return
+
+        options = []
+        path_map = {}
+        for s in unfiled:
+            rel_time = format_relative_time(s["mtime"])
+            label = f"{rel_time:<10} │ {s['title'][:55]}"
+            options.append(label)
+            path_map[label] = s["path"]
+
+        chosen_label = gum_choose(options, header="Select conversation to stash:")
+        if not chosen_label:
+            print("Cancelled.")
+            return
+        session_path = path_map[chosen_label]
+
+    if not target_folder:
+        # Pick destination folder
+        folders = [f["name"] for f in get_folders()]
+        folder_options = ["+ New Folder..."] + folders
+        chosen_folder = gum_choose(folder_options, header="Select destination folder:")
+        if not chosen_folder:
+            print("Cancelled.")
+            return
+
+        if chosen_folder == "+ New Folder...":
+            new_name = gum_input(header="New Folder Name:", placeholder="e.g. Economics, Music, Detroit-Paper")
+            if not new_name:
+                print("Cancelled.")
+                return
+            target_folder = new_name.strip()
+        else:
+            target_folder = chosen_folder
+
+    dest_dir = os.path.join(FOLDERS_DIR, target_folder)
+    os.makedirs(dest_dir, exist_ok=True)
+    dest_path = os.path.join(dest_dir, os.path.basename(session_path))
+
+    shutil.move(session_path, dest_path)
+    print(f"\033[1;32m✓ Stashed conversation into '{target_folder}'\033[0m")
+    print(f"  Destination: {dest_path}")
+
+def cmd_organize():
+    ensure_dirs()
+    unfiled = get_unfiled_sessions(limit=40)
+    if not unfiled:
+        print("No unfiled conversations found.")
+        return
+
+    options = []
+    path_map = {}
+    for s in unfiled:
+        rel_time = format_relative_time(s["mtime"])
+        label = f"{rel_time:<10} │ {s['title'][:55]}"
+        options.append(label)
+        path_map[label] = s["path"]
+
+    chosen_labels = gum_choose(
+        options,
+        header="Select conversations to stash (Space to select, Enter to confirm):",
+        no_limit=True
+    )
+    if not chosen_labels:
+        print("No conversations selected.")
+        return
+
+    folders = [f["name"] for f in get_folders()]
+    folder_options = ["+ New Folder..."] + folders
+    chosen_folder = gum_choose(folder_options, header="Move selected conversations to:")
+    if not chosen_folder:
+        print("Cancelled.")
+        return
+
+    if chosen_folder == "+ New Folder...":
+        new_name = gum_input(header="New Folder Name:", placeholder="e.g. Economics, System")
+        if not new_name:
+            print("Cancelled.")
+            return
+        target_folder = new_name.strip()
+    else:
+        target_folder = chosen_folder
+
+    dest_dir = os.path.join(FOLDERS_DIR, target_folder)
+    os.makedirs(dest_dir, exist_ok=True)
+
+    count = 0
+    for label in chosen_labels:
+        src = path_map.get(label)
+        if src and os.path.exists(src):
+            dst = os.path.join(dest_dir, os.path.basename(src))
+            shutil.move(src, dst)
+            count += 1
+
+    print(f"\033[1;32m✓ Stashed {count} conversations into '{target_folder}'\033[0m")
+
+def cmd_rename():
+    folders = [f["name"] for f in get_folders()]
+    if not folders:
+        print("No folders exist to rename.")
+        return
+
+    chosen = gum_choose(folders, header="Select folder to rename:")
+    if not chosen:
+        return
+
+    new_name = gum_input(header=f"Rename '{chosen}' to:", placeholder="New folder name")
+    if not new_name or new_name.strip() == chosen:
+        print("Cancelled or unchanged.")
+        return
+
+    src = os.path.join(FOLDERS_DIR, chosen)
+    dst = os.path.join(FOLDERS_DIR, new_name.strip())
+    if os.path.exists(dst):
+        print(f"Error: Folder '{new_name.strip()}' already exists.")
+        return
+
+    os.rename(src, dst)
+    print(f"\033[1;32m✓ Renamed folder '{chosen}' → '{new_name.strip()}'\033[0m")
+
+def cmd_new(folder_name=None, remaining_args=None):
+    ensure_dirs()
+    if not folder_name:
+        folders = [f["name"] for f in get_folders()]
+        folder_options = ["+ New Folder..."] + folders
+        chosen = gum_choose(folder_options, header="Start new chat in folder:")
+        if not chosen:
+            return
+        if chosen == "+ New Folder...":
+            folder_name = gum_input(header="New folder name:")
+            if not folder_name:
+                return
+        else:
+            folder_name = chosen
+
+    folder_dir = os.path.join(FOLDERS_DIR, folder_name)
+    os.makedirs(folder_dir, exist_ok=True)
+
+    args = ["pi", "--session-dir", folder_dir]
+    if remaining_args:
+        args.extend(remaining_args)
+
+    print(f"\033[1;36mStarting new Pi conversation in folder '{folder_name}'...\033[0m")
+    os.execvp("pi", args)
+
+def cmd_resume(folder_name=None, remaining_args=None):
+    ensure_dirs()
+    if not folder_name:
+        folders = [f["name"] for f in get_folders()]
+        if not folders:
+            print("No folders found.")
+            return
+        folder_name = gum_choose(folders, header="Resume latest conversation in:")
+        if not folder_name:
+            return
+
+    folder_dir = os.path.join(FOLDERS_DIR, folder_name)
+    if not os.path.isdir(folder_dir):
+        print(f"Error: Folder '{folder_name}' does not exist.")
+        return
+
+    args = ["pi", "--session-dir", folder_dir, "-c"]
+    if remaining_args:
+        args.extend(remaining_args)
+
+    print(f"\033[1;36mResuming latest conversation in folder '{folder_name}'...\033[0m")
+    os.execvp("pi", args)
+
+def cmd_browse():
+    folders = get_folders()
+    unfiled_count = len(glob.glob(os.path.join(UNFILED_DIR, "*.jsonl")))
+
+    options = [f"📁 {f['name']} ({f['count']})" for f in folders]
+    options.append(f"📥 Unfiled ({unfiled_count})")
+    options.append("➕ Create new folder")
+
+    chosen = gum_choose(options, header="Pi Folders Dashboard:")
+    if not chosen:
+        return
+
+    if chosen == "➕ Create new folder":
+        name = gum_input(header="Folder name:")
+        if name:
+            os.makedirs(os.path.join(FOLDERS_DIR, name.strip()), exist_ok=True)
+            print(f"✓ Created folder '{name.strip()}'.")
+        return
+
+    if chosen.startswith("📁 "):
+        folder_name = chosen.split(" ")[1]
+        sessions = get_sessions_in_folder(folder_name)
+    else:
+        folder_name = "Unfiled"
+        sessions = get_unfiled_sessions(limit=30)
+
+    if not sessions:
+        print(f"No conversations in '{folder_name}'.")
+        return
+
+    sess_options = []
+    sess_map = {}
+    for s in sessions:
+        rel_time = format_relative_time(s["mtime"])
+        label = f"{rel_time:<10} │ {s['title'][:55]}"
+        sess_options.append(label)
+        sess_map[label] = s
+
+    chosen_sess_label = gum_choose(sess_options, header=f"Conversations in {folder_name}:")
+    if not chosen_sess_label:
+        return
+
+    s = sess_map[chosen_sess_label]
+    action_options = [
+        "▶ Resume with pi (local)",
+        "▶ Resume with pihat (cloud)",
+        "▶ Resume with beta (Stata container)",
+        "📁 Move to another folder",
+        "🗑️ Delete conversation"
+    ]
+    action = gum_choose(action_options, header=f"Action for: {s['title'][:40]}")
+    if not action:
+        return
+
+    if "Resume with pi (" in action:
+        os.execvp("pi", ["pi", "--session", s["path"]])
+    elif "Resume with pihat" in action:
+        os.execvp("zsh", ["zsh", "-ic", f"pihat --session '{s['path']}'"])
+    elif "Resume with beta" in action:
+        os.execvp("zsh", ["zsh", "-ic", f"beta --session '{s['path']}'"])
+    elif "Move to another folder" in action:
+        cmd_stash(s["path"])
+    elif "Delete conversation" in action:
+        confirm = gum_choose(["No, keep it", "Yes, delete permanently"], header="Are you sure?")
+        if confirm == "Yes, delete permanently":
+            os.remove(s["path"])
+            print(f"✓ Deleted {s['filename']}")
+
+def main():
+    if len(sys.argv) < 2:
+        cmd_browse()
+        return
+
+    subcmd = sys.argv[1].lower()
+    if subcmd in ("list", "folders", "ls"):
+        cmd_list()
+    elif subcmd in ("stash", "mv", "move"):
+        target = sys.argv[2] if len(sys.argv) > 2 else None
+        folder = sys.argv[3] if len(sys.argv) > 3 else None
+        cmd_stash(target, folder)
+    elif subcmd in ("organize", "batch", "triage"):
+        cmd_organize()
+    elif subcmd in ("rename", "mvdir"):
+        cmd_rename()
+    elif subcmd in ("new", "create"):
+        folder = sys.argv[2] if len(sys.argv) > 2 else None
+        cmd_new(folder, sys.argv[3:] if len(sys.argv) > 3 else None)
+    elif subcmd in ("resume", "continue", "-c"):
+        folder = sys.argv[2] if len(sys.argv) > 2 else None
+        cmd_resume(folder, sys.argv[3:] if len(sys.argv) > 3 else None)
+    elif subcmd in ("browse", "ui"):
+        cmd_browse()
+    elif subcmd in ("help", "--help", "-h"):
+        print("Usage: pif [command] [args]")
+        print("\nCommands:")
+        print("  pif                Open interactive dashboard (browse folders & sessions)")
+        print("  pif stash          Stash recent unfiled conversation into a folder")
+        print("  pif organize       Batch-stash multiple conversations into a folder")
+        print("  pif list           List all folders and conversation counts")
+        print("  pif new <folder>   Start a brand new conversation in a folder")
+        print("  pif resume <folder>Resume latest conversation in a folder")
+        print("  pif rename         Rename an existing folder")
+        print("  pif help           Show this help message")
+    else:
+        folders = [f["name"].lower() for f in get_folders()]
+        if subcmd in folders:
+            cmd_resume(sys.argv[1], sys.argv[2:])
+        else:
+            print(f"Unknown command: {subcmd}. Run 'pif help' for usage.")
+
+if __name__ == "__main__":
+    main()
