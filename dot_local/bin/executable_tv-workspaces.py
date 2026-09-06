@@ -406,6 +406,46 @@ def spawn_terminal(command_str, cwd=None):
         subprocess.Popen(cmd)
     sys.exit(0)
 
+def resolve_picker_launch(target_out, expect_key, home=None):
+    """Return (shell command, cwd) for a folder-picker selection."""
+    home = home or os.path.realpath(os.path.expanduser("~"))
+
+    if target_out.startswith("new:"):
+        f_name = target_out[4:]
+        if expect_key == "ctrl-h":
+            return f"piwork new '{f_name}' --agent beta", None
+        if expect_key == "ctrl-b":
+            return f"piwork new '{f_name}' --agent betahat", None
+        if expect_key == "ctrl-l":
+            return f"piwork new '{f_name}' --agent pi", None
+        if f_name == "Unfiled":
+            return "pihat", None
+        fdir = os.path.join(FOLDERS_DIR, f_name)
+        return f"pihat --session-dir '{fdir}'", None
+
+    if target_out.startswith("session:"):
+        session_path = target_out[8:]
+        meta = parse_session_meta(session_path)
+        cwd = meta["cwd"] if meta["cwd"] and os.path.isdir(meta["cwd"]) else ""
+        project_cwd = cwd if cwd and os.path.realpath(cwd) != home else ""
+
+        if expect_key == "ctrl-b":
+            if project_cwd:
+                return f"betahat '{project_cwd}' --session '{session_path}'", project_cwd
+            return f"piwork resume-betahat '{session_path}'", None
+        if expect_key == "ctrl-h":
+            if project_cwd:
+                return f"beta '{project_cwd}' --session '{session_path}'", project_cwd
+            return f"piwork resume-beta '{session_path}'", None
+        if expect_key == "ctrl-l":
+            return f"pi --session '{session_path}'", cwd or home
+        if expect_key == "ctrl-m":
+            return f"piwork stash '{session_path}'", None
+        return f"pihat --session '{session_path}'", cwd or home
+
+    return None
+
+
 def run_folder_session_picker(folder):
     tv_bin = "/home/linuxbrew/.linuxbrew/bin/tv"
     script_bin = "/var/home/samuel/.local/bin/tv-workspaces.py"
@@ -445,41 +485,9 @@ def run_folder_session_picker(folder):
         expect_key = lines[0]
 
     home = os.path.realpath(os.path.expanduser("~"))
-
-    if target_out.startswith("new:"):
-        f_name = target_out[4:]
-        if expect_key == "ctrl-h":
-            spawn_terminal(f"piwork new '{f_name}' --agent beta")
-        elif expect_key == "ctrl-b":
-            spawn_terminal(f"piwork new '{f_name}' --agent betahat")
-        elif expect_key == "ctrl-l":
-            spawn_terminal(f"piwork new '{f_name}' --agent pi")
-        elif f_name == "Unfiled":
-            spawn_terminal("pihat")
-        else:
-            fdir = os.path.join(FOLDERS_DIR, f_name)
-            spawn_terminal(f"pihat --session-dir '{fdir}'")
-    elif target_out.startswith("session:"):
-        session_path = target_out[8:]
-        meta = parse_session_meta(session_path)
-        cwd = meta["cwd"] if meta["cwd"] and os.path.isdir(meta["cwd"]) else ""
-
-        if expect_key == "ctrl-b":
-            if cwd and os.path.realpath(cwd) != home:
-                spawn_terminal(f"betahat '{cwd}' --session '{session_path}'", cwd=cwd)
-            else:
-                spawn_terminal(f"piwork resume-betahat '{session_path}'")
-        elif expect_key == "ctrl-h":
-            if cwd and os.path.realpath(cwd) != home:
-                spawn_terminal(f"beta '{cwd}' --session '{session_path}'", cwd=cwd)
-            else:
-                spawn_terminal(f"piwork resume-beta '{session_path}'")
-        elif expect_key == "ctrl-l":
-            spawn_terminal(f"pi --session '{session_path}'", cwd=cwd or home)
-        elif expect_key == "ctrl-m":
-            spawn_terminal(f"piwork stash '{session_path}'")
-        else:
-            spawn_terminal(f"pihat --session '{session_path}'", cwd=cwd or home)
+    launch = resolve_picker_launch(target_out, expect_key, home)
+    if launch:
+        spawn_terminal(*launch)
 
 def cmd_action(action_type, target):
     home = os.path.realpath(os.path.expanduser("~"))

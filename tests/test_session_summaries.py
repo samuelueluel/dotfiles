@@ -155,6 +155,34 @@ class SessionSummaryTests(unittest.TestCase):
         ):
             self.assertIn(line, config)
 
+    def test_nested_picker_routing(self) -> None:
+        session_path = Path(self.tempdir.name) / "session.jsonl"
+        session_path.write_text(
+            '{"type":"session","id":"s1","cwd":"/var/home/samuel"}\n',
+            encoding="utf-8",
+        )
+        target = f"session:{session_path}"
+        home = "/var/home/samuel"
+        expected = {
+            None: "pihat --session",
+            "ctrl-b": "piwork resume-betahat",
+            "ctrl-l": "pi --session",
+            "ctrl-h": "piwork resume-beta",
+            "ctrl-m": "piwork stash",
+        }
+        for key, prefix in expected.items():
+            command, _cwd = tv.resolve_picker_launch(target, key, home)
+            self.assertIn(prefix, command)
+
+        command, _cwd = tv.resolve_picker_launch("new:Economics", None, home)
+        self.assertIn("pihat --session-dir", command)
+        command, _cwd = tv.resolve_picker_launch("new:Economics", "ctrl-b", home)
+        self.assertIn("--agent betahat", command)
+        command, _cwd = tv.resolve_picker_launch("new:Economics", "ctrl-l", home)
+        self.assertIn("--agent pi", command)
+        command, _cwd = tv.resolve_picker_launch("new:Economics", "ctrl-h", home)
+        self.assertIn("--agent beta", command)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
