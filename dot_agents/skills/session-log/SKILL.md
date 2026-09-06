@@ -5,19 +5,7 @@ description: Creates, searches, and reviews permanent local Pi session summaries
 
 # Session Summary Management
 
-The canonical store is the permanent local index:
-
-```text
-~/.pi/agent/session-summaries.json
-```
-
-It is keyed by the full Pi session UUID and is never automatically pruned. It powers Television previews and agent-facing session search. Do not treat the 30-day Obsidian logs as authoritative; routine session logging does not use TurboVault.
-
-## On-Demand Persistence
-
-The skill does not run background model calls or summarize sessions at shutdown. When explicitly asked to summarize or backfill session logs, saving the substantive summaries to the local index is part of that operation; do not merely report a chat-only summary. Skip greetings, empty sessions, and context-only read-and-wait sessions unless the user asks to include them.
-
-## Intent Routing
+## Request-Routing Playbook
 
 ```text
 REQUEST
@@ -29,6 +17,25 @@ REQUEST
 └─ "session backlog" / "unlogged sessions" / "backfill summaries"
                                 → preview bounded candidates, then summarize only after confirmation
 ```
+
+## Non-Negotiable Rules
+
+- Only create or update summaries when the user explicitly invokes this skill or requests session logging/backfill; never run background, startup, or shutdown summarization.
+- Never hand-edit the JSON index; use the atomic `piwork summary set|get|search|recent|backlog` CLI.
+- Preserve each session's full UUID, canonical storage keys, and allowed statuses; older records without `status` remain valid.
+- Treat backlog discovery as read-only until the user confirms processing; inspect a bounded candidate list and never infer a target from the newest transcript.
+- Skip active/recent, empty, greeting-only, and context-only sessions unless the user explicitly asks to include them.
+- Never delete or prune records, rewrite raw JSONL transcripts, or write routine summaries to Obsidian/TurboVault.
+
+## Canonical Store
+
+The canonical store is the permanent local index:
+
+```text
+~/.pi/agent/session-summaries.json
+```
+
+It is keyed by the full Pi session UUID and is never automatically pruned. It powers Television previews and agent-facing session search. Do not treat the 30-day Obsidian logs as authoritative; routine session logging does not use TurboVault.
 
 ## Search
 
@@ -102,9 +109,5 @@ For an explicitly identified older session, pass its known UUID and transcript p
 
 ## Retention and Safety
 
-- Never delete or prune records automatically.
-- `piwork summary backlog` is discovery-only; it never writes summaries or modifies transcripts.
 - Session summaries survive transcript moves and folder renames because they are keyed by UUID.
-- Do not rewrite raw JSONL transcripts to store summaries.
-- Do not write routine summaries to Obsidian or invoke TurboVault.
 - If a summary is unavailable, distinguish clearly between a permanent summary result and a raw-transcript fallback.
