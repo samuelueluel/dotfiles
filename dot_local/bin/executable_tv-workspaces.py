@@ -11,6 +11,13 @@ import json
 import shutil
 import subprocess
 import time
+
+LOCAL_LIB = os.path.expanduser("~/.local/lib")
+if LOCAL_LIB not in sys.path:
+    sys.path.insert(0, LOCAL_LIB)
+
+from pi_session_summary import find_session_path, load_store, summary_search_text  # noqa: E402
+
 from datetime import datetime
 
 FOLDERS_DIR = os.path.expanduser("~/.pi/agent/folders")
@@ -124,9 +131,39 @@ def get_session_title(file_path):
         pass
     return name if name else (first_msg if first_msg else "Untitled conversation")
 
+def get_summary(meta, summary_store):
+    session_id = meta.get("id", "")
+    if not session_id:
+        return {}
+    record = summary_store.get("sessions", {}).get(session_id, {})
+    return record if isinstance(record, dict) else {}
+
+
+def session_display(meta, folder, rel_time, summary_store):
+    summary = get_summary(meta, summary_store)
+    display = f"  [{folder}] {rel_time:<8} {meta['title']}"
+    snippet = summary_search_text(summary, limit=None)
+    if snippet:
+        display += f" — {snippet}"
+    return display
+
+
+def summary_display(record):
+    stamp = (record.get("updated_at") or record.get("logged_at") or "")[:10]
+    title = record.get("title") or record.get("session_id") or "Untitled summary"
+    snippet = summary_search_text(record, limit=None)
+    display = f"  [Summary] {stamp:<10} {title}"
+    if snippet:
+        display += f" — {snippet}"
+    return display
+
+
 def cmd_source():
     os.makedirs(FOLDERS_DIR, exist_ok=True)
     os.makedirs(UNFILED_DIR, exist_ok=True)
+    summary_store = load_store()
+    live_ids = set()
+    live_paths = set()
 
     folder_names = sorted([d for d in os.listdir(FOLDERS_DIR) if os.path.isdir(os.path.join(FOLDERS_DIR, d)) and not d.startswith(".")])
 
@@ -149,39 +186,64 @@ def cmd_source():
     display = f"📥 [Folder] Unfiled          ({unfiled_count} chats · {rel_unfiled_time})"
     print(f"{display}\tfolder:Unfiled")
 
-    # Now list individual conversations inside user folders
+    # List individual conversations inside user folders.
     for folder in folder_names:
         fdir = os.path.join(FOLDERS_DIR, folder)
         files = glob.glob(os.path.join(fdir, "*.jsonl"))
         files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
         for f in files:
-            title = get_session_title(f)
-            rel_time = format_relative_time(os.path.getmtime(f))
-            tag = f"[{folder}]"
-            display = f"  {tag:<14} {rel_time:<8} {title}"
+            meta = parse_session_meta(f)
+            live_paths.add(os.path.realpath(f))
+            if meta.get("id"):
+                live_ids.add(meta["id"])
+            rel_time = format_relative_time(meta["mtime"])
+            display = session_display(meta, folder, rel_time, summary_store)
             print(f"{display}\tsession:{f}")
 
-    # List all unfiled conversations so top-level search finds every conversation
+    # List all unfiled conversations so top-level search finds every conversation.
     unfiled_files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
     for f in unfiled_files:
-        title = get_session_title(f)
-        rel_time = format_relative_time(os.path.getmtime(f))
-        tag = "[Unfiled]"
-        display = f"  {tag:<14} {rel_time:<8} {title}"
+        meta = parse_session_meta(f)
+        live_paths.add(os.path.realpath(f))
+        if meta.get("id"):
+            live_ids.add(meta["id"])
+        rel_time = format_relative_time(meta["mtime"])
+        display = session_display(meta, "Unfiled", rel_time, summary_store)
         print(f"{display}\tsession:{f}")
+
+    # Preserve searchable summaries even when their transcript is not in a visible
+    # workspace (for example, a legacy or archived transcript).
+    for session_id, record in sorted(
+        summary_store.get("sessions", {}).items(),
+        key=lambda item: item[1].get("updated_at", item[1].get("logged_at", "")) if isinstance(item[1], dict) else "",
+        reverse=True,
+    ):
+        if session_id in live_ids or not isinstance(record, dict):
+            continue
+        transcript_path = record.get("transcript_path", "")
+        if transcript_path and not os.path.isfile(transcript_path):
+            transcript_path = ""
+        if transcript_path and os.path.realpath(transcript_path) in live_paths:
+            continue
+        summary_record = dict(record)
+        summary_record["session_id"] = session_id
+        if transcript_path:
+            summary_record["transcript_path"] = transcript_path
+        print(f"{summary_display(summary_record)}\tsummary:{session_id}")
 
 def cmd_list_folder(folder):
     os.makedirs(FOLDERS_DIR, exist_ok=True)
     os.makedirs(UNFILED_DIR, exist_ok=True)
+    summary_store = load_store()
 
     if folder == "Unfiled":
         files = glob.glob(os.path.join(UNFILED_DIR, "*.jsonl"))
         files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
         print("➕ [New] Start fresh conversation (Unfiled)\tnew:Unfiled")
         for f in files:
-            title = get_session_title(f)
-            rel_time = format_relative_time(os.path.getmtime(f))
-            display = f"  {rel_time:<8} │ {title}"
+            meta = parse_session_meta(f)
+            rel_time = format_relative_time(meta["mtime"])
+            display = session_display(meta, "Unfiled", rel_time, summary_store)
             print(f"{display}\tsession:{f}")
     else:
         fdir = os.path.join(FOLDERS_DIR, folder)
@@ -190,9 +252,9 @@ def cmd_list_folder(folder):
         files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
         print(f"➕ [New] Start fresh conversation in {folder}\tnew:{folder}")
         for f in files:
-            title = get_session_title(f)
-            rel_time = format_relative_time(os.path.getmtime(f))
-            display = f"  {rel_time:<8} │ {title}"
+            meta = parse_session_meta(f)
+            rel_time = format_relative_time(meta["mtime"])
+            display = session_display(meta, folder, rel_time, summary_store)
             print(f"{display}\tsession:{f}")
 
 def cmd_preview(target):
@@ -205,6 +267,7 @@ def cmd_preview(target):
 
         files = glob.glob(os.path.join(fdir, "*.jsonl"))
         files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
+        summary_store = load_store()
 
         print(f"\033[1;36m📁 Project Folder: {folder}\033[0m")
         print(f"\033[2mPath: {fdir}\033[0m")
@@ -218,7 +281,10 @@ def cmd_preview(target):
             for f in files[:12]:
                 meta = parse_session_meta(f)
                 rel_time = format_relative_time(meta["mtime"])
-                print(f" • \033[32m{rel_time:<8}\033[0m {meta['title']}")
+                summary = get_summary(meta, summary_store)
+                snippet = summary_search_text(summary, limit=140)
+                suffix = f" — {snippet}" if snippet else ""
+                print(f" • \033[32m{rel_time:<8}\033[0m {meta['title']}{suffix}")
 
         print("\n" + "─" * 50)
         print("\033[1;33mActions:\033[0m")
@@ -251,6 +317,29 @@ def cmd_preview(target):
         print("  Esc    → Cancel / Close")
         return
 
+    if target.startswith("summary:"):
+        session_id = target[8:]
+        record = load_store().get("sessions", {}).get(session_id, {})
+        if not isinstance(record, dict):
+            print("Summary not found.")
+            return
+        transcript_path = find_session_path(session_id, record.get("transcript_path", ""))
+        print(f"\033[1;36m{record.get('title', session_id)}\033[0m")
+        print(f"\033[2mSummary archive entry  │  ID: {session_id}\033[0m\n")
+        if record.get("summary"):
+            print("\033[1mPermanent Session Summary:\033[0m")
+            print(f"  {record['summary']}\n")
+        for label, field in (("What changed", "what_changed"), ("Where it lives", "where_it_lives"), ("Next up", "next_up")):
+            if record.get(field):
+                print(f"\033[1m{label}:\033[0m")
+                print(f"  {record[field]}\n")
+        if transcript_path:
+            print(f"\033[2mTranscript: {transcript_path}\033[0m\n")
+            print("This summary has a resolvable transcript; use the session entry to resume it.")
+        else:
+            print("Transcript is not currently available; this is an archived summary only.")
+        return
+
     if target.startswith("session:"):
         session_path = target[8:]
         if not os.path.exists(session_path):
@@ -258,6 +347,7 @@ def cmd_preview(target):
             return
 
         meta = parse_session_meta(session_path)
+        summary = get_summary(meta, load_store())
         rel_time = format_relative_time(meta["mtime"])
         dt = datetime.fromtimestamp(meta["mtime"]).strftime("%Y-%m-%d %H:%M")
 
@@ -268,6 +358,19 @@ def cmd_preview(target):
         print(f"\033[1;36m{meta['title']}\033[0m")
         print(f"\033[2mFolder: {folder}  │  Updated: {dt} ({rel_time})  │  Turns: {meta['turn_count']}\033[0m")
         print(f"\033[2mCWD: {meta['cwd']}  │  ID: {meta['id'][:12]}...\033[0m\n")
+
+        if summary:
+            print("\033[1mPermanent Session Summary:\033[0m")
+            if summary.get("summary"):
+                print(f"  {summary['summary']}")
+            if summary.get("what_changed"):
+                print(f"  What changed: {summary['what_changed']}")
+            if summary.get("where_it_lives"):
+                print(f"  Where it lives: {summary['where_it_lives']}")
+            if summary.get("next_up"):
+                print(f"  Next up: {summary['next_up']}")
+            print()
+
         print("─" * 50)
         print("\033[1mInitial User Prompt:\033[0m")
         print(f"  {meta['first_prompt'][:250] if meta['first_prompt'] else '(None)'}\n")
@@ -367,6 +470,15 @@ def run_folder_session_picker(folder):
 
 def cmd_action(action_type, target):
     home = os.path.realpath(os.path.expanduser("~"))
+
+    if target.startswith("summary:"):
+        session_id = target[8:]
+        session_path = find_session_path(session_id)
+        if session_path:
+            cmd_action(action_type, f"session:{session_path}")
+        else:
+            print("This is an archived summary without an available transcript.")
+        return
 
     if target.startswith("folder:"):
         folder = target[7:]

@@ -1,88 +1,64 @@
 ---
 name: session-log
-description: Records, reviews, or catches up on session handoffs in Samuel's rolling 30-day domain logs (Pi-Session-Log for systems/tools, Beta-Session-Log for empirical research). Use when asked to "log this", "log last session", "log sessions from past N days", "where did we leave off", or "catch up".
+description: Creates, searches, and reviews permanent local Pi session summaries. Use when asked to "log this", "what session did we", "find the session where", "where did we leave off", or "catch up".
 ---
 
-# Session Log Management
+# Session Summary Management
 
-## Request-Routing Playbook
+The canonical store is the permanent local index:
 
-Before making any tool call, resolve the caller domain and map the request to one route:
+```text
+~/.pi/agent/session-summaries.json
+```
+
+It is keyed by the full Pi session UUID and is never automatically pruned. It powers Television previews and agent-facing session search. Do not treat the 30-day Obsidian logs as authoritative; routine session logging does not use TurboVault.
+
+## Intent Routing
 
 ```text
 REQUEST
-│
-├─ Domain Resolution:
-│  ├─ pi / pihat (Linux, Dotfiles, UI, Tools) ──→ Target: 02_Memories/Pi-Session-Log.md
-│  └─ beta / betahat (Stata, Econometrics)    ──→ Target: 02_Memories/Beta-Session-Log.md
-│
-└─ Intent Routing:
-   ├─ "log this" / "/log" ───────────────→ ACTIVE RECORD
-   │                                        ├─ Draft one top-level bullet with a blue parenthesized date and four nested child bullets
-   │                                        ├─ turbovault_read_note → prepend under the active rolling-window heading
-   │                                        └─ Prune entries > 30 days → turbovault_write_note
-   │
-   ├─ "log last session" ────────────────→ RETROACTIVE SINGLE
-   │                                        ├─ Inspect newest ~/.pi/agent/sessions/ transcript
-   │                                        ├─ Draft one dated bullet with nested details + session ID
-   │                                        └─ Prepend to domain log & prune > 30 days
-   │
-   ├─ "log sessions from [N] days" ──────→ BATCH CATCH-UP
-   │                                        ├─ Scan transcripts in N-day window
-   │                                        ├─ Filter trivial turns; consolidate by date
-   │                                        └─ Prepend to domain log & prune > 30 days
-   │
-   └─ "catch up" / "where did we leave" ─→ STATUS BRIEFING (READ-ONLY)
-                                            ├─ turbovault_read_note on domain log
-                                            ├─ Summarize top 2–3 entries (3–4 sentences)
-                                            └─ INVARIANT: Never read raw JSONL transcripts
+├─ "log this" / "/log"          → write or update one permanent summary
+├─ "what session did we ..."     → search permanent summaries, then report matches
+├─ "find the session where ..."  → search permanent summaries, then report matches
+├─ "where did we leave off"     → show recent permanent summaries and synthesize status
+└─ "catch up"                    → show recent permanent summaries and synthesize status
 ```
 
-## Intent Procedures
+## Search
 
-### 1. Active Session Log ("log this" / "/log")
-1. Formulate one complete bullet entry from the current conversation:
-   - `- ~={blue}(YYYY-MM-DD)=~ Brief session title`
-   - `    - ~={green}What changed:=~` 1–2 sentences on high-level architecture, features, or bug fixes.
-   - `    - ~={green}Where it lives:=~` Exact file paths (Chezmoi templates, configs, binaries, or datasets); reference vault notes with proper `[[wikilinks]]` (omit `.md`, using `[[Folder/Note|Note]]` when helpful).
-   - `    - ~={green}Next up / unfinished:=~` Concrete pending items, tests, or unverified edge cases. Never include routine “commit and push” housekeeping; mention version-control work only when a concrete unresolved failure or user decision remains.
-   - `    - *Session: <session-id>*` (passive metadata for human traceability).
-2. Read the target domain log via `turbovault_read_note` and retain its returned `hash`.
-3. Prepend the new entry under the active rolling-window heading.
-4. Prune any top-level bullet entry whose `YYYY-MM-DD` date inside `~={blue}(...)=~` is strictly older than 30 days.
-5. Write back using `turbovault_write_note` with `expected_hash=<returned hash>` and a descriptive `commit_message`.
+Use the bounded CLI rather than loading the entire JSON file:
 
-### 2. Retroactive Single-Session Log ("log last session")
-1. Inspect newest previous transcript in `~/.pi/agent/sessions/<workspace>/` (or current agent logs).
-2. Extract substantive changes into one dated top-level bullet with the three labeled child bullets and final italicized session ID child bullet.
-3. Read target domain log and retain its returned `hash`; prepend the entry under the active rolling-window heading, prune top-level entries older than 30 days, and write back with `expected_hash=<returned hash>` and a descriptive `commit_message`.
-
-### 3. Batch Multi-Day Catch-Up ("log sessions from past N days")
-1. Scan session transcripts in `~/.pi/agent/sessions/` matching the requested timestamp window.
-2. Filter out trivial or cancelled sessions; consolidate related micro-sessions by date, with each session represented as one dated top-level bullet and four nested child bullets.
-3. Read target domain log and retain its returned `hash`; prepend the entries under the active rolling-window heading, prune top-level entries older than 30 days, and write back with `expected_hash=<returned hash>` and a descriptive `commit_message`.
-
-### 4. Status Catch-Up ("where did we leave off" / "catch up")
-1. Read target domain log via `turbovault_read_note`.
-2. Present a brief 3–4 sentence summary of the top 2–3 recent entries in chat.
-3. **Invariant:** Never attempt to read, grep, or reconstruct raw JSONL transcript files during catch-up. The distilled log bullets are the authoritative handoff.
-
-## CPTR / Headless Limitation
-
-- CPTR supports read-only catch-up, but `turbovault_write_note` is blocked. Draft the complete nested bullet entry in chat and state that the log was not saved; use regular Pi for the mutation.
-
-## Formatting & Vault Rules
-
-- **Mutation Safety:** Retain the `hash` returned by `turbovault_read_note`; pass it as `expected_hash` and include a descriptive `commit_message` in every `turbovault_write_note` call. Never use a blind overwrite.
-- **TurboVault MCP Only:** Always interact with `02_Memories/` notes via `turbovault` tools. Never use shell commands on vault files.
-- **Closed Palette:** Strictly NO `**bold**`. Use `~={green}active labels=~` for bullet keys. Session-log notes have one narrow exception: use `~={blue}(YYYY-MM-DD)=~` for the complete parenthesized date only; keep the brief title plain and do not use blue elsewhere.
-- **Session Entry Structure:** Use one top-level bullet per session, with the format below. Use exactly four spaces for each child bullet; do not create a heading or section for an individual session. Use blue for the complete parenthesized date, green for the three content labels, and make the final child bullet the italicized session ID. Bullet-on-bullet nesting is intentional here, even where the general vault guidance recommends alternating list types.
-- **Vault Note Links:** Every reference to an Obsidian vault note in a session entry must use proper `[[wikilinks]]`; omit the `.md` extension and prefer `[[Folder/Note|Note]]` when the exact vault path is known. References to scripts, configs, datasets, and other non-vault files remain plain paths or code.
-
-```markdown
-- ~={blue}(YYYY-MM-DD)=~ Brief session title
-    - ~={green}What changed:=~ Summary of substantive changes.
-    - ~={green}Where it lives:=~ Exact paths or locations; vault notes use `[[Folder/Note|Note]]` wikilinks.
-    - ~={green}Next up / unfinished:=~ Concrete pending work or verification.
-    - *Session: <session-id>*
+```bash
+~/.local/bin/piwork summary search --json "price variable"
+~/.local/bin/piwork summary get <session-id> --json
+~/.local/bin/piwork summary recent --json --limit 10
 ```
+
+Search matches titles, summaries, changes, locations, next steps, keywords, and initial prompts. Report the session title, date/updated time, workspace, transcript path, and the relevant summary. If no summary matches, fall back to an exact text search of the raw JSONL transcripts and state that the result came from an unsummarized transcript.
+
+## Writing a Summary
+
+For "log this", write a structured record with:
+
+- `title`: concise session title
+- `summary`: one-sentence purpose/outcome
+- `what_changed`: substantive changes, decisions, or findings
+- `where_it_lives`: exact files, commands, or project locations
+- `next_up`: unfinished work or verification
+- `keywords`: exact identifiers worth searching later (variable names, functions, papers, commands, paths)
+
+Write it through the atomic CLI interface. In Pi's built-in `bash` tool, use the injected `PI_SESSION_ID` and `PI_SESSION_FILE` values for the active session:
+
+```bash
+printf '%s' '<JSON object>' | ~/.local/bin/piwork summary set "$PI_SESSION_ID" --transcript-path "$PI_SESSION_FILE" --stdin
+```
+
+For an explicitly identified older session, pass its known UUID and transcript path instead. If the session environment variables are unavailable, do not guess from the newest file; use an explicit session path/ID or state that the summary could not be attached. Preserve existing fields when updating a record.
+
+## Retention and Safety
+
+- Never delete or prune records automatically.
+- Session summaries survive transcript moves and folder renames because they are keyed by UUID.
+- Do not rewrite raw JSONL transcripts to store summaries.
+- Do not write routine summaries to Obsidian or invoke TurboVault.
+- If a summary is unavailable, distinguish clearly between a permanent summary result and a raw-transcript fallback.

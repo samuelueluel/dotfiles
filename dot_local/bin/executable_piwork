@@ -11,8 +11,22 @@ import json
 import shutil
 import subprocess
 import time
+import argparse
 from datetime import datetime
 from pathlib import Path
+
+LOCAL_LIB = os.path.expanduser("~/.local/lib")
+if LOCAL_LIB not in sys.path:
+    sys.path.insert(0, LOCAL_LIB)
+
+from pi_session_summary import (  # noqa: E402
+    find_session_path,
+    get_summary,
+    recent_summaries,
+    search_summaries,
+    set_summary,
+    workspace_for_path,
+)
 
 FOLDERS_DIR = os.path.expanduser("~/.pi/agent/folders")
 UNFILED_DIR = os.path.expanduser("~/.pi/agent/sessions/--var-home-samuel--")
@@ -142,6 +156,120 @@ def gum_input(header="Input:", placeholder=""):
     if p.returncode != 0:
         return None
     return stdout.strip()
+
+# --- SUMMARY INDEX COMMANDS ---
+
+def _summary_record_from_args(args):
+    payload = {}
+    if args.stdin:
+        payload = json.load(sys.stdin)
+    elif args.json_payload:
+        payload = json.loads(args.json_payload)
+    if not isinstance(payload, dict):
+        raise ValueError("summary payload must be a JSON object")
+
+    for name in (
+        "title", "workspace", "summary", "what_changed", "where_it_lives",
+        "next_up", "initial_prompt", "transcript_path", "keywords",
+    ):
+        value = getattr(args, name, None)
+        if value is not None:
+            payload[name] = value
+
+    session_path = payload.get("transcript_path") or find_session_path(args.session_id)
+    if session_path:
+        payload["transcript_path"] = session_path
+        metadata = parse_session_meta(session_path)
+        payload.setdefault("title", metadata.get("title", ""))
+        payload.setdefault("initial_prompt", metadata.get("first_prompt", ""))
+        payload.setdefault("workspace", workspace_for_path(session_path))
+    return set_summary(args.session_id, payload)
+
+
+def _print_summary_record(record, include_score=False):
+    if include_score:
+        print(f"Score: {record.get('score', 0)}")
+    print(f"Session: {record.get('session_id', '')}")
+    print(f"Title: {record.get('title', 'Untitled conversation')}")
+    if record.get("workspace"):
+        print(f"Workspace: {record['workspace']}")
+    if record.get("transcript_path"):
+        print(f"Transcript: {record['transcript_path']}")
+    if record.get("summary"):
+        print(f"Summary: {record['summary']}")
+    if record.get("what_changed"):
+        print(f"What changed: {record['what_changed']}")
+    if record.get("where_it_lives"):
+        print(f"Where it lives: {record['where_it_lives']}")
+    if record.get("next_up"):
+        print(f"Next up: {record['next_up']}")
+    if record.get("keywords"):
+        print(f"Keywords: {', '.join(record['keywords'])}")
+    print()
+
+
+def cmd_summary(argv):
+    parser = argparse.ArgumentParser(prog="piwork summary")
+    subparsers = parser.add_subparsers(dest="action", required=True)
+
+    set_parser = subparsers.add_parser("set", help="create or update one permanent summary")
+    set_parser.add_argument("session_id")
+    set_parser.add_argument("--stdin", action="store_true", help="read a JSON object from stdin")
+    set_parser.add_argument("--json", dest="json_payload", help="read fields from a JSON object")
+    set_parser.add_argument("--title")
+    set_parser.add_argument("--workspace")
+    set_parser.add_argument("--summary")
+    set_parser.add_argument("--what-changed")
+    set_parser.add_argument("--where-it-lives")
+    set_parser.add_argument("--next-up")
+    set_parser.add_argument("--initial-prompt")
+    set_parser.add_argument("--transcript-path")
+    set_parser.add_argument("--keywords")
+
+    get_parser = subparsers.add_parser("get", help="show one summary")
+    get_parser.add_argument("session_id")
+    get_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    search_parser = subparsers.add_parser("search", help="search permanent summaries")
+    search_parser.add_argument("query", nargs="+")
+    search_parser.add_argument("--limit", type=int, default=10)
+    search_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    recent_parser = subparsers.add_parser("recent", help="show recent summaries")
+    recent_parser.add_argument("--limit", type=int, default=10)
+    recent_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    args = parser.parse_args(argv)
+    if args.action == "set":
+        record = _summary_record_from_args(args)
+        print(json.dumps(record, ensure_ascii=False, indent=2))
+        return
+
+    if args.action == "get":
+        record = get_summary(args.session_id)
+        if not record:
+            print(f"No summary found for session {args.session_id}.", file=sys.stderr)
+            raise SystemExit(1)
+        if args.json_output:
+            print(json.dumps(record, ensure_ascii=False, indent=2))
+        else:
+            _print_summary_record(record)
+        return
+
+    if args.action == "search":
+        records = search_summaries(" ".join(args.query), args.limit)
+    else:
+        records = recent_summaries(args.limit)
+
+    if args.json_output:
+        print(json.dumps(records, ensure_ascii=False, indent=2))
+        return
+    if not records:
+        print("No session summaries found.")
+        return
+    for record in records:
+        _print_summary_record(record, include_score=args.action == "search")
+
 
 # --- CLI COMMANDS ---
 
@@ -568,6 +696,8 @@ def main():
     elif subcmd == "resume-betahat":
         target = sys.argv[2] if len(sys.argv) > 2 else None
         cmd_resume_beta(target, agent="betahat")
+    elif subcmd == "summary":
+        cmd_summary(sys.argv[2:])
     elif subcmd in ("browse", "ui"):
         cmd_browse()
     elif subcmd in ("help", "--help", "-h"):
@@ -580,6 +710,7 @@ def main():
         print("  piwork new <folder>   Start a brand new conversation in a workspace (pi/pihat/beta/betahat)")
         print("  piwork resume <folder>Resume latest conversation in a workspace")
         print("  piwork rename         Rename an existing workspace folder")
+        print("  piwork summary ...    Set, search, or inspect permanent session summaries")
         print("  piwork help           Show this help message")
     else:
         folders = [f["name"].lower() for f in get_folders()]
