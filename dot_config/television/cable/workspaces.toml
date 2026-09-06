@@ -24,13 +24,14 @@ command = "/var/home/samuel/.local/bin/tv-workspaces.py preview '{split:\t:1}'"
 enter = "actions:open"
 alt-space = "actions:open"
 ctrl-n = "actions:new"
-ctrl-b = "actions:beta"
-ctrl-h = "actions:pihat"
+ctrl-b = "actions:betahat"
+ctrl-h = "actions:beta"
+ctrl-l = "actions:pi"
 ctrl-m = "actions:move"
 ctrl-r = "actions:rename"
 
 [actions.open]
-description = "Resume session or browse folder"
+description = "Open folder or resume session with pihat"
 command = "/var/home/samuel/.local/bin/tv-workspaces.py action open '{split:\t:1}'"
 mode = "execute"
 
@@ -40,8 +41,18 @@ command = "/var/home/samuel/.local/bin/tv-workspaces.py action new '{split:\t:1}
 mode = "execute"
 
 [actions.beta]
-description = "Resume with beta (Stata container)"
+description = "Resume with beta (Stata container + local)"
 command = "/var/home/samuel/.local/bin/tv-workspaces.py action beta '{split:\t:1}'"
+mode = "execute"
+
+[actions.betahat]
+description = "Resume with betahat (Stata container + cloud)"
+command = "/var/home/samuel/.local/bin/tv-workspaces.py action betahat '{split:\t:1}'"
+mode = "execute"
+
+[actions.pi]
+description = "Resume with pi (local)"
+command = "/var/home/samuel/.local/bin/tv-workspaces.py action pi '{split:\t:1}'"
 mode = "execute"
 
 [actions.pihat]

@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import sys
 import tempfile
@@ -105,6 +107,53 @@ class SessionSummaryTests(unittest.TestCase):
         meta = {"id": "s1", "title": "Session title"}
         display = tv.session_display(meta, "Unfiled", "now", {"sessions": {"s1": record}})
         self.assertIn("ultra-rare-next-step-token", display)
+
+    def test_preview_uses_distinct_summary_headings(self) -> None:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            tv.print_summary_sections({
+                "summary": "Overview text.",
+                "what_changed": "Changed text.",
+                "where_it_lives": "Location text.",
+                "next_up": "Next text.",
+            })
+        rendered = output.getvalue()
+        for heading in ("[Overview]", "[What Changed]", "[Where It Lives]", "[Next Up]"):
+            self.assertIn(heading, rendered)
+        self.assertNotIn("What changed:", rendered)
+
+    def test_session_action_routing(self) -> None:
+        session_path = Path(self.tempdir.name) / "session.jsonl"
+        session_path.write_text(
+            '{"type":"session","id":"s1","cwd":"/var/home/samuel"}\n',
+            encoding="utf-8",
+        )
+        calls = []
+        original_spawn = tv.spawn_terminal
+        tv.spawn_terminal = lambda command, cwd=None: calls.append((command, cwd))
+        try:
+            for action, expected in (
+                ("open", "pihat"),
+                ("pi", "pi --session"),
+                ("beta", "piwork resume-beta"),
+                ("betahat", "piwork resume-betahat"),
+            ):
+                calls.clear()
+                tv.cmd_action(action, f"session:{session_path}")
+                self.assertEqual(len(calls), 1)
+                self.assertIn(expected, calls[0][0])
+        finally:
+            tv.spawn_terminal = original_spawn
+
+    def test_workspaces_keybindings_match_agent_mapping(self) -> None:
+        config = (REPO_ROOT / "dot_config/television/cable/workspaces.toml").read_text(encoding="utf-8")
+        for line in (
+            'enter = "actions:open"',
+            'ctrl-b = "actions:betahat"',
+            'ctrl-l = "actions:pi"',
+            'ctrl-h = "actions:beta"',
+        ):
+            self.assertIn(line, config)
 
 
 if __name__ == "__main__":

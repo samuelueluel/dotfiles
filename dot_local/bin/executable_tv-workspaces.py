@@ -158,6 +158,20 @@ def summary_display(record):
     return display
 
 
+def print_summary_sections(record):
+    sections = (
+        ("Overview", "summary"),
+        ("What Changed", "what_changed"),
+        ("Where It Lives", "where_it_lives"),
+        ("Next Up", "next_up"),
+    )
+    for label, field in sections:
+        value = record.get(field)
+        if value:
+            print(f"\033[1;36m[{label}]\033[0m")
+            print(f"  {value}\n")
+
+
 def cmd_source():
     os.makedirs(FOLDERS_DIR, exist_ok=True)
     os.makedirs(UNFILED_DIR, exist_ok=True)
@@ -288,9 +302,10 @@ def cmd_preview(target):
 
         print("\n" + "─" * 50)
         print("\033[1;33mActions:\033[0m")
-        print("  Enter  → Open folder to select / resume a conversation")
+        print("  Enter  → Open folder / drill down to sessions")
         print("  Ctrl+N → Start a fresh conversation in this folder")
         print("  Ctrl+R → Rename this workspace folder")
+        print("  Session picker: Enter=pihat  Ctrl+B=betahat  Ctrl+L=pi  Ctrl+H=beta")
         return
 
     if target.startswith("new:"):
@@ -311,9 +326,10 @@ def cmd_preview(target):
         print("\nAll subsequent messages in this session will automatically be stored in this workspace folder.\n")
         print("─" * 50)
         print("\033[1;33mActions:\033[0m")
-        print("  Enter  → Choose agent & launch in Ghostty (pihat default)")
-        print("  Ctrl+H → Direct launch with pihat (cloud frontier)")
-        print("  Ctrl+B → Direct launch with beta / betahat (Stata container)")
+        print("  Enter  → Launch pihat (cloud)")
+        print("  Ctrl+B → Launch betahat (Stata + cloud)")
+        print("  Ctrl+L → Launch pi (local)")
+        print("  Ctrl+H → Launch beta (Stata + local)")
         print("  Esc    → Cancel / Close")
         return
 
@@ -326,16 +342,15 @@ def cmd_preview(target):
         transcript_path = find_session_path(session_id, record.get("transcript_path", ""))
         print(f"\033[1;36m{record.get('title', session_id)}\033[0m")
         print(f"\033[2mSummary archive entry  │  ID: {session_id}\033[0m\n")
-        if record.get("summary"):
-            print("\033[1mPermanent Session Summary:\033[0m")
-            print(f"  {record['summary']}\n")
-        for label, field in (("What changed", "what_changed"), ("Where it lives", "where_it_lives"), ("Next up", "next_up")):
-            if record.get(field):
-                print(f"\033[1m{label}:\033[0m")
-                print(f"  {record[field]}\n")
+        print_summary_sections(record)
         if transcript_path:
             print(f"\033[2mTranscript: {transcript_path}\033[0m\n")
-            print("This summary has a resolvable transcript; use the session entry to resume it.")
+            print("This summary has a resolvable transcript.")
+            print("\033[1;33mActions:\033[0m")
+            print("  Enter  → Resume with pihat (cloud)")
+            print("  Ctrl+B → Resume with betahat (Stata + cloud)")
+            print("  Ctrl+L → Resume with pi (local)")
+            print("  Ctrl+H → Resume with beta (Stata + local)")
         else:
             print("Transcript is not currently available; this is an archived summary only.")
         return
@@ -360,16 +375,7 @@ def cmd_preview(target):
         print(f"\033[2mCWD: {meta['cwd']}  │  ID: {meta['id'][:12]}...\033[0m\n")
 
         if summary:
-            print("\033[1mPermanent Session Summary:\033[0m")
-            if summary.get("summary"):
-                print(f"  {summary['summary']}")
-            if summary.get("what_changed"):
-                print(f"  What changed: {summary['what_changed']}")
-            if summary.get("where_it_lives"):
-                print(f"  Where it lives: {summary['where_it_lives']}")
-            if summary.get("next_up"):
-                print(f"  Next up: {summary['next_up']}")
-            print()
+            print_summary_sections(summary)
 
         print("─" * 50)
         print("\033[1mInitial User Prompt:\033[0m")
@@ -381,9 +387,10 @@ def cmd_preview(target):
 
         print("─" * 50)
         print("\033[1;33mActions:\033[0m")
-        print("  Enter  → Resume chat with pi (local)")
-        print("  Ctrl+H → Resume chat with pihat (cloud frontier)")
-        print("  Ctrl+B → Resume chat with beta (Stata container)")
+        print("  Enter  → Resume with pihat (cloud)")
+        print("  Ctrl+B → Resume with betahat (Stata + cloud)")
+        print("  Ctrl+L → Resume with pi (local)")
+        print("  Ctrl+H → Resume with beta (Stata + local)")
         print("  Ctrl+M → Move/stash this chat into another folder")
         return
 
@@ -414,7 +421,7 @@ def run_folder_session_picker(folder):
         "--preview-size=60",
         "--preview-word-wrap",
         "--preview-border=thick",
-        "--expect=ctrl-b;ctrl-h;ctrl-m",
+        "--expect=ctrl-b;ctrl-h;ctrl-l;ctrl-m",
     ]
 
     try:
@@ -434,7 +441,7 @@ def run_folder_session_picker(folder):
 
     expect_key = None
     target_out = lines[-1]
-    if len(lines) > 1 and lines[0] in ("ctrl-b", "ctrl-h", "ctrl-m"):
+    if len(lines) > 1 and lines[0] in ("ctrl-b", "ctrl-h", "ctrl-l", "ctrl-m"):
         expect_key = lines[0]
 
     home = os.path.realpath(os.path.expanduser("~"))
@@ -442,15 +449,16 @@ def run_folder_session_picker(folder):
     if target_out.startswith("new:"):
         f_name = target_out[4:]
         if expect_key == "ctrl-h":
-            if f_name == "Unfiled":
-                spawn_terminal("pihat")
-            else:
-                fdir = os.path.join(FOLDERS_DIR, f_name)
-                spawn_terminal(f"pihat --session-dir '{fdir}'")
-        elif expect_key == "ctrl-b":
             spawn_terminal(f"piwork new '{f_name}' --agent beta")
+        elif expect_key == "ctrl-b":
+            spawn_terminal(f"piwork new '{f_name}' --agent betahat")
+        elif expect_key == "ctrl-l":
+            spawn_terminal(f"piwork new '{f_name}' --agent pi")
+        elif f_name == "Unfiled":
+            spawn_terminal("pihat")
         else:
-            spawn_terminal(f"piwork new '{f_name}'")
+            fdir = os.path.join(FOLDERS_DIR, f_name)
+            spawn_terminal(f"pihat --session-dir '{fdir}'")
     elif target_out.startswith("session:"):
         session_path = target_out[8:]
         meta = parse_session_meta(session_path)
@@ -458,15 +466,20 @@ def run_folder_session_picker(folder):
 
         if expect_key == "ctrl-b":
             if cwd and os.path.realpath(cwd) != home:
+                spawn_terminal(f"betahat '{cwd}' --session '{session_path}'", cwd=cwd)
+            else:
+                spawn_terminal(f"piwork resume-betahat '{session_path}'")
+        elif expect_key == "ctrl-h":
+            if cwd and os.path.realpath(cwd) != home:
                 spawn_terminal(f"beta '{cwd}' --session '{session_path}'", cwd=cwd)
             else:
                 spawn_terminal(f"piwork resume-beta '{session_path}'")
-        elif expect_key == "ctrl-h":
-            spawn_terminal(f"pihat --session '{session_path}'", cwd=cwd or home)
+        elif expect_key == "ctrl-l":
+            spawn_terminal(f"pi --session '{session_path}'", cwd=cwd or home)
         elif expect_key == "ctrl-m":
             spawn_terminal(f"piwork stash '{session_path}'")
         else:
-            spawn_terminal(f"pi --session '{session_path}'", cwd=cwd or home)
+            spawn_terminal(f"pihat --session '{session_path}'", cwd=cwd or home)
 
 def cmd_action(action_type, target):
     home = os.path.realpath(os.path.expanduser("~"))
@@ -503,22 +516,33 @@ def cmd_action(action_type, target):
                 spawn_terminal("pihat")
             else:
                 spawn_terminal(f"pihat --session-dir '{fdir}'")
+        elif action_type == "pi":
+            if folder == "Unfiled":
+                spawn_terminal("pi")
+            else:
+                spawn_terminal(f"pi --session-dir '{fdir}'")
         elif action_type == "beta":
             spawn_terminal(f"piwork new '{folder}' --agent beta")
+        elif action_type == "betahat":
+            spawn_terminal(f"piwork new '{folder}' --agent betahat")
         elif action_type == "rename":
             spawn_terminal("piwork rename")
         return
 
     if target.startswith("new:"):
         folder = target[4:]
-        if action_type == "pihat":
+        if action_type in ("open", "pihat"):
             if folder == "Unfiled":
                 spawn_terminal("pihat")
             else:
                 fdir = os.path.join(FOLDERS_DIR, folder)
                 spawn_terminal(f"pihat --session-dir '{fdir}'")
+        elif action_type == "pi":
+            spawn_terminal(f"piwork new '{folder}' --agent pi")
         elif action_type == "beta":
             spawn_terminal(f"piwork new '{folder}' --agent beta")
+        elif action_type == "betahat":
+            spawn_terminal(f"piwork new '{folder}' --agent betahat")
         else:
             spawn_terminal(f"piwork new '{folder}'")
         return
@@ -528,15 +552,20 @@ def cmd_action(action_type, target):
         meta = parse_session_meta(session_path)
         cwd = meta["cwd"] if meta["cwd"] and os.path.isdir(meta["cwd"]) else ""
 
-        if action_type == "open":
+        if action_type in ("open", "pihat"):
+            spawn_terminal(f"pihat --session '{session_path}'", cwd=cwd or home)
+        elif action_type == "pi":
             spawn_terminal(f"pi --session '{session_path}'", cwd=cwd or home)
         elif action_type == "beta":
             if cwd and os.path.realpath(cwd) != home:
                 spawn_terminal(f"beta '{cwd}' --session '{session_path}'", cwd=cwd)
             else:
                 spawn_terminal(f"piwork resume-beta '{session_path}'")
-        elif action_type == "pihat":
-            spawn_terminal(f"pihat --session '{session_path}'", cwd=cwd or home)
+        elif action_type == "betahat":
+            if cwd and os.path.realpath(cwd) != home:
+                spawn_terminal(f"betahat '{cwd}' --session '{session_path}'", cwd=cwd)
+            else:
+                spawn_terminal(f"piwork resume-betahat '{session_path}'")
         elif action_type == "move":
             spawn_terminal(f"piwork stash '{session_path}'")
         return
