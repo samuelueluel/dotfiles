@@ -7,8 +7,10 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -23,6 +25,18 @@ assert spec and spec.loader
 summary = importlib.util.module_from_spec(spec)
 sys.modules["pi_session_summary"] = summary
 spec.loader.exec_module(summary)
+
+from importlib.machinery import SourceFileLoader
+
+
+PIWORK_PATH = REPO_ROOT / "dot_local" / "bin" / "executable_piwork"
+piwork_spec = importlib.util.spec_from_file_location(
+    "piwork", PIWORK_PATH, loader=SourceFileLoader("piwork", str(PIWORK_PATH))
+)
+assert piwork_spec and piwork_spec.loader
+piwork = importlib.util.module_from_spec(piwork_spec)
+sys.modules["piwork"] = piwork
+piwork_spec.loader.exec_module(piwork)
 
 TV_PATH = REPO_ROOT / "dot_local" / "bin" / "executable_tv-workspaces.py"
 tv_spec = importlib.util.spec_from_file_location("tv_workspaces", TV_PATH)
@@ -44,6 +58,20 @@ class SessionSummaryTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
+
+    def write_transcript(self, relative_path: str, session_id: str, title: str, message_count: int, mtime: float) -> Path:
+        path = Path(self.tempdir.name) / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        entries = [
+            {"type": "session", "id": session_id, "cwd": "/var/home/samuel"},
+            {"type": "session_info", "name": title},
+        ]
+        for index in range(message_count):
+            role = "user" if index % 2 == 0 else "assistant"
+            entries.append({"type": "message", "message": {"role": role, "content": f"{title} message {index}"}})
+        path.write_text("\n".join(json.dumps(entry) for entry in entries) + "\n", encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+        return path
 
     def test_partial_update_preserves_keywords(self) -> None:
         summary.set_summary("s1", {
@@ -107,6 +135,93 @@ class SessionSummaryTests(unittest.TestCase):
         meta = {"id": "s1", "title": "Session title"}
         display = tv.session_display(meta, "Unfiled", "now", {"sessions": {"s1": record}})
         self.assertIn("ultra-rare-next-step-token", display)
+
+    def test_backlog_scans_filed_and_unfiled_and_excludes_existing(self) -> None:
+        now = time.time()
+        economics = self.write_transcript(
+            "folders/Economics/economics.jsonl", "economics-session", "Economics work", 3, now - 3 * 86400
+        )
+        unfiled = self.write_transcript(
+            "sessions/unfiled/unfiled.jsonl", "unfiled-session", "Unfiled work", 2, now - 2 * 86400
+        )
+        filed = self.write_transcript(
+            "folders/Music/already-logged.jsonl", "logged-session", "Already logged", 4, now - 2 * 86400
+        )
+        summary.set_summary("logged-session", {"summary": "Already summarized.", "transcript_path": str(filed)})
+
+        report = summary.backlog_summaries(now=now, days=7, idle_hours=24, limit=10)
+        by_id = {candidate["session_id"]: candidate for candidate in report["candidates"]}
+        self.assertEqual(set(by_id), {"economics-session", "unfiled-session"})
+        self.assertEqual(by_id["economics-session"]["workspace"], "Economics")
+        self.assertEqual(by_id["unfiled-session"]["workspace"], "Unfiled")
+        self.assertEqual(by_id["economics-session"]["message_count"], 3)
+
+    def test_backlog_workspace_and_idle_filters(self) -> None:
+        now = time.time()
+        self.write_transcript(
+            "folders/Economics/old.jsonl", "economics-session", "Economics work", 2, now - 3 * 86400
+        )
+        self.write_transcript(
+            "folders/Music/recent.jsonl", "recent-session", "Recent work", 2, now - 2 * 3600
+        )
+        self.write_transcript(
+            "folders/Music/active.jsonl", "active-session", "Active work", 2, now - 3 * 86400
+        )
+
+        report = summary.backlog_summaries(
+            now=now,
+            days=7,
+            idle_hours=24,
+            workspace="Economics",
+            exclude_session_ids=["active-session"],
+            limit=10,
+        )
+        self.assertEqual([candidate["session_id"] for candidate in report["candidates"]], ["economics-session"])
+
+    def test_backlog_cli_excludes_active_session_environment(self) -> None:
+        now = time.time()
+        self.write_transcript(
+            "sessions/unfiled/active.jsonl", "active-session", "Active work", 2, now - 3 * 86400
+        )
+        self.write_transcript(
+            "folders/Economics/other.jsonl", "other-session", "Other work", 2, now - 3 * 86400
+        )
+        previous_session_id = os.environ.get("PI_SESSION_ID")
+        os.environ["PI_SESSION_ID"] = "active-session"
+        output = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(output):
+                piwork.cmd_summary([
+                    "backlog", "--json", "--days", "7", "--idle-hours", "24", "--limit", "10"
+                ])
+        finally:
+            if previous_session_id is None:
+                os.environ.pop("PI_SESSION_ID", None)
+            else:
+                os.environ["PI_SESSION_ID"] = previous_session_id
+
+        report = json.loads(output.getvalue())
+        self.assertEqual([candidate["session_id"] for candidate in report["candidates"]], ["other-session"])
+
+    def test_backlog_reports_limit_and_does_not_mutate_index(self) -> None:
+        now = time.time()
+        for index in range(3):
+            self.write_transcript(
+                f"sessions/unfiled/session-{index}.jsonl",
+                f"session-{index}",
+                f"Session {index}",
+                2,
+                now - (index + 2) * 86400,
+            )
+        summary.set_summary("existing", {"summary": "Keep this record."})
+        index_path = Path(summary.SUMMARY_INDEX_PATH)
+        before = index_path.read_bytes()
+
+        report = summary.backlog_summaries(now=now, days=7, idle_hours=24, limit=2)
+        self.assertEqual(report["total_matches"], 3)
+        self.assertEqual(report["returned_count"], 2)
+        self.assertTrue(report["truncated"])
+        self.assertEqual(index_path.read_bytes(), before)
 
     def test_preview_uses_distinct_summary_headings(self) -> None:
         output = io.StringIO()

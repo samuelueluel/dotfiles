@@ -20,6 +20,7 @@ if LOCAL_LIB not in sys.path:
     sys.path.insert(0, LOCAL_LIB)
 
 from pi_session_summary import (  # noqa: E402
+    backlog_summaries,
     find_session_path,
     get_summary,
     recent_summaries,
@@ -208,6 +209,24 @@ def _print_summary_record(record, include_score=False):
     print()
 
 
+def _print_backlog_report(report):
+    total = report["total_matches"]
+    returned = report["returned_count"]
+    limit = report["limit"]
+    if not total:
+        print("No unsummarized session candidates found.")
+        return
+    suffix = f" (showing {returned}; limit {limit})" if report["truncated"] else ""
+    print(f"Found {total} unsummarized session candidate(s){suffix}.")
+    for candidate in report["candidates"]:
+        title = " ".join(str(candidate.get("title", "Untitled conversation")).split())
+        print(f"[{candidate['workspace']}] {candidate['modified_at']} · {candidate['message_count']} messages · {title}")
+        print(f"  Session: {candidate['session_id']}")
+        print(f"  Transcript: {candidate['transcript_path']}")
+    if report["truncated"]:
+        print(f"Use --limit N to inspect a different bounded batch; {total - returned} candidate(s) are not shown.")
+
+
 def cmd_summary(argv):
     parser = argparse.ArgumentParser(prog="piwork summary")
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -239,6 +258,17 @@ def cmd_summary(argv):
     recent_parser.add_argument("--limit", type=int, default=10)
     recent_parser.add_argument("--json", action="store_true", dest="json_output")
 
+    backlog_parser = subparsers.add_parser(
+        "backlog",
+        help="discover old sessions without permanent summaries (read-only)",
+    )
+    backlog_parser.add_argument("--limit", type=int, default=10)
+    backlog_parser.add_argument("--days", type=float, default=None)
+    backlog_parser.add_argument("--idle-hours", type=float, default=24.0)
+    backlog_parser.add_argument("--workspace", default="")
+    backlog_parser.add_argument("--exclude-session-id", action="append", default=[])
+    backlog_parser.add_argument("--json", action="store_true", dest="json_output")
+
     args = parser.parse_args(argv)
     if args.action == "set":
         record = _summary_record_from_args(args)
@@ -254,6 +284,24 @@ def cmd_summary(argv):
             print(json.dumps(record, ensure_ascii=False, indent=2))
         else:
             _print_summary_record(record)
+        return
+
+    if args.action == "backlog":
+        excluded = list(args.exclude_session_id)
+        active_session_id = os.environ.get("PI_SESSION_ID", "").strip()
+        if active_session_id:
+            excluded.append(active_session_id)
+        report = backlog_summaries(
+            limit=args.limit,
+            days=args.days,
+            idle_hours=args.idle_hours,
+            workspace=args.workspace,
+            exclude_session_ids=excluded,
+        )
+        if args.json_output:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            _print_backlog_report(report)
         return
 
     if args.action == "search":
@@ -710,7 +758,7 @@ def main():
         print("  piwork new <folder>   Start a brand new conversation in a workspace (pi/pihat/beta/betahat)")
         print("  piwork resume <folder>Resume latest conversation in a workspace")
         print("  piwork rename         Rename an existing workspace folder")
-        print("  piwork summary ...    Set, search, or inspect permanent session summaries")
+        print("  piwork summary ...    Set, search, inspect, or discover permanent session summaries")
         print("  piwork help           Show this help message")
     else:
         folders = [f["name"].lower() for f in get_folders()]

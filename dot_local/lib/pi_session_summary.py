@@ -10,6 +10,7 @@ import json
 import os
 import re
 import tempfile
+import time
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Iterator
@@ -200,13 +201,14 @@ def _message_text(content: Any) -> str:
     return ""
 
 
-def read_session_metadata(file_path: str) -> dict[str, str]:
-    metadata = {
+def read_session_metadata(file_path: str) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
         "path": file_path,
         "session_id": "",
         "cwd": "",
         "title": "",
         "initial_prompt": "",
+        "message_count": 0,
     }
     try:
         with open(file_path, "r", encoding="utf-8", errors="ignore") as handle:
@@ -224,6 +226,7 @@ def read_session_metadata(file_path: str) -> dict[str, str]:
                 elif entry_type == "session_info" and entry.get("name"):
                     metadata["title"] = str(entry["name"]).strip()
                 elif entry_type == "message":
+                    metadata["message_count"] += 1
                     message = entry.get("message") or {}
                     if message.get("role") == "user" and not metadata["initial_prompt"]:
                         metadata["initial_prompt"] = _message_text(message.get("content"))
@@ -234,13 +237,92 @@ def read_session_metadata(file_path: str) -> dict[str, str]:
     return metadata
 
 
-def session_records() -> list[dict[str, str]]:
+def session_records() -> list[dict[str, Any]]:
     records = []
     for path in iter_session_paths():
         metadata = read_session_metadata(path)
         if metadata["session_id"]:
             records.append(metadata)
     return records
+
+
+def backlog_summaries(
+    *,
+    limit: int = 10,
+    days: float | None = None,
+    idle_hours: float = 24.0,
+    workspace: str = "",
+    exclude_session_ids: list[str] | set[str] | None = None,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Find old, unsummarized transcripts without modifying the index."""
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    if days is not None and days < 0:
+        raise ValueError("days must be nonnegative")
+    if idle_hours < 0:
+        raise ValueError("idle-hours must be nonnegative")
+
+    current_time = float(time.time() if now is None else now)
+    excluded = {str(session_id).strip() for session_id in (exclude_session_ids or []) if str(session_id).strip()}
+    excluded_workspace = str(workspace or "").strip().casefold()
+    summarized = {
+        str(session_id).strip()
+        for session_id in load_store().get("sessions", {})
+        if str(session_id).strip()
+    }
+    cutoff = current_time - (days * 86400) if days is not None else None
+    idle_cutoff = current_time - (idle_hours * 3600)
+    candidates: list[dict[str, Any]] = []
+
+    for path in iter_session_paths():
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            continue
+        if cutoff is not None and mtime < cutoff:
+            continue
+        if mtime > idle_cutoff:
+            continue
+
+        metadata = read_session_metadata(path)
+        session_id = str(metadata.get("session_id") or "").strip()
+        if not session_id or session_id in summarized or session_id in excluded:
+            continue
+
+        session_workspace = workspace_for_path(path)
+        if excluded_workspace and session_workspace.casefold() != excluded_workspace:
+            continue
+
+        message_count = int(metadata.get("message_count") or 0)
+        candidates.append({
+            "session_id": session_id,
+            "title": metadata.get("title") or "Untitled conversation",
+            "workspace": session_workspace or "Unknown",
+            "transcript_path": os.path.realpath(path),
+            "mtime": mtime,
+            "modified_at": datetime.fromtimestamp(mtime).replace(microsecond=0).isoformat(),
+            "message_count": message_count,
+            "turn_count": message_count,
+            "initial_prompt": metadata.get("initial_prompt", ""),
+        })
+
+    candidates.sort(key=lambda item: (-float(item["mtime"]), item["session_id"]))
+    total_matches = len(candidates)
+    selected = candidates[:limit]
+    return {
+        "candidates": selected,
+        "total_matches": total_matches,
+        "returned_count": len(selected),
+        "limit": limit,
+        "truncated": total_matches > len(selected),
+        "filters": {
+            "days": days,
+            "idle_hours": idle_hours,
+            "workspace": workspace or "",
+            "excluded_session_ids": sorted(excluded),
+        },
+    }
 
 
 def session_path_index() -> dict[str, str]:
