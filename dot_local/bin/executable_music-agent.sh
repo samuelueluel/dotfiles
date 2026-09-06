@@ -2,7 +2,7 @@
 # Music Agent: dedicated pihat session with music skill and Last.fm MCP
 
 MODEL="${PIHAT_MODEL:-openai-codex/gpt-5.6-luna}"
-SCOPE='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-5.6*:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max'
+SCOPE='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-5.6*:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
 STATE_DIR="$HOME/.pi/running"
 mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/$$.state"

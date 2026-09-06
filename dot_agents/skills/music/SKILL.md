@@ -5,10 +5,6 @@ description: Manages MPD/rmpc playback and queues, criterion-based local album c
 
 # Music Management: MPD, `mpc`, `rmpc`, and Beets
 
-## CPTR / Headless Limitation
-
-CPTR's conservative headless Bash policy does not allow `mpc`, `rmpc`, or interactive `music-onboard`. Use CPTR for explanatory guidance only; perform playback, queue, tagging, and onboarding through regular Pi or a host terminal, and report blocked commands without claiming they ran.
-
 ## Request-Routing Playbook
 
 ```text
@@ -43,8 +39,8 @@ REQUEST
 ## Criteria-Based Curation Workflow
 
 1. **Resolve action and pool:** Queue language means local MPD items and an append mutation; suggestion language means no mutation. Honor explicit local-library or outside-library scope.
-2. **Parse criteria:** Separate hard filters (library presence, `Unrated`, rating bounds, named genres, exclusions) from ranking signals (“likely to like,” similarity, recency, novelty). Never relax a hard filter silently.
-3. **Generate distinct candidates:** Deduplicate local track matches by album artist + album (and date when needed). Generate external candidates from Last.fm, then remove exact artist/album matches already present in MPD.
+2. **Parse criteria:** Separate hard filters (library presence, `Unrated`, rating bounds, named genres, exclusions) from ranking signals (“likely to like,” similarity, recency, novelty). Never relax a hard filter silently. Never restrict candidate discovery by grouping ratings (`R: *`), `[Priority]`, or familiarity unless Samuel explicitly requests rating bounds or priority status.
+3. **Generate distinct candidates:** Deduplicate local track matches by album artist + album (and date when needed). Keep unrated, low-play-count, and unfamiliar albums fully eligible for discovery. Generate external candidates from Last.fm, then remove exact artist/album matches already present in MPD.
 4. **Enrich and rank:** Combine live MPD ratings/genres with relevant Last.fm personal play counts, recency, and similarity. Explicit ratings are stronger preference evidence than play counts; high play counts indicate exposure or engagement, not approval.
 5. **Select the requested count:** Avoid albums already in the queue and repeated candidates. If too few satisfy the hard criteria, use the available set and report the shortfall rather than weakening the request.
 6. **Complete the action:** For queue requests, append every track from each selected album in track order without clearing, playing, or shuffling. For suggestions, return the ranked list with concise evidence and local availability.
@@ -58,8 +54,13 @@ REQUEST
 - **Wouldn't usually listen to:** Enter novelty mode: favor locally underrepresented genres/artists or low-familiarity candidates, while retaining at least one bridge signal such as an adjacent genre, a similarity edge, or affinity to a highly rated album.
 - **In the ballpark of genres `A`, `B`, `C`:** Treat as a broad union plus adjacent similarity candidates; deduplicate separate MPD searches because MPD lacks `OR`. Require intersection only when Samuel says “all,” “both,” or “every,” and honor explicit exclusions.
 
-## Evidence Boundaries
+## Evidence Boundaries & Discovery Engine
 
+- **Four-Pillar Discovery Synthesis:** Active music discovery synthesizes four distinct discovery streams:
+  1. **Last.fm MCP:** Collaborative filtering, artist/track similarity graphs, tag discovery, and personal listening history.
+  2. **Library RYM Genre Tags:** Local structural filtering and thematic clustering using live canonical RYM subgenres via `mpc search genre`.
+  3. **Implicit Model Knowledge:** Nuanced reasoning over instrumentation, production styles, scene lineage, and aesthetic atmosphere.
+  4. **Targeted Web Search:** Authorized for outside-library discovery, obscure scenes, and RYM/critical consensus; not required for local library filtering.
 - For installed albums, current ratings and canonical RYM-derived genres come from live MPD metadata displayed by `rmpc` and queried with `mpc`.
 - Use Last.fm personal charts/history for play evidence and Last.fm similarity/tag endpoints for discovery. Never use its folksonomy as authority for canonical RYM genre tags.
 - Explain recommendations using observed evidence; never invent a rating, play count, last-played date, similarity link, genre, or library-presence result. If a Last.fm result is paginated or truncated, label partial coverage rather than claiming completeness.
@@ -80,7 +81,7 @@ REQUEST
 - **Rating Syntax:** Use `R: 5`, never `R: 5.0`.
 - **Natural-Language Tag Mutation:** “Tag this album with `X`,” “add `X`,” and “apply `X`” mean append with `music-add-tag`, preserving all existing genre and grouping values. Use `music-set-tags` only when Samuel explicitly says “set,” “replace,” “only,” or otherwise requests field replacement.
 - **Inclusive Tag Matching:** Requests for albums or tracks “with,” “having,” or “tagged” `X` mean `X` must be present; additional grouping/tag values remain allowed. Require an exclusive match only when the user says “only,” “exclusively,” or explicitly excludes another value.
-- **Album Rating Semantics:** Unless Samuel explicitly names RYM data, “album rating” and comparisons such as “less than 4,” “at least `R: 4`,” or “between 3.5 and 4.5” refer to numeric comparison over live MPD `grouping` ratings. Ignore non-rating grouping flags and exclude `Unrated`; strict terms exclude the boundary and inclusive terms include it.
+- **Album Rating Semantics:** Unless Samuel explicitly names RYM data, “album rating” and comparisons such as “less than 4,” “at least `R: 4`,” or “between 3.5 and 4.5” refer to numeric comparison over live MPD `grouping` ratings. Ignore non-rating grouping flags and exclude `Unrated`; strict terms exclude the boundary and inclusive terms include it. Never apply rating or priority filters implicitly to general similarity, genre, or mood requests.
 - **MPD Filter Syntax:** Filter expressions require explicit parentheses around each clause and sub-expression; `OR` and numeric comparisons are unsupported. Expand rating comparisons over the finite canonical rating set using regex or separate searches. When filter behavior is version-sensitive, inspect `mpd --version`.
 
 ## RateYourMusic Genre Tagging Convention & Datasets

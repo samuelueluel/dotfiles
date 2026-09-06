@@ -21,9 +21,7 @@ Usage:
   lem-load-model MODEL_ID
 
 Load a local Lemonade model and choose speculative decoding, reasoning,
-KV-cache quantization, and parallel slots using gum. When
-PI_CPTR_THINKING_LEVEL_FILE is set, the Qwen reasoning choice is also
-returned as a Pi thinking-level override for pi-cptr-model.
+KV-cache quantization, and parallel slots using gum.
 EOF
 }
 
@@ -348,10 +346,6 @@ else
   args+=" --parallel $par"
 fi
 args=${args# }
-
-if [[ -n "${PI_CPTR_THINKING_LEVEL_FILE:-}" && -n "$pi_thinking_level" ]]; then
-  printf '%s\n' "$pi_thinking_level" > "$PI_CPTR_THINKING_LEVEL_FILE"
-fi
 
 note="loading $id  [override: $args]"
 if ! curl -sS -m 10 "$LEM_API/models" 2>/dev/null | grep -q "\"id\"[[:space:]]*:[[:space:]]*\"$id\""; then

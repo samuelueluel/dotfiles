@@ -2,7 +2,13 @@
 
 **Load this file when** selecting local albums by criteria, building a personalized queue, interpreting taste or novelty language, or recommending artists/albums outside the library.
 
-## Evidence Sources
+## Evidence Sources & Discovery Pillars
+
+Music curation and discovery operates across four synthesized pillars:
+1. **Last.fm MCP:** Collaborative filtering (`get_similar_artists`, `get_similar_tracks`, `get_tag_top_albums`), user scrobble history, and exposure metrics.
+2. **Library RYM Genre Tags:** Local library structural querying via live MPD genre fields (`mpc search genre ...`), leveraging fine-grained canonical RYM subgenres.
+3. **Implicit Model Knowledge:** Nuanced understanding of production aesthetics, instrumentation, historical scenes, and artistic trajectories.
+4. **Targeted Web Search:** Authorized for outside-library exploration, obscure release verification, and RYM/critical discourse; generally unnecessary for within-library matching.
 
 | Question | Primary source | Supporting source |
 |---|---|---|
@@ -10,7 +16,8 @@
 | What is its current album rating? | MPD `grouping` (`R: 5` through `R: 2.5`, or `Unrated`) | Never substitute the CSV snapshot |
 | What are its current canonical genres? | MPD `genre` values displayed by `rmpc` | RYM manifest only for audit/provenance |
 | How often or recently has Samuel listened? | Last.fm personal charts and recent scrobbles | Treat missing/truncated results as unknown |
-| What is similar or related? | Last.fm similar artists/tracks | Artist top albums and tag top albums generate album candidates |
+| What is similar or related? | Last.fm similar artists/tracks + Model knowledge | Artist top albums, tag top albums, web search |
+| What are candidates outside the library? | Last.fm + Model knowledge + Web search | RYM collection snapshot for URL/context |
 | Is an external release in Samuel's RYM snapshot? | `rym_collection_genres.csv` | Useful for RYM URL and snapshot context, not current local state |
 
 ## Local Candidate Construction
@@ -21,7 +28,7 @@
    mpc -f '%albumartist%\t%album%\t%date%\t%grouping%\t%genre%\t%file%' search <criteria>
    ```
 3. Collapse track results to distinct album artist + album. Include date when different releases share those fields.
-4. Apply hard criteria before Last.fm enrichment. For multiple broad genres, run separate MPD searches and deduplicate because MPD has no `OR`.
+4. Apply hard criteria before Last.fm enrichment. For multiple broad genres, run separate MPD searches and deduplicate because MPD has no `OR`. Do not apply implicit grouping rating or `[Priority]` filters; unrated, rarely played, and unfamiliar releases must remain fully eligible unless explicit bounds are requested.
 5. Inspect the current queue and remove already-queued albums unless Samuel explicitly permits duplicates:
    ```bash
    mpc -f '%albumartist%\t%album%\t%file%' playlist

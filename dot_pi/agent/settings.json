@@ -48,8 +48,10 @@
       "source": "npm:@kennyfrc/pi-system-reminders@0.2.0",
       "extensions": []
     },
-    "npm:@juicesharp/rpiv-advisor@2.8.0",
-    "npm:pi-smart-compact"
+    "local-packages/rpiv-advisor-lean",
+    "npm:pi-smart-compact",
+    "local-packages/pi-compact-transcript",
+    "npm:pi-antigravity"
   ],
   "extensions": [
     "extensions/agent-title.ts",
@@ -59,7 +61,7 @@
     "extensions/powerline-footer.ts",
     "extensions/todo-reminders.ts"
   ],
-  "lastChangelogVersion": "0.85.0",
+  "lastChangelogVersion": "0.85.1",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "compaction": {
@@ -73,8 +75,8 @@
     "summaryModel": "openai-codex/gpt-5.6-luna",
     "segmentationModel": "openai-codex/gpt-5.6-luna",
     "verificationModel": "openai-codex/gpt-5.6-luna",
-    "summaryThinkingLevel": "medium",
-    "segmentationThinkingLevel": "medium",
+    "summaryThinkingLevel": "high",
+    "segmentationThinkingLevel": "high",
     "autoTrigger": true,
     "autoTriggerStrategy": "settled",
     "minContextPercent": 80,
@@ -105,5 +107,6 @@
     "autoTitle": {
       "enable": true
     }
-  }
+  },
+  "outputPad": 0
 }
