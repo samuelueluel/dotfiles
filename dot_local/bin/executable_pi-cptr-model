@@ -150,7 +150,7 @@ use_model() {
 
   if [[ "$model" == local/* ]]; then
     command -v lem-load-model >/dev/null 2>&1 || die "lem-load-model is required for local models"
-    if [[ "${model#local/}" == Qwen3.8-* ]]; then
+    if [[ "${model#local/}" == Qwen3.8-* || "${model#local/}" == UD-Q4_K_XL || "${model#local/}" == UD-IQ4_XS ]]; then
       thinking_file=$(mktemp "$WORKSPACE/.cptr/.thinking.XXXXXX")
       rm -f "$thinking_file"
       if ! PI_CPTR_THINKING_LEVEL_FILE="$thinking_file" \

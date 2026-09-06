@@ -123,10 +123,10 @@ case "$id" in
       f16) args+=" -ctk f16 -ctv f16" ;;
     esac
     ;;
-  UD-Q4_K_XL|Qwen3.8-Flash-Next-*)
+  UD-Q4_K_XL|UD-IQ4_XS|Qwen3.8-Flash-Next-*)
     # Qwen3.8-Flash-Next is a qwen4exp model with a very large PLE tensor.
-    # The extra-model registry attaches mmproj-F16.gguf; keep the model on
-    # Nathan's Vulkan path and preserve mmap-backed lazy loading.
+    # The extra-model registry attaches mmproj-F16.gguf; use the current
+    # Vulkan path by default and preserve mmap-backed loading.
     fixed_parallel=1
     pi_thinking_level="max"
     args+=" --force-vulkan --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
@@ -290,6 +290,56 @@ case "$id" in
     die "unsupported local model: $id"
     ;;
 esac
+
+# The standard Qwen3.8 Q4/Q6 models can be compared across the current
+# engines and the halo-box builds. ROCmFP4 remains pinned to Laurent because
+# its quantization/layout is not assumed to work in the new fork.
+if [[ "$id" == Qwen3.8-* || "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS ]] && [[ "$id" != *ROCmFP4* ]]; then
+  halo_backend="${LEM_HALO_BACKEND:-}"
+  if [[ -z "$halo_backend" ]]; then
+    halo_backend=$(gum choose --header "Qwen3.8 backend" \
+      --selected "current     existing Nathan/Laurent path" \
+      "current     existing Nathan/Laurent path" \
+      "halo-vulkan halo-box Vulkan/RADV" \
+      "halo-rocm   halo-box ROCm/HIP") || exit 1
+    halo_backend="${halo_backend%%[ ]*}"
+  fi
+  case "$halo_backend" in
+    current|default) ;;
+    halo-vulkan) args+=" --force-halo-vulkan" ;;
+    halo-rocm) args+=" --force-halo-rocm" ;;
+    *) die "unsupported LEM_HALO_BACKEND: $halo_backend (use current, halo-vulkan, or halo-rocm)" ;;
+  esac
+
+  # The halo fork exposes the Qwen3.8 Flash PLE as --ngram-on-disk rather
+  # than Nathan's --tensor-read-lazy option. It is backend-independent.
+  if [[ "$halo_backend" == halo-vulkan || "$halo_backend" == halo-rocm ]] && \
+     [[ "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS || "$id" == Qwen3.8-Flash-Next-* ]]; then
+    args+=" --ngram-on-disk"
+  fi
+
+  # Optional runtime profiles expose fork-specific environment switches without
+  # allowing arbitrary process arguments through the Lemonade API.
+  halo_profile="${LEM_HALO_PROFILE:-default}"
+  case "$halo_profile" in
+    default) ;;
+    vk-perf|vk-no-split)
+      [[ "$halo_backend" == halo-vulkan ]] || die "$halo_profile requires LEM_HALO_BACKEND=halo-vulkan"
+      [[ "$halo_profile" == vk-perf ]] && args+=" --halo-env GGML_VK_PERF_LOGGER=1"
+      [[ "$halo_profile" == vk-no-split ]] && args+=" --halo-env GGML_VK_MMV_NO_SPLIT=1"
+      ;;
+    rocm-blocking|rocm-async)
+      [[ "$halo_backend" == halo-rocm ]] || die "$halo_profile requires LEM_HALO_BACKEND=halo-rocm"
+      [[ "$halo_profile" == rocm-blocking ]] && args+=" --halo-env HIP_LAUNCH_BLOCKING=1"
+      [[ "$halo_profile" == rocm-async ]] && args+=" --halo-env HIP_LAUNCH_BLOCKING=0"
+      ;;
+    reasoning-budget-4k|reasoning-budget-8k)
+      [[ "$halo_backend" == halo-vulkan || "$halo_backend" == halo-rocm ]] || die "$halo_profile requires a Halo backend"
+      args+=" --reasoning-budget-enable --reasoning-budget $([[ "$halo_profile" == reasoning-budget-4k ]] && printf 4096 || printf 8192)"
+      ;;
+    *) die "unsupported LEM_HALO_PROFILE: $halo_profile (use default, vk-perf, vk-no-split, rocm-blocking, rocm-async, reasoning-budget-4k, or reasoning-budget-8k)" ;;
+  esac
+fi
 
 if (( fixed_parallel )); then
   args+=" --parallel 1"

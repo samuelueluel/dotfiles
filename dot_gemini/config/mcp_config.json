@@ -1,19 +1,30 @@
 {
   "mcpServers": {
-    "mcp-stata": {
+    "dropbox": {
+      "args": [
+        "--from",
+        "git+https://github.com/neverprepared/mcp-dropbox@9a98b4f7de235970cfc3b0452b4d6f8b45af9aa3",
+        "--with",
+        "mcp\u003c2.0.0",
+        "mcp-dropbox"
+      ],
       "command": "uvx",
+      "disabled": false
+    },
+    "mcp-stata": {
       "args": [
         "--with",
-        "mcp<2",
+        "mcp\u003c2",
         "mcp-stata"
       ],
+      "command": "uvx",
+      "disabled": true,
       "env": {
-        "STATA_PATH": "/usr/local/stata19/stata-mp",
-        "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"
+        "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact",
+        "STATA_PATH": "/usr/local/stata19/stata-mp"
       }
     },
     "turbovault": {
-      "command": "turbovault",
       "args": [
         "--vault",
         "/var/home/samuel/Dropbox/Sam-Obsidian-Vault",
@@ -21,7 +32,12 @@
         "/var/home/samuel/.config/turbovault/config.yaml",
         "--profile",
         "production"
-      ]
+      ],
+      "command": "turbovault"
+    },
+    "zotero": {
+      "disabled": false,
+      "serverUrl": "http://127.0.0.1:13308/mcp"
     }
   }
 }

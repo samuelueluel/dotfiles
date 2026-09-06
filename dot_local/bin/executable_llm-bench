@@ -397,7 +397,7 @@ def has_flag(tokens: list[str], name: str) -> bool:
 
 def model_is_qwen38(model_id: str, original_args: str) -> bool:
     low = f"{model_id} {original_args}".lower()
-    return "qwen3.8" in low or "qwen3-8" in low or model_id.lower() == "ud-q4_k_xl"
+    return "qwen3.8" in low or "qwen3-8" in low or model_id.lower() in {"ud-q4_k_xl", "ud-iq4_xs"}
 
 
 def model_is_draft_only(model: dict[str, Any]) -> bool:
@@ -434,6 +434,11 @@ SPEC_FLAG_NAMES = {
 # not carry the external MTP sidecar by default.
 EXTERNAL_MTP_PROFILES: dict[str, dict[str, Any]] = {
     "UD-Q4_K_XL": {
+        "draft_model": "/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf",
+        "n_max": 3,
+        "p_min": 0.75,
+    },
+    "UD-IQ4_XS": {
         "draft_model": "/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf",
         "n_max": 3,
         "p_min": 0.75,
@@ -611,6 +616,10 @@ def summarize_spec(tokens: list[str]) -> str:
 
 def infer_engine(tokens: list[str], backend: str) -> str:
     """Name the actual dispatch path, not just Lemonade's generic recipe."""
+    if has_flag(tokens, "--force-halo-vulkan"):
+        return "Halo Vulkan"
+    if has_flag(tokens, "--force-halo-rocm"):
+        return "Halo ROCm/HIP"
     if has_flag(tokens, "--force-rocm"):
         return "Gaetan ROCm/HIP"
     if has_flag(tokens, "--force-laurent"):
@@ -1470,11 +1479,81 @@ def collect_report_environment() -> dict[str, str]:
 
 def engine_binary_path(engine: str) -> str:
     low = engine.lower()
+    if "halo" in low and "vulkan" in low:
+        return "/opt/lemonade/llama/halo-vulkan/bin/llama-server-real"
+    if "halo" in low and "rocm" in low:
+        return "/opt/lemonade/llama/halo-rocm/llama-server"
     if "laurent" in low:
         return "/opt/lemonade/llama/vulkan-laurent/bin/llama-server"
     if "rocm" in low:
         return "/opt/lemonade/llama/rocm/llama-server"
     return "/opt/lemonade/llama/vulkan/bin/llama-server-real"
+
+
+def expected_runtime_paths(engine: str) -> tuple[str, ...]:
+    low = engine.lower()
+    if "halo" in low and "vulkan" in low:
+        return ("/opt/lemonade/llama/halo-vulkan/bin/llama-server-real",)
+    if "halo" in low and "rocm" in low:
+        return (
+            "/opt/lemonade/llama/halo-rocm/llama-server",
+            "/opt/lemonade/llama/halo-rocm/ld-linux-x86-64.so.2",
+        )
+    if "laurent" in low:
+        return ("/opt/lemonade/llama/vulkan-laurent/bin/llama-server",)
+    if "rocm" in low:
+        return ("/opt/lemonade/llama/rocm/llama-server",)
+    return ("/opt/lemonade/llama/vulkan/bin/llama-server-real",)
+
+
+def expected_runtime_marker(engine: str) -> str:
+    low = engine.lower()
+    if "halo" in low and "vulkan" in low:
+        return "halo-vulkan"
+    if "halo" in low and "rocm" in low:
+        return "halo-rocm"
+    if "laurent" in low:
+        return "laurent"
+    if "rocm" in low:
+        return "gaetan"
+    return "nathan"
+
+
+def detect_runtime_identity() -> dict[str, str]:
+    script = (
+        "for p in $(ps -eo pid=); do "
+        "marker=$(tr '\\0' '\\n' < /proc/$p/environ 2>/dev/null | sed -n 's/^TURQUOISE_LLM_ENGINE=//p'); "
+        "case \"$marker\" in nathan|laurent|gaetan|halo-vulkan|halo-rocm) "
+        "exe=$(readlink -f /proc/$p/exe 2>/dev/null || true); "
+        "sha=$(sha256sum \"$exe\" 2>/dev/null | awk '{print $1}'); "
+        "printf '%s\\t%s\\t%s\\t%s\\n' \"$p\" \"$exe\" \"$sha\" \"$marker\";; esac; "
+        "done"
+    )
+    raw = command_output("podman", "exec", "lemonade", "sh", "-lc", script, timeout=8.0)
+    for line in raw.splitlines():
+        parts = line.split("\t", 3)
+        if len(parts) == 4 and parts[0].isdigit() and parts[1]:
+            return {"pid": parts[0], "exe": parts[1], "sha256": parts[2], "marker": parts[3]}
+    return {}
+
+
+def verify_runtime_engine(engine: str) -> dict[str, str]:
+    identity = detect_runtime_identity()
+    if not identity:
+        raise BenchmarkError(f"{engine}: could not identify the live llama-server executable")
+    expected_paths = expected_runtime_paths(engine)
+    if identity["exe"] not in expected_paths:
+        raise BenchmarkError(
+            f"{engine}: runtime executable mismatch; expected one of {', '.join(expected_paths)}, "
+            f"got {identity['exe']} (PID {identity['pid']}); refusing to benchmark"
+        )
+    expected_marker = expected_runtime_marker(engine)
+    if identity.get("marker") != expected_marker:
+        raise BenchmarkError(
+            f"{engine}: runtime marker mismatch; expected TURQUOISE_LLM_ENGINE={expected_marker}, "
+            f"got {identity.get('marker') or '<missing>'}; refusing to benchmark"
+        )
+    return identity
 
 
 def detect_engine_build(engine: str) -> str:
@@ -1490,6 +1569,10 @@ def build_description(engine: str) -> str:
     if override:
         return override
     low = engine.lower()
+    if "halo" in low and "vulkan" in low:
+        return "halo-box/strix-llama.cpp; CMake: -DGGML_VULKAN=ON -DGGML_NATIVE=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release"
+    if "halo" in low and "rocm" in low:
+        return "halo-box/strix-llama.cpp; CMake: -DGGML_HIP=ON -DGGML_NATIVE=ON -DAMDGPU_TARGETS=gfx1151 -DGGML_HIP_GRAPHS=ON -DGGML_HIP_MMQ_MFMA=ON -DGGML_HIP_NO_VMM=ON -DGGML_HIP_RCCL=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release"
     if "nathan" in low:
         return "Nathanw1014/llama.cpp branch strix-halo-vulkan; CMake: -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release; targets llama-server llama-cli llama-bench"
     if "laurent" in low:
@@ -1502,7 +1585,7 @@ def build_description(engine: str) -> str:
 def infer_quant(model_id: str, checkpoint: str | None) -> str:
     text = f"{model_id} {checkpoint or ''}"
     patterns = (
-        "UD-Q2_K_XL", "UD-Q3_K_XL", "UD-Q4_K_XL", "UD-Q5_K_XL", "UD-Q6_K_XL", "UD-Q8_K_XL",
+        "UD-Q2_K_XL", "UD-Q3_K_XL", "UD-Q4_K_XL", "UD-IQ4_XS", "UD-Q5_K_XL", "UD-Q6_K_XL", "UD-Q8_K_XL",
         "Q2_K_XL", "Q4_K_M", "Q4_K_S", "Q4_0", "Q5_K_M", "Q6_K", "Q8_0", "IQ2_XXS", "IQ3_XXS",
     )
     for pattern in patterns:
@@ -1514,9 +1597,16 @@ def infer_quant(model_id: str, checkpoint: str | None) -> str:
 
 def backend_description(model: dict[str, Any], environment: dict[str, str]) -> str:
     engine = str(model.get("engine") or model.get("backend") or "unknown")
-    if "rocm" in engine.lower():
-        hip_blocking = os.environ.get("HIP_LAUNCH_BLOCKING", "0")
-        return f"ROCm {os.environ.get('LLM_BENCH_ROCM_VERSION', 'not detected')}, HIP_LAUNCH_BLOCKING={hip_blocking} (engine: {engine})"
+    low = engine.lower()
+    if "rocm" in low:
+        if "halo" in low:
+            benchmark_args = str(model.get("benchmark_args") or "")
+            match = re.search(r"--halo-env(?:=|\s+)HIP_LAUNCH_BLOCKING=([01])", benchmark_args)
+            hip_blocking = match.group(1) if match else "1"
+        else:
+            hip_blocking = os.environ.get("HIP_LAUNCH_BLOCKING", "0")
+        rocm_version = environment.get("rocm_version") or os.environ.get("LLM_BENCH_ROCM_VERSION", "not detected")
+        return f"ROCm {rocm_version}, HIP_LAUNCH_BLOCKING={hip_blocking} (engine: {engine})"
     return f"Vulkan RADV, Mesa {environment.get('mesa_version', 'not detected')} (engine: {engine})"
 
 
@@ -1557,12 +1647,15 @@ def render_markdown(run: dict[str, Any]) -> str:
         model_heading = f"#### `{model['model_id']}`"
         if single_task:
             model_heading += f" · {task_labels[0]}"
+        runtime_identity = model.get("runtime_identity") or {}
         lines.extend(
             [
                 model_heading,
                 "",
                 f"- Model: `{model.get('model_reference') or model['model_id']}` · quant `{model.get('quant') or 'not recorded'}`",
                 f"- Runtime: engine `{model.get('engine') or model.get('backend') or 'unknown'}` · backend `{backend_description(model, environment)}` · build `{model.get('engine_build') or 'not detected'}`",
+                f"- Runtime executable: `{runtime_identity.get('exe') or 'not verified'}` · SHA-256 `{runtime_identity.get('sha256') or 'not recorded'}` · PID `{runtime_identity.get('pid') or 'not recorded'}` · marker `{runtime_identity.get('marker') or 'not recorded'}`",
+                f"- Runtime note: `{model.get('runtime_note') or 'verified live executable after load'}`",
                 f"- Speculation: `{model.get('spec_summary') or 'unknown'}`",
                 f"- KV cache: `{model.get('kv_summary') or 'unknown'}` · options `{model.get('options_source') or 'unknown'}`",
                 f"- Flags: `{model.get('benchmark_args') or 'not recorded'}`",
@@ -2016,6 +2109,7 @@ def main() -> int:
                 model["merge_args"],
                 args.load_timeout,
             )
+            model["runtime_identity"] = verify_runtime_engine(model["engine"])
             actual_options = loaded.get("recipe_options") if isinstance(loaded.get("recipe_options"), dict) else {}
             model["loaded_health"] = {
                 "model_name": loaded.get("model_name"),

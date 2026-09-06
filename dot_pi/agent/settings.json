@@ -48,7 +48,8 @@
       "source": "npm:@kennyfrc/pi-system-reminders@0.2.0",
       "extensions": []
     },
-    "npm:@juicesharp/rpiv-advisor@2.8.0"
+    "npm:@juicesharp/rpiv-advisor@2.8.0",
+    "npm:pi-smart-compact"
   ],
   "extensions": [
     "extensions/agent-title.ts",
@@ -58,13 +59,32 @@
     "extensions/powerline-footer.ts",
     "extensions/todo-reminders.ts"
   ],
-  "lastChangelogVersion": "0.84.4",
+  "lastChangelogVersion": "0.85.0",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,
-    "keepRecentTokens": 40000
+    "keepRecentTokens": 20000
+  },
+  "smartCompact": {
+    "mode": "auto",
+    "profile": "balanced",
+    "summaryModel": "openai-codex/gpt-5.6-luna",
+    "segmentationModel": "openai-codex/gpt-5.6-luna",
+    "verificationModel": "openai-codex/gpt-5.6-luna",
+    "summaryThinkingLevel": "medium",
+    "segmentationThinkingLevel": "medium",
+    "autoTrigger": true,
+    "autoTriggerStrategy": "settled",
+    "minContextPercent": 80,
+    "requireApproval": false,
+    "zeroCallEnabled": true,
+    "backupEnabled": true,
+    "scrubSecrets": true,
+    "agentToolAccess": "disabled",
+    "contextGraphEnabled": false,
+    "showStatus": false
   },
   "sessions": {
     "messaging": {

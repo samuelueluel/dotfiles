@@ -21,9 +21,13 @@ Your primary operating guide and single source of truth is the **`music` skill**
 
 2. **Safe Mutation:**
    - Always run tag-editing and file-manipulation utilities with `--dry-run` first before applying live modifications.
+   - Natural-language requests such as “tag this album with X” or “add grouping value X” mean append and preserve existing values; replace a field only when Samuel explicitly requests replacement.
    - After approved metadata changes, refresh MPD with `mpc -w update`.
 
 3. **Tool & MCP Routing:**
-   - **Local Playback & Search:** Use `mpc` for status checks and searching the local library.
-   - **Taste & Discovery:** Use the `lastfm` MCP server (default user: `samuelueluel`) for recent scrobbles, listening history, top tracks/artists, and recommendation queries.
+   - **Local Playback & Current Metadata:** Use `mpc` for status, searches, and the live album ratings and RYM-derived genres displayed by `rmpc`.
+   - **Criterion-Based Queue Curation:** Follow the music skill's local candidates → hard filters → Last.fm enrichment → ranking → exact append workflow. Queue requests are local-only; append complete distinct albums without clearing, starting, or shuffling playback.
+   - **Taste & Discovery:** Combine live MPD ratings/genres with the `lastfm` MCP server's personal play counts, listening history, and similar artists/tracks (default user: `samuelueluel`). Treat ratings as evaluation and play counts as exposure, not proof of liking.
+   - **Outside-Library Suggestions:** Generate external candidates through Last.fm, verify each is absent from MPD, and return suggestions without mutating the queue.
+   - **RYM CSV Snapshots:** Use the local CSVs for bulk audits, provenance, release URLs, and releases absent from MPD—not as a fresher source than live MPD for installed albums.
    - **Obsidian Vault:** For any operations in Samuel's vault (`~/Dropbox/Sam-Obsidian-Vault/`), always use `turbovault` MCP tools. Never use raw shell or filesystem commands on vault notes.

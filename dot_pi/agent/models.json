@@ -9,7 +9,7 @@
           "id": "anthropic/claude-opus-5",
           "name": "Anthropic: Claude Opus 5",
           "reasoning": true,
-          "contextWindow": 1000000,
+          "contextWindow": 320000,
           "maxTokens": 128000,
           "compat": {
             "thinkingFormat": "openrouter",
@@ -27,7 +27,7 @@
           "id": "anthropic/claude-sonnet-5",
           "name": "Anthropic: Claude Sonnet 5",
           "reasoning": true,
-          "contextWindow": 1000000,
+          "contextWindow": 320000,
           "maxTokens": 128000,
           "compat": {
             "thinkingFormat": "openrouter",
@@ -45,7 +45,7 @@
           "id": "deepseek/deepseek-v4-flash-0731",
           "name": "DeepSeek V4 Flash (US)",
           "reasoning": true,
-          "contextWindow": 1048576,
+          "contextWindow": 320000,
           "maxTokens": 131072,
           "samplingParams": {
             "temperature": 1.0,
@@ -71,7 +71,7 @@
           "id": "google/gemini-3.7-flash",
           "name": "Google: Gemini 3.7 Flash",
           "reasoning": true,
-          "contextWindow": 1048576,
+          "contextWindow": 320000,
           "maxTokens": 65536,
           "compat": {
             "thinkingFormat": "openrouter"
@@ -89,7 +89,7 @@
           "id": "moonshotai/kimi-k3",
           "name": "Moonshot AI: Kimi K3",
           "reasoning": true,
-          "contextWindow": 1000000,
+          "contextWindow": 320000,
           "maxTokens": 128000,
           "compat": {
             "supportsDeveloperRole": false,
@@ -107,7 +107,7 @@
           "id": "openai/gpt-5.6-luna-pro",
           "name": "OpenAI: GPT-5.6 Luna Pro",
           "reasoning": true,
-          "contextWindow": 1050000,
+          "contextWindow": 320000,
           "maxTokens": 128000,
           "compat": {
             "supportsDeveloperRole": true,
@@ -125,7 +125,79 @@
           "id": "z-ai/glm-5.3-flash",
           "name": "Z.ai: GLM 5.3 Flash (US)",
           "reasoning": true,
-          "contextWindow": 1048576,
+          "contextWindow": 320000,
+          "maxTokens": 131072,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "openrouter"
+          },
+          "thinkingLevelMap": {
+            "low": "low",
+            "high": "high",
+            "max": "max"
+          }
+        },
+        {
+          "id": "meta/muse-spark-1.3-contributor",
+          "name": "Meta: Muse Spark 1.3 Contributor",
+          "reasoning": true,
+          "contextWindow": 320000,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "openrouter"
+          },
+          "thinkingLevelMap": {
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": "xhigh",
+            "xhigh": "xhigh"
+          }
+        }
+      ]
+    },
+    "openrouter-ds": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "api": "openai-completions",
+      "apiKey": "$OPENROUTER_API_KEY_DS",
+      "models": [
+        {
+          "id": "deepseek/deepseek-v4-flash-0731",
+          "name": "DeepSeek V4 Flash (CN)",
+          "reasoning": true,
+          "contextWindow": 320000,
+          "maxTokens": 131072,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0,
+            "presence_penalty": 0.0
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "openrouter",
+            "requiresReasoningContentOnAssistantMessages": true
+          },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": "xhigh"
+          }
+        },
+        {
+          "id": "z-ai/glm-5.3-flash",
+          "name": "Z.ai: GLM 5.3 Flash (CN)",
+          "reasoning": true,
+          "contextWindow": 320000,
           "maxTokens": 131072,
           "samplingParams": {
             "temperature": 1.0,
@@ -143,14 +215,176 @@
         }
       ]
     },
-    "openrouter-ds": {
+    "openrouter-us-max": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "api": "openai-completions",
+      "apiKey": "$OPENROUTER_API_KEY_US",
+      "models": [
+        {
+          "id": "anthropic/claude-opus-5",
+          "name": "Anthropic: Claude Opus 5 (Max Context)",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "compat": {
+            "thinkingFormat": "openrouter",
+            "cacheControlFormat": "anthropic"
+          },
+          "thinkingLevelMap": {
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": "max",
+            "xhigh": "xhigh"
+          }
+        },
+        {
+          "id": "anthropic/claude-sonnet-5",
+          "name": "Anthropic: Claude Sonnet 5 (Max Context)",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "compat": {
+            "thinkingFormat": "openrouter",
+            "cacheControlFormat": "anthropic"
+          },
+          "thinkingLevelMap": {
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": "max",
+            "xhigh": "xhigh"
+          }
+        },
+        {
+          "id": "deepseek/deepseek-v4-flash-0731",
+          "name": "DeepSeek V4 Flash (US / Max Context)",
+          "reasoning": true,
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0,
+            "presence_penalty": 0.0
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "openrouter",
+            "requiresReasoningContentOnAssistantMessages": true
+          },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": "xhigh"
+          }
+        },
+        {
+          "id": "google/gemini-3.7-flash",
+          "name": "Google: Gemini 3.7 Flash (Max Context)",
+          "reasoning": true,
+          "contextWindow": 1048576,
+          "maxTokens": 65536,
+          "compat": {
+            "thinkingFormat": "openrouter"
+          },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": null,
+            "xhigh": null
+          }
+        },
+        {
+          "id": "moonshotai/kimi-k3",
+          "name": "Moonshot AI: Kimi K3 (Max Context)",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "openrouter"
+          },
+          "thinkingLevelMap": {
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": "max",
+            "xhigh": "xhigh"
+          }
+        },
+        {
+          "id": "openai/gpt-5.6-luna-pro",
+          "name": "OpenAI: GPT-5.6 Luna Pro (Max Context)",
+          "reasoning": true,
+          "contextWindow": 1050000,
+          "maxTokens": 128000,
+          "compat": {
+            "supportsDeveloperRole": true,
+            "thinkingFormat": "openrouter"
+          },
+          "thinkingLevelMap": {
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": "max",
+            "xhigh": "xhigh"
+          }
+        },
+        {
+          "id": "z-ai/glm-5.3-flash",
+          "name": "Z.ai: GLM 5.3 Flash (US / Max Context)",
+          "reasoning": true,
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "openrouter"
+          },
+          "thinkingLevelMap": {
+            "low": "low",
+            "high": "high",
+            "max": "max"
+          }
+        },
+        {
+          "id": "meta/muse-spark-1.3-contributor",
+          "name": "Meta: Muse Spark 1.3 Contributor (Max Context)",
+          "reasoning": true,
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "openrouter"
+          },
+          "thinkingLevelMap": {
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": "xhigh",
+            "xhigh": "xhigh"
+          }
+        }
+      ]
+    },
+    "openrouter-ds-max": {
       "baseUrl": "https://openrouter.ai/api/v1",
       "api": "openai-completions",
       "apiKey": "$OPENROUTER_API_KEY_DS",
       "models": [
         {
           "id": "deepseek/deepseek-v4-flash-0731",
-          "name": "DeepSeek V4 Flash (CN)",
+          "name": "DeepSeek V4 Flash (CN / Max Context)",
           "reasoning": true,
           "contextWindow": 1048576,
           "maxTokens": 131072,
@@ -176,7 +410,7 @@
         },
         {
           "id": "z-ai/glm-5.3-flash",
-          "name": "Z.ai: GLM 5.3 Flash (CN)",
+          "name": "Z.ai: GLM 5.3 Flash (CN / Max Context)",
           "reasoning": true,
           "contextWindow": 1048576,
           "maxTokens": 131072,
@@ -269,6 +503,13 @@
           "maxTokens": 131072
         },
         {
+          "id": "UD-IQ4_XS",
+          "name": "Qwen3.8 Flash Next | IQ4_XS",
+          "reasoning": true,
+          "contextWindow": 262144,
+          "maxTokens": 131072
+        },
+        {
           "id": "Qwen3.8-Flash-Next-ROCmFP4",
           "name": "Qwen3.8 Flash Next | ROCmFP4",
           "reasoning": true,
@@ -301,6 +542,111 @@
               }
             ]
           },
+          "contextWindow": 320000,
+          "maxTokens": 128000,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": "low"
+          },
+          "compat": {
+            "supportsOpenAIGrammarTools": true,
+            "supportsAdditionalTools": true,
+            "supportsToolSearch": true
+          }
+        },
+        {
+          "id": "gpt-5.6-sol-max",
+          "name": "GPT-5.6 Sol (Max Context)",
+          "api": "openai-codex-responses",
+          "baseUrl": "https://chatgpt.com/backend-api",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {
+            "input": 5,
+            "output": 30,
+            "cacheRead": 0.5,
+            "cacheWrite": 6.25,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 10,
+                "output": 45,
+                "cacheRead": 1,
+                "cacheWrite": 12.5
+              }
+            ]
+          },
+          "contextWindow": 1050000,
+          "maxTokens": 128000,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": "low"
+          },
+          "compat": {
+            "supportsOpenAIGrammarTools": true,
+            "supportsAdditionalTools": true,
+            "supportsToolSearch": true
+          }
+        },
+        {
+          "id": "gpt-5.6-luna-max",
+          "name": "GPT-5.6 Luna (Max Context)",
+          "api": "openai-codex-responses",
+          "baseUrl": "https://chatgpt.com/backend-api",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {
+            "input": 0.2,
+            "output": 1.2,
+            "cacheRead": 0.02,
+            "cacheWrite": 0.25,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 0.4,
+                "output": 1.8,
+                "cacheRead": 0.04,
+                "cacheWrite": 0.5
+              }
+            ]
+          },
+          "contextWindow": 1050000,
+          "maxTokens": 128000,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": "low"
+          },
+          "compat": {
+            "supportsOpenAIGrammarTools": true,
+            "supportsAdditionalTools": true,
+            "supportsToolSearch": true
+          }
+        },
+        {
+          "id": "gpt-5.6-terra-max",
+          "name": "GPT-5.6 Terra (Max Context)",
+          "api": "openai-codex-responses",
+          "baseUrl": "https://chatgpt.com/backend-api",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {
+            "input": 2,
+            "output": 12,
+            "cacheRead": 0.2,
+            "cacheWrite": 2.5,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 4,
+                "output": 18,
+                "cacheRead": 0.4,
+                "cacheWrite": 5
+              }
+            ]
+          },
           "contextWindow": 1050000,
           "maxTokens": 128000,
           "thinkingLevelMap": {
@@ -317,22 +663,22 @@
       ],
       "modelOverrides": {
         "gpt-5.4": {
-          "contextWindow": 1050000
+          "contextWindow": 320000
         },
         "gpt-5.4-mini": {
-          "contextWindow": 1050000
+          "contextWindow": 320000
         },
         "gpt-5.5": {
-          "contextWindow": 1050000
+          "contextWindow": 320000
         },
         "gpt-5.6-luna": {
-          "contextWindow": 1050000
+          "contextWindow": 320000
         },
         "gpt-5.6-sol": {
-          "contextWindow": 1050000
+          "contextWindow": 320000
         },
         "gpt-5.6-terra": {
-          "contextWindow": 1050000
+          "contextWindow": 320000
         }
       }
     }

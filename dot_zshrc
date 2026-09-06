@@ -598,12 +598,12 @@ pi-safe-stata-2() {
 #
 # pihat / betahat write a state file to ~/.pi/running/ for status monitoring.
 
-# Helper: populate global _PI_SKILL_ARGS with --no-skills + --skill for all skills except stata*.
-# Also skips agy-only skills (auto, mode, manual) so they never load into pi.
+# Helper: populate global _PI_SKILL_ARGS with --no-skills + --skill for all skills except stata* and music.
+# Also skips agy-only skills (auto, mode, manual) so they never load into pi/pihat.
 _pi_nonstata_skills() {
   typeset -ga _PI_SKILL_ARGS
   _PI_SKILL_ARGS=("--no-skills")
-  local -a _pi_skip=(auto mode manual)
+  local -a _pi_skip=(auto mode manual music)
   local s
   for s in ~/.agents/skills/*; do
     [[ -d "$s" ]] || continue
@@ -910,11 +910,10 @@ _lem_preload() {
   command lem-load-model "$@"
 }
 
-# The subagents extension applies maxConcurrent from ~/.pi/agent/subagents.json
-# at session start and never reads PI_SUBAGENTS_MAX_CONCURRENT, so launchers
-# write the file (single key; all other keys preserved) AND export the var.
-# Concurrent sessions snapshot at their own startup, so last-launch-wins only
-# affects sessions started afterward.
+# The subagents extension reads PI_SUBAGENTS_MAX_CONCURRENT at session start
+# and uses it to override the fallback in ~/.pi/agent/subagents.json for that
+# process. Launchers export the value without rewriting shared configuration,
+# so concurrent local and cloud sessions retain independent startup snapshots.
 _pi_subagent_concurrency() {
   export PI_SUBAGENTS_MAX_CONCURRENT="$1"
 }

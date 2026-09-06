@@ -534,7 +534,7 @@ binds {
     MouseBack hotkey-overlay-title="Focus previous window" { focus-window-previous; }
     Mod+Space hotkey-overlay-title="Television Hub" repeat=false { spawn "kitty" "--config" "{{ .chezmoi.homeDir }}/.config/kitty/launcher.conf" "--class" "kitty-launcher" "--title" "TV Hub" "-e" "sh" "-c" "sleep 0.1 && exec /home/linuxbrew/.linuxbrew/bin/tv 'Television Hub'"; }
     //Mod+Ctrl+Space hotkey-overlay-title="Launcher (rofi)" repeat=false { spawn "rofi" "-show" "drun"; }
-    Mod+B hotkey-overlay-title="Toggle bar visibility" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "bar" "toggle"; }
+    // Mod+B hotkey-overlay-title="Toggle bar visibility" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "bar" "toggle"; }
     // Mod+Y hotkey-overlay-title="Toggle notification center" { spawn "qs" "ipc" "call" "notifications" "toggle"; }
     // Mod+X hotkey-overlay-title="Clear all notifications" { spawn "qs" "ipc" "call" "notifications" "clear"; }
     Mod+Ctrl+Space repeat=false { toggle-overview; }
@@ -601,8 +601,8 @@ binds {
 
     //Mod+I hotkey-overlay-title="Toggle focus mode (wallpaper + centering + opacity)" repeat=false { spawn "niri-mode-toggle"; }
     // NOTE: niri-tile-toggle script is fragile — it hardcodes gap/border values. Update the script if gaps or borders change in this config.
-    Mod+I hotkey-overlay-title="Toggle tile-scroll mode (50% columns)" repeat=false { spawn "niri-tile-toggle"; }
-    Mod+Ctrl+I hotkey-overlay-title="Resize right column to complement of focused" repeat=false { spawn "niri-complement-column"; }
+    Mod+C hotkey-overlay-title="Toggle tile-scroll mode (50% columns)" repeat=false { spawn "niri-tile-toggle"; }
+    Mod+Ctrl+C hotkey-overlay-title="Resize neighbor column to complement of focused" repeat=false { spawn "niri-complement-column"; }
 
     Mod+Tab hotkey-overlay-title="Focus previous window" { focus-window-previous; }
 
@@ -626,6 +626,9 @@ binds {
 
     Mod+Minus      { set-column-width "-5%"; }
     Mod+Equal      { set-column-width "+5%"; }
+
+    Mod+Shift+Minus hotkey-overlay-title="Paired split: shrink focused / grow neighbor" { spawn "niri-complement-column" "-5%"; }
+    Mod+Shift+Equal hotkey-overlay-title="Paired split: grow focused / shrink neighbor" { spawn "niri-complement-column" "+5%"; }
 
     Mod+Ctrl+Minus { set-window-height "-5%"; }
     Mod+Ctrl+Equal { set-window-height "+5%"; }

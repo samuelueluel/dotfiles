@@ -27,6 +27,20 @@ When normalized, grouping values are deduplicated and ordered as follows:
 3. `Unrated` → `Overrated` → `Underrated` → `<500 ratings` → `FL` → `Wall`
 4. Custom/other values (alphabetical)
 
+## Natural-Language Album Rating Comparisons
+
+Interpret bare album-rating language against the live MPD `grouping` rating set, not the RYM CSV snapshot:
+
+| Request | Matching grouping ratings |
+|---|---|
+| less than / under 4 | `R: 3.5`, `R: 3`, `R: 2.5` |
+| 4 or less / at most 4 | `R: 4`, `R: 3.5`, `R: 3`, `R: 2.5` |
+| greater than / over 4 | `R: 4.5`, `R: 5` |
+| 4 or greater / at least 4 | `R: 4`, `R: 4.5`, `R: 5` |
+| between 3.5 and 4.5 | `R: 3.5`, `R: 4`, `R: 4.5` (inclusive unless Samuel says otherwise) |
+
+MPD returns tracks. For album-level questions, deduplicate matches by album artist plus album, adding date when needed to distinguish releases. Do not include `Unrated` or treat flags such as `Overrated` as numeric values unless Samuel explicitly requests them.
+
 ## MPD Search Forms
 
 ```bash
@@ -55,7 +69,10 @@ mpc search '((grouping == "[Priority]") AND (grouping == "Unrated"))'
 # Genre + Date prefix (dates are treated as strings)
 mpc search '((genre == "Art Rock") AND (date starts_with "199"))'
 
-# Regex match (PCRE)
+# Regex match (PCRE): less than R: 4
+mpc search '((grouping =~ "^R: (3[.]5|3|2[.]5)$"))'
+
+# Multiple constraints: highly rated and fewer than 500 RYM ratings
 mpc search '((grouping == "<500 ratings") AND (grouping =~ "^R: (4([.]5)?|5)$"))'
 
 # Negation
@@ -94,19 +111,19 @@ RateYourMusic (RYM) is Samuel's official gold-standard genre taxonomy across the
 2. **Multi-Value Tag Storage:**
    - Genres are written as discrete array items in `tag_utils.set_values(audio, 'genres', ['Genre 1', 'Genre 2'])`.
    - Flattened strings with embedded semicolons are not the target tag format.
-3. **Library Manifest:** `~/.config/music/library_rym_genres_manifest.csv` provides the verified mapping for the current library.
+3. **Live Installed-Library Genres:** Current canonical RYM-derived genre values are the live MPD `genre` tags displayed by `rmpc` and queried with `mpc`.
 
 ## RateYourMusic Datasets & References
 
-- **Library-Wide RYM Manifest:** `~/.config/music/library_rym_genres_manifest.csv` (current mappings to canonical RYM genres).
-- **Rated Collection:** `~/.config/music/rym_collection_genres.csv` (current rated releases with star ratings and URLs for taste grounding).
+- **Library-Wide RYM Manifest:** `~/.config/music/library_rym_genres_manifest.csv` supports bulk genre audits, mapping provenance, planned/current comparisons, and cross-checks. It is a snapshot; prefer live MPD genres for installed albums.
+- **Rated Collection:** `~/.config/music/rym_collection_genres.csv` supports collection-wide offline queries, RYM release URLs, and lookups for releases absent from MPD. Its ratings and genres are snapshots; prefer live MPD metadata for installed albums and current taste judgments.
 
 ### Quick Query Patterns
 
 ```python
 import csv
 
-# Query full library manifest for specific RYM genres
+# Query the manifest for a bulk audit or cross-check
 with open("/var/home/samuel/.config/music/library_rym_genres_manifest.csv") as f:
     manifest = list(csv.DictReader(f))
 
@@ -116,7 +133,7 @@ slowcore_albums = [
 ]
 ```
 
-### CLI One-Liner (Rated Release Query)
+### CLI One-Liner (Offline Rated-Collection Snapshot Query)
 ```bash
 python3 -c '
 import csv

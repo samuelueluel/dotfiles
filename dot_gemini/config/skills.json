@@ -1,0 +1,24 @@
+{
+  "entries": [
+    {
+      "path": "/var/home/samuel/.agents/skills",
+      "include_only": [
+        "^citation-integrity$",
+        "^document-analysis$",
+        "^grill-me$",
+        "^handoff$",
+        "^latex$",
+        "^multisource$",
+        "^music$",
+        "^obsidian$",
+        "^session-log$",
+        "^skill-creation$",
+        "^skill-update$",
+        "^small-talk$",
+        "^web-source-integrity$",
+        "^zotero$",
+        "^zotero-extract$"
+      ]
+    }
+  ]
+}
