@@ -1,6 +1,6 @@
 ---
 name: session-log
-description: Creates, searches, and reviews permanent local Pi session summaries, including bounded manual backlog processing. Use when asked to "log this", "what session did we", "find the session where", "where did we leave off", "catch up", "find unlogged sessions", or "backfill summaries".
+description: Automatically saves, searches, and reviews permanent local Pi session summaries for substantive sessions, with bounded manual backlog processing. Use when asked to "log this", "what session did we", "find the session where", "where did we leave off", "catch up", "find unlogged sessions", or "backfill summaries".
 ---
 
 # Session Summary Management
@@ -12,6 +12,12 @@ The canonical store is the permanent local index:
 ```
 
 It is keyed by the full Pi session UUID and is never automatically pruned. It powers Television previews and agent-facing session search. Do not treat the 30-day Obsidian logs as authoritative; routine session logging does not use TurboVault.
+
+## Automatic Session Logging
+
+The global `session-summary.ts` extension listens for Pi's `session_shutdown` event and writes one semantic summary for each substantive completed session. It runs when a session is quit, replaced, resumed, or forked, but not during `/reload`. It uses the active session model with low reasoning effort, bounds the transcript sent to the summarizer, validates the JSON result, and persists it through `piwork summary set`.
+
+The extension skips empty sessions, greetings, and context-only read-and-wait sessions. It bounds the transcript and redacts common credential patterns before sending content to the summarizer. A summary failure never blocks Pi shutdown; the session remains discoverable through `piwork summary backlog` for later recovery. Automatic summaries are written only to the local index, not to Obsidian.
 
 ## Intent Routing
 
