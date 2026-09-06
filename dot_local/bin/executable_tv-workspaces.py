@@ -160,10 +160,11 @@ def summary_display(record):
 
 def print_summary_sections(record):
     sections = (
-        ("Overview", "summary"),
-        ("What Changed", "what_changed"),
-        ("Where It Lives", "where_it_lives"),
-        ("Next Up", "next_up"),
+        ("Status", "status"),
+        ("Summary", "summary"),
+        ("Outcomes", "what_changed"),
+        ("Artifacts", "where_it_lives"),
+        ("Open Items", "next_up"),
     )
     for label, field in sections:
         value = record.get(field)

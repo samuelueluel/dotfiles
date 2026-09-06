@@ -21,11 +21,13 @@ FOLDERS_ROOT = os.path.expanduser("~/.pi/agent/folders")
 SESSIONS_ROOT = os.path.expanduser("~/.pi/agent/sessions")
 UNFILED_DIR = os.path.join(SESSIONS_ROOT, "--var-home-samuel--")
 SUMMARY_VERSION = 1
+SUMMARY_STATUS_VALUES = frozenset({"complete", "in_progress", "blocked", "exploratory"})
 
 _SEARCH_FIELDS = (
     "session_id",
     "title",
     "workspace",
+    "status",
     "summary",
     "what_changed",
     "where_it_lives",
@@ -132,6 +134,12 @@ def normalize_record(session_id: str, fields: dict[str, Any]) -> dict[str, Any]:
     ):
         if field in fields and fields[field] is not None:
             record[field] = _as_text(fields[field])
+    if "status" in fields and fields["status"] is not None:
+        status = _as_text(fields["status"]).casefold()
+        if status not in SUMMARY_STATUS_VALUES:
+            allowed = ", ".join(sorted(SUMMARY_STATUS_VALUES))
+            raise ValueError(f"status must be one of: {allowed}")
+        record["status"] = status
     if "keywords" in fields and fields["keywords"] is not None:
         record["keywords"] = _as_keywords(fields["keywords"])
     return record

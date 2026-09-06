@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -223,19 +224,59 @@ class SessionSummaryTests(unittest.TestCase):
         self.assertTrue(report["truncated"])
         self.assertEqual(index_path.read_bytes(), before)
 
-    def test_preview_uses_distinct_summary_headings(self) -> None:
+    def test_preview_uses_professional_summary_headings_and_spacing(self) -> None:
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             tv.print_summary_sections({
+                "status": "in_progress",
                 "summary": "Overview text.",
                 "what_changed": "Changed text.",
                 "where_it_lives": "Location text.",
                 "next_up": "Next text.",
             })
         rendered = output.getvalue()
-        for heading in ("[Overview]", "[What Changed]", "[Where It Lives]", "[Next Up]"):
-            self.assertIn(heading, rendered)
-        self.assertNotIn("What changed:", rendered)
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", rendered)
+        for heading in ("[Status]", "[Summary]", "[Outcomes]", "[Artifacts]", "[Open Items]"):
+            self.assertIn(heading, plain)
+        self.assertIn("[Summary]\n  Overview text.\n\n[Outcomes]", plain)
+        self.assertIn("[Artifacts]\n  Location text.\n\n[Open Items]", plain)
+        self.assertNotIn("[Overview]", plain)
+        self.assertNotIn("What changed:", plain)
+
+    def test_legacy_records_and_valid_status_values(self) -> None:
+        legacy = summary.set_summary("legacy", {"summary": "Legacy record."})
+        self.assertNotIn("status", legacy)
+        for index, status in enumerate(sorted(summary.SUMMARY_STATUS_VALUES)):
+            record = summary.set_summary(f"status-{index}", {"status": status})
+            self.assertEqual(record["status"], status)
+
+    def test_invalid_status_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "status must be one of"):
+            summary.set_summary("invalid-status", {"status": "done"})
+        self.assertIsNone(summary.get_summary("invalid-status"))
+
+    def test_status_and_professional_labels_are_searchable(self) -> None:
+        summary.set_summary("blocked-session", {
+            "status": "blocked",
+            "what_changed": "Identified a blocked deployment step.",
+        })
+        result = summary.search_summaries("blocked")[0]
+        self.assertEqual(result["session_id"], "blocked-session")
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            piwork._print_summary_record({
+                "session_id": "blocked-session",
+                "status": "blocked",
+                "what_changed": "Deployment blocker.",
+                "where_it_lives": "deploy.sh",
+                "next_up": "Resolve credentials.",
+            })
+        rendered = output.getvalue()
+        self.assertIn("Status: blocked", rendered)
+        self.assertIn("Outcomes: Deployment blocker.", rendered)
+        self.assertIn("Artifacts: deploy.sh", rendered)
+        self.assertIn("Open Items: Resolve credentials.", rendered)
 
     def test_session_action_routing(self) -> None:
         session_path = Path(self.tempdir.name) / "session.jsonl"

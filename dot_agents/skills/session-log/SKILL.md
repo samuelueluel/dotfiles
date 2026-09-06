@@ -79,11 +79,14 @@ Backlog discovery must search both filed workspace folders and `Unfiled`; never 
 For "log this", write a structured record with:
 
 - `title`: concise session title
-- `summary`: one-sentence purpose/outcome
-- `what_changed`: substantive changes, decisions, or findings
-- `where_it_lives`: exact files, commands, or project locations
-- `next_up`: unfinished work or verification
+- `status` (optional): exactly one of `complete`, `in_progress`, `blocked`, or `exploratory`
+- `summary`: one-sentence purpose/outcome; displayed as `Summary`
+- `what_changed`: substantive changes, decisions, or findings; displayed as `Outcomes`
+- `where_it_lives`: exact files, commands, or project locations; displayed as `Artifacts`
+- `next_up`: unfinished work or verification; displayed as `Open Items`
 - `keywords`: exact identifiers worth searching later (variable names, functions, papers, commands, paths)
+
+The user-facing outline is `[Summary]`, `[Outcomes]`, `[Artifacts]`, and `[Open Items]`, with optional `[Status]`. Keep the existing storage keys for backward compatibility; older records without `status` remain valid.
 
 Write it through the atomic CLI interface. In Pi's built-in `bash` tool, use the injected `PI_SESSION_ID` and `PI_SESSION_FILE` values for the active session:
 

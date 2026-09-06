@@ -20,6 +20,7 @@ if LOCAL_LIB not in sys.path:
     sys.path.insert(0, LOCAL_LIB)
 
 from pi_session_summary import (  # noqa: E402
+    SUMMARY_STATUS_VALUES,
     backlog_summaries,
     find_session_path,
     get_summary,
@@ -170,7 +171,7 @@ def _summary_record_from_args(args):
         raise ValueError("summary payload must be a JSON object")
 
     for name in (
-        "title", "workspace", "summary", "what_changed", "where_it_lives",
+        "title", "workspace", "status", "summary", "what_changed", "where_it_lives",
         "next_up", "initial_prompt", "transcript_path", "keywords",
     ):
         value = getattr(args, name, None)
@@ -192,6 +193,8 @@ def _print_summary_record(record, include_score=False):
         print(f"Score: {record.get('score', 0)}")
     print(f"Session: {record.get('session_id', '')}")
     print(f"Title: {record.get('title', 'Untitled conversation')}")
+    if record.get("status"):
+        print(f"Status: {record['status']}")
     if record.get("workspace"):
         print(f"Workspace: {record['workspace']}")
     if record.get("transcript_path"):
@@ -199,13 +202,13 @@ def _print_summary_record(record, include_score=False):
     if record.get("summary"):
         print(f"Summary: {record['summary']}")
     if record.get("what_changed"):
-        print(f"What changed: {record['what_changed']}")
+        print(f"Outcomes: {record['what_changed']}")
     if record.get("where_it_lives"):
-        print(f"Where it lives: {record['where_it_lives']}")
+        print(f"Artifacts: {record['where_it_lives']}")
     if record.get("next_up"):
-        print(f"Next up: {record['next_up']}")
+        print(f"Open Items: {record['next_up']}")
     if record.get("keywords"):
-        print(f"Keywords: {', '.join(record['keywords'])}")
+        print(f"Search terms: {', '.join(record['keywords'])}")
     print()
 
 
@@ -237,6 +240,7 @@ def cmd_summary(argv):
     set_parser.add_argument("--json", dest="json_payload", help="read fields from a JSON object")
     set_parser.add_argument("--title")
     set_parser.add_argument("--workspace")
+    set_parser.add_argument("--status", choices=sorted(SUMMARY_STATUS_VALUES))
     set_parser.add_argument("--summary")
     set_parser.add_argument("--what-changed")
     set_parser.add_argument("--where-it-lives")
