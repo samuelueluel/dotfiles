@@ -1,6 +1,6 @@
 ---
 name: session-log
-description: Automatically saves, searches, and reviews permanent local Pi session summaries for substantive sessions, with bounded manual backlog processing. Use when asked to "log this", "what session did we", "find the session where", "where did we leave off", "catch up", "find unlogged sessions", or "backfill summaries".
+description: Creates, searches, and reviews permanent local Pi session summaries, including bounded manual backlog processing. Use when asked to "log this", "what session did we", "find the session where", "where did we leave off", "catch up", "find unlogged sessions", or "backfill summaries".
 ---
 
 # Session Summary Management
@@ -13,11 +13,9 @@ The canonical store is the permanent local index:
 
 It is keyed by the full Pi session UUID and is never automatically pruned. It powers Television previews and agent-facing session search. Do not treat the 30-day Obsidian logs as authoritative; routine session logging does not use TurboVault.
 
-## Automatic Session Logging
+## On-Demand Persistence
 
-The global `session-summary.ts` extension listens for Pi's `session_shutdown` event and writes one semantic summary for each substantive completed session. It runs when a session is quit, replaced, resumed, or forked, but not during `/reload`. It uses the active session model with low reasoning effort, bounds the transcript sent to the summarizer, validates the JSON result, and persists it through `piwork summary set`.
-
-The extension skips empty sessions, greetings, and context-only read-and-wait sessions. It bounds the transcript and redacts common credential patterns before sending content to the summarizer. A summary failure never blocks Pi shutdown; the session remains discoverable through `piwork summary backlog` for later recovery. Automatic summaries are written only to the local index, not to Obsidian.
+The skill does not run background model calls or summarize sessions at shutdown. When explicitly asked to summarize or backfill session logs, saving the substantive summaries to the local index is part of that operation; do not merely report a chat-only summary. Skip greetings, empty sessions, and context-only read-and-wait sessions unless the user asks to include them.
 
 ## Intent Routing
 
@@ -67,7 +65,7 @@ The result reports the total candidate count, returned count, truncation status,
 
 For a confirmed batch:
 
-1. Process candidates one at a time, preserving each candidate's exact UUID, transcript path, and workspace.
+1. Process candidates one at a time, preserving each candidate's exact UUID, transcript path, and workspace. The requested summary is persisted as part of processing, so it is available to future `piwork summary search` and Television searches.
 2. Skip the active/recent sessions, empty sessions, and clearly trivial conversations unless explicitly asked to include them.
 3. Never overwrite an existing summary during backlog processing; the discovery command should already exclude those UUIDs.
 4. Read the candidate transcript and write a structured record through `piwork summary set`:
