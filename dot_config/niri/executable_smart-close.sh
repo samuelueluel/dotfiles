@@ -29,6 +29,10 @@ if [ "$app_id" = "com.mitchellh.ghostty" ]; then
             tmux kill-session -t music-agent >/dev/null 2>&1
             pat=''
             ;;
+        "Local Music Agent")
+            tmux kill-session -t music-agent-local >/dev/null 2>&1
+            pat=''
+            ;;
         *)            pat=''                ;;
     esac
     if [ -n "$pat" ]; then
