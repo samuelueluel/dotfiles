@@ -38,6 +38,11 @@ command -v gum >/dev/null 2>&1 || {
   exit 1
 }
 
+# Match the New Mexico palette used by .zshrc; detached launchers do not source it.
+export GUM_CHOOSE_CURSOR_FOREGROUND="#1AAAD4"
+export GUM_CHOOSE_SELECTED_FOREGROUND="#1AAAD4"
+export GUM_CHOOSE_HEADER_FOREGROUND="#DA9E8A"
+
 choice=$(gum choose --header "select model" \
   "dense38-q4   Qwen3.8 Dense 27B | Q4" \
   "dense38-q6   Qwen3.8 Dense 27B | Q6" \
