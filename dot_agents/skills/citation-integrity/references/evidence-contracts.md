@@ -1,6 +1,8 @@
 # Evidence Contracts & Token Specifications
 
-**Load this file when** composing Zotero-grounded claims or formatting canonical brace tokens for passages, direct source reads, bibliography entries, or graph structures.
+**Load this file when** composing Zotero-grounded claims or formatting internal canonical evidence records for passages, direct source reads, bibliography entries, or graph structures.
+
+The brace-delimited forms below are internal canonical record formats for validation and adjudication. Never emit them as raw citation stamps in a human-facing response. For user-facing output, assign `[^c1]`, `[^c2]`, and so on immediately after supported claims, then collect readable entries retaining every field in one `### Evidence` block at the absolute end of the response. Keep the canonical records unchanged for machine-facing paths.
 
 ## 1. Semantic-Passage Evidence
 

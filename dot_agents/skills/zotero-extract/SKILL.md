@@ -52,6 +52,17 @@ Mode contracts: ordinary Zotero search answers from best-supported passages — 
 6. **Close**: zero pending → report manifest counts to Samuel; `worklist` lists sidecar-creation candidates.
 7. **Reduce separately**: adjudicate conflicting records, assess comparability, synthesize against the inclusion rule. Final claims follow the citation-integrity contract; the manifest proves coverage, not findings.
 
+## Citation-integrity handoff
+
+A packet accepted by `zotero-extract submit` is candidate evidence for the main session, not an automatically approved citation. After the manifest reaches zero pending and before synthesis, the main session must:
+
+1. Confirm the packet is `processed`, the `item_key` resolves to the requested source, the `inclusion_rule` matches the run, and `source.path`/`source.sha256` still match the manifest and disk.
+2. Recheck each `records[].quote` verbatim and preserve its `records[].anchor` as the page, section, or table locator. `records[].kind` classifies the candidate claim; `confidence`, `ambiguous`, and `note` remain flags rather than proof.
+3. Preserve `extraction_route` and `route_fidelity`. A `mineru_sidecar` packet must be recheckable against the permitted sidecar route; a `pdf_text_layer` packet must be re-read through `zotero_get_item_fulltext` or `zotero_read_pdf_pages` before final approval when the packet alone is insufficient.
+4. Never invent a `Rerank` score for full-document, sidecar, or direct-page evidence. If a claim relies on semantic RAG, retrieve a separate `zotero_semantic_search` passage and require raw `Rerank > 0` under `citation-integrity`.
+5. Resolve conflicts, comparability, units, samples, specifications, attribution, and cross-paper synthesis in the main session. `omission_pass`, `negative_result`, and the manifest provide completeness signals, not automatic substantive support.
+6. Keep the validated JSON packet unchanged for machine-facing review. Render approved human-facing claims using `citation-integrity`'s `[^cN]` footnotes; never expose raw packet JSON as the answer.
+
 ## Worker Delegation & Concurrency
 
 - Worker turns may delegate to subagents in **both tiers** — for context isolation, not speed: each paper's full text lives in a disposable child context, never in main-session history.

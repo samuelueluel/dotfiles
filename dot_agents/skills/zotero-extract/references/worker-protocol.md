@@ -62,6 +62,10 @@ Rules:
   second omission pass. Explore runs with `prompt_mode: replace`, giving each
   paper a clean, isolated context.
 
+## Citation boundary
+
+Workers emit packet fields only. They do not emit citation-integrity tokens, human-facing footnotes, adjudication decisions, or cross-paper synthesis. The main session performs the packet-to-citation handoff only after deterministic validation and source/hash checks.
+
 ## Validation Contract (`zotero-extract submit`)
 
 - `packet_version` must be `1`; `inclusion_rule` must exactly echo the run's rule (stale or cross-run packets rejected).

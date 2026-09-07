@@ -1,8 +1,19 @@
 {
-  "scribeEffort": "high",
   "modelKey": "openai-codex/gpt-5.6-sol",
   "effort": "xhigh",
+  "scribeModelKey": "openai-codex/gpt-5.6-luna",
+  "scribeEffort": "xhigh",
   "protocolMode": "both",
   "maxSkillToolRounds": 2,
-  "systemPromptFile": "advisor-prompt.txt"
+  "systemPromptFile": "advisor-prompt.txt",
+  "guidance": {
+    "promptSnippet": "Consult the strategic advisor when reaching a decision fork, encountering anomalies, recovering from errors, or verifying final deliverables.",
+    "promptGuidelines": [
+      "Conduct orientation and inspection FIRST (reading files, checking schemas, inspecting git status or logs). Do not call advisor before inspecting primary evidence.",
+      "Call `advisor` the moment you encounter a DECISION FORK: a data anomaly, an ambiguous requirement, an architectural trade-off, or an empirical specification choice. State the observed facts and your proposed plan in `question` and pass relevant excerpts in `evidence`.",
+      "Call `advisor` when stuck — repeated tool failures, unexpected regression results, or non-converging edits.",
+      "Call `advisor` before declaring the task complete. Make your changes durable first, and pass the `git diff` or summary output in `evidence` for a final verification check.",
+      "Give the advisor's guidance serious weight, and summarize the key takeaway in your next visible message to the user."
+    ]
+  }
 }

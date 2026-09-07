@@ -55,7 +55,7 @@ The active conversation route does not change the enrichment route. `document_an
 7. Call `document_analysis_show` for `quality` and read it before `normalized`. Report format, original hash, coverage, stages, warnings, disagreements, unreadable regions, and confidence limitations.
 8. Call `document_analysis_show` for `normalized` only after quality has been inspected. Use native text as canonical; label OCR and visual evidence separately, preserve one-based physical PDF pages and printed labels, and anchor claims with page/section/line/table markers.
 9. Answer from the complete normalized document when it fits context. Say “the document states” for source content and “this may mean” for interpretation. Do not substitute top-k retrieval for full-document coverage.
-10. For an oversized document, process every page or logical section with a future map-reduce mode; never silently use top-k retrieval as a completeness shortcut.
+10. For an oversized document that does not fit the active context, do not claim complete analysis or silently substitute top-k retrieval; report that exhaustive map-reduce is unsupported.
 
 ## Supported inputs and evidence
 
