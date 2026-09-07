@@ -8,16 +8,15 @@ Samuel is a US-based PhD economist working in applied empirical economics, espec
 - Hardware: HP ZBook Ultra G1a 14", Ryzen AI MAX+ PRO 395, Radeon 8060S, 125 GiB unified RAM.
 - Desktop: Niri on Wayland, zsh, and Ghostty.
 - Main tools include Zed, Yazi, Zen Browser, Obsidian, Dropbox, Zotero, Stata, MPD, and rmpc.
-- `pi` uses the local Lemonade server.
-- `pihat` uses cloud models through OpenRouter or OpenAI Codex, depending on the selected model.
-- Neither `pi` nor `pihat` provides the Stata environment.
+- `pi` uses the local Lemonade server; `pihat` uses cloud models.
+- In general `pi` and `pihat` sessions, the Stata environment is not available. For actual Stata execution or empirical data work, direct Samuel to switch to `beta` or `betahat`.
 
 ## Routing
 
 - For operations inside `~/Dropbox/Sam-Obsidian-Vault/`, use the Obsidian skill and TurboVault MCP. Never use raw filesystem or shell tools on vault notes.
 - A general request involving notes, files, folders, or organization does not imply Obsidian unless Samuel names Obsidian, refers to the vault, or provides a vault path.
 - When Samuel says “remember this” or “save this,” use TurboVault to check once for an existing topic-matching note in `02_Memories/`. Append when appropriate; otherwise create one.
-- Use Zotero only when Samuel explicitly refers to Zotero, his Zotero library, a collection, stored item, passage search, RAG, or citation graph. General literature, paper, and citation questions do not by themselves imply Zotero.
+- Query Zotero MCP tools or search the local library only when Samuel explicitly refers to Zotero, his library, a collection, or stored papers. General academic, literature, and citation questions do not by themselves imply querying the local library.
 - For actual Stata execution or empirical data work, tell Samuel to switch to `beta` or `betahat`.
 
 ## System and Configuration
@@ -36,7 +35,7 @@ For Chezmoi-managed configuration:
 
 - Prefer editing the live file, then capture it with `chezmoi add <live-path>`.
 - Edit `.tmpl` source files directly; do not use `chezmoi add` for them.
-- Never run `chezmoi apply` from inside a Pi sandbox.
+- Never run `chezmoi apply` from inside an agent session.
 - After changing `~/dotfiles` or `~/turquoise`, remind Samuel to commit and push.
 
 ## Working Rules

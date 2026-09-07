@@ -5,6 +5,8 @@
  * lives in @juicesharp/rpiv-config.
  */
 
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { GuidanceFields } from "@juicesharp/rpiv-config";
 import { configPath, loadJsonConfigWithLegacyFallback, saveJsonConfig } from "@juicesharp/rpiv-config";
 import { EFFORT_ORDINAL, type GradedEffort } from "./messages.js";
@@ -12,14 +14,43 @@ import { EFFORT_ORDINAL, type GradedEffort } from "./messages.js";
 const ADVISOR_CONFIG_PATH = configPath("rpiv-advisor", "advisor.json");
 
 export type DisabledForModelsEntry = string | { model: string; minEffort?: GradedEffort };
+export type ProtocolMode = "attach" | "tools" | "both";
 
-interface AdvisorConfig {
+export interface AdvisorConfig {
 	modelKey?: string;
 	effort?: GradedEffort;
 	scribeModelKey?: string;
 	scribeEffort?: GradedEffort;
 	guidance?: GuidanceFields;
 	disabledForModels?: DisabledForModelsEntry[];
+	/** How recently loaded skill guidance reaches the reviewer. */
+	protocolMode?: ProtocolMode;
+	/** Maximum advisor-side rounds that may call skill_read/skill_grep. */
+	maxSkillToolRounds?: number;
+	/** Relative to advisor.json, or an absolute path, for live reviewer preferences. */
+	systemPromptFile?: string;
+}
+
+export const DEFAULT_PROTOCOL_MODE: ProtocolMode = "both";
+export const DEFAULT_MAX_SKILL_TOOL_ROUNDS = 2;
+
+export function getAdvisorProtocolMode(config: AdvisorConfig): ProtocolMode {
+	return config.protocolMode === "attach" || config.protocolMode === "tools" || config.protocolMode === "both"
+		? config.protocolMode
+		: DEFAULT_PROTOCOL_MODE;
+}
+
+export function getMaxSkillToolRounds(config: AdvisorConfig): number {
+	if (!Number.isInteger(config.maxSkillToolRounds)) return DEFAULT_MAX_SKILL_TOOL_ROUNDS;
+	return Math.max(0, Math.min(3, config.maxSkillToolRounds as number));
+}
+
+/** Resolve the optional live prompt file without reading it. */
+export function resolveAdvisorSystemPromptFile(value: string | undefined): string | undefined {
+	if (typeof value !== "string" || !value.trim()) return undefined;
+	const filename = value.trim();
+	if (filename.startsWith("~/")) return resolve(join(homedir(), filename.slice(2)));
+	return isAbsolute(filename) ? resolve(filename) : resolve(dirname(ADVISOR_CONFIG_PATH), filename);
 }
 
 export function loadAdvisorConfig(): AdvisorConfig {

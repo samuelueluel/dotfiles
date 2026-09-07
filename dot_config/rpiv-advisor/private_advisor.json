@@ -1,5 +1,8 @@
 {
+  "scribeEffort": "high",
   "modelKey": "openai-codex/gpt-5.6-sol",
   "effort": "xhigh",
-  "scribeEffort": "high"
+  "protocolMode": "both",
+  "maxSkillToolRounds": 2,
+  "systemPromptFile": "advisor-prompt.txt"
 }

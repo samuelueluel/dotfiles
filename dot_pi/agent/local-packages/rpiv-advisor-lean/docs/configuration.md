@@ -47,10 +47,13 @@ previous selection and the active tool list are left untouched.
 | `disabledForModels` | `(string \| { model, minEffort? })[]` | `[]` | hand-edited |
 | `guidance.promptSnippet` | `string` | built-in snippet | hand-edited |
 | `guidance.promptGuidelines` | `string[]` | built-in guidelines | hand-edited |
+| `protocolMode` | `"attach"` \| `"tools"` \| `"both"` | `"both"` | hand-edited |
+| `maxSkillToolRounds` | integer, clamped to `0`–`3` | `2` | hand-edited |
+| `systemPromptFile` | `string` path | absent | hand-edited |
 
 `/advisor` only ever writes `modelKey` and `effort`; scribe settings,
-`guidance`, and `disabledForModels` are preserved across saves, so hand-edits
-survive.
+`guidance`, `disabledForModels`, `protocolMode`, `maxSkillToolRounds`, and
+`systemPromptFile` are preserved across saves, so hand-edits survive.
 
 ### `modelKey`
 
@@ -83,6 +86,38 @@ A refresh occurs only when activity since the checkpoint exceeds 12 messages or
 and bypass the scribe. If the configured model is unavailable, the extension
 tries `openai-codex/gpt-5.6-luna` and then `openai/gpt-5.6-luna`; if no scribe
 can run, it preserves the old checkpoint and forwards the unsummarized delta.
+
+### `protocolMode`
+
+Controls how recently loaded local skill guidance reaches the reviewer:
+
+- `attach` — attach a bounded excerpt of correlated recent `read` results; do not
+  expose advisor-side skill tools.
+- `tools` — attach only a manifest of correlated skill paths and expose the
+  restricted `skill_read`/`skill_grep` tools.
+- `both` — use both mechanisms (the default).
+
+The attachment keeps at most four recent Markdown files and 14,000 characters.
+It is not a replay of every skill in the vault. Skill tools are restricted to
+`~/.agents/skills/`, the current project's `.agents/skills/`, and
+`~/dotfiles/dot_agents/skills/` and never write or access the network.
+
+### `maxSkillToolRounds`
+
+The advisor may make at most this many rounds of skill-tool calls before a final
+no-tools completion is forced. The value is clamped to `0`–`3`; the default is
+`2`. The tool appetite prompt is guidance only—the extension enforces this hard
+cap. Set it to `0` to disable advisor-side skill lookups while retaining the
+protocol attachment.
+
+### `systemPromptFile`
+
+An optional live prompt file. Relative paths resolve beside `advisor.json`; `~`
+and absolute paths are also accepted. The file is read for every consultation,
+then appended to the built-in advisor prompt and capped at 6,000 characters.
+A missing or unreadable file falls back to the built-in prompt. This is the
+personality/tuning surface; the built-in protocol and tool boundaries remain in
+code and in the packaged prompt.
 
 ### `disabledForModels`
 
@@ -138,8 +173,9 @@ editing them.
 The built-in guidelines tell the model to call `advisor` before substantive
 work, again when it believes the task is complete (after making the deliverable
 durable), and when it is stuck or considering a change of approach; to weight
-the advice seriously unless empirically contradicted; and to reconcile
-conflicting evidence with one more `advisor` call rather than silently switching.
+the advice seriously unless empirically contradicted; to include exact evidence
+for source-grounded questions; and to reconcile conflicting evidence with one
+more `advisor` call rather than silently switching.
 
 ## Notifications
 

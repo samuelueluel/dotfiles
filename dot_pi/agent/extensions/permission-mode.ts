@@ -46,8 +46,6 @@ type PermissionSystemRuntime = {
 
 const CPTR_HEADLESS = process.env.PI_CPTR_HEADLESS === "1";
 const SCOPED_FILESYSTEM_PREFIX = "openwebui_filesystem_";
-// Read-only tool names carried over from modes.ts. Bash commands are checked
-// separately by the structured policy in lib/bash-policy.ts.
 const HEADLESS_ALLOWED_TOOLS = new Set([
   "read",
   "grep",

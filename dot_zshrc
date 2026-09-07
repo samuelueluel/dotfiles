@@ -990,7 +990,7 @@ beta() {
   printf 'type=beta\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
 
   printf '\033]2;β - %s\007' "${abs_target##*/}"
-  { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
+  { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM.md" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
 }
 
@@ -1022,7 +1022,7 @@ betahat() {
   export PI_STATE_FILE="$_state_file"
   printf 'type=betahat\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
   printf '\033]2;β̂ - %s\007' "${abs_target##*/}"
-  { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
+  { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM.md" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
 }
 

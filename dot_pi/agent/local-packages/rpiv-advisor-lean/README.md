@@ -62,6 +62,11 @@ To turn it back off, run `/advisor` and choose **No advisor**.
   checkpoint stored in tool-result details. Later calls reuse it and send only
   activity since its boundary; the scribe refreshes in batches when that delta
   grows beyond 12 messages or 16,000 characters.
+- **Skill-aware review without blind context replay** — correlated recent skill
+  reads become a bounded active-protocol attachment, while the reviewer can use
+  restricted read-only `skill_read`/`skill_grep` lookups when a rule is missing or
+  ambiguous. The scribe distills operative constraints instead of copying whole
+  skill files.
 - **Provider-safe history** — tool activity is serialized as labeled text before
   either side-call, and inventory plus briefing become one user message. Slicing
   cannot create orphan tool-call results or invalid consecutive message roles.
@@ -95,11 +100,17 @@ write leaves your previous selection untouched and tells you so.
 | `scribeModelKey` | Lower-cost model that refreshes the rolling checkpoint. | `openai-codex/gpt-5.6-luna` |
 | `scribeEffort` | Reasoning effort used for checkpoint refreshes. | `high` |
 | `disabledForModels` | Executor models the advisor is stripped for. Plain strings block at any effort; `{ "model": "…", "minEffort": "…" }` blocks only at or above that effort. | `[]` |
+| `protocolMode` | How local skill protocol reaches the reviewer: `attach`, `tools`, or `both`. | `both` |
+| `maxSkillToolRounds` | Hard cap on advisor-side skill-tool rounds; bounded to `0`–`3`. | `2` |
+| `systemPromptFile` | Live reviewer personality/preferences file, relative to `advisor.json` or absolute. | absent |
 
 ```json
 {
   "modelKey": "anthropic/claude-opus-4-5",
   "effort": "high",
+  "protocolMode": "both",
+  "maxSkillToolRounds": 2,
+  "systemPromptFile": "advisor-prompt.txt",
   "disabledForModels": [
     "anthropic/claude-opus-4-5",
     { "model": "openai/gpt-5.2", "minEffort": "high" }
@@ -108,7 +119,7 @@ write leaves your previous selection untouched and tells you so.
 ```
 
 `/advisor` only rewrites `modelKey` and `effort`, so hand-edited keys —
-`disabledForModels` and the `guidance` overrides — survive every save.
+`disabledForModels`, the `guidance` overrides, and the protocol/prompt settings — survive every save.
 
 ## Reference
 

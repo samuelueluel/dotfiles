@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import type { AssistantMessage, Message, Model, TextContent, Usage } from "@earendil-works/pi-ai";
 import { serializeConversation, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { stripInflightAdvisorCall } from "./context.js";
+import { boundSkillReadResults } from "./protocol.js";
 
 const SUMMARY_MESSAGE_THRESHOLD = 12;
 const SUMMARY_CHAR_THRESHOLD = 16_000;
@@ -32,7 +33,7 @@ Rewrite the prior checkpoint (if supplied) using only the new activity, current 
 7. CONSULTATION TARGET:
    - The exact question for the advisor when supplied; otherwise the specific judgment now needed.
 
-Preserve exact paths, identifiers, commands, error strings, versions, thresholds, and material numerical values. Remove stale or superseded state instead of accumulating it. The output is a checkpoint, not narrative prose.`;
+Preserve exact paths, identifiers, commands, error strings, versions, thresholds, and material numerical values. When the activity contains local skill/protocol guidance, treat its operative rules as active constraints and retain the rule, its scope, and the skill path in the checkpoint. Distill that guidance; do not copy an entire skill document into the checkpoint. Remove stale or superseded state instead of accumulating it. The output is a checkpoint, not narrative prose.`;
 
 export interface AdvisorCheckpointState {
 	version: 1;
@@ -50,6 +51,8 @@ export interface LeanMetrics {
 	leanMessagesCount: number;
 	checkpointReused: boolean;
 	checkpointUpdated: boolean;
+	protocolAttached: boolean;
+	protocolFiles?: string[];
 }
 
 export interface LeanResult {
@@ -160,6 +163,7 @@ function buildAdvisorBriefing(opts: {
 	activityMessages: Message[];
 	gitDiff: string | null;
 	checkpointUpdated: boolean;
+	protocolText?: string;
 }): string {
 	const sections: string[] = [];
 	if (opts.checkpoint) {
@@ -168,6 +172,7 @@ function buildAdvisorBriefing(opts: {
 	if (hasText(opts.currentUserRequest)) {
 		sections.push(`=== CURRENT USER REQUEST (VERBATIM; AUTHORITATIVE) ===\n${opts.currentUserRequest}`);
 	}
+	if (hasText(opts.protocolText)) sections.push(opts.protocolText);
 
 	const activityLabel = opts.checkpointUpdated
 		? "RECENT ACTIVITY (VERBATIM SERIALIZATION)"
@@ -209,6 +214,8 @@ export async function buildLeanAdvisorMessages(opts: {
 	question?: string;
 	evidence?: string;
 	priorEvidence?: string;
+	protocolText?: string;
+	protocolFiles?: string[];
 }): Promise<LeanResult> {
 	const {
 		ctx,
@@ -225,13 +232,18 @@ export async function buildLeanAdvisorMessages(opts: {
 		question,
 		evidence,
 		priorEvidence,
+		protocolText,
+		protocolFiles,
 	} = opts;
 
 	// Native tool-call blocks are useful to the executor but brittle in a sliced
 	// side-call: a retained toolResult without its assistant toolCall is rejected
 	// by providers. We therefore serialize all advisor/scribe history into labeled
-	// text and never forward native toolCall/toolResult blocks.
+	// text and never forward native toolCall/toolResult blocks. Skill reads are
+	// bounded before either side-call; the full bounded protocol attachment is
+	// assembled separately from correlated branch entries.
 	const deltaMessages = stripInflightAdvisorCall(rawSessionMessages);
+	const scribeDeltaMessages = boundSkillReadResults(deltaMessages, ctx.cwd, 3_500);
 	const deltaChars = contentCharacterCount(deltaMessages);
 	const summaryAttempted =
 		deltaMessages.length > SUMMARY_MESSAGE_THRESHOLD || deltaChars > SUMMARY_CHAR_THRESHOLD;
@@ -279,7 +291,7 @@ export async function buildLeanAdvisorMessages(opts: {
 										question,
 										evidence,
 										priorEvidence,
-										deltaMessages,
+										deltaMessages: scribeDeltaMessages,
 									}),
 								),
 							],
@@ -315,15 +327,17 @@ export async function buildLeanAdvisorMessages(opts: {
 	// Otherwise send the complete unsummarized delta. On scribe failure this is a
 	// correctness-preserving fallback: never advance a generic/lossy checkpoint.
 	const activityMessages = checkpointUpdated ? deltaMessages.slice(-RAW_TAIL_MESSAGES) : deltaMessages;
+	const advisorActivityMessages = boundSkillReadResults(activityMessages, ctx.cwd, 2_000);
 	const briefing = buildAdvisorBriefing({
 		checkpoint,
 		currentUserRequest,
 		question,
 		evidence,
 		priorEvidence,
-		activityMessages,
+		activityMessages: advisorActivityMessages,
 		gitDiff: getWorkingGitDiff(ctx.cwd),
 		checkpointUpdated,
+		protocolText,
 	});
 	const messages = [textMessage(briefing)];
 
@@ -341,6 +355,8 @@ export async function buildLeanAdvisorMessages(opts: {
 			leanMessagesCount: messages.length,
 			checkpointReused: previousCheckpoint !== undefined,
 			checkpointUpdated,
+			protocolAttached: hasText(protocolText),
+			protocolFiles: protocolFiles?.length ? protocolFiles : undefined,
 		},
 	};
 }

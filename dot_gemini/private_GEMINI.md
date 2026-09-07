@@ -14,7 +14,7 @@ Samuel is a US-based PhD economist working in applied empirical economics, espec
 - For operations inside `~/Dropbox/Sam-Obsidian-Vault/`, use the Obsidian skill and TurboVault MCP. Never use raw filesystem or shell tools on vault notes.
 - A general request involving notes, files, folders, or organization does not imply Obsidian unless Samuel names Obsidian, refers to the vault, or provides a vault path.
 - When Samuel says “remember this” or “save this,” use TurboVault to check once for an existing topic-matching note in `02_Memories/`. Append when appropriate; otherwise create one.
-- Use Zotero only when Samuel explicitly refers to Zotero, his Zotero library, a collection, stored item, passage search, RAG, or citation graph. General literature, paper, and citation questions do not by themselves imply Zotero.
+- Query Zotero MCP tools or search the local library only when Samuel explicitly refers to Zotero, his library, a collection, or stored papers. General academic, literature, and citation questions do not by themselves imply querying the local library.
 
 ## System and Configuration
 

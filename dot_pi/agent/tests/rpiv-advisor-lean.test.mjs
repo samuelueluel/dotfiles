@@ -25,6 +25,18 @@ const { getInventoryMessage, mergeInventoryWithAdvisorMessages } = await jiti.im
 	`${packageRoot}/advisor/inventory.ts`,
 );
 const { executeAdvisor } = await jiti.import(`${packageRoot}/advisor/execute.ts`);
+const {
+	collectActiveProtocolContext,
+	getAllowedSkillRoots,
+	resolveAllowedSkillPath,
+	renderActiveProtocolContext,
+} = await jiti.import(`${packageRoot}/advisor/protocol.ts`);
+const {
+	ADVISOR_SKILL_TOOLS,
+	executeAdvisorSkillTool,
+	runAdvisorWithSkillTools,
+} = await jiti.import(`${packageRoot}/advisor/skill-tools.ts`);
+const { getAdvisorSystemPrompt } = await jiti.import(`${packageRoot}/advisor/prompt.ts`);
 const { setAdvisorEffort, setAdvisorModel } = await jiti.import(`${packageRoot}/advisor/state.ts`);
 const { SessionManager } = await import(`${piModules}/@earendil-works/pi-coding-agent/dist/index.js`);
 
@@ -636,4 +648,183 @@ test("executeAdvisor stores consultation evidence and includes it in both model 
 	assert.equal(result.details.advisorCheckpoint.summary, "CHECKPOINT-SUMMARY");
 	assert.match(requests[0].messages[0].content[0].text, /STORED-EVIDENCE-MARKER/);
 	assert.match(requests[1].messages[0].content[0].text, /STORED-EVIDENCE-MARKER/);
+});
+
+test("correlated recent skill reads become a bounded active protocol attachment", () => {
+	const skillPath = "/var/home/samuel/.agents/skills/music/SKILL.md";
+	const branch = [
+		{ type: "message", id: "read-call", message: assistant([{ type: "toolCall", id: "read-1", name: "read", arguments: { path: skillPath } }], 1) },
+		{ type: "message", id: "read-result", message: toolResult("read", "read-1", "MUSIC-PROTOCOL-MARKER\nUse the music workflow.", 2) },
+		{ type: "message", id: "other", message: user("continue", 3) },
+		{ type: "message", id: "advisor-call", message: assistant([{ type: "toolCall", id: "advisor-1", name: "advisor", arguments: {} }], 4) },
+	];
+	const context = collectActiveProtocolContext(branch, process.cwd());
+	assert.deepEqual(context.files.map((file) => file.path), [skillPath]);
+	const rendered = renderActiveProtocolContext(context, true, 2_000);
+	assert.match(rendered, /ACTIVE PROJECT PROTOCOL \(BINDING\)/);
+	assert.match(rendered, /MUSIC-PROTOCOL-MARKER/);
+	assert.doesNotMatch(rendered, /advisor-1/);
+
+	const stale = collectActiveProtocolContext(branch, process.cwd(), 2);
+	assert.equal(stale.files.length, 0);
+});
+
+test("skill reads are bounded before scribe serialization", async () => {
+	const skillPath = "/var/home/samuel/.agents/skills/music/SKILL.md";
+	const fullSkillRead = `SKILL-HEAD\n${"A".repeat(2_500)}\nMIDDLE-SKILL-CONTENT\n${"B".repeat(5_000)}\nSKILL-TAIL`;
+	const raw = [
+		assistant([{ type: "toolCall", id: "read-skill", name: "read", arguments: { path: skillPath } }], 1),
+		toolResult("read", "read-skill", fullSkillRead, 2),
+		...Array.from({ length: 13 }, (_, index) => user(`activity-${index}`, index + 3)),
+	];
+	let scribeInput = "";
+	await buildLeanAdvisorMessages({
+		ctx: dummyContext({ provider: "openai-codex", id: "gpt-5.6-luna" }),
+		rawSessionMessages: raw,
+		completeSimple: async (_model, request) => {
+			scribeInput = request.messages[0].content[0].text;
+			return { content: [{ type: "text", text: "bounded checkpoint" }], stopReason: "stop" };
+		},
+		currentEntryId: "boundary",
+	});
+	assert.match(scribeInput, /Local skill protocol read; bounded excerpt/);
+	assert.doesNotMatch(scribeInput, /MIDDLE-SKILL-CONTENT/);
+});
+
+test("advisor skill tools read only permitted Markdown and grep bounded matches", () => {
+	const roots = getAllowedSkillRoots(process.cwd());
+	assert.ok(roots.some((root) => root.endsWith("/.agents/skills")));
+	assert.ok(resolveAllowedSkillPath("music/SKILL.md", process.cwd(), true)?.endsWith("music/SKILL.md"));
+	assert.equal(resolveAllowedSkillPath("/etc/passwd", process.cwd(), true), undefined);
+
+	const read = executeAdvisorSkillTool(
+		{ type: "toolCall", id: "skill-read", name: "skill_read", arguments: { path: "music/SKILL.md" } },
+		process.cwd(),
+	);
+	assert.equal(read.isError, false);
+	assert.match(read.content[0].text, /SKILL\.md/);
+
+	const grep = executeAdvisorSkillTool(
+		{
+			type: "toolCall",
+			id: "skill-grep",
+			name: "skill_grep",
+			arguments: { pattern: "music", path: "music/SKILL.md", literal: true, maxResults: 2 },
+		},
+		process.cwd(),
+	);
+	assert.equal(grep.isError, false);
+	assert.match(grep.content[0].text, /SKILL\.md:\d+:/);
+
+	const denied = executeAdvisorSkillTool(
+		{ type: "toolCall", id: "denied", name: "skill_read", arguments: { path: "/etc/passwd" } },
+		process.cwd(),
+	);
+	assert.equal(denied.isError, true);
+});
+
+test("advisor skill loop services tools, preserves pairs, and enforces the round cap", async () => {
+	const requests = [];
+	const seenUsage = [];
+	let index = 0;
+	const responses = [
+		{ content: [{ type: "toolCall", id: "g-1", name: "skill_grep", arguments: { pattern: "workflow", path: "music/SKILL.md" } }], stopReason: "toolUse", usage: usage(3) },
+		{ content: [{ type: "toolCall", id: "r-1", name: "skill_read", arguments: { path: "music/SKILL.md" } }], stopReason: "toolUse", usage: usage(4) },
+		{ content: [{ type: "text", text: "Use the loaded music protocol." }], stopReason: "stop", usage: usage(5) },
+	];
+	const result = await runAdvisorWithSkillTools({
+		model: { provider: "mock", id: "advisor" },
+		systemPrompt: "system",
+		initialMessages: [user("review")],
+		completeSimple: async (_model, request) => {
+			requests.push(request);
+			return responses[index++];
+		},
+		requestOptions: {},
+		cwd: process.cwd(),
+		maxToolRounds: 2,
+		onUsage: (value) => seenUsage.push(value),
+	});
+	assert.equal(result.toolRounds, 2);
+	assert.equal(result.toolCalls, 2);
+	assert.equal(requests[0].tools.length, ADVISOR_SKILL_TOOLS.length);
+	assert.equal(requests[1].messages.at(-1).role, "toolResult");
+	assert.equal(requests[2].tools.length, 0);
+	assert.equal(seenUsage.length, 3);
+	assert.equal(result.response.content[0].text, "Use the loaded music protocol.");
+});
+
+test("advisor skill loop makes only one forced no-tools completion after the cap", async () => {
+	const requests = [];
+	let calls = 0;
+	const result = await runAdvisorWithSkillTools({
+		model: { provider: "mock", id: "advisor" },
+		systemPrompt: "system",
+		initialMessages: [user("review")],
+		completeSimple: async (_model, request) => {
+			requests.push(request);
+			calls++;
+			return { content: [{ type: "toolCall", id: `call-${calls}`, name: "skill_grep", arguments: { pattern: "never" } }], stopReason: "toolUse" };
+		},
+		requestOptions: {},
+		cwd: process.cwd(),
+		maxToolRounds: 1,
+	});
+	assert.equal(requests.length, 2);
+	assert.equal(requests[0].tools.length, ADVISOR_SKILL_TOOLS.length);
+	assert.equal(requests[1].tools.length, 0);
+	assert.equal(result.toolRounds, 1);
+	assert.equal(result.toolCalls, 1);
+});
+
+test("empty-response retry does not reset the consultation skill-tool budget", async () => {
+	const entries = [
+		user("Review the music workflow", 1),
+		assistant([{ type: "toolCall", id: "advisor-current", name: "advisor", arguments: {} }], 2),
+	];
+	const { ctx, pi } = executeContext([], { entries });
+	const requests = [];
+	let call = 0;
+	ctx.modelRegistry.runtime.completeSimple = async (_model, request) => {
+		requests.push(request);
+		call++;
+		if (call === 1 || call === 3) {
+			return {
+				content: [{ type: "toolCall", id: `skill-${call}`, name: "skill_grep", arguments: { pattern: "workflow", path: "music/SKILL.md" } }],
+				stopReason: "toolUse",
+			};
+		}
+		return { content: [], stopReason: "stop" };
+	};
+	const result = await executeAdvisor(ctx, pi, {}, undefined, undefined);
+	assert.equal(result.content[0].text, "Advisor returned no text content.");
+	assert.equal(result.details.skillToolRounds, 2);
+	assert.equal(result.details.skillToolCalls, 2);
+	assert.equal(requests.filter((request) => request.tools.length > 0).length, 3);
+	assert.equal(requests.at(-1).tools.length, 0);
+});
+
+test("executeAdvisor attaches loaded protocol and enables restricted advisor tools", async () => {
+	const skillPath = "/var/home/samuel/.agents/skills/music/SKILL.md";
+	const entries = [
+		user("Follow the music workflow", 1),
+		assistant([{ type: "toolCall", id: "read-skill", name: "read", arguments: { path: skillPath } }], 2),
+		toolResult("read", "read-skill", "EXECUTOR-READ-MUSIC-PROTOCOL", 3),
+		assistant([{ type: "toolCall", id: "advisor-current", name: "advisor", arguments: {} }], 4),
+	];
+	const { ctx, pi } = executeContext([], { entries });
+	const requests = [];
+	ctx.modelRegistry.runtime.completeSimple = async (_model, request) => {
+		requests.push(request);
+		return { content: [{ type: "text", text: "Follow the active protocol." }], stopReason: "stop" };
+	};
+	const result = await executeAdvisor(ctx, pi, {}, undefined, undefined);
+	assert.equal(result.content[0].text, "Follow the active protocol.");
+	assert.equal(result.details.protocolMode, "both");
+	assert.equal(result.details.leanMetrics.protocolAttached, true);
+	assert.ok(result.details.leanMetrics.protocolFiles.includes(skillPath));
+	assert.equal(requests.length, 1);
+	assert.equal(requests[0].tools.length, ADVISOR_SKILL_TOOLS.length);
+	assert.match(requests[0].messages[0].content[0].text, /EXECUTOR-READ-MUSIC-PROTOCOL/);
+	assert.match(requests[0].systemPrompt, /Local advisor preferences \(live file\)/);
 });

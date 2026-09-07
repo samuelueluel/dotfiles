@@ -50,8 +50,7 @@
     },
     "local-packages/rpiv-advisor-lean",
     "npm:pi-smart-compact",
-    "local-packages/pi-compact-transcript",
-    "npm:pi-antigravity"
+    "local-packages/pi-compact-transcript"
   ],
   "extensions": [
     "extensions/agent-title.ts",
@@ -77,6 +76,8 @@
     "verificationModel": "openai-codex/gpt-5.6-luna",
     "summaryThinkingLevel": "high",
     "segmentationThinkingLevel": "high",
+    "codexMaxCallMs": 300000,
+    "maxLatencyMs": 0,
     "autoTrigger": true,
     "autoTriggerStrategy": "settled",
     "minContextPercent": 80,

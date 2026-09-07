@@ -681,22 +681,6 @@
           "contextWindow": 320000
         }
       }
-    },
-    "antigravity": {
-      "modelOverrides": {
-        "gemini-3.8-flash": {
-          "name": "Google: Gemini 3.8 Flash (AGY)",
-          "contextWindow": 320000,
-          "thinkingLevelMap": {
-            "minimal": "low",
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-            "xhigh": "high",
-            "max": "high"
-          }
-        }
-      }
     }
   }
 }

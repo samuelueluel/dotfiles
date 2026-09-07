@@ -1,8 +1,9 @@
 /**
  * advisor — Advisor-strategy pattern: a zero-param `advisor` tool + `/advisor`
- * command that forward the serialized conversation branch to a separately-
- * configured reviewer model. Advisor has no tools, never emits user-facing
- * output, and returns guidance the executor resumes with.
+ * command that forwards a bounded, serialized conversation branch to a
+ * separately-configured reviewer model. Advisor-side skill tools are restricted
+ * and read-only; the reviewer never emits user-facing output and returns
+ * guidance the executor resumes with.
  *
  * The implementation is one concern per file under this directory; this barrel
  * re-exports the package's public surface (consumed by ../index.ts, the repo-
@@ -15,7 +16,9 @@
  *   policy     — disabledForModels blocklist + blocked predicates
  *   inventory  — globalThis tool-inventory cache + serializer
  *   context    — branch-message massaging
- *   prompt     — system-prompt loader
+ *   prompt     — system-prompt loader plus live preferences
+ *   protocol   — recent skill-protocol attachment and path boundaries
+ *   skill-tools — bounded advisor-side skill lookups
  *   execute    — the advisor side-call
  *   register   — advisor tool registration
  *   handlers   — mid-session lifecycle handlers

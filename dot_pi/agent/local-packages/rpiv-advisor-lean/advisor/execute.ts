@@ -1,7 +1,7 @@
 /**
  * execute — the advisor side-call. Curates the executor's branch into a
- * checkpoint-plus-delta briefing, invokes the advisor model via completeSimple
- * with no tools, and returns a structured tool result. Every result branch (success
+ * checkpoint-plus-delta briefing, preserves recently loaded skill protocol, and
+ * invokes the advisor model through a bounded read-only skill-tool loop. Every result branch (success
  * / abort / error / empty) and the pre-call error paths funnel through
  * buildAdvisorResult so the envelope is built in exactly one place.
  */
@@ -37,9 +37,16 @@ import {
 	msgConsulting,
 } from "./messages.js";
 import { getRuntimeCompleteSimple, loadCompleteSimple } from "./pi-compat.js";
-import { ADVISOR_SYSTEM_PROMPT } from "./prompt.js";
+import { getAdvisorSystemPrompt } from "./prompt.js";
+import { collectActiveProtocolContext, renderActiveProtocolContext } from "./protocol.js";
+import {
+	getAdvisorProtocolMode,
+	getMaxSkillToolRounds,
+	loadAdvisorConfig,
+	type ProtocolMode,
+} from "./config.js";
+import { runAdvisorWithSkillTools } from "./skill-tools.js";
 import { getAdvisorEffort, getAdvisorModel } from "./state.js";
-import { loadAdvisorConfig } from "./config.js";
 import {
 	type AdvisorCheckpointState,
 	buildLeanAdvisorMessages,
@@ -58,6 +65,9 @@ interface AdvisorDetails {
 	leanMetrics?: LeanMetrics;
 	advisorCheckpoint?: AdvisorCheckpointState;
 	consultationEvidence?: string;
+	protocolMode?: ProtocolMode;
+	skillToolRounds?: number;
+	skillToolCalls?: number;
 }
 
 // Extract the advisor's text content from a completeSimple response: concatenate
@@ -107,6 +117,9 @@ function buildAdvisorResult(opts: {
 	errorMessage?: string;
 	leanResult?: LeanResult;
 	consultationEvidence?: string;
+	protocolMode?: ProtocolMode;
+	skillToolRounds?: number;
+	skillToolCalls?: number;
 }): AgentToolResult<AdvisorDetails> {
 	const usage = combineUsage(opts.advisorUsage, opts.scribeUsage);
 	const details: AdvisorDetails = { effort: opts.effort };
@@ -121,6 +134,9 @@ function buildAdvisorResult(opts: {
 		if (opts.leanResult.checkpoint) details.advisorCheckpoint = opts.leanResult.checkpoint;
 	}
 	if (opts.consultationEvidence !== undefined) details.consultationEvidence = opts.consultationEvidence;
+	if (opts.protocolMode !== undefined) details.protocolMode = opts.protocolMode;
+	if (opts.skillToolRounds !== undefined) details.skillToolRounds = opts.skillToolRounds;
+	if (opts.skillToolCalls !== undefined) details.skillToolCalls = opts.skillToolCalls;
 	return { content: [{ type: "text", text: opts.text }], details, usage };
 }
 
@@ -152,6 +168,9 @@ export async function executeAdvisor(
 
 	let leanResult: LeanResult | undefined;
 	let accumulatedAdvisorUsage: Usage | undefined;
+	let protocolMode: ProtocolMode | undefined;
+	let skillToolRounds = 0;
+	let skillToolCalls = 0;
 	try {
 		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(advisor);
 		if (!auth.ok) {
@@ -204,6 +223,12 @@ export async function executeAdvisor(
 		// than replaying raw history across that boundary.
 		const previousCheckpoint = checkpointDelta === undefined ? undefined : checkpointCandidate;
 		const advisorCfg = loadAdvisorConfig();
+		protocolMode = getAdvisorProtocolMode(advisorCfg);
+		const activeProtocol = collectActiveProtocolContext(branchEntries, ctx.cwd);
+		const protocolText = renderActiveProtocolContext(
+			activeProtocol,
+			protocolMode === "attach" || protocolMode === "both",
+		);
 		leanResult = await buildLeanAdvisorMessages({
 			ctx,
 			rawSessionMessages: checkpointDelta ?? convertToLlm(sessionMessages),
@@ -219,23 +244,46 @@ export async function executeAdvisor(
 			question: consultation.question,
 			evidence: consultation.evidence,
 			priorEvidence,
+			protocolText,
+			protocolFiles: activeProtocol.files.map((file) => file.path),
 		});
 
 		const inventoryMessage = getInventoryMessage(pi.getAllTools());
 		const messages: Message[] = mergeInventoryWithAdvisorMessages(inventoryMessage, leanResult.messages);
+		const systemPrompt = getAdvisorSystemPrompt(advisorCfg.systemPromptFile);
+		const configuredToolRounds = getMaxSkillToolRounds(advisorCfg);
+		const skillToolsEnabled = protocolMode !== "attach" && configuredToolRounds > 0;
+		const maxToolRounds = skillToolsEnabled ? configuredToolRounds : 0;
+		let remainingToolRounds = maxToolRounds;
 
-		// Single dispatch point — both attempts reuse the SAME `messages` and
-		// `requestOptions`, so the retry cannot diverge from attempt 1. `tools: []`
-		// reaffirms the "never calls tools" contract. Historical tool activity has
-		// already been serialized to text, so no orphan provider call IDs remain.
+		// Historical executor tool activity is serialized to text, so no orphan
+		// provider call IDs are forwarded. The only native tools exposed here are
+		// the bounded, read-only skill tools serviced by runAdvisorWithSkillTools.
 		const callAdvisor = async (): Promise<AssistantMessage> => {
-			const result = await completeSimple(
-				advisor,
-				{ systemPrompt: ADVISOR_SYSTEM_PROMPT, messages, tools: [] },
+			const attemptToolRounds = remainingToolRounds;
+			const run = await runAdvisorWithSkillTools({
+				model: advisor,
+				systemPrompt,
+				initialMessages: messages,
+				completeSimple,
 				requestOptions,
-			);
-			accumulatedAdvisorUsage = combineUsage(accumulatedAdvisorUsage, result.usage);
-			return result;
+				cwd: ctx.cwd,
+				maxToolRounds: attemptToolRounds,
+				toolsEnabled: skillToolsEnabled && attemptToolRounds > 0,
+				onUsage: (usage) => {
+					accumulatedAdvisorUsage = combineUsage(accumulatedAdvisorUsage, usage);
+				},
+				onToolRound: (round, calls) => {
+					onUpdate?.({
+						content: [{ type: "text", text: `Advisor checking local skill protocol (round ${round}, ${calls.length} call${calls.length === 1 ? "" : "s"})...` }],
+						details: { advisorModel: advisorLabel, effort },
+					});
+				},
+			});
+			remainingToolRounds = Math.max(0, remainingToolRounds - run.toolRounds);
+			skillToolRounds += run.toolRounds;
+			skillToolCalls += run.toolCalls;
+			return run.response as AssistantMessage;
 		};
 
 		// Build the terminal envelope for an aborted/error stopReason, or return
@@ -254,6 +302,9 @@ export async function executeAdvisor(
 					errorMessage: r.errorMessage ?? ERR_ABORTED_DETAIL,
 					leanResult,
 					consultationEvidence: consultation.evidence,
+					protocolMode,
+					skillToolRounds,
+					skillToolCalls,
 				});
 			}
 			if (r.stopReason === "error") {
@@ -267,6 +318,9 @@ export async function executeAdvisor(
 					errorMessage: r.errorMessage,
 					leanResult,
 					consultationEvidence: consultation.evidence,
+					protocolMode,
+					skillToolRounds,
+					skillToolCalls,
 				});
 			}
 			return undefined;
@@ -304,6 +358,9 @@ export async function executeAdvisor(
 					errorMessage: ERR_EMPTY_RESPONSE_DETAIL,
 					leanResult,
 					consultationEvidence: consultation.evidence,
+					protocolMode,
+					skillToolRounds,
+					skillToolCalls,
 				});
 			}
 		}
@@ -317,6 +374,9 @@ export async function executeAdvisor(
 			stopReason: response.stopReason,
 			leanResult,
 			consultationEvidence: consultation.evidence,
+			protocolMode,
+			skillToolRounds,
+			skillToolCalls,
 		});
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
@@ -329,6 +389,9 @@ export async function executeAdvisor(
 			errorMessage: message,
 			leanResult,
 			consultationEvidence: consultation.evidence,
+			protocolMode,
+			skillToolRounds,
+			skillToolCalls,
 		});
 	}
 }

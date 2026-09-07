@@ -1,6 +1,6 @@
 {
 	"name": "@samuel/rpiv-advisor-lean",
-	"version": "2.8.0-lean.4",
+	"version": "2.8.0-lean.5",
 	"description": "Pi extension. Branch-aware checkpointed advisor with focused repeated consultations.",
 	"keywords": [
 		"pi-package",

@@ -15,7 +15,8 @@ especially when the user says “ask the advisor what it thinks about X.” With
 question, the reviewer supplies the highest-value general plan, correction, or
 stop signal. `evidence` accepts up to 60,000 characters of exact source, diffs,
 errors, or line-numbered excerpts. Use it when the requested judgment cannot be
-grounded in a checkpoint alone; the reviewer has no tools. Evidence is stored on
+grounded in a checkpoint alone; restricted skill tools are for protocol lookup,
+not arbitrary source inspection. Evidence is stored on
 the tool result, summarized into the next checkpoint refresh, and carried
 verbatim into exactly one follow-up consultation before it expires.
 
@@ -31,16 +32,20 @@ Each call assembles the request in this order:
    so forks automatically restore the state valid at that branch point.
 3. **Current user request** — copied verbatim and marked authoritative over stale
    or superseded checkpoint content.
-4. **Activity since the checkpoint** — only messages after the checkpoint entry.
+4. **Active project protocol** — correlated recent `read` results for Markdown
+   below the permitted skill roots, attached in `attach`/`both` mode with a
+   four-file/14,000-character bound. `tools`/`both` mode also gives the reviewer
+   restricted `skill_read` and `skill_grep` tools for current or missing rules.
+5. **Activity since the checkpoint** — only messages after the checkpoint entry.
    Without a checkpoint, Pi's resolved context is used. A Pi compaction or
    branch-summary boundary after a checkpoint resets reuse to that resolved
    context rather than replaying raw pre-boundary messages.
-5. **Working git diff** — appended when the working directory is a dirty Git
+6. **Working git diff** — appended when the working directory is a dirty Git
    repository.
-6. **Consultation evidence** — optional exact material copied verbatim outside
+7. **Consultation evidence** — optional exact material copied verbatim outside
    the scribe checkpoint. The prior consultation's evidence is also included
    here for one hop, and the next refresh retains its critical conclusions.
-7. **Consultation question** — copied verbatim and labeled as the question to
+8. **Consultation question** — copied verbatim and labeled as the question to
    answer, or replaced by a general review request when omitted.
 
 History is converted to Pi's labeled conversation serialization before either
@@ -57,12 +62,14 @@ are sent with the unchanged checkpoint. If the scribe fails, the old checkpoint
 and complete raw delta are sent; no generic fallback is allowed to overwrite
 real state.
 
-The reviewer is invoked with the advisor system prompt, `tools: []`, and the
-configured reasoning effort. It never calls tools and never writes to your
-transcript — its answer comes back only as the tool result the executor reads.
-The default prompt guidelines direct the executor to restate the advisor's key
-guidance in its next visible reply, so the guidance is not left only in a
-collapsed tool card.
+The reviewer is invoked with the advisor system prompt and configured reasoning
+effort. In `tools`/`both` mode it may use only the two restricted skill tools;
+the extension services them locally, read-only, and enforces at most three tool
+rounds (two by default) before a final no-tools completion. It never receives
+executor tools and never writes to your transcript — its answer comes back only
+as the tool result the executor reads. The default prompt guidelines direct the
+executor to restate the advisor's key guidance in its next visible reply, so the
+guidance is not left only in a collapsed tool card.
 
 While the call is in flight the executor streams
 `Consulting advisor (<label>[, <effort>])…`.
@@ -86,9 +93,14 @@ While the call is in flight the executor streams
       summaryAttempted: boolean,
       checkpointReused: boolean,
       checkpointUpdated: boolean,
+      protocolAttached: boolean,
+      protocolFiles?: string[],
       scribeError?: string,
       // message counts and scribe model omitted here
     },
+    protocolMode?: "attach" | "tools" | "both",
+    skillToolRounds?: number,
+    skillToolCalls?: number,
     advisorCheckpoint?: {
       version: 1,
       summary: string,
