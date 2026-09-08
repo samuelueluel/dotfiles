@@ -1,6 +1,10 @@
 import * as path from "node:path";
 import * as os from "node:os";
+import * as fs from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 export const VAULT_ROOT = path.join(os.homedir(), "Dropbox", "Sam-Obsidian-Vault");
 export const VAULT_OBSIDIAN_DIR = path.join(VAULT_ROOT, ".obsidian");
@@ -198,3 +202,214 @@ export function isChezmoiManaged(filePath: string): boolean {
     return false;
   }
 }
+
+/**
+ * Automatically heals macOS/BSD sed invocations on GNU sed Linux systems.
+ * GNU sed interprets `sed -i ''` as taking '' as the script and fails.
+ * Rewrites `sed -i ''` and `sed -i ""` to `sed -i`.
+ */
+export function autoHealSedCommand(command: string): string {
+  if (!command || !command.includes("sed")) return command;
+  return command.replace(/\b(sed\b(?:\s+-[a-zA-Z]+)*\s+)-i\s+['"]{2}\s+/g, "$1-i ");
+}
+
+export type SyntaxCheckResult = {
+  valid: boolean;
+  error?: string;
+  skipped?: boolean;
+};
+
+/**
+ * Validates configuration and code syntax across Python, Bash, JSON, JSONC,
+ * TOML, YAML, and KDL without external npm bloat.
+ * Skips Chezmoi .tmpl template files and unhandled extensions.
+ */
+export function validateFileSyntax(filePath: string): SyntaxCheckResult {
+  if (!filePath) return { valid: true, skipped: true };
+  const resolved = path.resolve(filePath);
+
+  // Skip Chezmoi template files (*.tmpl) as they contain Go template tags
+  if (resolved.endsWith(".tmpl")) return { valid: true, skipped: true };
+
+  if (!fs.existsSync(resolved)) return { valid: true, skipped: true };
+
+  const ext = path.extname(resolved).toLowerCase();
+  const basename = path.basename(resolved).toLowerCase();
+
+  try {
+    // 1. Python (.py)
+    if (ext === ".py") {
+      execFileSync("python3", ["-m", "py_compile", resolved], {
+        stdio: "pipe",
+        timeout: 2000,
+      });
+      return { valid: true };
+    }
+
+    // 2. Shell script (.sh, .bash)
+    if (ext === ".sh" || ext === ".bash") {
+      execFileSync("bash", ["-n", resolved], {
+        stdio: "pipe",
+        timeout: 2000,
+      });
+      return { valid: true };
+    }
+
+    // 3. JSON (.json)
+    if (ext === ".json") {
+      const content = fs.readFileSync(resolved, "utf8");
+      JSON.parse(content);
+      return { valid: true };
+    }
+
+    // 4. JSONC (.jsonc)
+    if (ext === ".jsonc") {
+      const content = fs.readFileSync(resolved, "utf8");
+      const stripped = content.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+      JSON.parse(stripped);
+      return { valid: true };
+    }
+
+    // 5. TOML (.toml)
+    if (ext === ".toml") {
+      execFileSync(
+        "python3",
+        ["-c", "import tomllib, pathlib, sys; tomllib.loads(pathlib.Path(sys.argv[1]).read_text())", resolved],
+        { stdio: "pipe", timeout: 2000 }
+      );
+      return { valid: true };
+    }
+
+    // 6. YAML (.yaml, .yml)
+    if (ext === ".yaml" || ext === ".yml") {
+      try {
+        const YAML = require("/var/home/samuel/.pi/agent/npm/node_modules/yaml");
+        const content = fs.readFileSync(resolved, "utf8");
+        YAML.parse(content);
+      } catch (yamlErr: any) {
+        // If YAML module isn't loaded, return syntax error if it threw parse error
+        if (yamlErr && yamlErr.name === "YAMLParseError") {
+          return { valid: false, error: yamlErr.message };
+        }
+        if (yamlErr && yamlErr.code !== "MODULE_NOT_FOUND") {
+          return { valid: false, error: yamlErr.message };
+        }
+      }
+      return { valid: true };
+    }
+
+    // 7. KDL (.kdl / config.kdl) via Niri
+    if (ext === ".kdl" || basename === "config.kdl") {
+      if (fs.existsSync("/usr/bin/niri")) {
+        execFileSync("niri", ["validate", "--config", resolved], {
+          stdio: "pipe",
+          timeout: 2000,
+        });
+      }
+      return { valid: true };
+    }
+
+    // 8. Justfile (justfile, Justfile, *.just) via just
+    if (basename === "justfile" || basename === "Justfile" || ext === ".just" || basename.endsWith(".just")) {
+      if (fs.existsSync("/usr/bin/just")) {
+        execFileSync("just", ["--dump", "--justfile", resolved], {
+          stdio: "pipe",
+          timeout: 2000,
+        });
+      }
+      return { valid: true };
+    }
+  } catch (err: any) {
+    const errorMsg =
+      err?.stderr?.toString()?.trim() ||
+      err?.stdout?.toString()?.trim() ||
+      err?.message ||
+      "Unknown syntax error";
+    return { valid: false, error: errorMsg };
+  }
+
+  return { valid: true, skipped: true };
+}
+
+/**
+ * Checks whether an Agent prompt to Explore violates the read-only invariant
+ * by asking it to edit, write, or refactor code.
+ */
+export function checkExplorePrompt(prompt: string): CommandCheckResult {
+  if (!prompt) return { blocked: false };
+
+  // Explicit carve-out: Zotero full-document extraction workers are authorized Explore runs
+  if (prompt.includes("ZOTERO_EXTRACT_WORKER: FULL_DOCUMENT")) {
+    return { blocked: false };
+  }
+
+  if (
+    /\b(edit|modify|rewrite|refactor|update|delete|create)\b.*\b(file|script|code|note|module|function)\b/i.test(
+      prompt
+    ) ||
+    /\brun\b.*\b(stata|do-?file|regression)\b/i.test(prompt)
+  ) {
+    return {
+      blocked: true,
+      reason:
+        "Explore subagents are strictly read-only. File edits, refactorings, and Stata execution must be performed inline in the main session per Subagents.md.",
+    };
+  }
+
+  return { blocked: false };
+}
+
+/**
+ * Ensures Zotero extraction workers have unlimited turns by removing max_turns.
+ */
+export function healZoteroWorkerInput(input: Record<string, unknown>): {
+  healedInput: Record<string, unknown>;
+  wasHealed: boolean;
+} {
+  const result = { ...input };
+  let wasHealed = false;
+  const prompt = typeof result.prompt === "string" ? result.prompt : "";
+
+  if (prompt.includes("ZOTERO_EXTRACT_WORKER: FULL_DOCUMENT")) {
+    if (result.max_turns !== undefined) {
+      delete result.max_turns;
+      wasHealed = true;
+    }
+    if (result.subagent_type !== "Explore") {
+      result.subagent_type = "Explore";
+      wasHealed = true;
+    }
+  }
+
+  return { healedInput: result, wasHealed };
+}
+
+/**
+ * Checks whether a shell command executed from within an Explore subagent
+ * attempts filesystem mutation or redirection.
+ */
+export function checkExploreMutatingCommand(command: string): CommandCheckResult {
+  if (!command) return { blocked: false };
+
+  // File redirection: >, >>
+  if (/[^0-9\s]\s*>{1,2}\s*[^&]/.test(command) || /\s+>{1,2}\s+/.test(command)) {
+    return {
+      blocked: true,
+      reason: "Explore subagents are strictly read-only. Shell output redirection to files is prohibited.",
+    };
+  }
+
+  // Mutating commands
+  if (
+    /\b(rm|touch|mkdir|mv|cp|chmod|chown)\b/.test(command) ||
+    /\bgit\s+(commit|add|checkout|restore|merge|rebase|pull|push|branch|tag|stash|cherry-pick)\b/.test(command)
+  ) {
+    return {
+      blocked: true,
+      reason: "Explore subagents are strictly read-only. Mutating shell commands are prohibited per Explore.md.",
+    };
+  }
+
+  return { blocked: false };
+}
+

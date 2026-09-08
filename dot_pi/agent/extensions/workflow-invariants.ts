@@ -2,20 +2,71 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+  autoHealSedCommand,
   checkDestructiveCommand,
+  checkExploreMutatingCommand,
+  checkExplorePrompt,
   checkPrivilegedOrHostMutation,
   checkVaultShellAccess,
+  healZoteroWorkerInput,
   isChezmoiManaged,
   isDotfilesStaticPath,
   isSecretFilePath,
   isVaultNotePath,
+  validateFileSyntax,
   DOTFILES_ROOT,
   VAULT_ROOT,
 } from "../lib/workflow-invariants-logic.js";
 
 export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
   // Pre-tool checks: boundaries, privilege, destructive commands, auto-healing
-  pi.on("tool_call", async (event) => {
+  pi.on("tool_call", async (event, ctx) => {
+    const isExplore = ctx?.getSystemPrompt?.()?.includes("STRICT READ-ONLY SEARCH SPECIALIST") ?? false;
+
+    // Hard boundary for Explore subagents
+    if (isExplore) {
+      if (event.toolName === "write" || event.toolName === "edit") {
+        return {
+          block: true,
+          reason:
+            "Blocked by policy: Explore subagents are strictly read-only. File modifications are prohibited per Explore.md and Subagents.md.",
+        };
+      }
+      if (event.toolName === "bash") {
+        const cmd = String((event.input as { command?: unknown }).command || "");
+        const check = checkExploreMutatingCommand(cmd);
+        if (check.blocked) {
+          return {
+            block: true,
+            reason: `Blocked by policy: ${check.reason}`,
+          };
+        }
+      }
+    }
+
+    // Agent tool calls: delegation boundaries and zotero worker auto-healing
+    if (event.toolName === "Agent") {
+      const input = (event.input || {}) as Record<string, unknown>;
+      const prompt = typeof input.prompt === "string" ? input.prompt : "";
+
+      // 1. Check Explore prompt against mutations
+      if (input.subagent_type === "Explore") {
+        const check = checkExplorePrompt(prompt);
+        if (check.blocked) {
+          return {
+            block: true,
+            reason: `Blocked by policy: ${check.reason}`,
+          };
+        }
+      }
+
+      // 2. Auto-heal Zotero extraction workers
+      const { healedInput, wasHealed } = healZoteroWorkerInput(input);
+      if (wasHealed) {
+        event.input = healedInput;
+      }
+    }
+
     // 1. Filesystem-touching tools: read, write, edit
     if (event.toolName === "read" || event.toolName === "write" || event.toolName === "edit") {
       const rawPath = String((event.input as { path?: unknown }).path || "");
@@ -64,10 +115,16 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
       }
     }
 
-    // 3. Bash commands: privileged, destructive, vault access
+    // 3. Bash commands: privileged, destructive, vault access, and sed auto-healing
     if (event.toolName === "bash") {
       const cmd = String((event.input as { command?: unknown }).command || "");
       if (cmd) {
+        // Auto-heal macOS/BSD sed -i '' on GNU sed Linux
+        const healed = autoHealSedCommand(cmd);
+        if (healed !== cmd) {
+          (event.input as { command: string }).command = healed;
+        }
+
         // Check vault access in shell
         if (checkVaultShellAccess(cmd)) {
           return {
@@ -98,7 +155,7 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
     }
   });
 
-  // Post-tool checks: Chezmoi staging reminder for tracked live files
+  // Post-tool checks: Chezmoi staging reminder and syntax verification
   pi.on("tool_result", async (event) => {
     if (event.toolName !== "write" && event.toolName !== "edit") return;
     const rawPath = String((event.input as { path?: unknown }).path || "");
@@ -106,7 +163,16 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
 
     const resolved = path.resolve(rawPath);
 
-    // Skip paths inside the dotfiles repo or vault
+    // Multi-language syntax verification
+    const syntaxCheck = validateFileSyntax(resolved);
+    if (!syntaxCheck.valid && syntaxCheck.error) {
+      event.content.push({
+        type: "text",
+        text: `\n\n[Syntax Error Detected] File '${resolved}' has invalid syntax:\n${syntaxCheck.error}\nPlease correct the syntax immediately.`,
+      });
+    }
+
+    // Skip Chezmoi staging check for paths inside dotfiles repo or vault
     if (resolved.startsWith(DOTFILES_ROOT) || resolved.startsWith(VAULT_ROOT)) return;
 
     // Check if the live path is actively tracked by Chezmoi

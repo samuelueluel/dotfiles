@@ -11,6 +11,7 @@ description: Manage notes, documents, and folder organization in Samuel's Obsidi
 - **Mutation safety:** Read current content and hash before editing or overwriting. Every mutation requires a descriptive `commit_message`.
 - **Titles and prefixes:** The filename is the note title; never repeat it as an H1. Start the body at H1 with the first content section. Preserve existing plugin-generated heading numbers and all user-applied sorting prefixes (`00_`, `01_`, `z_`); create new headings without numbers.
 - **Vault formatting:** Never use Markdown `**bold**` in notes. Use `~={green}text=~` for active labels or terms (1–2 per paragraph) and `~={magenta}text=~` only for genuine hazards. Indent nested lists by four spaces and alternate list types between levels.
+- **Prose and tone:** Write for fast human scanning and reliable agent parsing. Use plain, direct English with high information density and natural professional flow. Never use LLM filler, throat-clearing, or buzzwords (such as "crucial", "delve", "testament", "vital", "it is important to note"). See [prose style guide](references/prose-style-guide.md).
 - **Frontmatter:** Every note requires YAML frontmatter. Set `created: YYYY-MM-DDTHH:MM:SS` on creation and update `updated:` on edits, using local time without a timezone. Require a 1–2 sentence `description:` in `10_Projects/`, `20_Library/`, and `02_Memories/`.
 - **Tags:** Keep flat lowercase tags in frontmatter only; never use inline `#tags`. Prefer `pin`, `to-read`, `to-do`, `moc`, `python`, `stata`, `latex`, `linux`, `probability`, `econometrics`, `economics`, and `math`. Every `00_` hub note requires `moc`.
 - **CPTR/headless:** Read-only TurboVault operations are permitted, but blocked mutations were not saved and must never be reported as successful.
@@ -34,29 +35,31 @@ The tree is the sole intent router. Execution location follows the general deleg
 
 ## Retrieval Workflow
 
-1. **Known path:** Read it directly in the main session.
-2. **Unknown path:** Start with a cheap metadata lookup, normally:
+1. **Known path:** Read it directly in the main session using `turbovault_read_note`.
+2. **Unknown path:** Start with a quick metadata lookup:
    ```sql
    SELECT path, description FROM files
    WHERE path LIKE '%<term>%' OR description LIKE '%<term>%'
    LIMIT 5;
    ```
-   Read the resolved path directly. If metadata does not resolve the request, use a bounded content search rather than guessing.
-3. **Discovery and graph work:** Keep small bounded searches inline. Use an `Explore` agent only for a genuinely broad unknown result set when the general delegation gate is satisfied. In CPTR/headless mode, keep permitted discovery inline and bounded.
+   Read the resolved path directly. If metadata does not find it, use a narrow content search rather than guessing.
+3. **Searching and Graph Lookups:** Keep small, focused searches in the main session. Use an `Explore` subagent only for a genuinely broad search that would clutter the chat context. In CPTR/headless mode, never use subagents; keep searches inline and narrow.
 
-## Mutation Workflow
+## Editing & Creating Notes
 
-1. For filing, moving, or lifecycle decisions, load [Hybrid PARA structure](references/hybrid-para-structure.md).
-2. For note creation or prose edits, load [formatting and syntax](references/formatting-and-syntax.md), apply the required frontmatter, and use TurboVault mutation tools.
-3. Use structured SEARCH/REPLACE for edits. Preserve unrelated content, existing heading numbers, and user prefixes.
-4. If the git substrate rejects a mutation because the working tree diverged, load [TurboVault substrate guidance](references/turbovault-guide.md) before retrying.
+1. For filing, moving, or folder decisions, check [Hybrid PARA structure](references/hybrid-para-structure.md).
+2. For writing notes or editing text, check [formatting and syntax](references/formatting-and-syntax.md), include the required frontmatter, and use TurboVault tools.
+3. Follow the [prose style guide](references/prose-style-guide.md) for clear language, active voice, and high information density.
+4. Use SEARCH/REPLACE blocks for edits. Preserve unrelated content, existing heading numbers, and folder prefixes.
+5. If a write fails because the underlying git repository has diverged, read [TurboVault substrate guidance](references/turbovault-guide.md) before retrying.
 
-## Agent Memories (`02_Memories/`)
+## Saving Memories (`02_Memories/`)
 
-When Samuel says “remember this” or “save this,” run one cheap metadata query for an existing topic-matching note. Append when appropriate; otherwise create `02_Memories/<Topic-Slug>.md`. Treat memory notes as historical captures or scratchwork whose current factual claims may need verification.
+When Samuel says "remember this" or "save this", run a quick metadata query to check for an existing note on that topic. Add to the existing note if appropriate; otherwise create `02_Memories/<Topic-Slug>.md`. Treat memory notes as historical records or scratchpads whose factual claims may need checking.
 
-## Progressive Disclosure and Reference Routing
+## Reference Guides
 
-- If writing note content or handling headings, colors, lists, wikilinks, callouts, frontmatter, descriptions, or tags, load [formatting and syntax](references/formatting-and-syntax.md).
-- If filing, organizing, naming, archiving, or choosing a folder, load [Hybrid PARA structure](references/hybrid-para-structure.md).
-- If handling git-substrate divergence or deciding whether broad discovery belongs inline or in Explore, load [TurboVault substrate guidance](references/turbovault-guide.md).
+- If writing note content, headings, colors, lists, wikilinks, callouts, frontmatter, descriptions, or tags: read [formatting and syntax](references/formatting-and-syntax.md).
+- If drafting or editing note text, choosing words, avoiding LLM buzzwords, or balancing information density: read [prose style guide](references/prose-style-guide.md).
+- If filing, organizing, naming, archiving, or picking a folder: read [Hybrid PARA structure](references/hybrid-para-structure.md).
+- If handling git repository errors or deciding whether a search needs an Explore subagent: read [TurboVault substrate guidance](references/turbovault-guide.md).

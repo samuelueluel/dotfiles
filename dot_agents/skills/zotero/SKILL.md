@@ -7,49 +7,64 @@ description: Manages Samuel's local Zotero library through MCP, including identi
 
 ## Non-Negotiable Rules
 
-- An explicit `zotero-extract` request or exhaustive/full-document request routes to `zotero-extract`; do not answer it through ordinary RAG or silently reduce its scope.
-- Keep Zotero work in the main session; never delegate it to subagents. Carve-out: mechanical extraction workers under the zotero-extract skill may delegate, subject to the session's configured subagent concurrency — identity, verification, adjudication, and synthesis stay in the main session.
-- For claims about source content, load and follow `~/.agents/skills/citation-integrity/SKILL.md`.
-- Ordinary literature questions are MCP-first. Pi exposes tools with one literal `zotero_*` prefix; never parse MCP transport or spill files with shell commands.
-- Do not call `advisor` for ordinary Zotero RAG. This skill and `citation-integrity` govern retrieval.
-- Never upload PDF bytes to Zotero Cloud, call `zotero_attach_file`, or use `zotero_add_item` with a file. For explicitly requested ingestion, load [library operations](references/library-ops.md) and attach local PDFs with `zotero-link`.
-- Never download, ingest, parse, or embed a cited work merely because it appears in a bibliography. Never delete an item without explicit confirmation.
+- If Samuel asks for `zotero-extract` or asks for an exhaustive/complete collection review, route to the `zotero-extract` skill. Do not answer it with ordinary search or reduce the scope.
+- Keep ordinary Zotero work in the main session; never delegate it to subagents. (The only exception is collection extraction workers under `zotero-extract`). Identity resolution, verification, and synthesis always stay in the main session.
+- For claims about paper content or numbers, load and follow `~/.agents/skills/citation-integrity/SKILL.md`.
+- For ordinary search answers with exact numbers, direct quotes, causal claims, comparisons, or superlatives, run `zotero_audit_claims` after reading the pages and before writing your final answer. (This tool is not used inside `zotero-extract`).
+- Use the official `zotero_*` MCP tools. Never parse MCP internal files or temporary files with shell commands.
+- Do not call `advisor` for ordinary Zotero searches. This skill and `citation-integrity` govern retrieval.
+- Never upload PDF files to Zotero Cloud, call `zotero_attach_file`, or use `zotero_add_item` with a file. To add papers, read [library operations](references/library-ops.md) and attach local PDFs with `zotero-link`.
+- Never download, parse, or embed a paper just because it appears in a bibliography. Never delete a library item without Samuel's explicit confirmation.
 - Never run a host-wide `pkill llama-server`.
 
 ## Request-Routing Playbook
 
 ```text
 REQUEST
-├─ Explicit `zotero-extract` or exhaustive/full-document request? ─→ EXTRACTION HANDOFF: zotero-extract
-├─ Library mutation? ───────────────→ MUTATION: load library-ops; confirm destructive actions
-├─ Bibliography occurrence/count? ─→ REFERENCE: search_bibliography_entries
-├─ Named source or item? ──────────→ IDENTITY: resolve_exact_source
-│                                    ├─ exact → bind item_key, then CONTENT and/or VERIFY
-│                                    ├─ ambiguous → clarify; do not choose semantically
-│                                    └─ absent → stop; never substitute a related work
-├─ Substantive topic/question? ────→ CONTENT: scoped semantic_search → positive Rerank evidence
-├─ Exact number/table/page? ───────→ VERIFY: read_pdf_pages; outline only if page unknown;
-│                                             known-item sidecar only if page extraction fails
-├─ Citation relationships? ────────→ GRAPH: neighbors / coupling / inbound ranking
-└─ Metadata/inventory? ────────────→ METADATA: metadata lookup / collection items
+├─ Explicit `zotero-extract` or complete collection audit? ─→ EXTRACTION HANDOFF: zotero-extract
+├─ Library mutation or adding papers? ─────────────────────→ MUTATION: load library-ops; confirm destructive actions
+├─ Bibliography occurrence or citation count? ─────────────→ REFERENCE: search_bibliography_entries
+├─ Named paper or item? ───────────────────────────────────→ IDENTITY: resolve_exact_source
+│                                                            ├─ exact → bind item_key, then CONTENT and/or VERIFY
+│                                                            ├─ ambiguous → clarify; do not guess semantically
+│                                                            └─ absent → stop; never substitute another paper
+├─ Substantive topic or question? ─────────────────────────→ CONTENT: scoped semantic_search → positive Rerank evidence
+├─ Exact number, table, or page? ──────────────────────────→ VERIFY: read_pdf_pages; outline only if page unknown;
+│                                                                     known-item sidecar only if page reading fails
+├─ Citation relationships or coupling? ────────────────────→ GRAPH: neighbors / coupling / inbound ranking
+└─ Metadata or inventory? ─────────────────────────────────→ METADATA: metadata lookup / collection items
 ```
 
-Common chains: named-paper finding = IDENTITY → CONTENT → VERIFY; named number = IDENTITY → VERIFY; comparison = CONTENT → VERIFY winner/challenger; exact citation count = REFERENCE; topic-expanded graph = CONTENT seeds → GRAPH → CONTENT/VERIFY.
+Common tool chains:
+- Named paper findings: IDENTITY → CONTENT → VERIFY
+- Named number: IDENTITY → VERIFY
+- Comparison between papers: CONTENT → VERIFY winner and challenger
+- Exact citation count: REFERENCE
+- Citation graph expansion: CONTENT seeds → GRAPH → CONTENT/VERIFY
+For high-risk claims in ordinary searches, finish the chain with `zotero_audit_claims` before writing the answer.
 
-REFERENCE proves literal bibliography occurrences and exact counts. IDENTITY proves source identity and scope. GRAPH proves returned structure; METADATA proves descriptive facts. None proves substantive findings. Follow only answer-changing evidence gaps.
+Remember what each tool proves: REFERENCE proves bibliography appearances; IDENTITY proves item identity; GRAPH proves network structure; METADATA proves descriptive facts. None of these prove a paper's empirical findings.
 
-## Adaptive Literature-RAG Fast Path
+## Adaptive Literature Search
 
-For findings, mechanisms, estimates, equations, and topical “which paper?” questions, use this bounded loop. A named source must pass the identity gate first.
+For findings, mechanisms, estimates, equations, and "which paper?" questions, use this loop. If a paper is named, resolve its identity first.
 
-1. **Start scoped:** Call `zotero_semantic_search` with a task-oriented query, normally `limit=5–8`, and `collection=<KEY>` when scoped. Known keys are in [collections](references/collections.md).
-2. **Gate passages:** Keep positive-`Rerank`, non-`REF` passages that concern the claim. Never substitute `Relevance` for `Rerank`.
-3. **Follow the evidence gap:** Before a follow-up, identify what could materially change the current answer and use the cheapest reliable retrieval that resolves it. Avoid near-duplicate searches and irrelevant context.
-4. **Compare correctly:** For plausible leaders, establish the outcome, sign, unit, treatment dose, geography, horizon, and specification. Rank comparable estimates; otherwise qualify the comparison dimension.
-5. **Verify and stop:** Directly verify the winning claim and any plausible challenger needed to justify it. Stop when the claim is supported, material ambiguity is resolved or disclosed, and another call is unlikely to change the answer. Two uninformative follow-ups strongly favor stopping.
-6. **Answer with evidence:** Fetch metadata only for sources actually cited. Answer directly using verified evidence; distinguish source statements from analytical synthesis or recommendations, and never attribute your inference to a source. Offer interpretation only when the request calls for it. Apply the exact evidence-token contract from `citation-integrity`.
+1. **Start with a focused search:** Call `zotero_semantic_search` with a clear query, `limit=5–8`, and `collection=<KEY>` when searching a specific collection. Known keys are in [collections](references/collections.md).
+2. **Filter passages by score:** Keep passages with `Rerank > 0`. Never treat passages marked `REF` as findings. Never substitute `Relevance` for `Rerank`.
+3. **Follow evidence gaps:** Before searching again, ask what missing information would actually change your answer. Avoid repetitive searches.
+4. **Compare models carefully:** For comparisons, note the outcome variable, sign (+/-), unit, sample, geography, and time horizon.
+5. **Verify, audit, and stop:** Directly verify winning claims and numbers using `zotero_read_pdf_pages`. For high-risk claims, run `zotero_audit_claims` before writing the answer. Stop when the question is answered, or when two follow-up searches yield no new evidence.
+6. **Answer with evidence:** Fetch metadata only for papers you actually cite. Answer directly using verified evidence and `citation-integrity` footnotes. Distinguish source statements from your own synthesis. Never attribute your own inferences to a paper.
 
 A collection scopes the retrieval corpus, not study geography. For difficult comparisons, graph expansion, filters, or exact counts, load [search and retrieval](references/search-retrieval.md).
+
+### Final claim audit (ordinary RAG only)
+
+- Send 1–8 atomic claims and 1–4 evidence references each to `zotero_audit_claims`; use exact parent item keys and truthful semantic, PDF-page, or known-item sidecar routes. Never submit paths, arbitrary source text, or caller-supplied reranker scores.
+- The audit rehydrates semantic evidence and requires fresh raw `Rerank > 0`; exact numbers normally need direct PDF-page evidence. A sidecar is a visibly weaker fallback only after a failed or unreadable page route, and its provenance must remain sidecar provenance.
+- Comparison claims require separately validated evidence for both sides. In `rules_only` mode semantic support remains `insufficient`; checker failure also fails closed. The audit result maps claim IDs to evidence locators but never replaces `citation-integrity` footnotes.
+- `escalation="bounded"` is capped at three unresolved claims and stays on each explicit item key: one hybrid retrieval, one targeted sidecar search, and one narrow page/section read. Never broaden to titles, DOIs, collections, neighbors, related papers, or full-paper reads.
+- If the running service does not expose `zotero_audit_claims` because it is still pinned to an older tested tag, do not emulate the audit or broaden retrieval; report the unavailable capability and preserve the existing fail-closed evidence rules.
 
 ### Exact-source identity gate
 

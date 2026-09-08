@@ -1,31 +1,33 @@
 # Stata House Style Guide
 
-**Load this file when** reviewing visual standards, section hierarchy, comment conventions, or line-wrapping rules for Stata do-files.
+Load this file when reviewing visual standards, section outlines, comment rules, or line-wrapping conventions for Stata do-files.
 
 ---
 
-## 1. Visual Hierarchy & Outline Standards
+## 1. Visual Structure and Outlines
 
-Stata do-files follow a structured outline that enables fast human scanning and clean agent parsing.
+Stata do-files use a consistent outline so they are easy for people to skim and easy for tools to parse.
 
-### 1.1. Column Width & The Sprawl Rule
-- **Headers, Banners, and Prose Blocks:** Formatted to a fixed column width (default: **64 columns**, optimal for 80-column half-screen splits in Niri on 14" displays; optionally 72 columns for full-width views).
-- **Active Code Lines (The Sprawl Rule):** Active Stata code statements are **allowed to sprawl**. Long regression calls (`reghdfe`), detailed graphs (`twoway`), and complex variable transformations must never be artificially broken or wrapped simply to satisfy column boundaries unless already continued with `///`. This prevents introducing whitespace errors into macro expansions or expressions.
+### 1.1. Column Width and Code Sprawl
+
+- **Headers, Banners, and Notes:** Formatted to a fixed column width (default: **64 columns**, which fits cleanly into half-screen editor splits on 14" displays; optionally 72 columns for full-width views).
+- **Active Code Lines (Let Code Sprawl):** Active Stata commands are **allowed to sprawl**. Long regression calls (`reghdfe`), detailed graphs (`twoway`), and complex variable transformations must never be split or wrapped just to fit column limits. Splitting active code can introduce whitespace bugs into macros and expressions. Only wrap lines if they already use `///` line continuations.
 
 ### 1.2. Section Banners
+
 - **Level 1 (Major Sections):** Uppercase, bracketed titles enclosed in full-width ASCII `=` borders. Major integers take a trailing dot (`[1. ...]`).
   ```stata
   * ==============================================================
   * [1. DATA INGESTION & HARMONIZATION]
   * ==============================================================
   ```
-- **Level 2 (Subsections):** Title Case, bracketed titles enclosed in full-width ASCII `-` borders. Decimal subsection identifiers omit trailing dots (`[1.1 ...]`).
+- **Level 2 (Subsections):** Title Case, bracketed titles enclosed in full-width ASCII `-` borders. Decimal subsection numbers omit trailing dots (`[1.1 ...]`).
   ```stata
   * --------------------------------------------------------------
   * [1.1 Merge Census Boundaries]
   * --------------------------------------------------------------
   ```
-- **Inline Comments & Labels:** Short explanatory labels (e.g. `// clean raw string`, `// drop unmatched`) must remain inline. Never promote short inline comments into banners.
+- **Inline Comments and Labels:** Short notes (such as `// clean raw string` or `// drop unmatched`) must remain inline. Never promote short inline notes into banners.
 
 ---
 
@@ -52,24 +54,24 @@ Every production do-file must open with a standardized top-of-file metadata bloc
 
 ---
 
-## 3. Comment Types & Placement Conventions (The 3-Way Separation Rule)
+## 3. Comment Types and Placement
 
-Stata comments follow strict syntactic roles:
+Use the right comment style for each task:
 
-- **1. Standalone Line / Step Comments (`* `):**
-  - Use `* ` strictly for standalone, single-line human step comments (e.g. `* 3.2 Correct survey miscodes`, `* Clean tract boundary indicators`).
-  - `* ` is universally recognized across all Stata execution contexts (interactive console, do-files, and batch jobs).
-  - Never use `//` on its own line.
-- **2. End-of-Line / Trailing Annotations (`//`):**
-  - Use `//` strictly for trailing notes on active code lines (e.g. `replace type9 = 1 if TYPE == "S"  // single`).
-  - Trailing `/* note */` comments are automatically converted to `// note` by the style builder.
-  - Keep trailing tags short (under 50 characters). Explanations exceeding 50 characters must precede the command as a wrapped `/* ... */` block.
-- **3. Substantive Prose & Notes Blocks (`/* ... */`):**
-  - Single-line notes that fit within 64 columns remain on a single line:
+- **1. Standalone Line Comments (`* `):**
+  - Use `* ` for standalone, single-line step comments (for example, `* 3.2 Correct survey miscodes` or `* Clean tract boundary indicators`).
+  - Stata recognizes `* ` across all environments: interactive console, do-files, and batch jobs.
+  - Never put `//` on its own line.
+- **2. Trailing Comments on Code Lines (`//`):**
+  - Use `//` for notes at the end of active code lines (for example, `replace type9 = 1 if TYPE == "S"  // single`).
+  - The styling script converts trailing `/* note */` comments into `// note`.
+  - Keep trailing notes short (under 50 characters). If an explanation needs more than 50 characters, put it before the command in a wrapped `/* ... */` block.
+- **3. Explanatory Notes and Blocks (`/* ... */`):**
+  - Short notes that fit within 64 columns stay on a single line:
     ```stata
     /* These have addresses in the separate variables, but not in addRes. */
     ```
-  - Multi-line notes and structured rationale use wrapped `/* ... */` blocks where the opening `/*` is on its own line, the title or lead-in sentence sits flush (0 indent), and bullet points take a clean 2-space indent (`  - ` with `    ` continuation):
+  - For longer notes, use a block comment `/* ... */`. Put `/*` on its own line. Start intro sentences at the left edge (no indent). Indent bullet items with 2 spaces (`  - `) and indent continuation lines with 4 spaces:
     ```stata
     /*
     Examine duplicate addresses:
@@ -80,7 +82,7 @@ Stata comments follow strict syntactic roles:
         for each of those parcels.
     */
     ```
-  - Multi-tier structured notes use `>` (tier 1: 2-space indent) and `-` (tier 2: 4-space indent):
+  - For nested notes, use `>` (tier 1: 2-space indent) and `-` (tier 2: 4-space indent):
     ```stata
     /*
     Identification & Inference Notes:
@@ -92,24 +94,24 @@ Stata comments follow strict syntactic roles:
           robustness do-file.
     */
     ```
-- **4. Discarded / Exploratory Code:**
-  - When exploratory code or alternative estimation attempts are retained for documentation rather than deleted, tag them with a structured header:
+- **4. Old or Exploratory Code:**
+  - When keeping test code or alternative specifications for future reference, label them clearly in a comment block:
     ```stata
-    /* [DISCARDED EXPLORATION: Fuzzy Address Matching via matchit]
-       Preserved for audit provenance; string similarity did not recover parcels.
+    /* [EXPLORATION: Fuzzy Address Matching via matchit]
+       Kept for reference; string similarity did not recover parcels.
        keep if temp2 == 1
        matchit idadd9 addResorig using ...
     */
     ```
 - **5. Line Continuations (`///`):**
-  - Use `///` strictly when continuing long active commands across lines.
+  - Use `///` only to continue long executable commands across multiple lines.
 
 ---
 
-## 4. Spacing & Punctuation Invariants
+## 4. Spacing and Blank Lines
 
-- **Major Sections (Level 1):** Exactly two blank lines preceding the opening border.
-- **Subsections (Level 2):** Exactly one blank line preceding the opening border.
-- **Consecutive Blank Lines:** No more than two blank lines anywhere in the file.
-- **Trailing Whitespace:** Completely stripped from every line.
-- **End of File:** Exactly one trailing newline.
+- **Major Sections (Level 1):** Exactly two blank lines before the opening border.
+- **Subsections (Level 2):** Exactly one blank line before the opening border.
+- **Consecutive Blank Lines:** No more than two blank lines in a row anywhere in the file.
+- **Trailing Spaces:** Remove trailing whitespace from every line.
+- **End of File:** End the file with exactly one newline.

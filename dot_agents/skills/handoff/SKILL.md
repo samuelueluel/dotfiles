@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Compact the current conversation into a comprehensive handoff document for another agent to pick up. Use when user asks to "handoff", "create a handoff", "wrap up for next agent", or prepare a multi-step session transfer.
+description: Creates a standalone handoff note in Obsidian for another agent session to pick up. Use when the user asks to "handoff", "create a handoff", "wrap up for next agent", or prepare a session transfer.
 disable-model-invocation: true
 argument-hint: "What will the next session be used for?"
 ---
@@ -9,20 +9,20 @@ argument-hint: "What will the next session be used for?"
 
 ## Non-Negotiable Rules
 
-- **TurboVault MCP Only:** All memory notes in `~/Dropbox/Sam-Obsidian-Vault/02_Memories/` MUST be written using `turbovault_write_note`. Never use raw shell commands (`cat`, `echo`, `write_to_file`) on vault notes.
-- **Vault Styling Standards:** Strictly NO markdown bolding (`**bold**`). Use `~={green}active labels=~` and `~={magenta}hazard labels=~`. Include standard YAML frontmatter (`created`, `updated`, `description`, `tags`).
-- **Domain Handoff Routing:** For standard rolling session handoffs, prefer appending to `02_Memories/Pi-Session-Log.md` or `02_Memories/Beta-Session-Log.md` via the `session-log` skill. Use this skill only when the user explicitly requests a standalone, multi-topic handoff document.
-- **CPTR / Headless Limitation:** CPTR cannot invoke `session_handoff` or mutate TurboVault. It may draft the handoff in chat, but use regular Pi to save it; never claim the note was written when the mutation is blocked.
-- **Artifact De-Duplication:** Do not duplicate content already captured in other artifacts (PRDs, plans, ADRs, commits, diffs). Reference them by path or URL instead.
+- **Use TurboVault MCP:** All notes in `~/Dropbox/Sam-Obsidian-Vault/02_Memories/` must be written with `turbovault_write_note`. Never use raw shell commands or built-in file writing tools on vault notes.
+- **Vault Styling Standards:** Do not use markdown bold (`**bold**`). Use `~={green}active labels=~` and `~={magenta}hazard labels=~`. Include standard YAML frontmatter (`created`, `updated`, `description`, `tags`).
+- **When to Use Handoff vs. Session Log:** For normal daily session summaries, use the `session-log` skill to add an entry to `02_Memories/Pi-Session-Log.md` or `02_Memories/Beta-Session-Log.md`. Use this `handoff` skill only when Samuel explicitly asks for a standalone handoff document.
+- **CPTR Limitation:** CPTR cannot edit TurboVault notes or call `session_handoff`. It can draft the note in chat, but a regular Pi session must save it. Never claim the file was saved when writing is blocked.
+- **Do Not Repeat Other Files:** If details are already recorded in plans, notes, commit messages, or diffs, link to their exact file paths instead of copying them.
 
-## Handoff Generation Procedure
+## Handoff Procedure
 
-1. If the user passed arguments, treat them as the explicit focus for the next session.
-2. Structure the standalone handoff document in `02_Memories/<Topic>-Handoff.md`:
+1. If Samuel gave specific topics or questions, make them the primary focus for the next session.
+2. Structure the standalone note as `02_Memories/<Topic>-Handoff.md`:
    - Frontmatter (`created`, `description`, `tags: [handoff, memory]`).
    - `# <Topic> Handoff`
    - `## Current State & Decisions Made`
    - `## Where Work Lives (Exact Paths)`
    - `## Next Session Action Plan`
-   - `## Suggested Skills` (explicit skills the next agent should invoke)
-3. Write using `turbovault_write_note`.
+   - `## Suggested Skills` (specific skills the next agent should load)
+3. Save the note using `turbovault_write_note`.

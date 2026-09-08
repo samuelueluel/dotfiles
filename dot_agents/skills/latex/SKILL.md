@@ -5,15 +5,15 @@ description: Rules for writing math as delimited LaTeX so it renders as terminal
 
 # LaTeX Math Rendering
 
-Pi renders delimited LaTeX into terminal Unicode in interactive chat. Math written as plain text, Unicode glyphs, or unsupported LaTeX will fail conversion and render as raw text.
+Pi converts delimited LaTeX into clean terminal Unicode in chat. Math written as plain text, copy-pasted Unicode symbols, or unsupported LaTeX commands will fail to convert and show up as raw code.
 
 ## Core Rules
 
-1. **Always Delimit:** Wrap all mathematical notation, variables, and symbols in `$...$` (inline) or `$$...$$` / `\[...\]` (display blocks). Never write bare text like `beta_1` or Unicode `β₁`.
-2. **Whole-Block Fallback:** If a single unsupported construct occurs in a block, the **entire block** fails back to raw LaTeX source. Keep math strictly within the supported set.
-3. **No Math in Code Fences:** Code fences keep text raw by design. Only place LaTeX inside code fences if presenting raw `.tex` source code or `esttab` code.
-4. **Delimiters Hug Content:** Write `$\beta_1$`, not `$ \beta_1 $`. Ensure all opening `$` delimiters have matching closings.
-5. **Re-Typeset OCR / Sidecar Formulas:** MinerU sidecars and web text mix raw LaTeX and Unicode OCR artifacts. Always normalize and re-typeset formulas into supported delimited LaTeX.
+1. **Always Use Delimiters:** Wrap all math variables, numbers, and symbols in `$...$` (inline) or `$$...$$` / `\[...\]` (display blocks). Never write bare text like `beta_1` or bare symbols like `β₁`.
+2. **Unsupported Commands Break the Entire Block:** If a single unsupported command appears in an equation, the **entire block** fails to render and displays as raw code. Stick strictly to the supported commands below.
+3. **No Math Inside Code Fences:** Code blocks (```) keep text raw on purpose. Never put math inside code fences unless you are explicitly showing raw `.tex` source code or Stata `esttab` output.
+4. **No Extra Spaces Around Delimiters:** Write `$\beta_1$`, not `$ \beta_1 $`. Always make sure opening `$` signs have matching closing `$` signs.
+5. **Clean Up Extracted Formulas:** Text from web pages or MinerU sidecars often mixes messy OCR symbols with raw LaTeX. Always re-type formulas using clean, supported LaTeX commands.
 
 ## Supported LaTeX Constructs
 

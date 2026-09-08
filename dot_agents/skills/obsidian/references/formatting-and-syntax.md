@@ -1,8 +1,8 @@
 # Obsidian Formatting, Syntax & Frontmatter Schema
 
-**Load this file when** writing note text, applying color tags, formatting headings, nesting lists, inserting wikilinks/callouts, or structuring YAML frontmatter.
+Load this file when applying color tags, formatting headings, nesting lists, inserting wikilinks/callouts, or structuring YAML frontmatter. For tone, word choice, avoiding LLM buzzwords, and information density, see [prose style guide](prose-style-guide.md).
 
-## 1. Heading Examples
+---
 
 For `Example-Note.md`, begin with the first content section rather than repeating the filename:
 

@@ -26,7 +26,7 @@ WHEN DELEGATION IS JUSTIFIED:
     KNOWN FACTS: <files, terms, or clues already established in conversation>
     OUTPUT: <direct answer + exact supporting file links; no search diaries>
   Never ask the child to reconstruct or rediscover parent context.
-- Set `max_turns` conservatively (normally 4–8) for ordinary search assignments, require early stopping when the answer is found, and prohibit unrequested search broadening. Exception: a full-document extraction prompt marked `ZOTERO_EXTRACT_WORKER: FULL_DOCUMENT` must omit `max_turns` entirely so source completeness is not cut off by an arbitrary ceiling; keep its one-source scope strict and accept only a normally completed worker.
+- Set `max_turns` conservatively (normally 4–8) for ordinary search assignments, require early stopping when the answer is found, and prohibit unrequested search broadening. Exception: full-document extraction workers marked `ZOTERO_EXTRACT_WORKER: FULL_DOCUMENT` require unlimited turns (automatically enforced by runtime hooks); keep their one-source scope strict and accept only normally completed workers.
 - Model and thinking for Explore are managed automatically; omit model when calling Explore.
 
 Available agent types:

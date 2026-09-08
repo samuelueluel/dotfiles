@@ -12,30 +12,30 @@ REQUEST
 ├─ "log this" / "/log"          → write or update one permanent summary
 ├─ "what session did we ..."     → search permanent summaries, then report matches
 ├─ "find the session where ..."  → search permanent summaries, then report matches
-├─ "where did we leave off"     → show recent permanent summaries and synthesize status
-├─ "catch up"                    → show recent permanent summaries and synthesize status
+├─ "where did we leave off"     → show recent permanent summaries and synthesize current state
+├─ "catch up"                    → show recent permanent summaries and synthesize current state
 └─ "session backlog" / "unlogged sessions" / "backfill summaries"
                                 → preview bounded candidates, then summarize only after confirmation
 ```
 
 ## Non-Negotiable Rules
 
-- Only create or update summaries when the user explicitly invokes this skill or requests session logging/backfill; never run background, startup, or shutdown summarization.
-- Never hand-edit the JSON index; use the atomic `piwork summary set|get|search|recent|backlog` CLI.
-- Preserve each session's full UUID, canonical storage keys, and allowed statuses; older records without `status` remain valid.
-- Treat backlog discovery as read-only until the user confirms processing; inspect a bounded candidate list and never infer a target from the newest transcript.
-- Skip active/recent, empty, greeting-only, and context-only sessions unless the user explicitly asks to include them.
-- Never delete or prune records, rewrite raw JSONL transcripts, or write routine summaries to Obsidian/TurboVault.
+- Only create or update summaries when Samuel explicitly asks to log, catch up, or backfill; never run automatic background logging at startup or shutdown.
+- Never edit the JSON summaries file by hand; always use the `piwork summary` CLI tools (`set`, `get`, `search`, `recent`, `backlog`).
+- Keep each session's full UUID. New summaries omit `status`; older summaries that already have a `status` field are fine and should be left alone.
+- Backlog searches are read-only until Samuel confirms what to process. Always inspect the candidate list first; never assume which session to summarize based on the newest file timestamp.
+- Skip active, recent, empty, or greeting-only sessions unless Samuel explicitly asks to include them.
+- Never delete or prune summaries, rewrite raw JSONL transcripts, or write routine session logs to Obsidian/TurboVault.
 
 ## Canonical Store
 
-The canonical store is the permanent local index:
+The permanent index lives at:
 
 ```text
 ~/.pi/agent/session-summaries.json
 ```
 
-It is keyed by the full Pi session UUID and is never automatically pruned. It powers Television previews and agent-facing session search. Do not treat the 30-day Obsidian logs as authoritative; routine session logging does not use TurboVault.
+It is organized by full Pi session UUID and is never automatically pruned. It powers Television fuzzy search and session lookups. Do not use Obsidian or TurboVault for routine session summaries.
 
 ## Search
 
@@ -90,14 +90,13 @@ Backlog discovery must search both filed workspace folders and `Unfiled`; never 
 For "log this", write a structured record with:
 
 - `title`: concise session title
-- `status` (optional): exactly one of `complete`, `in_progress`, `blocked`, or `exploratory`
 - `summary`: one-sentence purpose/outcome; displayed as `Summary`
 - `what_changed`: substantive changes, decisions, or findings; displayed as `Outcomes`
 - `where_it_lives`: exact files, commands, or project locations; displayed as `Artifacts`
 - `next_up`: unfinished work or verification; displayed as `Open Items`
 - `keywords`: exact identifiers worth searching later (variable names, functions, papers, commands, paths)
 
-The user-facing outline is `[Summary]`, `[Outcomes]`, `[Artifacts]`, and `[Open Items]`, with optional `[Status]`. Keep the existing storage keys for backward compatibility; older records without `status` remain valid.
+The user-facing outline is exactly `[Summary]`, `[Outcomes]`, `[Artifacts]`, and `[Open Items]`. When updating a historical record, preserve any stored `status` silently for backward compatibility, but never display a separate status section.
 
 Write it through the atomic CLI interface. In Pi's built-in `bash` tool, use the injected `PI_SESSION_ID` and `PI_SESSION_FILE` values for the active session:
 

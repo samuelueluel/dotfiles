@@ -1,70 +1,75 @@
 ---
 name: stata-house-style
-description: Formats Stata do-files to Samuel's house style (metadata headers, ASCII section banners, wrapped prose comments, and standardized spacing) under a cryptographic zero-code-mutation invariant. Use when the user asks to "format dofile", "apply house style", "style Stata code", "organize dofile", or asks to standardize Stata script outlines.
+description: Formats Stata do-files to Samuel's house style (metadata headers, ASCII section banners, wrapped prose comments, and standardized spacing) without changing active executable code. Use when the user asks to "format dofile", "apply house style", "style Stata code", "organize dofile", or asks to standardize Stata script outlines.
 ---
 
 # Stata House Style
 
-Enforces Samuel's standardized house style on Stata do-files: top-level metadata headers, boxed ASCII section banners, wrapped prose comments, and normalized vertical blank lines.
+Formats Stata do-files to match Samuel's house style: top metadata headers, boxed ASCII section banners, wrapped block comments, and clean vertical spacing.
 
-Operates via an **Architect + Builder** workflow: the agent analyzes the do-file and crafts a JSON recipe; a deterministic Python script verifies that active code syntax is 100% untouched and applies formatting.
+The formatting workflow uses two roles:
+1. **The agent** reads the do-file, understands its structure, and creates a JSON recipe.
+2. **A Python script** checks that executable code will not change, then applies the formatting.
 
-## Non-Negotiable Rules
+## Core Rules
 
-- **Zero Active Code Mutation:** The builder cryptographically hashes all active code tokens before and after formatting (`sha256`). If a single executable character, keyword, variable, option, or macro token changes, it aborts immediately.
-- **Code Sprawl Allowed:** Never wrap, break, or force line-continuation (`///`) on active code lines. Executable commands are permitted to sprawl horizontally across the screen without artificial column limits.
-- **Column Constraints Apply to Structure Only:** Fixed column widths (default: 64 columns, optimal for Niri 80-column half-splits on 14" screens; optionally 72 columns) apply exclusively to top metadata headers, section banners, and wrapped `/* ... */` prose notes.
-- **Never Box Inline Labels:** Short inline or single-line code labels (e.g. `// drop missing`, `// setup paths`) must remain inline. Only genuine section milestones are promoted to banners.
-- **Preserve Substantive Rationale:** Never strip or delete comments that document data warnings, citation anchors, sample restrictions, or methodological derivations.
+- **Zero Active Code Changes:** The Python script hashes all active code tokens before and after formatting using `sha256`. If any executable character, keyword, variable, option, or macro changes, the script stops immediately without modifying the file.
+- **Let Code Sprawl:** Never wrap, split, or add line-continuation slashes (`///`) to active code lines. Executable commands can stretch horizontally as far as needed. Do not enforce column width limits on active code.
+- **Column Limits Apply Only to Structure:** Fixed column widths (default: 64 columns, optimal for half-screen editor splits; optionally 72 columns) apply only to top metadata headers, section banners, and wrapped `/* ... */` notes.
+- **Do Not Box Inline Labels:** Keep short inline notes (such as `// drop missing` or `// setup paths`) on their own lines or at the end of lines. Only turn major section milestones into boxed banners.
+- **Keep Substantive Comments:** Never remove comments that explain data caveats, citations, sample restrictions, or methodological choices.
 
-## Request-Routing Playbook
+## Request Routing
 
 ```text
-REQUEST
-├─ User asks to format or style a do-file ──────────→ WORKFLOW: 4-Step Styling Execution
-├─ User asks to inspect or preview formatting ──────→ DRY-RUN: --scan then --diff
-└─ User asks to verify active code equality ────────→ VERIFY: python3 stata_house_style.py --verify <orig> <new>
+User Request
+├─ Format or style a do-file ──────────→ Follow 4-Step Styling Execution
+├─ Inspect or preview formatting ──────→ Dry run: run with --scan, then --diff
+└─ Check if active code changed ───────→ Run: python3 stata_house_style.py --verify <orig> <new>
 ```
 
-## Workflows & Invariants
+## Workflows
 
 ### 4-Step Styling Execution
 
-1. **Scan Structure & Enumerate Comments:**
-   Run the scanner to extract exact line ranges of existing comments and banners:
+1. **Scan Structure and Find Existing Comments:**
+   Run the scanner to see the exact line numbers of existing comments and banners:
    ```bash
    python3 ~/.agents/skills/stata-house-style/scripts/stata_house_style.py --scan <target_file.do>
    ```
-2. **Draft Semantic Recipe:**
-   Read the script to infer metadata (Purpose, Inputs, Outputs) and logical section divisions. Write `/tmp/style_recipe.json`:
-   - `header`: Metadata fields (Purpose, Author, Created, Updated, Inputs, Outputs, Notes) and lines to replace.
-   - `preamble`: (Optional). Lines 1-indexed to replace with standard `project_globals.do` preamble.
-   - `banners`: Section numbers and titles (`level: 1` for `=`, `level: 2` for `-`).
-   - `prose_blocks`: Multi-line methodological prose to wrap cleanly.
-   *(See [references/recipe-schema.md](references/recipe-schema.md) for full schema).*
-3. **Verify Invariant & Preview Diff:**
-   Run `--diff` to preview the proposed layout changes and verify the active code token hash matches:
+
+2. **Write the Recipe:**
+   Read the script to identify its metadata (Purpose, Inputs, Outputs) and logical sections. Write the configuration to `/tmp/style_recipe.json`:
+   - `header`: Metadata fields (Purpose, Author, Created, Updated, Inputs, Outputs, Notes) and line numbers to replace.
+   - `preamble`: (Optional). Line numbers to replace with the standard `project_globals.do` preamble.
+   - `banners`: Section numbers and titles (`level: 1` uses `=`, `level: 2` uses `-`).
+   - `prose_blocks`: Long prose comments to wrap cleanly.
+   *(See [references/recipe-schema.md](references/recipe-schema.md) for full schema details).*
+
+3. **Preview the Diff and Verify Active Code:**
+   Run `--diff` to preview formatting changes and verify that active code tokens match byte-for-byte:
    ```bash
-   # Standard: full-file active code bit-identical
+   # Standard: entire file active code must match exactly
    python3 ~/.agents/skills/stata-house-style/scripts/stata_house_style.py <target_file.do> /tmp/style_recipe.json --diff
 
-   # With preamble modernization: active code body bit-identical
+   # With preamble modernization: active code below the preamble must match exactly
    python3 ~/.agents/skills/stata-house-style/scripts/stata_house_style.py <target_file.do> /tmp/style_recipe.json --diff --preamble
    ```
-4. **Apply Formatting In-Place:**
-   Apply the formatting once verified:
+
+4. **Apply Formatting:**
+   Once verified, write the formatted output to the file:
    ```bash
    python3 ~/.agents/skills/stata-house-style/scripts/stata_house_style.py <target_file.do> /tmp/style_recipe.json [--preamble]
    ```
 
-### Verification & Safety Audit
+### Check Active Code Outside the Script
 
-If an edit was made manually or outside the recipe runner, verify that active code tokens remain bit-identical:
+If you edited a file by hand, check that executable code remained unchanged:
 ```bash
 python3 ~/.agents/skills/stata-house-style/scripts/stata_house_style.py <original.do> --verify <styled.do>
 ```
 
-## Progressive Disclosure & Reference Routing
+## References
 
-- For visual standards, banner designs, spacing rules, and prose formatting conventions, load [house-style-guide](references/house-style-guide.md).
-- For JSON recipe fields, validation constraints, and worked recipe examples, load [recipe-schema](references/recipe-schema.md).
+- [house-style-guide](references/house-style-guide.md): Visual standards, banner formats, comment types, and blank-line rules.
+- [recipe-schema](references/recipe-schema.md): Recipe fields, schema rules, and complete JSON examples.

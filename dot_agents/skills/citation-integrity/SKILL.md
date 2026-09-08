@@ -7,51 +7,67 @@ description: Enforces evidence contracts for claims from Samuel's Zotero passage
 
 ## Claim-to-Evidence Playbook
 
-Apply this sequence separately to every material Zotero-grounded claim. This is a claim-level evidence map, not a replacement for the Zotero skill's request routing or the detailed contracts below.
+Apply this sequence separately to every material Zotero-grounded claim. This maps claims to evidence types; it does not replace the main Zotero skill's routing or the rules below.
 
 ```text
 MATERIAL CLAIM
 → classify the claim
-  ├─ finding / mechanism / definition ─→ positive-Rerank passage or direct source
+  ├─ finding / mechanism / definition ─→ positive-Rerank passage or direct source read
   ├─ empirical number / table value ──→ exact passage + direct page verification when needed
   ├─ source identity / scope ─────────→ resolve_exact_source (identity metadata only)
   ├─ bibliography occurrence / count → zotero_search_bibliography_entries (raw entries / distinct citers)
   ├─ graph relationship / ranking ───→ graph tool with explicit scope
   └─ plain metadata fact ─────────────→ verified metadata lookup
+→ for a high-risk ordinary-RAG draft ─→ zotero_audit_claims after evidence retrieval/verification
 → check that the chosen route is permitted to support this claim
 → isolate the claim to its own source; comparisons require separate evidence per clause
-→ verify value, unit, sign, specification, attribution, and horizon when applicable
-→ attach an internal canonical evidence record naming the actual item, evidence location/type, and source classification; render it as a human-facing evidence footnote
-→ if the contract fails: retrieve stronger evidence, qualify/mark UNVERIFIED, or omit
+→ verify value, unit, sign (+/-), specification, attribution, and time horizon
+→ attach an internal evidence record naming the item and locator; render as a footnote
+→ if evidence is insufficient: retrieve stronger evidence, mark UNVERIFIED, or omit
 ```
 
-Hard boundaries: resolver output proves identity/scope, reference search proves bibliography occurrence, graph tools prove returned structure, and metadata proves descriptive facts. None of those routes proves a paper's substantive findings. Semantic evidence requires raw `Rerank > 0` and a non-`REF` passage; direct evidence must genuinely come from a truthful read route. Substantive content tokens omit internal route labels; identity, bibliography, and graph audit tokens use the explicit operation labels defined below.
+Remember what each tool can and cannot prove:
+- The resolver proves only source identity and collection membership.
+- Bibliography search proves only that a paper appears in a reference list.
+- Citation graph tools prove only the graph structure returned by the tool.
+- Metadata lookups prove only descriptive facts (like title, author, or year).
+None of these tools prove a paper's actual empirical findings. To support a finding, you must have a passage with `Rerank > 0` (not a reference list) or read the actual source text directly. The `zotero_audit_claims` tool checks your work; it is not an evidence source by itself.
 
 ## Scope & Non-Negotiable Rules
 
-Enforce this skill for every Zotero-grounded claim, including casual chat and literature synthesis.
+Follow these rules for every Zotero-grounded claim, including casual chat and literature reviews.
 
-1. **Ground Every Claim:** Every finding, number, reference occurrence, or graph metric must trace directly to its own retrieved source record.
-2. **Verify Empirical Numbers:** Confirm exact values, units, sign, sample, specification, and horizon verbatim in the cited text. Escalate to `zotero_read_pdf_pages`, or to a targeted known-item MinerU sidecar extraction when page retrieval is unavailable or malformed; otherwise drop the value or mark it `UNVERIFIED`.
-3. **Gate Confidence on Raw `Rerank`:** Only scores `> 0` may support substantive claims after passage verification. Negative scores are diagnostic/discovery evidence only. Missing `Rerank` indicates an instrumentation failure—never invent scores.
-4. **Isolate Sources:** Never let one paper's passage or graph measure carry another paper's claim. Attach distinct tokens to each clause in multi-paper comparisons.
-5. **Respect Resolution Boundaries:** `unresolved` or `ambiguous` references support only literal raw-string occurrences, never clean target identities or graph edges.
-6. **Reject Bibliography Snippets:** Chunks marked `REF` or containing reference lists are discovery metadata, not substantive evidence for findings.
-7. **External Reference Constraints:** `ext:*` nodes are metadata-only without outgoing references. Never infer source findings from an external citation. Check library metadata before asserting absence.
-8. **Explicit Failure Reporting:** State "No evidence found in the library" or "Unverified" rather than hallucinating from memory.
-9. **Source Metadata in Evidence Records:** Every cited local Zotero source must carry its verified native `itemType` and derived `source_group`; also include canonical `review:*` and `type:*` tags when present in the internal record and its corresponding human-facing evidence note. Retrieve metadata only for final cited sources. These labels describe/filter the source and never prove the claim.
-10. **True Internal Route, Context-Specific Evidence Labels:** Every claim must genuinely originate from a permitted retrieval route (`zotero_semantic_search`, `zotero_read_pdf_pages`, `zotero_get_item_fulltext`, or `mineru_sidecar`); sidecar, shell, or other local output must never be passed off as a page read, and the vague legacy label `direct PDF` remains banned internally. Substantive evidence records and their human-facing notes do **not** display internal route names—the location (`passage N/M`, `p. X`, `lines X–Y`, `Rerank`) carries the audit trail. Identity, bibliography, and graph evidence notes use the explicit operation labels specified below. When a claim rests on weaker-than-page evidence, disclose that in prose, not in the footnote marker. Raw canonical records may remain available to machine-facing and adjudication paths, but never emit brace-delimited records as human-facing citation stamps.
-11. **Resolver Is an Identity Gate:** Treat `zotero_resolve_exact_source` as metadata identity and collection-scope evidence only. An `exact` result permits retrieval from its returned `item_key` but does not support a finding; `ambiguous` and `absent` results support only the reported identity boundary or conflict. Never use `related_matches` as substantive evidence or silently replace the requested source with one of them.
+1. **Ground Every Claim:** Every finding, number, reference count, or graph metric must trace directly to its own retrieved source record.
+2. **Verify Numbers in the Source Text:** Confirm exact values, units, signs (+/-), samples, specifications, and time horizons directly in the cited text. If the passage does not show the exact number, read the actual PDF page with `zotero_read_pdf_pages` (or use a targeted MinerU sidecar extraction if the page tool fails). If you cannot verify the exact number, drop it or mark it `UNVERIFIED`.
+3. **Only Use Positive Rerank Scores:** Passages with a `Rerank` score of 0 or lower cannot support a claim about a paper's findings. Treat zero or negative scores as search clues only. Never make up a `Rerank` score.
+4. **Keep Sources Separate:** Never use one paper's evidence to back up a claim about a different paper. In comparisons between papers, give each claim its own separate footnote.
+5. **Handle Unclear References Carefully:** If a reference search returns ambiguous or unresolved results, state only that the raw text string appeared. Do not assume the paper identity or build graph links from it.
+6. **Do Not Cite Bibliography Sections as Findings:** Passages marked `REF` or containing reference lists only prove what a paper cited. They never prove the paper's own findings.
+7. **External References (`ext:*`):** External nodes contain basic metadata only and do not link to outgoing citations. Never infer a paper's findings from an external reference. Check your local library before claiming a paper is missing.
+8. **Admit Missing Evidence:** Say "No evidence found in the library" or mark the claim "Unverified" instead of guessing from memory.
+9. **Include Source Details in Evidence Notes:** In each footnote, include the verified `itemType` and `source_group` (e.g., `journalArticle/article`), along with any `review:*` or `type:*` tags. Only look up metadata for sources you actually cite. These tags describe the source—they do not prove the claim.
+10. **Use Truthful Retrieval Routes:**
+    - Every claim must come from a valid tool route (`zotero_semantic_search`, `zotero_read_pdf_pages`, `zotero_get_item_fulltext`, or `mineru_sidecar`).
+    - Never label sidecar or shell text as a page read, and do not use the vague label "direct PDF".
+    - Footnotes do not show internal tool names. Instead, show the exact location (e.g., `passage 12/40`, `p. 14`, `lines 45–60`, `Rerank +3.2`).
+    - If your evidence comes from a weaker source (like a sidecar rather than the original PDF page), explain that directly in your text.
+    - Never print raw curly-brace records (`{...}`) in chat; format them as standard footnotes.
+11. **Use the Resolver Only for Identity:** `zotero_resolve_exact_source` tells you whether a paper exists in a collection. It gives you the `item_key` to search, but it does not prove any findings. If the result is ambiguous or absent, report the conflict. Never use `related_matches` as evidence or silently switch to another paper.
+12. **Auditing High-Risk Claims:** When making critical or exact claims in regular Zotero searches, run `zotero_audit_claims` after gathering evidence and before writing your final answer.
+    - Check each claim against the tool's verdict: `supported` means you can cite it; `revise` means soften your wording; `unsupported` or `insufficient` means drop the claim or explain the gap.
+    - Never cite the audit check itself as proof for a claim.
+    - Do not use `zotero_audit_claims` inside `zotero-extract` collection runs.
+    - If the tool is not available on the current server, keep the existing strict evidence checks without widening your search.
 
 ## Human-Facing Evidence Presentation
 
-For interactive, machine-to-human responses, use Markdown footnotes rather than raw brace-delimited evidence stamps:
+For chat responses, use standard Markdown footnotes rather than raw curly-brace records:
 
-- Put a `[^cN]` marker immediately after the supported clause. Number markers by first appearance.
-- Reuse a marker only for the same source and evidence locator. Different passages, pages, sections, or supporting records receive separate markers; attach multiple markers when one claim has multiple sources.
-- Place one `### Evidence` block at the absolute end of the response, containing only the referenced entries. Omit the shared block only when neither web nor Zotero evidence is cited.
-- Render each internal canonical record as a readable entry while retaining every required field: author/year, title when available, item key, passage/page/section/line locator, `Rerank` when applicable, source classification, canonical tags, and explicit operation labels for identity, bibliography, or graph evidence.
-- If web evidence is also present, combine the `[^wN]` and `[^cN]` definitions in this same final block while keeping the namespaces separate.
+- Put a `[^cN]` marker immediately after the supported clause. Number markers in order of appearance.
+- Reuse a marker only for the exact same source and page/passage locator. Different passages, pages, or sources receive separate markers.
+- Place one `### Evidence` block at the very end of your response, listing only the cited entries. Omit the block only if no evidence was cited.
+- Format each footnote with author/year, title when available, item key, locator (`passage`, `p.`, `lines`), `Rerank` when applicable, and source tags.
+- If web evidence is also present, combine the `[^wN]` and `[^cN]` definitions in this same final block while keeping the numbers distinct.
 
 ```markdown
 A paper reports the claimed mechanism.[^c1]
@@ -60,47 +76,47 @@ A paper reports the claimed mechanism.[^c1]
 [^c1]: Author — Title (Year); item KEY; passage 12/40, p. 14, Rerank +3.22; journalArticle/article; review:checked
 ```
 
-Keep structured JSON and raw canonical evidence records unchanged for machine-facing or background-adjudication paths; only the human-facing rendering changes.
+Keep structured JSON and raw canonical evidence records unchanged for machine-facing background tasks; only human-facing chat responses use footnotes.
 
 ## Zotero-Extraction Packet Adjudication
 
-A validated `zotero-extract` packet is a candidate-evidence container, not an approved citation and not a new retrieval route. The main session performs this handoff after `zotero-extract submit` accepts the packet and before cross-paper synthesis.
+A validated `zotero-extract` packet contains candidate evidence; it is not an automatic citation and not a new tool route. The main session reviews packets after `zotero-extract submit` accepts them and before writing cross-paper conclusions.
 
-| Packet field | Adjudication use |
+| Packet field | Purpose in Review |
 |---|---|
-| `packet_version`, accepted `processed` state | Confirms the packet passed the deterministic validator; failed, escalated, excluded, or pending items are not citation evidence. |
-| `item_key`, `inclusion_rule` | Exact source identity and run-scope gates; never substitute a related match or silently change the rule. |
-| `extraction_route`, `route_fidelity` | Preserve provenance. These fields describe how the worker read the source; they do not create a new citation route or a `Rerank` score. |
-| `source.path`, `source.sha256` | Confirm the packet is bound to the manifest and unchanged source before using any record. |
-| `records[].kind`, `records[].quote`, `records[].anchor` | Map the claim class, verbatim candidate evidence, and page/section/table locator. Recheck the quote and locator before final approval. |
-| `records[].confidence`, `ambiguous`, `note` | Adjudication flags only; worker confidence never replaces source verification. |
-| `omission_pass`, `negative_result` | Completeness and honest-negative signals; neither proves a substantive claim by itself. |
-| `worker` | Model/provenance metadata for the audit trail. |
+| `packet_version`, accepted `processed` state | Confirms the packet passed the validator. Failed, escalated, or pending items cannot be cited. |
+| `item_key`, `inclusion_rule` | Ensures the item matches the assigned source and rule. Never substitute another paper. |
+| `extraction_route`, `route_fidelity` | Shows how the worker read the source. This is provenance, not a `Rerank` score. |
+| `source.path`, `source.sha256` | Verifies that the packet came from an unchanged source file. |
+| `records[].kind`, `records[].quote`, `records[].anchor` | Contains the verbatim quote and page/section locator. Re-check before final approval. |
+| `records[].confidence`, `ambiguous`, `note` | Review flags only. Worker confidence never replaces checking the source. |
+| `omission_pass`, `negative_result` | Indicates whether the worker checked the whole document. An empty result is an honest negative finding. |
+| `worker` | Model and process metadata for the audit trail. |
 
-Adjudication gates:
+Review steps:
 
-1. Confirm item identity, manifest state, source hash, verbatim quote, and anchor. If a `mineru_sidecar` packet cannot be rechecked against the permitted sidecar route, or a `pdf_text_layer` packet cannot be re-read through `zotero_get_item_fulltext` or `zotero_read_pdf_pages`, keep it as a candidate and mark it unverified.
-2. Treat the packet route as provenance, never as a semantic-search score. If the final claim relies on RAG retrieval, obtain a separate `zotero_semantic_search` passage with raw `Rerank > 0`; never fabricate `Rerank` for full-document, sidecar, or direct page evidence.
-3. Resolve conflicting records, source comparability, units, samples, specifications, and cross-paper attribution in the main session. Workers and the manifest do not adjudicate them.
-4. The manifest proves collection coverage and terminal state, not the truth of findings. Empty packets support only an honest full-document negative result under the recorded rule.
-5. Keep the validated JSON packet unchanged for machine-facing review. Human-facing claims use the footnote contract above, not raw packet JSON or brace-delimited records.
+1. Confirm item identity, manifest state, source hash, and quotes. If you cannot verify the packet against the original source or sidecar, mark the evidence unverified.
+2. Packet extraction routes describe how the worker read the text; they do not provide `Rerank` scores. If a claim requires semantic search, run `zotero_semantic_search` separately.
+3. Compare findings across papers in the main session. Workers extract evidence from single papers; they do not synthesize cross-paper conclusions.
+4. The extraction manifest proves that papers were processed, not that their claims are true. An empty packet proves only that no matching evidence was found under the inclusion rule.
+5. Format final findings as human-readable footnotes; do not dump raw JSON packets in chat.
 
 ## Evidence Router & Canonical Tokens
 
-| Claim Type | Evidence Source Tool | Internal canonical record (render as footnote) |
+| Claim Type | Evidence Tool | Internal Record (Render as Footnote) |
 |---|---|---|
 | Substantive passage / findings | `zotero_semantic_search` | `{Author Year, item KEY, passage N/M, p. X, Rerank +S; itemType/source_group; canonical tags}` |
-| Direct page / full-text read | `zotero_read_pdf_pages` / `zotero_get_item_fulltext` | `{Author Year, item KEY, p. X; itemType/source_group; canonical tags}` or, when no page is mapped, `{Author Year, item KEY, § heading; itemType/source_group; canonical tags}` |
-| Known-item sidecar extraction | Targeted `grep`/`sed` on the item's MinerU sidecar | `{Author Year, item KEY, p. X if mapped, lines X–Y; itemType/source_group; canonical tags}` |
-| Source identity / collection membership | `zotero_resolve_exact_source` | `{resolve_exact_source → status, item KEY or conflict, collection scope}` — identity metadata only; not support for findings |
-| Bibliography occurrence / identity | `zotero_search_bibliography_entries` | `{search_bibliography_entries → citing KEY, entry N, status, confidence, parse P}` |
-| Citation graph structure / coupling | `zotero_rank_works_by_inbound_citations` / `zotero_get_citation_neighbors` / `zotero_find_bibliographically_coupled_papers` | `{tool → scope, seed/target item keys, node kind, returned measure}` |
+| Direct page / full-text read | `zotero_read_pdf_pages` / `zotero_get_item_fulltext` | `{Author Year, item KEY, p. X; itemType/source_group; canonical tags}` or `{Author Year, item KEY, § heading; ...}` |
+| Known-item sidecar extraction | Targeted `grep`/`sed` on MinerU sidecar | `{Author Year, item KEY, p. X if mapped, lines X–Y; itemType/source_group; canonical tags}` |
+| Source identity / collection scope | `zotero_resolve_exact_source` | `{resolve_exact_source → status, item KEY or conflict, collection scope}` (identity metadata only) |
+| Bibliography occurrence | `zotero_search_bibliography_entries` | `{search_bibliography_entries → citing KEY, entry N, status, confidence, parse P}` |
+| Citation graph structure | `zotero_rank_works_by_inbound_citations` / neighbors | `{tool → scope, seed/target item keys, node kind, returned measure}` |
 
-*Metadata fields:* In the internal record and corresponding evidence note, use compact labels such as `journalArticle/article; review:checked`. Include only verified canonical `review:*` and `type:*` tags; omit the tag segment when none are present or metadata could not be retrieved. Never emit noncanonical legacy/subject tags in evidence records.
-*API Facts:* Plain metadata claims (title, creators, year, key, tags, collections) require verification. The resolver may support a plain identity or collection-membership claim, but it never supports a substantive finding. Emit a resolver evidence record and corresponding footnote only when identity, absence, ambiguity, or collection membership is itself material; resolver-only identity notes do not require a separate metadata call unless the related record is substantively discussed. Substantive evidence records carry the evidence location; the route behind them must internally be one permitted for that claim type.
-*Multisource:* Invoking `/skill:multisource` changes response structure only; it never relaxes these evidence contracts.
+- *Metadata formatting:* In evidence records and footnotes, use compact labels such as `journalArticle/article; review:checked`. Include only verified canonical `review:*` and `type:*` tags. Omit the tag section when none exist.
+- *API Facts:* Basic metadata claims (title, authors, year, key, collections) must be verified. The resolver can prove collection membership, but never proves an empirical finding.
+- *Multisource:* Using `/skill:multisource` changes how responses are structured; it never relaxes these evidence rules.
 
 ## Progressive Disclosure
 
-- For exact internal evidence-record schemas, field constraints, and syntax examples, load [evidence contracts](references/evidence-contracts.md).
-- For score thresholds, number verification checklists, figure handling, and failure phrasing, load [verification workflow](references/verification-workflow.md).
+- For exact internal evidence schemas and field rules, load [evidence contracts](references/evidence-contracts.md).
+- For score thresholds, number verification checklists, and failure phrasing, load [verification workflow](references/verification-workflow.md).

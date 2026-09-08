@@ -1,6 +1,6 @@
 ---
 name: skill-creation
-description: Creates new agent skills with proper structure, progressive disclosure, request-routing playbooks, and negative invariants. Use when the user asks to "create a skill", "write a skill", or "build a new skill".
+description: Creates new agent skills with clear structure, decision trees, plain-language instructions, and guardrails. Use when the user asks to "create a skill", "write a skill", or "build a new skill".
 disable-model-invocation: true
 ---
 
@@ -8,24 +8,30 @@ disable-model-invocation: true
 
 ## CPTR / Headless Limitation
 
-CPTR can inspect and draft skill changes but cannot write `~/.agents/skills/`, run `chezmoi add`, or apply files. Use regular Pi for the approved write and verification; never claim a skill was created or persisted from CPTR.
+CPTR can inspect and draft skill changes, but cannot write to `~/.agents/skills/`, run `chezmoi add`, or apply files. Use a regular Pi session to write and verify approved changes; never claim a skill was created or saved from CPTR.
 
-## Core Design Pillars
+## Core Design Guidelines
 
-High-performance skills serve as deterministic scaffolding over stochastic models. Every skill must embody six architectural pillars:
+Good skills give models clear, dependable rules to follow so they do not guess or cut corners. Every skill should follow six core guidelines:
 
-1. **Description as Air Traffic Controller:** The frontmatter `description:` is the **only** text visible to the model during global skill discovery. It must include exact trigger phrases, keywords, CLI aliases, and file patterns.
-2. **Request-Routing Decision Trees:** Visual top-down ASCII trees at the top of `SKILL.md` anchor attention and enforce an `if/elif/else` mental model across multi-intent skills. Use one canonical dispatch index; workflow sections add details rather than repeat the same route map.
-3. **Explicit Negative Invariants ("Do NOT"):** Clearly stated non-negotiable boundaries ("Never use raw shell tools on vault notes", "Never guess regression specifications") that prune hallucinatory shortcuts. **All** negative invariants, behavioral boundaries, and output/syntax rules must reside directly in `SKILL.md`, never hidden in `references/`.
-4. **Fast-Path Cognitive Budget (~120–150 lines):** `SKILL.md` is the always-loaded fast path. Treat the line budget as a ceiling, not a measure of clarity. Keep it compact, scannable, and operational; eliminate repeated guidance and long compound bullets before offloading deep edge cases, encyclopedic tables, and manuals to `references/`. Preserve complexity only when it changes routing, tool or evidence requirements, stopping behavior, or safety. Optimize for the least capable intended model, and never strip governing rules merely to make `SKILL.md` smaller.
-5. **Deterministic Script Offloading:** Replace fragile, multi-step shell generation with standalone scripts in `scripts/` or `~/.local/bin/` to save tokens and eliminate syntax errors.
-6. **Evergreen Verification (No Snapshots):** Teach commands to inspect live system state (`chezmoi status`, `query_frontmatter_sql`), never bake static counts or dates into instructions. Enforce read-before-write checks.
+1. **Clear Discovery in the Description:** The frontmatter `description:` is the only text the agent sees before choosing to load a skill. It must include exact trigger phrases, keywords, commands, and file patterns so the agent knows when to activate it.
+2. **Request-Routing Decision Trees:** When a skill handles multiple tasks or modes, place a top-down ASCII flowchart at the top of `SKILL.md`. This shows the agent which path to take at a glance. Use one main diagram; the numbered sections below then explain each step.
+3. **Clear Rules and Hook Synergy:** State non-negotiable boundaries clearly ("Never guess regression specifications", "Always use TurboVault for vault notes") so the model does not cut corners.
+   - **Reasoning Rules vs. Physical Tool Limits:** Distinguish thinking rules (how to interpret data, econometric rules, output formatting) from physical tool limits (file paths, blocked commands, read-only tools).
+   - **Check Existing Hooks:** Look at active hooks in `10_Projects/Local-LLMs/Agents/Pi/Pi-Hooks.md` and `~/.pi/agent/lib/workflow-invariants-logic.ts`. If a hook already stops a bad action physically, state the proper tool instruction cleanly in `SKILL.md` without long defensive warnings.
+   - **Hook Offloading:** If you find a new physical tool rule that does not have a hook yet, **ask Samuel** if you should add a hook to `workflow-invariants.ts`. Hooks enforce physical boundaries automatically, which is more reliable than hoping a prompt prevents a mistake.
+4. **Plain Language over Line Compression (~150–200 lines):** `SKILL.md` is loaded on every run. Clarity and plain language always beat strict line brevity:
+   - **Direct, Everyday English:** Write in short, active-voice sentences with concrete verbs ("Do X first", "Never delete Y", "If Z fails, ask Samuel"). Avoid abstract phrasing, dense compound clauses, or complicated jargon. Simple commands guide models—especially smaller local models—much more reliably.
+   - **Guideline, Not a Straitjacket:** Aim for roughly 150–200 lines (up to 250 for skills with multi-mode decision trees). Never cram ideas into dense, hard-to-read sentences just to save vertical space. If writing clearly takes 180 lines instead of 130, that is completely fine.
+   - **What to Move to References:** Keep all governing rules and workflows in `SKILL.md`. Move only large lookup tables, API schemas, full script code, and rare troubleshooting steps into `references/`.
+5. **Put Complex Shell Logic in Scripts:** Replace long or fragile shell commands with standalone helper scripts in `scripts/` or `~/.local/bin/`. This avoids syntax errors and keeps skill files short and readable.
+6. **Check Live State Instead of Hardcoding Dates or Counts:** Teach the agent to inspect current system state (such as running `chezmoi status` or querying live databases) rather than hardcoding temporary counts, dates, or file lists. Always read files before editing them.
 
 ## Skill Directory Structure
 
 ```text
 skill-name/
-├── SKILL.md           # Fast-path instructions (~120–150 lines)
+├── SKILL.md           # Fast-path instructions (~150–200 lines)
 ├── references/        # Deep thematic references, loaded on demand only
 │   ├── troubleshooting.md
 │   └── api-schemas.md
@@ -85,35 +91,35 @@ REQUEST
 
 ## Description Requirements
 
-The frontmatter description is the discovery gate:
+The frontmatter description helps the agent find the skill:
 - Max 1024 characters. Third-person phrasing.
 - **Sentence 1 (Capability):** What the skill enables.
 - **Sentence 2 (Explicit Triggers):** Exact user phrases, slash commands, or file extensions (`"Use when user asks to 'log this', 'catch up', or mentions session handoffs."`).
 
-## Progressive Disclosure (`references/`)
+## Moving Detail to `references/` (Progressive Disclosure)
 
-First eliminate redundant explanations and give each governing rule one canonical home. Then split deep material into a `references/` folder when:
-- `SKILL.md` approaches ~120–150 lines.
-- Material covers encyclopedic catalogs, extensive schemas, multi-table references, deep CLI manuals, or secondary failure recovery.
+First remove repeated explanations so each rule lives in one clear place. Then move background detail into a `references/` folder when:
+- `SKILL.md` approaches ~180–200 lines (or 250 for skills with multi-mode decision trees).
+- The content consists of big lookup tables, schemas, detailed command manuals, or rare troubleshooting guides.
 
-### The Invariant vs. Reference Boundary:
-- **Rules Stay in `SKILL.md`:** 100% of negative invariants, safety boundaries ("Never do X"), and output formatting/syntax requirements (e.g. indentation, title conventions) must live in `SKILL.md`. Agents only load `SKILL.md` by default; any rule banished exclusively to `references/` is invisible during ordinary execution.
-- **Catalogs Go to `references/`:** Deep lookup tables, taxonomies, full script code, and rare troubleshooting walkthroughs. References provide *data and manuals*, never *governing constraints*.
+### What Stays in `SKILL.md` vs. What Moves to `references/`:
+- **Rules Always Stay in `SKILL.md`:** All safety boundaries, "never do X" rules, and output formatting requirements must stay in `SKILL.md`. Agents only load `SKILL.md` by default; any rule tucked away in `references/` will be ignored during normal work.
+- **Reference Material Goes to `references/`:** Large tables, lists of codes, full scripts, and rare troubleshooting steps belong in `references/`. Reference files provide background details and manuals, not basic rules.
 
 ### Reference File Standards:
-1. **The Header Contract:** Every reference file must open with an H1 title followed immediately by a bold trigger block on line 3:
+1. **Header Trigger on Line 3:** Every reference file must open with a main title on line 1, followed on line 3 by a clear note explaining when to load it:
    ```markdown
    # Topic Title
 
    **Load this file when** [specific failure mode, advanced operation, schema lookup, or edge case].
    ```
-   *Why:* When an agent loads a reference file via `read`, this opening line provides immediate visual and attentional confirmation that it landed on the correct document.
-2. **Thematic Cohesion (One File Per Theme):** Create focused, single-purpose references (e.g., `references/troubleshooting.md`, `references/schemas.md`, `references/api-tables.md`). Never create catch-all `misc.md` or `notes.md` files.
-3. **Pointer Phrasing in `SKILL.md`:** Never list bare markdown links. In `SKILL.md`, under `## Progressive Disclosure & Reference Routing`, pair every link with an explicit condition:
+   *Why:* When an agent loads a reference file via `read`, this opening line confirms right away that it opened the right document.
+2. **One Topic Per File:** Create focused reference files (such as `references/troubleshooting.md` or `references/schemas.md`). Never create catch-all `misc.md` or `notes.md` files.
+3. **Explain Links in `SKILL.md`:** Never list bare markdown links. Under `## Progressive Disclosure & Reference Routing`, pair every link with an explicit condition:
    - *Good:* `- If page extraction fails, tables are malformed, or OCR is unreadable, load [deep-dive reading](references/deep-dive-reading.md).`
    - *Bad:* `- See [deep-dive reading](references/deep-dive-reading.md).`
-4. **Relative Pathing:** Always resolve pointers relative to the skill directory: `[topic](references/topic.md)`.
-5. **Evergreen Guarantee:** Reference files must describe timeless protocols, CLI flags, schemas, and invariants. Never record static snapshot facts (e.g. document counts, temporary state dates, or active process IDs).
+4. **Use Relative Paths:** Always write links relative to the skill folder: `[topic](references/topic.md)`.
+5. **Keep Instructions Timeless:** Describe permanent commands, flags, and steps. Never hardcode temporary counts, dates, or process IDs that will soon be outdated.
 
 ## Markdown Standards & Vault Syntax Isolation
 
@@ -122,16 +128,18 @@ First eliminate redundant explanations and give each governing rule one canonica
 
 ## Review Checklist
 
-- [ ] Description includes explicit trigger phrasing ("Use when...")
-- [ ] Non-negotiable rules section contains hard negative invariants ("Never do X")
-- [ ] 100% of negative invariants, safety boundaries, and output formatting rules reside in `SKILL.md` (never hidden in `references/`)
-- [ ] Multi-intent skills (3+ routes) include an ASCII Request-Routing Playbook tree
-- [ ] Decision tree is top-down, acyclic, and wrapped in a fenced `text` code block
-- [ ] Each rule has one canonical home; the same dispatch map is not repeated
-- [ ] Fast-path `SKILL.md` fits within ~120–150 lines
-- [ ] A model can identify the route, next action, forbidden shortcuts, stopping condition, and required output without reconciling repeated instructions
+- [ ] Description includes clear trigger phrases ("Use when...")
+- [ ] Rules separate thinking guidelines from physical tool limits
+- [ ] Physical tool limits checked against `Pi-Hooks.md` / `workflow-invariants.ts`; Samuel asked if a new hook is needed
+- [ ] All safety boundaries, rules, and output formatting stay in `SKILL.md` (never hidden in `references/`)
+- [ ] Multi-intent skills (3+ tasks) include an ASCII decision tree
+- [ ] Decision tree is top-down, straightforward, and wrapped in a fenced `text` code block
+- [ ] Each rule lives in one place without repeating the same flowchart
+- [ ] Written in plain, direct English with clear active-voice instructions (no dense jargon packing)
+- [ ] Fast-path `SKILL.md` fits comfortably within ~150–200 lines (up to 250 if needed for clarity)
+- [ ] The agent can see the route, next step, forbidden shortcuts, stopping condition, and required output clearly
 - [ ] Uses standard Markdown for skill prose; literal Obsidian highlight syntax appears only in code when documenting vault behavior
-- [ ] Complex multi-line shell logic offloaded to scripts
-- [ ] Deep edge cases split into self-describing `references/` files
-- [ ] No time-sensitive state snapshots or dates baked into instructions
+- [ ] Long or complex shell commands moved into standalone scripts
+- [ ] Rare edge cases and detailed lookup tables moved to self-describing reference files
+- [ ] No temporary dates, counts, or time-sensitive snapshots baked into text
 - [ ] Tracked in Chezmoi (`chezmoi add ~/.agents/skills/<skill-name>/SKILL.md`)
