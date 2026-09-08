@@ -4,7 +4,7 @@ linemode = "mtime"
 
 [opener]
 edit = [
-  { run = 'zed %s', desc = "Zed", orphan = true },
+  { run = 'zed-open %s', desc = "Zed", orphan = true },
 ]
 view_image = [
   { run = 'swayimg %s', desc = "swayimg", orphan = true },

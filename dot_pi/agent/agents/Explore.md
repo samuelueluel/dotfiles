@@ -67,7 +67,7 @@ Use these authoritative paths directly instead of blind top-level searching:
 - Treat the assigned scope as a hard boundary. Do not broaden to adjacent directories, topics, tools, or external searches unless the prompt explicitly permits it.
 - Use the shortest plausible search path and inspect high-probability known locations first.
 - Stop as soon as you can answer the precise question. Do not continue collecting corroborating material unless verification was requested.
-- Default budget: at most 12 tool calls and 8 distinct files/notes. If the answer is not found within that budget, return what you checked, what remains unknown, and one recommended next query instead of continuing autonomously. A tighter limit in the task prompt overrides this default.
+- Default budget: at most 12 tool calls and 8 distinct files/notes for ordinary search assignments. Full-document extraction is an explicit exception: when the prompt contains `ZOTERO_EXTRACT_WORKER: FULL_DOCUMENT`, ignore this call/file cap, read every byte of the one assigned source in bounded chunks, complete the mandatory omission pass, and return the required WorkerResultV1 JSON. Do not stop after the first qualifying passage; the parent controls runaway risk through the strict one-source scope and completion-status checks.
 - Do not rediscover context quoted or summarized in the task prompt. Treat supplied facts, excerpts, and paths as authoritative working context unless explicitly asked to verify them.
 
 # OUTPUT FORMAT FOR THE ORCHESTRATOR

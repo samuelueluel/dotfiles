@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { cleanupSessionRuntime } from "../lib/session-runtime.js";
+import { SESSION_RUNTIME_OWNED } from "../lib/session-runtime.js";
 import { documentRootAccess, routeFor } from "../lib/document-analysis-bridge-logic.ts";
 import { DOCUMENT_ANALYSIS_TOOL_NAMES } from "../lib/document-analysis-bridge-policy.ts";
 import { isSafeBashCommand } from "../lib/bash-policy.ts";
@@ -8,7 +8,7 @@ import { isSafeBashCommand } from "../lib/bash-policy.ts";
  * Compatibility layer for the old modes.ts extension.
  *
  * pi-permission-system owns tool/path/MCP/skill permissions. This extension
- * keeps the three session modes Samuel uses: manual, autoask, and auto.
+ * keeps the three process-local modes Samuel uses: manual, autoask, and auto.
  * Manual mode also retains the old conservative Bash guard because
  * pi-permission-system's bash rules are wildcard-based and cannot safely
  * express the old structured read-only parser.
@@ -31,6 +31,28 @@ export const AUTO_MODE_BLOCK_REASON = [
 ].join(" ");
 
 const ASK_USER_TOOL_NAME = "ask_user";
+
+export const PERMISSION_MODE_STATE_KEY = Symbol.for("samuel.pi.permission-mode.state");
+
+type ProcessModeState = {
+  initialized: boolean;
+  mode?: Mode;
+};
+
+function getProcessModeState(): ProcessModeState {
+  const globalScope = globalThis as typeof globalThis & Record<PropertyKey, unknown>;
+  const existing = globalScope[PERMISSION_MODE_STATE_KEY];
+  if (existing && typeof existing === "object") return existing as ProcessModeState;
+
+  const state: ProcessModeState = { initialized: false };
+  Object.defineProperty(globalScope, PERMISSION_MODE_STATE_KEY, {
+    configurable: true,
+    enumerable: false,
+    value: state,
+    writable: true,
+  });
+  return state;
+}
 
 function isAutomaticMode(mode: Mode): boolean {
   return mode !== "manual";
@@ -321,8 +343,8 @@ function notify(ctx: ExtensionContext, message: string, level: "error" | "info" 
 }
 
 export default function permissionModeExtension(pi: ExtensionAPI): void {
-  let currentMode: Mode = "manual";
-  let sessionModeOverride: Mode | undefined;
+  const processState = getProcessModeState();
+  let currentMode: Mode = processState.mode ?? "manual";
   // Track only whether ask_user was active before entering auto mode. This
   // restores the prior policy-filtered state without re-enabling a tool that
   // was already hidden by another policy.
@@ -350,27 +372,24 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
 
   const synchronizeModeWithBackend = (ctx: ExtensionContext): void => {
     const runtime = permissionRuntime();
-    if (!runtime?.getYoloMode) return;
+    const desiredMode = processState.mode;
 
-    if (sessionModeOverride) {
-      const enabled = isAutomaticMode(sessionModeOverride);
-      if (runtime.getYoloMode() !== enabled) {
+    if (desiredMode) {
+      currentMode = desiredMode;
+      const enabled = isAutomaticMode(desiredMode);
+      if (runtime?.getYoloMode && runtime.getYoloMode() !== enabled) {
         const result = runtime.setYoloMode?.(enabled, {
-          persist: false,
+          // The session-runtime config is process-owned. Persisting the
+          // override there keeps package lifecycle refreshes and in-process
+          // child sessions from reverting the parent window's mode.
+          persist: SESSION_RUNTIME_OWNED,
           source: "permission-mode",
         });
         if (result?.error) {
           currentMode = runtime.getYoloMode() ? "auto" : "manual";
-          try {
-            setStatus(ctx, currentMode);
-          } catch {
-            // A reload/session replacement may invalidate the old event context.
-          }
-          return;
         }
       }
-      currentMode = sessionModeOverride;
-    } else {
+    } else if (runtime?.getYoloMode) {
       currentMode = runtime.getYoloMode() ? "auto" : "manual";
     }
 
@@ -384,7 +403,9 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
   const applyMode = (mode: Mode, ctx: ExtensionContext): boolean => {
     const runtime = permissionRuntime();
     const result = runtime?.setYoloMode?.(isAutomaticMode(mode), {
-      persist: false,
+      // This path is a private per-process config created by session-runtime;
+      // it is not the user's shared permission-system defaults.
+      persist: SESSION_RUNTIME_OWNED,
       source: "permission-mode",
     });
 
@@ -398,7 +419,8 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
       return false;
     }
 
-    sessionModeOverride = mode;
+    processState.mode = mode;
+    processState.initialized = true;
     currentMode = mode;
     synchronizeAskUserToolVisibility();
     setStatus(ctx, mode);
@@ -412,24 +434,33 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
   };
 
   pi.on("session_start", async (_event, ctx) => {
-    // /manual, /autoask, and /auto are session-local. A new/reloaded session
-    // starts from the backend's local snapshot unless the process was launched
-    // explicitly with -a/--approve or PI_DEFAULT_MODE.
-    sessionModeOverride = requestedStartupMode();
-    currentMode = sessionModeOverride
-      ?? (permissionRuntime()?.getYoloMode?.() === true ? "auto" : "manual");
+    // Child Agent sessions share this process and therefore must reuse the
+    // parent's explicit mode instead of deriving a fresh mode from the
+    // backend's disk snapshot. The state is intentionally process-lived and
+    // changes only through an explicit mode command or a new OS process.
+    if (!processState.initialized) {
+      const requested = requestedStartupMode();
+      processState.mode = requested
+        ?? (permissionRuntime()?.getYoloMode?.() === true ? "auto" : "manual");
+      processState.initialized = true;
+    }
+    currentMode = processState.mode ?? "manual";
     synchronizeModeWithBackend(ctx);
     synchronizeAskUserToolVisibility();
   });
 
   // pi-permission-system refreshes its extension config during this lifecycle.
-  // Its config path is already process-local, and this reconciliation keeps the
-  // footer/runtime coherent when the backend or startup mode changed.
+  // Reconcile the process-owned mode after that refresh so the footer/runtime
+  // stays coherent across reloads and child Agent sessions.
   pi.on("resources_discover", async (event, ctx) => {
     if (event.reason !== "startup" && event.reason !== "reload") return;
 
     const requested = requestedStartupMode();
-    if (requested) sessionModeOverride = requested;
+    if (requested && !processState.initialized) {
+      processState.mode = requested;
+      processState.initialized = true;
+    }
+    currentMode = processState.mode ?? currentMode;
     synchronizeModeWithBackend(ctx);
     synchronizeAskUserToolVisibility();
     // Let later package handlers refresh first, then reapply an explicit mode.
@@ -455,10 +486,6 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     return {};
   });
 
-  pi.on("session_shutdown", async (event) => {
-    if (event.reason === "quit") cleanupSessionRuntime();
-  });
-
   pi.registerCommand("manual", {
     description: "Switch to manual permission mode",
     handler: async (_args, ctx) => {
@@ -467,14 +494,14 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("auto", {
-    description: "Switch to non-interactive auto mode for this session",
+    description: "Switch to non-interactive auto mode for this Pi process",
     handler: async (_args, ctx) => {
       applyMode("auto", ctx);
     },
   });
 
   pi.registerCommand("autoask", {
-    description: "Switch to auto permission mode while allowing user questions",
+    description: "Switch to process-local auto permission mode while allowing user questions",
     handler: async (_args, ctx) => {
       applyMode("autoask", ctx);
     },

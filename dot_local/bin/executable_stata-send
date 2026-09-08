@@ -1,0 +1,58 @@
+#!/bin/bash
+# Send selected Stata code to a running interactive session via tmux.
+# Zed sets ZED_SELECTED_TEXT, ZED_FILE, ZED_DIRNAME when spawning the task.
+TARGET="${STATA_TMUX_TARGET:-stata}"
+TMPFILE="/tmp/zed_stata_run.do"
+
+# Locate project root from active file in Zed
+find_project_root() {
+    local start_dir="$1"
+    local dir="$start_dir"
+    while [ "$dir" != "/" ] && [ -n "$dir" ]; do
+        if [ -f "$dir/project_globals.do" ]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+
+    # Fallback to .git root if present
+    dir="$start_dir"
+    while [ "$dir" != "/" ] && [ -n "$dir" ]; do
+        if [ -d "$dir/.git" ]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+
+    # Fallback to file directory
+    echo "$start_dir"
+}
+
+FILE_PATH="${ZED_FILE:-}"
+START_DIR=""
+if [ -n "$FILE_PATH" ]; then
+    START_DIR="$(dirname "$FILE_PATH")"
+elif [ -n "${ZED_DIRNAME:-}" ]; then
+    START_DIR="$ZED_DIRNAME"
+elif [ -n "${ZED_WORKTREE_ROOT:-}" ]; then
+    START_DIR="$ZED_WORKTREE_ROOT"
+fi
+
+{
+    if [ -n "$START_DIR" ]; then
+        ROOT_DIR="$(find_project_root "$START_DIR")"
+        if [ -n "$ROOT_DIR" ]; then
+            echo "quietly cd \"$ROOT_DIR\""
+        fi
+    fi
+    printf '%s\n' "$ZED_SELECTED_TEXT"
+} > "$TMPFILE"
+
+if ! tmux has-session -t "$TARGET" 2>/dev/null; then
+    echo "stata-send: no tmux session named '$TARGET'" >&2
+    exit 1
+fi
+
+tmux send-keys -t "$TARGET" "do \"$TMPFILE\"" Enter

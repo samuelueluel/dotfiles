@@ -18,6 +18,7 @@ const modeModule = await jiti.import(
 
 function createHarness(initialTools = ["read", "ask_user", "bash"]) {
   const previousRuntime = globalThis.__piPermissionSystem;
+  const previousModeState = globalThis[modeModule.PERMISSION_MODE_STATE_KEY];
   let yoloMode = false;
   let activeTools = [...initialTools];
   const handlers = new Map();
@@ -76,6 +77,11 @@ function createHarness(initialTools = ["read", "ask_user", "bash"]) {
         delete globalThis.__piPermissionSystem;
       } else {
         globalThis.__piPermissionSystem = previousRuntime;
+      }
+      if (previousModeState === undefined) {
+        delete globalThis[modeModule.PERMISSION_MODE_STATE_KEY];
+      } else {
+        globalThis[modeModule.PERMISSION_MODE_STATE_KEY] = previousModeState;
       }
     },
   };

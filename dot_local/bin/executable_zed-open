@@ -1,0 +1,20 @@
+#!/bin/bash
+# Open files in Zed with their containing directory as the project workspace.
+if [ $# -eq 0 ]; then
+    exec zed
+fi
+
+FIRST="$1"
+if [ -d "$FIRST" ]; then
+    exec zed "$@"
+elif [ -f "$FIRST" ]; then
+    DIR="$(dirname "$FIRST")"
+    # Do not set root, tmp, or home directly as workspace to avoid indexing clutter
+    if [ "$DIR" = "$HOME" ] || [ "$DIR" = "/tmp" ] || [ "$DIR" = "/" ]; then
+        exec zed "$@"
+    else
+        exec zed "$DIR" "$@"
+    fi
+else
+    exec zed "$@"
+fi

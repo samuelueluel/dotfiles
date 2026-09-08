@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""zotero-extract — deterministic spine for exhaustive collection extraction.
+"""zotero-extract — deterministic spine for scoped full-document extraction.
 
 This is the deterministic-code tier of the exhaustive extraction workflow
 (see the zotero-extract skill). It never runs a model. It:
 
-  1. enumerates a Zotero collection subtree via the local API (or a supplied
-     item list), deduplicating items filed in several subcollections,
+  1. freezes an explicit item scope, populated from a Zotero collection
+     subtree or a caller-supplied list of Zotero parent items,
   2. resolves each item's text source (MinerU sidecar preferred, PDF text
      layer as the lower-fidelity fallback; ambiguous or oversized sources
      fail closed),
@@ -17,11 +17,14 @@ passes, adjudication, synthesis — belongs to the agent session (pihat or pi),
 not to this script.
 
 Usage:
-  zotero-extract init --collection KEY --rule "TEXT" | --rule-file PATH
-                      --outdir DIR [--name NAME] [--items-file FILE]
+  zotero-extract init (--collection KEY | --item KEY ... | --items KEY,... |
+                      --items-file FILE) --rule "TEXT" | --rule-file PATH
+                      --outdir DIR [--name NAME]
   zotero-extract source RUNDIR KEY
   zotero-extract pending RUNDIR [--limit N]
   zotero-extract submit RUNDIR PACKET.json
+  zotero-extract check-worker-result RUNDIR KEY RESULT.json
+  zotero-extract submit-worker-result RUNDIR KEY RESULT.json [--worker LABEL]
   zotero-extract mark RUNDIR KEY STATE --reason TEXT
       (STATE = excluded | unreadable | failed | escalated)
   zotero-extract status RUNDIR
@@ -36,8 +39,8 @@ Environment:
                                escalated (unit processing not yet implemented)
 
 Run directory layout:
-  RUNDIR/manifest.json     coverage manifest (authoritative state)
-  RUNDIR/config.json       collection, inclusion rule, created timestamp
+  RUNDIR/manifest.json     frozen-scope coverage manifest (authoritative state)
+  RUNDIR/config.json       scope, inclusion rule, created timestamp
   RUNDIR/packets/KEY.json  accepted evidence packets
   RUNDIR/sources/KEY.txt   text-layer extractions (script-produced)
 
@@ -60,7 +63,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 PROG = "zotero-extract"
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
 PACKET_VERSION = 1
 PAGE_SIZE = 100
 PAGE_CAP = 50000
@@ -71,6 +74,12 @@ NON_PARENT_TYPES = {"attachment", "note", "annotation"}
 RECORD_KINDS = ("finding", "definition", "method", "estimate", "qualification")
 CONFIDENCES = ("high", "medium", "low")
 MIN_QUOTE_CHARS = 20
+WORKER_RESULT_KEYS = frozenset({"records", "omission_pass", "negative_result"})
+WORKER_RECORD_KEYS = frozenset({
+    "kind", "span", "anchor", "confidence", "ambiguous", "note",
+})
+SPAN_KEYS = frozenset({"start", "end"})
+ANCHOR_KEYS = frozenset({"page", "section", "table"})
 
 ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\uFEFF\u00ad"))
 
@@ -113,6 +122,66 @@ def clean_title(s):
 def die(msg, code=1):
     print(f"{PROG}: {msg}", file=sys.stderr)
     sys.exit(code)
+
+
+def normalize_item_record(item, source):
+    """Normalize a Zotero API item or a compact explicit-scope record."""
+    if isinstance(item, str):
+        item = {"key": item}
+    if not isinstance(item, dict):
+        die(f"{source}: each explicit item must be a key or object")
+    data = item.get("data") if isinstance(item.get("data"), dict) else item
+    key = item.get("key") or item.get("item_key") or data.get("key")
+    if not isinstance(key, str) or not key.strip():
+        die(f"{source}: each explicit item needs a non-empty 'key'")
+    return {
+        "key": key.strip(),
+        "title": data.get("title") or item.get("title", "Untitled"),
+        "itemType": data.get("itemType") or item.get("itemType") or "unknown",
+        "date": data.get("date") or item.get("date", ""),
+    }
+
+
+def normalize_explicit_items(items, source):
+    """Validate an explicit item inventory without silently changing it."""
+    if not isinstance(items, list) or not items:
+        die(f"{source}: expected a non-empty JSON list of Zotero parent items")
+    normalized, seen = [], set()
+    for item in items:
+        record = normalize_item_record(item, source)
+        key = record["key"]
+        if key in seen:
+            die(f"{source}: duplicate explicit item key: {key}")
+        if record["itemType"] in NON_PARENT_TYPES:
+            die(f"{source}: {key} is {record['itemType']}; select its parent item")
+        seen.add(key)
+        normalized.append(record)
+    return normalized
+
+
+def parse_explicit_keys(values, csv_values):
+    """Parse repeatable --item and comma-separated --items selectors."""
+    keys = []
+    for value in list(values or []) + list(csv_values or []):
+        for raw_key in value.split(","):
+            key = raw_key.strip()
+            if not key:
+                die("explicit item selectors cannot contain an empty key")
+            keys.append(key)
+    if not keys:
+        return []
+    return [record["key"] for record in normalize_explicit_items(
+        [{"key": key} for key in keys], "explicit item selectors")]
+
+
+def load_items_file(path):
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        die(f"cannot read --items-file {path}: {e}")
+    if isinstance(raw, dict):
+        raw = raw.get("items")
+    return normalize_explicit_items(raw, f"--items-file {path}")
 
 
 def http_get_json(url):
@@ -197,6 +266,7 @@ def item_entry(order, key, title, item_type, date):
         "source_path": None,
         "source_sha256": None,
         "packet": None,
+        "worker_result": None,
         "records": 0,
         "updated_at": now(),
     }
@@ -254,6 +324,36 @@ def fetch_collection_items(scope_keys):
     return items
 
 
+def fetch_items_by_keys(keys):
+    """Fetch and validate explicit parent items from the local Zotero API."""
+    items = []
+    for key in keys:
+        item = http_get_json(f"{api_base()}/items/{key}?format=json")
+        items.extend(normalize_explicit_items([item], f"item {key}"))
+    return items
+
+
+def storage_attachment_path(child_key, relative_name):
+    """Resolve a Zotero storage URI beneath its attachment directory."""
+    if not isinstance(child_key, str) or not re.fullmatch(r"[A-Za-z0-9]{8}", child_key):
+        return None
+    if not isinstance(relative_name, str) or not relative_name:
+        return None
+    # Zotero storage/attachments paths are relative filenames. Reject absolute,
+    # platform-separator, and traversal forms before checking the resolved path.
+    if relative_name.startswith(("/", "\\")) or "\\" in relative_name:
+        return None
+    try:
+        attachment_root = (storage_dir() / child_key).resolve()
+        candidate = (attachment_root / relative_name).resolve()
+        if candidate == attachment_root:
+            return None
+        candidate.relative_to(attachment_root)
+    except (OSError, RuntimeError, ValueError):
+        return None
+    return candidate
+
+
 def resolve_pdf_paths(item_key):
     """Resolve ALL PDF attachment paths for a parent item (ambiguity is the
     caller's problem — silently choosing one would corrupt the source route)."""
@@ -265,15 +365,21 @@ def resolve_pdf_paths(item_key):
         if (data.get("itemType") == "attachment"
                 and data.get("contentType") == "application/pdf"):
             path = data.get("path")
-            if not path:
+            # Imported Zotero attachments expose `filename` plus an enclosure
+            # link in the API, but may omit data.path. Treat that shape as the
+            # equivalent storage URI; linked-file items still use data.path.
+            if not isinstance(path, str) or not path:
+                filename = data.get("filename")
+                path = f"storage:{filename}" if isinstance(filename, str) and filename else None
+            if not isinstance(path, str) or not path:
                 continue
-            if path.startswith("attachments:"):
-                cand = storage_dir() / ch["key"] / path.split(":", 1)[1]
+            if path.startswith(("attachments:", "storage:")):
+                cand = storage_attachment_path(ch.get("key"), path.split(":", 1)[1])
             elif path.startswith("/"):
                 cand = Path(path)
             else:
-                continue
-            if cand.is_file():
+                cand = None
+            if cand is not None and cand.is_file():
                 paths.append(cand)
     return paths
 
@@ -297,51 +403,108 @@ def cmd_init(args):
     if not rule:
         die("inclusion rule is empty — the rule governs what workers extract")
 
-    if args.items_file:
-        try:
-            raw = json.loads(Path(args.items_file).read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as e:
-            die(f"cannot read --items-file {args.items_file}: {e}")
-        raw_items = [{"key": it["key"],
-                      "title": it.get("title", "Untitled"),
-                      "itemType": it.get("itemType", "unknown"),
-                      "date": it.get("date", "")} for it in raw]
-        coll_name = args.name or "from-items-file"
+    explicit_keys = parse_explicit_keys(args.item, args.items)
+    if args.collection and explicit_keys:
+        die("choose one scope selector: --collection or explicit --item/--items keys")
+    if args.items_file and explicit_keys:
+        die("choose one explicit scope selector: --items-file or --item/--items keys")
+    if not args.collection and not args.items_file and not explicit_keys:
+        die("provide one scope selector: --collection, --item/--items, or --items-file")
+
+    if args.collection and args.items_file:
+        # Preserve the old offline/testing invocation while making its
+        # inventory provenance explicit. The file, not the collection, fixes
+        # the actual item boundary in this legacy form.
+        print(f"{PROG}: warning: --collection with --items-file is a legacy "
+              "collection-snapshot form; prefer --items-file alone for an "
+              "explicit item scope", file=sys.stderr)
+        raw_items = load_items_file(args.items_file)
+        scope_type = "collection"
+        scope_spec = {"collection_key": args.collection,
+                      "items_file": str(args.items_file)}
+        inventory_source = "legacy_items_file"
+        scope_name = args.name or "from-items-file"
+        collection_key = args.collection
+        collection_name = scope_name
+        n_subcolls = 0
+    elif args.collection:
+        api_scope_name, scope = fetch_collection_subtree(args.collection)
+        raw_items = fetch_collection_items(scope)
+        scope_name = args.name or api_scope_name
+        scope_type = "collection"
+        scope_spec = {"collection_key": args.collection}
+        inventory_source = "zotero_collection_subtree"
+        collection_key = args.collection
+        collection_name = scope_name
+        n_subcolls = len(scope) - 1
+    elif args.items_file:
+        raw_items = load_items_file(args.items_file)
+        scope_type = "items"
+        scope_spec = {"items_file": str(args.items_file)}
+        inventory_source = "explicit_items_file"
+        scope_name = args.name or "explicit-items"
+        collection_key = None
+        collection_name = None
         n_subcolls = 0
     else:
-        if not args.name:
-            die("--name is required when enumerating from the Zotero local API")
-        coll_name, scope = fetch_collection_subtree(args.collection)
-        raw_items = fetch_collection_items(scope)
-        n_subcolls = len(scope) - 1
+        raw_items = fetch_items_by_keys(explicit_keys)
+        scope_type = "items"
+        scope_spec = {"item_keys": explicit_keys}
+        inventory_source = "zotero_item_keys"
+        scope_name = args.name or "explicit-items"
+        collection_key = None
+        collection_name = None
+        n_subcolls = 0
 
+    explicit_scope = scope_type == "items"
     entries, seen = [], set()
-    for it in raw_items:
-        key = it.get("key")
-        data = it.get("data", it)
-        itype = data.get("itemType") or it.get("itemType") or "unknown"
-        if not key or key in seen or itype in NON_PARENT_TYPES:
+    for raw_item in raw_items:
+        record = normalize_item_record(raw_item, "scope inventory")
+        key = record["key"]
+        if key in seen:
+            if explicit_scope:
+                die(f"scope inventory: duplicate explicit item key: {key}")
+            continue
+        if record["itemType"] in NON_PARENT_TYPES:
+            if explicit_scope:
+                die(f"scope inventory: {key} is {record['itemType']}; "
+                    "select its parent item")
             continue
         seen.add(key)
-        entries.append(item_entry(len(entries), key,
-                                  data.get("title") or it.get("title", "Untitled"),
-                                  itype, data.get("date") or it.get("date", "")))
+        entries.append(item_entry(len(entries), key, record["title"],
+                                  record["itemType"], record["date"]))
     if not entries:
         die("no eligible parent items found (nothing to extract)")
 
+    # Explicit scopes are frozen and reproducible regardless of selector order;
+    # collection scopes retain the same deterministic ordering guarantee.
+    entries.sort(key=lambda entry: entry["item_key"])
+    for order, entry in enumerate(entries):
+        entry["order"] = order
+    if explicit_scope:
+        scope_spec["item_keys"] = [entry["item_key"] for entry in entries]
+
+    scope_fields = {
+        "scope_type": scope_type,
+        "scope_spec": scope_spec,
+        "inventory_source": inventory_source,
+        "scope_name": scope_name,
+        # These legacy fields remain so older readers and run directories keep
+        # working; scope_type/scope_spec are authoritative for new runs.
+        "collection_key": collection_key,
+        "collection_name": collection_name,
+        "subcollections_included": n_subcolls,
+    }
     config = {
         "run_created": now(),
-        "collection_key": args.collection,
-        "collection_name": coll_name,
-        "subcollections_included": n_subcolls,
+        **scope_fields,
         "inclusion_rule": rule,
         "items_file": args.items_file,
         "max_source_chars": max_source_chars(),
     }
     manifest = {
         "manifest_version": MANIFEST_VERSION,
-        "collection_key": args.collection,
-        "collection_name": coll_name,
+        **scope_fields,
         "inclusion_rule": rule,
         "items": entries,
     }
@@ -353,9 +516,13 @@ def cmd_init(args):
 
     n_sidecar = sum(1 for e in entries if e["extraction_route"] == "mineru_sidecar")
     print(f"Run initialized: {outdir}")
-    print(f"  collection : {coll_name} ({args.collection})"
-          + (f" — including {n_subcolls} subcollection(s)" if n_subcolls else ""))
-    print(f"  items      : {len(entries)} parent items (deduplicated)")
+    if scope_type == "collection":
+        print(f"  scope      : collection {collection_name} ({collection_key})"
+              + (f" — including {n_subcolls} subcollection(s)"
+                 if n_subcolls else ""))
+    else:
+        print(f"  scope      : explicit items ({len(entries)})")
+    print(f"  items      : {len(entries)} parent items (frozen)")
     print(f"  sidecar    : {n_sidecar}  (pdf_text_layer fallback: {len(entries) - n_sidecar})")
     print(f"  rule       : {rule}")
 
@@ -468,83 +635,105 @@ def cmd_pending(rundir, limit):
 
 # ---------------------------------------------------------------- submit
 
-def cmd_submit(rundir, packet_path):
-    rundir, m, c = load_run(rundir)
-    try:
-        pkt = json.loads(Path(packet_path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
-        die(f"cannot read packet {packet_path}: {e}")
+def source_file_for_item(rundir, item):
+    src_path = item.get("source_path") if item else None
+    if not src_path:
+        return None
+    path = Path(src_path)
+    return path if path.is_absolute() else Path(rundir) / path
 
+
+def append_key_shape_error(errors, label, value, expected):
+    if not isinstance(value, dict):
+        errors.append(f"{label} must be an object")
+        return
+    actual = set(value)
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing or extra:
+        details = []
+        if missing:
+            details.append(f"missing {missing}")
+        if extra:
+            details.append(f"unexpected {extra}")
+        errors.append(f"{label} keys invalid ({'; '.join(details)})")
+
+
+def validate_packet(rundir, manifest, config, packet):
+    """Validate a complete packet without mutating the run."""
     errors = []
+    if not isinstance(packet, dict):
+        return ["packet must be a JSON object"], None, [], ""
 
-    def err(msg):
-        errors.append(msg)
+    key = packet.get("item_key")
+    item = find_item(manifest, key)
+    if item is None:
+        return [f"packet item_key {key!r} is not part of this run"], None, [], ""
+    if item["state"] != "pending":
+        return [f"item {key} is not pending (state: {item['state']}); packet rejected"], \
+            item, [], ""
 
-    key = pkt.get("item_key")
-    it = find_item(m, key)
-    if it is None:
-        die(f"packet item_key {key!r} is not part of this run")
-    if it["state"] != "pending":
-        die(f"item {key} is not pending (state: {it['state']}); packet rejected")
+    if packet.get("packet_version") != PACKET_VERSION:
+        errors.append(f"packet_version must be {PACKET_VERSION}")
+    if packet.get("inclusion_rule") != config["inclusion_rule"]:
+        errors.append("inclusion_rule does not match this run's rule (stale or cross-run packet?)")
+    if packet.get("extraction_route") != item["extraction_route"]:
+        errors.append(f"extraction_route {packet.get('extraction_route')!r} != manifest route "
+                      f"{item['extraction_route']!r}; run 'source {key}' first")
+    if packet.get("route_fidelity") != item["route_fidelity"]:
+        errors.append(f"route_fidelity {packet.get('route_fidelity')!r} != manifest fidelity "
+                      f"{item['route_fidelity']!r}")
 
-    if pkt.get("packet_version") != PACKET_VERSION:
-        err(f"packet_version must be {PACKET_VERSION}")
-    if pkt.get("inclusion_rule") != c["inclusion_rule"]:
-        err("inclusion_rule does not match this run's rule (stale or cross-run packet?)")
-    if pkt.get("extraction_route") != it["extraction_route"]:
-        err(f"extraction_route {pkt.get('extraction_route')!r} != manifest route "
-            f"{it['extraction_route']!r}; run 'source {key}' first")
-    if pkt.get("route_fidelity") != it["route_fidelity"]:
-        err(f"route_fidelity {pkt.get('route_fidelity')!r} != manifest fidelity "
-            f"{it['route_fidelity']!r}")
-
-    src_path = it.get("source_path")
-    src_file = None
-    if src_path:
-        p = Path(src_path)
-        src_file = p if p.is_absolute() else Path(rundir) / p
-    declared_path = (pkt.get("source") or {}).get("path")
+    src_file = source_file_for_item(rundir, item)
+    source_obj = packet.get("source")
+    if not isinstance(source_obj, dict):
+        errors.append("source must be an object with path and sha256")
+        source_obj = {}
+    src_text_raw = ""
     if not src_file or not src_file.is_file():
-        err("no source text on file; run 'source' for this item first")
+        errors.append("no source text on file; run 'source' for this item first")
     else:
-        if declared_path != src_path:
-            err(f"source.path {declared_path!r} != manifest source {src_path!r}")
+        if source_obj.get("path") != item.get("source_path"):
+            errors.append(f"source.path {source_obj.get('path')!r} != manifest source "
+                          f"{item.get('source_path')!r}")
         current_hash = sha256_file(src_file)
-        declared = (pkt.get("source") or {}).get("sha256")
+        declared = source_obj.get("sha256")
         if declared != current_hash:
-            err("source.sha256 does not match current source file "
-                "(stale packet or source changed mid-run)")
-        if it.get("source_sha256") and declared != it["source_sha256"]:
-            err("source.sha256 does not match the manifest's recorded hash")
+            errors.append("source.sha256 does not match current source file "
+                          "(stale packet or source changed mid-run)")
+        if item.get("source_sha256") and declared != item["source_sha256"]:
+            errors.append("source.sha256 does not match the manifest's recorded hash")
+        src_text_raw = src_file.read_text(encoding="utf-8", errors="replace")
 
-    worker = pkt.get("worker")
+    worker = packet.get("worker")
     if worker is not None and not isinstance(worker, str):
-        err("worker must be a string (provider/model provenance)")
+        errors.append("worker must be a string (provider/model provenance)")
 
-    records = pkt.get("records")
+    records = packet.get("records")
     if not isinstance(records, list):
-        err("records must be a list")
+        errors.append("records must be a list")
         records = []
 
-    src_text = norm(src_file.read_text(encoding="utf-8", errors="replace")
-                    ) if src_file and src_file.is_file() else ""
-
+    src_text = norm(src_text_raw)
     for i, rec in enumerate(records):
         label = f"records[{i}]"
         if not isinstance(rec, dict):
-            err(f"{label}: not an object")
+            errors.append(f"{label}: not an object")
             continue
         if rec.get("kind") not in RECORD_KINDS:
-            err(f"{label}.kind must be one of {RECORD_KINDS}")
-        quote = rec.get("quote") or ""
+            errors.append(f"{label}.kind must be one of {RECORD_KINDS}")
+        quote = rec.get("quote")
+        if not isinstance(quote, str):
+            errors.append(f"{label}.quote must be a string")
+            quote = ""
         if len(norm(quote)) < MIN_QUOTE_CHARS:
-            err(f"{label}.quote too short (< {MIN_QUOTE_CHARS} normalized chars)")
+            errors.append(f"{label}.quote too short (< {MIN_QUOTE_CHARS} normalized chars)")
         elif src_text and norm(quote) not in src_text:
-            err(f"{label}.quote not found verbatim in source — copy the quote "
-                f"exactly from the provided source text")
+            errors.append(f"{label}.quote not found verbatim in source — copy the quote "
+                          f"exactly from the provided source text")
         anchor = rec.get("anchor")
         if not isinstance(anchor, dict):
-            err(f"{label}.anchor must be an object (page/section/table, any nullable)")
+            errors.append(f"{label}.anchor must be an object (page/section/table, any nullable)")
         else:
             sec = anchor.get("section")
             if isinstance(sec, str) and sec.strip() and src_text \
@@ -552,41 +741,242 @@ def cmd_submit(rundir, packet_path):
                 print(f"{PROG}: warning: {label}.anchor.section not found in source text",
                       file=sys.stderr)
         if rec.get("confidence") not in CONFIDENCES:
-            err(f"{label}.confidence must be one of {CONFIDENCES}")
+            errors.append(f"{label}.confidence must be one of {CONFIDENCES}")
         if not isinstance(rec.get("ambiguous", False), bool):
-            err(f"{label}.ambiguous must be a boolean")
+            errors.append(f"{label}.ambiguous must be a boolean")
 
-    omission = pkt.get("omission_pass") or {}
-    if omission.get("performed") is not True:
-        err("omission_pass.performed must be true — the second pass is mandatory")
+    omission = packet.get("omission_pass")
+    if not isinstance(omission, dict) or omission.get("performed") is not True:
+        errors.append("omission_pass.performed must be true — the second pass is mandatory")
 
-    negative = pkt.get("negative_result") or {}
-    if negative.get("examined_in_full") is not True:
-        err("negative_result.examined_in_full must be true for every packet")
-    if bool(records) != bool(negative.get("qualifying_evidence")):
-        err("negative_result.qualifying_evidence must be true iff records is "
-            "non-empty (an empty packet is a negative finding, not a shrug)")
+    negative = packet.get("negative_result")
+    if not isinstance(negative, dict) or negative.get("examined_in_full") is not True:
+        errors.append("negative_result.examined_in_full must be true for every packet")
+    if not isinstance(negative, dict) or not isinstance(negative.get("qualifying_evidence"), bool):
+        errors.append("negative_result.qualifying_evidence must be a boolean")
+    elif bool(records) != negative["qualifying_evidence"]:
+        errors.append("negative_result.qualifying_evidence must be true iff records is "
+                      "non-empty (an empty packet is a negative finding, not a shrug)")
 
-    if errors:
-        print(f"VALIDATION FAILED for {key}:", file=sys.stderr)
-        for e in errors:
-            print(f"  - {e}", file=sys.stderr)
-        sys.exit(1)
+    return errors, item, records, src_text_raw
 
-    dest = rundir / "packets" / f"{key}.json"
-    atomic_json(dest, pkt)
-    it["state"] = "processed"
-    it["reason"] = None
-    it["packet"] = str(dest)
-    it["records"] = len(records)
-    it["updated_at"] = now()
-    save_manifest(rundir, m)
 
-    counts = counts_by_state(m)
-    print(f"accepted {key}: {len(records)} record(s) -> {dest}")
+def accept_packet(rundir, manifest, key, packet, worker_result_path=None):
+    dest = Path(rundir) / "packets" / f"{key}.json"
+    atomic_json(dest, packet)
+    item = find_item(manifest, key)
+    item["state"] = "processed"
+    item["reason"] = None
+    item["packet"] = str(dest)
+    if worker_result_path is not None:
+        item["worker_result"] = str(worker_result_path)
+    item["records"] = len(packet["records"])
+    item["updated_at"] = now()
+    save_manifest(rundir, manifest)
+
+    counts = counts_by_state(manifest)
+    print(f"accepted {key}: {len(packet['records'])} record(s) -> {dest}")
     print("  " + " · ".join(f"{s} {counts[s]}" for s in ("processed", "pending",
                                                          "excluded", "unreadable",
                                                          "failed", "escalated")))
+
+
+def read_json_document(path, label):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8")), None
+    except (OSError, json.JSONDecodeError) as e:
+        return None, f"cannot read {label} {path}: {e}"
+
+
+def cmd_submit(rundir, packet_path):
+    rundir, manifest, config = load_run(rundir)
+    packet, parse_error = read_json_document(packet_path, "packet")
+    if parse_error:
+        die(parse_error)
+    errors, item, _, _ = validate_packet(rundir, manifest, config, packet)
+    key = packet.get("item_key") if isinstance(packet, dict) else None
+    if errors:
+        print(f"VALIDATION FAILED for {key}:", file=sys.stderr)
+        for error in errors:
+            print(f"  - {error}", file=sys.stderr)
+        sys.exit(1)
+    accept_packet(rundir, manifest, item["item_key"], packet)
+
+
+def validate_worker_result(rundir, manifest, key, result):
+    """Validate semantic WorkerResultV1 and materialize exact source spans."""
+    errors = []
+    item = find_item(manifest, key)
+    if item is None:
+        return [f"item_key {key!r} is not part of this run"], None, "", []
+    if item["state"] != "pending":
+        return [f"item {key} is not pending (state: {item['state']})"], item, "", []
+
+    src_file = source_file_for_item(rundir, item)
+    source_text = ""
+    if not src_file or not src_file.is_file():
+        errors.append("no source text on file; run 'source' for this item first")
+    else:
+        current_hash = sha256_file(src_file)
+        if not item.get("source_sha256"):
+            errors.append("manifest has no source hash; run 'source' for this item first")
+        elif current_hash != item["source_sha256"]:
+            errors.append("source changed since manifest resolution; run 'source' again")
+        source_text = src_file.read_text(encoding="utf-8", errors="replace")
+
+    if not isinstance(result, dict):
+        errors.append("WorkerResultV1 must be a JSON object")
+        return errors, item, source_text, []
+
+    append_key_shape_error(errors, "result", result, WORKER_RESULT_KEYS)
+    records = result.get("records")
+    if not isinstance(records, list):
+        errors.append("records must be a list")
+        records = []
+
+    omission = result.get("omission_pass")
+    if not isinstance(omission, dict):
+        errors.append("omission_pass must be an object")
+    else:
+        append_key_shape_error(errors, "omission_pass", omission, {"performed", "records_added"})
+        if omission.get("performed") is not True:
+            errors.append("omission_pass.performed must be true")
+        if (isinstance(omission.get("records_added"), bool)
+                or not isinstance(omission.get("records_added"), int)
+                or omission.get("records_added", -1) < 0):
+            errors.append("omission_pass.records_added must be a non-negative integer")
+
+    negative = result.get("negative_result")
+    if not isinstance(negative, dict):
+        errors.append("negative_result must be an object")
+    else:
+        append_key_shape_error(errors, "negative_result", negative,
+                               {"examined_in_full", "qualifying_evidence"})
+        if negative.get("examined_in_full") is not True:
+            errors.append("negative_result.examined_in_full must be true")
+        if not isinstance(negative.get("qualifying_evidence"), bool):
+            errors.append("negative_result.qualifying_evidence must be a boolean")
+        elif bool(records) != negative["qualifying_evidence"]:
+            errors.append("negative_result.qualifying_evidence must be true iff records is non-empty")
+
+    materialized = []
+    for i, record in enumerate(records):
+        label = f"records[{i}]"
+        if not isinstance(record, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        append_key_shape_error(errors, label, record, WORKER_RECORD_KEYS)
+        if set(record) != WORKER_RECORD_KEYS:
+            continue
+        if record["kind"] not in RECORD_KINDS:
+            errors.append(f"{label}.kind must be one of {RECORD_KINDS}")
+        if record["confidence"] not in CONFIDENCES:
+            errors.append(f"{label}.confidence must be one of {CONFIDENCES}")
+        if not isinstance(record["ambiguous"], bool):
+            errors.append(f"{label}.ambiguous must be a boolean")
+        if not isinstance(record["note"], str):
+            errors.append(f"{label}.note must be a string")
+
+        span = record["span"]
+        valid_span = isinstance(span, dict) and set(span) == SPAN_KEYS
+        if not valid_span:
+            append_key_shape_error(errors, f"{label}.span", span, SPAN_KEYS)
+        start = span.get("start") if valid_span else None
+        end = span.get("end") if valid_span else None
+        if (isinstance(start, bool) or not isinstance(start, int)
+                or isinstance(end, bool) or not isinstance(end, int)):
+            errors.append(f"{label}.span.start/end must be integer character offsets")
+            valid_span = False
+        elif start < 0 or end <= start or end > len(source_text):
+            errors.append(f"{label}.span must be within source text with end > start")
+            valid_span = False
+        elif start == 0 and end == len(source_text):
+            errors.append(f"{label}.span must identify a passage, not the entire source")
+            valid_span = False
+
+        anchor = record["anchor"]
+        if not isinstance(anchor, dict) or set(anchor) != ANCHOR_KEYS:
+            append_key_shape_error(errors, f"{label}.anchor", anchor, ANCHOR_KEYS)
+            anchor = None
+        elif (anchor["page"] is not None
+              and (isinstance(anchor["page"], bool)
+                   or not isinstance(anchor["page"], (int, str)))):
+            errors.append(f"{label}.anchor.page must be an integer, string, or null")
+        for field in ("section", "table"):
+            if anchor is not None and anchor[field] is not None \
+                    and not isinstance(anchor[field], str):
+                errors.append(f"{label}.anchor.{field} must be a string or null")
+
+        if valid_span and source_text:
+            quote = source_text[start:end]
+            if len(norm(quote)) < MIN_QUOTE_CHARS:
+                errors.append(f"{label}.span selects fewer than {MIN_QUOTE_CHARS} normalized characters")
+            else:
+                materialized.append({
+                    "kind": record["kind"],
+                    "quote": quote,
+                    "anchor": anchor,
+                    "confidence": record["confidence"],
+                    "ambiguous": record["ambiguous"],
+                    "note": record["note"],
+                })
+
+    return errors, item, source_text, materialized
+
+
+def cmd_check_worker_result(rundir, key, result_path):
+    rundir, manifest, _ = load_run(rundir)
+    result, parse_error = read_json_document(result_path, "worker result")
+    if parse_error:
+        print(json.dumps({"valid": False, "item_key": key,
+                          "errors": [parse_error]}, ensure_ascii=False))
+        sys.exit(1)
+    errors, _, _, materialized = validate_worker_result(rundir, manifest, key, result)
+    payload = {"valid": not errors, "item_key": key, "errors": errors}
+    if not errors:
+        payload["record_count"] = len(materialized)
+    print(json.dumps(payload, ensure_ascii=False))
+    if errors:
+        sys.exit(1)
+
+
+def cmd_submit_worker_result(rundir, key, result_path, worker):
+    rundir, manifest, config = load_run(rundir)
+    result, parse_error = read_json_document(result_path, "worker result")
+    if parse_error:
+        die(parse_error)
+    errors, item, _, materialized = validate_worker_result(rundir, manifest, key, result)
+    if errors:
+        print(f"WORKER RESULT INVALID for {key}:", file=sys.stderr)
+        for error in errors:
+            print(f"  - {error}", file=sys.stderr)
+        sys.exit(1)
+
+    packet = {
+        "packet_version": PACKET_VERSION,
+        "item_key": key,
+        "inclusion_rule": config["inclusion_rule"],
+        "extraction_route": item["extraction_route"],
+        "route_fidelity": item["route_fidelity"],
+        "source": {"path": item["source_path"],
+                   "sha256": item["source_sha256"]},
+        "records": materialized,
+        "omission_pass": result["omission_pass"],
+        "negative_result": result["negative_result"],
+    }
+    if worker is not None:
+        packet["worker"] = worker
+
+    packet_errors, _, _, _ = validate_packet(rundir, manifest, config, packet)
+    if packet_errors:
+        print(f"CONSTRUCTED PACKET VALIDATION FAILED for {key}:", file=sys.stderr)
+        for error in packet_errors:
+            print(f"  - {error}", file=sys.stderr)
+        sys.exit(1)
+
+    raw_dest = rundir / "worker-results" / f"{key}.json"
+    atomic_json(raw_dest, result)
+    accept_packet(rundir, manifest, key, packet, raw_dest)
 
 
 # ---------------------------------------------------------------- mark
@@ -619,12 +1009,25 @@ def counts_by_state(m):
     return counts
 
 
+def manifest_scope_type(m):
+    """Read new scope metadata while remaining compatible with old runs."""
+    return m.get("scope_type") or ("collection" if m.get("collection_key") else "items")
+
+
+def manifest_scope_label(m):
+    if manifest_scope_type(m) == "items":
+        return f"explicit items ({len(m.get('items', []))})"
+    name = m.get("collection_name") or m.get("scope_name") or "unknown"
+    key = m.get("collection_key") or "unknown"
+    return f"collection {name} ({key})"
+
+
 def cmd_status(rundir):
     _, m, _ = load_run(rundir)
     counts = counts_by_state(m)
     total = len(m["items"])
     print(f"Run: {rundir}")
-    print(f"  collection : {m['collection_name']} ({m['collection_key']})")
+    print(f"  scope      : {manifest_scope_label(m)}")
     print(f"  items      : {total}")
     print("  " + " · ".join(f"{s} {counts[s]}" for s in counts))
     pending = [e for e in m["items"] if e["state"] == "pending"]
@@ -642,7 +1045,7 @@ def cmd_manifest(rundir, as_json):
         print(json.dumps(m, indent=2, ensure_ascii=False))
         return
     counts = counts_by_state(m)
-    print(f"Coverage manifest — {m['collection_name']} ({m['collection_key']})")
+    print(f"Coverage manifest — {manifest_scope_label(m)}")
     print(f"Inclusion rule: {m['inclusion_rule']}")
     print("Counts: " + " · ".join(f"{s} {counts[s]}" for s in counts))
     print()
@@ -690,13 +1093,18 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("init", help="create a run: enumerate + resolve routes")
-    p.add_argument("--collection", required=True)
-    p.add_argument("--name", help="collection display name (required with local API)")
+    p = sub.add_parser("init", help="create a run from a frozen item scope")
+    p.add_argument("--collection", help="Zotero collection key; includes nested subcollections")
+    p.add_argument("--item", action="append", default=[],
+                   help="explicit Zotero parent item key; repeat as needed")
+    p.add_argument("--items", action="append", default=[],
+                   help="comma-separated explicit Zotero parent item keys")
+    p.add_argument("--items-file",
+                   help="JSON list/object of explicit Zotero items (offline-friendly)")
+    p.add_argument("--name", help="optional scope display name")
     p.add_argument("--rule", help="inclusion rule text for workers")
     p.add_argument("--rule-file", help="file holding the inclusion rule (for long rules)")
     p.add_argument("--outdir", required=True)
-    p.add_argument("--items-file", help="JSON item list instead of the local API (offline/testing)")
     p.set_defaults(fn=lambda a: cmd_init(a))
 
     p = sub.add_parser("source", help="resolve/print the text source for one item")
@@ -713,6 +1121,22 @@ def main():
     p.add_argument("rundir")
     p.add_argument("packet")
     p.set_defaults(fn=lambda a: cmd_submit(a.rundir, a.packet))
+
+    p = sub.add_parser("check-worker-result",
+                       help="validate a semantic WorkerResultV1 without mutation")
+    p.add_argument("rundir")
+    p.add_argument("key")
+    p.add_argument("result")
+    p.set_defaults(fn=lambda a: cmd_check_worker_result(a.rundir, a.key, a.result))
+
+    p = sub.add_parser("submit-worker-result",
+                       help="materialize source spans and submit a WorkerResultV1")
+    p.add_argument("rundir")
+    p.add_argument("key")
+    p.add_argument("result")
+    p.add_argument("--worker", help="optional provider/model provenance")
+    p.set_defaults(fn=lambda a: cmd_submit_worker_result(
+        a.rundir, a.key, a.result, a.worker))
 
     p = sub.add_parser("mark", help="mark a terminal non-success state")
     p.add_argument("rundir")

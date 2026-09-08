@@ -22,13 +22,43 @@ Run the 3-stage pipeline via `zotero-sidecar.sh`:
 
 ```bash
 # Ingestion Stages
-zotero-sidecar.sh create  <COLLECTION_KEY | KEY...>   # Stage 1: MinerU GPU parse -> Markdown sidecar
+zotero-sidecar.sh create  <COLLECTION_KEY | KEY...>   # Stage 1: capability-aware MinerU parse -> Markdown sidecar
 zotero-sidecar.sh enrich  <COLLECTION_KEY | KEY...>   # Stage 2: Inject [Figure Schema] blocks (requires :8084)
 zotero-sidecar.sh embed   <COLLECTION_KEY...>         # Stage 3: Chunk + embed into ChromaDB & BM25
 
 # Maintenance
 zotero-sidecar.sh reembed <COLLECTION_KEY...>         # Delete Chroma chunks first, then re-index
 ```
+
+### MinerU CLI compatibility and upgrade guardrail
+
+The sidecar creator must call the production `zotero_mcp.mineru.run_mineru` path through `zotero-sidecar.sh`; do not copy a command line from a different MinerU virtual environment. The runner is intentionally ~={green}capability-aware=~:
+
+- It probes the selected binary's `--help` output and adds `-b/--backend` only when that binary advertises the option. MinerU 3.x (`mineru`) and the retained 1.x (`magic-pdf`) CLI are both supported.
+- It exports the configured `semantic_search.mineru.config_json` as `MINERU_TOOLS_CONFIG_JSON` and selects the matching legacy/new VRAM variable.
+- The managed patcher byte-synchronizes `mineru.py` on every application, so an installed package cannot silently retain an older patch after `sjust uv`.
+
+After changing the MCP tag, MinerU virtual environment, or MinerU config, run this ~={green}fast preflight=~ before a batch:
+
+```bash
+ZOTERO_LOCAL=true "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" - <<'PY'
+from pathlib import Path
+from zotero_mcp.mineru import load_mineru_config, _build_mineru_invocation
+cfg = load_mineru_config()
+bin_path = Path(cfg["bin"])
+if not bin_path.exists():
+    raise SystemExit(f"MinerU binary missing: {bin_path}")
+cmd, env, modern = _build_mineru_invocation(
+    cfg, Path("/tmp/placeholder.pdf"), Path("/tmp/zotero-mineru-preflight")
+)
+print(f"binary={bin_path}")
+print(f"backend_flag_supported={modern}")
+print(f"command={' '.join(cmd)}")
+print(f"config_env={env.get('MINERU_TOOLS_CONFIG_JSON', 'default')}")
+PY
+```
+
+The preflight catches the previous failure immediately: a legacy `magic-pdf` must report `backend_flag_supported=False` and its command must contain no `-b`; a modern `mineru` may report `True`. For higher confidence, run one representative single-item `create`, wait for its detached log to report `DONE`, require a non-empty `<key>.md`, and inspect the log for `No such option`, `Traceback`, or `(null): No such file or directory` before launching a batch.
 
 ### Formula handling
 
@@ -92,19 +122,15 @@ If deadlocked (0% CPU or slow crawl), restart the container: `podman restart emb
 
 ## 4. Item-Scoped Re-embed (No Full Rebuild)
 
-To update a single item without re-embedding the whole library:
-1. Delete item chunks:
-   ```python
-   from pathlib import Path
-   from zotero_mcp.chroma_client import create_chroma_client
-   cc = create_chroma_client(str(Path.home() / '.config' / 'zotero-mcp' / 'config.json'))
-   cc.delete_item_chunks('<ITEM_KEY>')
-   ```
-2. Run incremental update:
-   ```bash
-   zotero-mcp-server update-db --fulltext
-   ```
-3. Rebuild sparse BM25 index (below) and reload service.
+Use the exact-key path for one or more parent items; it bypasses global DOI/title deduplication, refreshes existing chunks, does not run the library deletion pass, and does not advance the library sync watermark:
+
+```bash
+ZOTERO_LOCAL=true "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/zotero-mcp-server" \
+  update-db --fulltext --no-batch \
+  --item-key <ITEM_KEY> [--item-key <ANOTHER_ITEM_KEY>]
+```
+
+`--item-key` is repeatable. It accepts live parent-item keys only; `--limit`, `--force-rebuild`, and Batch API mode are rejected so an explicit request cannot broaden into a partial or destructive library update. Verify Chroma metadata (`item_key`, `fulltext_source`, and chunk count), rebuild sparse BM25 only if the run was interrupted, and reload the service if it was stopped.
 
 ## 5. Sparse (BM25) Index Synchronization
 

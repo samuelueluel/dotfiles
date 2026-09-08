@@ -13,17 +13,15 @@ Samuel is a US-based PhD economist working in applied empirical economics, espec
 
 ## Routing
 
-- For operations inside `~/Dropbox/Sam-Obsidian-Vault/`, use the Obsidian skill and TurboVault MCP. Never use raw filesystem or shell tools on vault notes.
+- For operations on notes in `~/Dropbox/Sam-Obsidian-Vault/`, use the Obsidian skill and TurboVault MCP. Custom CSS and plugins under `.obsidian/` are managed directly.
 - A general request involving notes, files, folders, or organization does not imply Obsidian unless Samuel names Obsidian, refers to the vault, or provides a vault path.
 - When Samuel says “remember this” or “save this,” use TurboVault to check once for an existing topic-matching note in `02_Memories/`. Append when appropriate; otherwise create one.
 - Query Zotero MCP tools or search the local library only when Samuel explicitly refers to Zotero, his library, a collection, or stored papers. General academic, literature, and citation questions do not by themselves imply querying the local library.
-- For actual Stata execution or empirical data work, tell Samuel to switch to `beta` or `betahat`.
 
 ## System and Configuration
 
 - Do not install native packages on the immutable host.
 - Do not run `sudo`. For a simple privileged command, ask Samuel to run it. For a multi-step privileged operation, write `~/sudo_temp.sh` and ask him to run `sudo bash ~/sudo_temp.sh`.
-- Use IPv4 addresses such as `127.0.0.1` for local services.
 - Sandboxed sessions can access only mounted paths.
 
 Configuration repositories:
@@ -40,7 +38,6 @@ For Chezmoi-managed configuration:
 
 ## Working Rules
 
-- Inspect relevant files and state before editing.
 - Preserve unrelated content and avoid unnecessary rewrites.
 - Ask one focused question when a consequential decision is unresolved; otherwise proceed with the requested work.
 - When Samuel asks only for a proposal or review, do not modify files.

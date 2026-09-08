@@ -1,0 +1,20 @@
+{
+  "name": "@samuel/pi-permission-system-process",
+  "version": "0.8.0-local.1",
+  "private": true,
+  "description": "Process-lifecycle compatibility wrapper for pi-permission-system",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "permissions"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}

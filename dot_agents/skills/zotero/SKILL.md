@@ -1,12 +1,13 @@
 ---
 name: zotero
-description: Manages Samuel's local Zotero library through MCP, including collection-scoped RAG, source verification, metadata, references, citation graphs, exports, ingestion, and maintenance. Use when Samuel names Zotero, his Zotero library, a collection, stored item, passage RAG, or citation graph, or asks to "find this paper", "who cites X", "how many times is X cited", "add this PDF to my library", or "export my bibliography".
+description: Manages Samuel's local Zotero library through MCP, including identity resolution, collection-scoped RAG, source verification, metadata, references, citation graphs, exports, ingestion, maintenance, and handoff to zotero-extract for explicit exhaustive extraction. Use when Samuel names Zotero, his Zotero library, a collection, stored item, passage RAG, citation graph, or explicitly asks for Zotero RAG, library management, or zotero-extract.
 ---
 
 # Zotero
 
 ## Non-Negotiable Rules
 
+- An explicit `zotero-extract` request or exhaustive/full-document request routes to `zotero-extract`; do not answer it through ordinary RAG or silently reduce its scope.
 - Keep Zotero work in the main session; never delegate it to subagents. Carve-out: mechanical extraction workers under the zotero-extract skill may delegate, subject to the session's configured subagent concurrency — identity, verification, adjudication, and synthesis stay in the main session.
 - For claims about source content, load and follow `~/.agents/skills/citation-integrity/SKILL.md`.
 - Ordinary literature questions are MCP-first. Pi exposes tools with one literal `zotero_*` prefix; never parse MCP transport or spill files with shell commands.
@@ -19,6 +20,7 @@ description: Manages Samuel's local Zotero library through MCP, including collec
 
 ```text
 REQUEST
+├─ Explicit `zotero-extract` or exhaustive/full-document request? ─→ EXTRACTION HANDOFF: zotero-extract
 ├─ Library mutation? ───────────────→ MUTATION: load library-ops; confirm destructive actions
 ├─ Bibliography occurrence/count? ─→ REFERENCE: search_bibliography_entries
 ├─ Named source or item? ──────────→ IDENTITY: resolve_exact_source
@@ -64,7 +66,7 @@ Do not infer source absence from failed semantic retrieval. Detailed identity an
 ### Do Not Do These by Default
 
 - Do not preflight `zotero_get_semantic_index_status`; use it only after a readiness or index error.
-- Do not enumerate a collection merely to feel exhaustive. Inventory only when completeness is requested or bounded discovery leaves a concrete recall problem — for "all/every/complete/audit" collection requests, route to the zotero-extract skill.
+- Do not enumerate a collection merely to feel exhaustive. Inventory only when completeness is requested or bounded discovery leaves a concrete recall problem — for an explicit `zotero-extract` request or "all/every/complete/audit" collection request, hand off to the zotero-extract skill.
 - Do not call graph tools unless the question concerns relationships or deliberately expands identified seeds.
 - Do not read outlines, full text, or every candidate “just in case.”
 - If MCP output is oversized, narrow the request or use a known-item fallback; never shell-parse the gateway's temporary result file.
@@ -74,6 +76,7 @@ Do not infer source absence from failed semantic retrieval. Detailed identity an
 
 - Native Zotero `itemType` is canonical; `source_group` is a query-time alias. Use only canonical `review:*` and `type:*` tags.
 - Semantic filter fields combine with `AND`. Never silently drop a supplied collection, item, type, group, or tag filter.
+- For targeted embedding maintenance, use `zotero_update_semantic_index(item_keys=[...])` or `zotero-mcp-server update-db --fulltext --no-batch --item-key KEY`. Exact-key refreshes preserve every requested live parent key, bypass DOI/title deduplication, refresh existing chunks, and leave watermark/deletion reconciliation untouched. Ordinary full-library indexing retains global DOI/title deduplication; never substitute a DOI/title duplicate for a requested key.
 - Missing `Rerank`: do not cite semantic results; repair the service or use verified direct evidence.
 - Reranker unavailable: ask Samuel to run `serve-reranker`; never use unranked substitutes.
 - Embedder unavailable: ask Samuel to run `serve-embedder`.
