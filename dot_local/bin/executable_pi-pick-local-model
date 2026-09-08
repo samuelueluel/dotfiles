@@ -7,6 +7,7 @@ usage() {
 Usage:
   pi-pick-local-model
   pi-pick-local-model --validate MODEL_ID
+  pi-pick-local-model --canonical-only
 
 Choose or validate a local Lemonade model using the same model IDs as pi.
 EOF
@@ -15,7 +16,8 @@ EOF
 is_valid_model() {
   case "$1" in
     Qwen3.8-27B-Q4|Qwen3.8-27B-Q6|Qwen3.8-27B-ROCmFP4|\
-    UD-Q4_K_XL|UD-IQ4_XS|Qwen3.8-Flash-Next-ROCmFP4|\
+    UD-Q4_K_XL|UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm|\
+    UD-IQ4_XS|Qwen3.8-Flash-Next-ROCmFP4|\
     Qwen3.6-MoE-35B-Q8|Tiel-Coder-35B-A3B-MTP-Q8|\
     DeepSeek-V4-Flash-Q2|DeepSeek-V4-Flash-Q2K|DeepSeek-V4-Flash-Q3)
       return 0
@@ -32,7 +34,14 @@ if [[ "${1:-}" == "--validate" ]]; then
   exit $?
 fi
 
-[[ $# -eq 0 ]] || { usage >&2; exit 2; }
+include_backend_aliases=1
+if [[ "${1:-}" == "--canonical-only" ]]; then
+  [[ $# -eq 1 ]] || { usage >&2; exit 2; }
+  include_backend_aliases=0
+else
+  [[ $# -eq 0 ]] || { usage >&2; exit 2; }
+fi
+
 command -v gum >/dev/null 2>&1 || {
   printf 'pi-pick-local-model: gum is required\n' >&2
   exit 1
@@ -43,24 +52,36 @@ export GUM_CHOOSE_CURSOR_FOREGROUND="#1AAAD4"
 export GUM_CHOOSE_SELECTED_FOREGROUND="#1AAAD4"
 export GUM_CHOOSE_HEADER_FOREGROUND="#DA9E8A"
 
-choice=$(gum choose --header "select model" \
-  "dense38-q4   Qwen3.8 Dense 27B | Q4" \
-  "dense38-q6   Qwen3.8 Dense 27B | Q6" \
-  "dense38-fp4  Qwen3.8 Dense 27B | ROCmFP4" \
-  "flash38-next Qwen3.8 Flash Next | Q4" \
-  "flash38-iq4  Qwen3.8 Flash Next | IQ4_XS" \
-  "flash38-fp4  Qwen3.8 Flash Next | ROCmFP4" \
-  "moe-q8       Qwen3.6 MoE 35B | Q8" \
-  "tiel-q8      Tiel Coder 35B A3B | Q8" \
-  "dsv4fl-q2    DeepSeek V4 Flash | Q2" \
-  "dsv4fl-q2k   DeepSeek V4 Flash | Q2_K_XL" \
-  "dsv4fl-q3    DeepSeek V4 Flash | Q3") || exit 1
+model_choices=(
+  "dense38-q4   Qwen3.8 Dense 27B | Q4"
+  "dense38-q6   Qwen3.8 Dense 27B | Q6"
+  "dense38-fp4  Qwen3.8 Dense 27B | ROCmFP4"
+  "flash38-next Qwen3.8 Flash Next | Q4"
+)
+if (( include_backend_aliases )); then
+  model_choices+=(
+    "flash38-halo-vk   Qwen3.8 Flash Next | Q4_K_XL | Halo Vulkan"
+    "flash38-halo-rocm Qwen3.8 Flash Next | Q4_K_XL | Halo ROCm"
+  )
+fi
+model_choices+=(
+  "flash38-iq4  Qwen3.8 Flash Next | IQ4_XS"
+  "flash38-fp4  Qwen3.8 Flash Next | ROCmFP4"
+  "moe-q8       Qwen3.6 MoE 35B | Q8"
+  "tiel-q8      Tiel Coder 35B A3B | Q8"
+  "dsv4fl-q2    DeepSeek V4 Flash | Q2"
+  "dsv4fl-q2k   DeepSeek V4 Flash | Q2_K_XL"
+  "dsv4fl-q3    DeepSeek V4 Flash | Q3"
+)
+choice=$(gum choose --header "select model" "${model_choices[@]}") || exit 1
 
 case "${choice%%[[:space:]]*}" in
   dense38-q4)   printf '%s\n' "Qwen3.8-27B-Q4" ;;
   dense38-q6)   printf '%s\n' "Qwen3.8-27B-Q6" ;;
-  flash38-next) printf '%s\n' "UD-Q4_K_XL" ;;
-  flash38-iq4)  printf '%s\n' "UD-IQ4_XS" ;;
+  flash38-next)      printf '%s\n' "UD-Q4_K_XL" ;;
+  flash38-halo-vk)   printf '%s\n' "UD-Q4_K_XL@halo-vulkan" ;;
+  flash38-halo-rocm) printf '%s\n' "UD-Q4_K_XL@halo-rocm" ;;
+  flash38-iq4)       printf '%s\n' "UD-IQ4_XS" ;;
   flash38-fp4)  printf '%s\n' "Qwen3.8-Flash-Next-ROCmFP4" ;;
   dense38-fp4)  printf '%s\n' "Qwen3.8-27B-ROCmFP4" ;;
   moe-q8)       printf '%s\n' "Qwen3.6-MoE-35B-Q8" ;;

@@ -868,7 +868,12 @@ pi() {
   local model_id
   model_id=$(_pi_pick_local_model) || return 1
   _lem_preload "$model_id" || return 1
-  local model_flag="local/$model_id"
+  local pi_model_id
+  case "$model_id" in
+    UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm) pi_model_id="UD-Q4_K_XL" ;;
+    *) pi_model_id="$model_id" ;;
+  esac
+  local model_flag="local/$pi_model_id"
 
   local go
   go=$(gum choose --header "pi · run in container?" \
@@ -975,7 +980,12 @@ beta() {
   local model_id
   model_id=$(_pi_pick_local_model) || return 1
   _lem_preload "$model_id" || return 1
-  local model_flag="local/$model_id"
+  local pi_model_id
+  case "$model_id" in
+    UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm) pi_model_id="UD-Q4_K_XL" ;;
+    *) pi_model_id="$model_id" ;;
+  esac
+  local model_flag="local/$pi_model_id"
 
   local level
   level=$(gum choose --header "beta · isolation level" \
@@ -1032,8 +1042,8 @@ betahat() {
 # on OpenRouter scores it (1-10 + rubric). See ~/llm-bench/bench.py.
 coder-bench() {
   local m1 m2
-  m1=$(_pi_pick_local_model) || return 1
-  m2=$(_pi_pick_local_model) || return 1
+  m1=$(_pi_pick_local_model --canonical-only) || return 1
+  m2=$(_pi_pick_local_model --canonical-only) || return 1
   python3 "$HOME/llm-bench/bench.py" --models "$m1,$m2" --tasks "$HOME/llm-bench/tasks.jsonl" --outdir "$HOME/llm-bench/out" "$@"
 }
 

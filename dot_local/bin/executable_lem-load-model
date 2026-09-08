@@ -57,8 +57,27 @@ ensure_qwen38_flash_fp4_mtp() {
 }
 
 [[ -n "${1:-}" ]] || { usage >&2; exit 2; }
-id=$1
-[[ "$id" != *$'\n'* && "$id" != *$'\r'* && "$id" != *' '* ]] || die "model contains whitespace"
+selection=$1
+[[ "$selection" != *$'\n'* && "$selection" != *$'\r'* && "$selection" != *' '* ]] || die "model contains whitespace"
+
+# Backend-qualified Flash choices are launcher aliases, not Lemonade model IDs.
+# Keep the canonical ID for registry lookup and the OpenAI model name.
+id="$selection"
+fixed_halo_backend=""
+case "$selection" in
+  UD-Q4_K_XL@halo-vulkan)
+    id="UD-Q4_K_XL"
+    fixed_halo_backend="halo-vulkan"
+    ;;
+  UD-Q4_K_XL@halo-rocm)
+    id="UD-Q4_K_XL"
+    fixed_halo_backend="halo-rocm"
+    ;;
+  *@*)
+    die "unsupported model/backend selection: $selection"
+    ;;
+esac
+
 command -v gum >/dev/null 2>&1 || die "gum is required for local model loading"
 
 curl -sS -m 5 "$LEM_API/health" >/dev/null 2>&1 \
@@ -67,6 +86,14 @@ curl -sS -m 5 "$LEM_API/health" >/dev/null 2>&1 \
 args=""
 pi_thinking_level=""
 fixed_parallel=0
+if [[ -n "$fixed_halo_backend" ]]; then
+  if [[ -n "${LEM_HALO_BACKEND:-}" && "${LEM_HALO_BACKEND}" != "$fixed_halo_backend" ]]; then
+    die "$selection conflicts with LEM_HALO_BACKEND=${LEM_HALO_BACKEND}"
+  fi
+  halo_backend="$fixed_halo_backend"
+else
+  halo_backend="${LEM_HALO_BACKEND:-}"
+fi
 case "$id" in
   Qwen3.8-Flash-Next-ROCmFP4*)
     # Agention's per-head ROCmFP4-FAST imatrix GGUF. This is not the
@@ -123,11 +150,17 @@ case "$id" in
     ;;
   UD-Q4_K_XL|UD-IQ4_XS|Qwen3.8-Flash-Next-*)
     # Qwen3.8-Flash-Next is a qwen4exp model with a very large PLE tensor.
-    # The extra-model registry attaches mmproj-F16.gguf; use the current
-    # Vulkan path by default and preserve mmap-backed loading.
+    # The extra-model registry attaches mmproj-F16.gguf; preserve mmap-backed
+    # loading while selecting the requested runtime backend.
     fixed_parallel=1
     pi_thinking_level="max"
-    args+=" --force-vulkan --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
+    if [[ "$fixed_halo_backend" == "halo-vulkan" ]]; then
+      args+=" --force-halo-vulkan --load-mode mmap --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
+    elif [[ "$fixed_halo_backend" == "halo-rocm" ]]; then
+      args+=" --force-halo-rocm --load-mode mmap --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
+    else
+      args+=" --force-vulkan --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
+    fi
 
     mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
       "on  MTP" \
@@ -293,7 +326,6 @@ esac
 # engines and the halo-box builds. ROCmFP4 remains pinned to Laurent because
 # its quantization/layout is not assumed to work in the new fork.
 if [[ "$id" == Qwen3.8-* || "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS ]] && [[ "$id" != *ROCmFP4* ]]; then
-  halo_backend="${LEM_HALO_BACKEND:-}"
   if [[ -z "$halo_backend" ]]; then
     halo_backend=$(gum choose --header "Qwen3.8 backend" \
       --selected "current     existing Nathan/Laurent path" \
@@ -304,8 +336,23 @@ if [[ "$id" == Qwen3.8-* || "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS ]] && [[ "
   fi
   case "$halo_backend" in
     current|default) ;;
-    halo-vulkan) args+=" --force-halo-vulkan" ;;
-    halo-rocm) args+=" --force-halo-rocm" ;;
+    halo-vulkan)
+      # The fixed Flash aliases already emitted their dispatch flag. For the
+      # generic Flash choice, replace the current Nathan-only flags instead of
+      # passing two backend selectors to the wrapper.
+      if [[ "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS || "$id" == Qwen3.8-Flash-Next-* ]]; then
+        args="${args/ --force-vulkan/}"
+        args="${args/ --tensor-read-lazy auto/}"
+      fi
+      [[ "$fixed_halo_backend" == "halo-vulkan" ]] || args+=" --force-halo-vulkan"
+      ;;
+    halo-rocm)
+      if [[ "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS || "$id" == Qwen3.8-Flash-Next-* ]]; then
+        args="${args/ --force-vulkan/}"
+        args="${args/ --tensor-read-lazy auto/}"
+      fi
+      [[ "$fixed_halo_backend" == "halo-rocm" ]] || args+=" --force-halo-rocm"
+      ;;
     *) die "unsupported LEM_HALO_BACKEND: $halo_backend (use current, halo-vulkan, or halo-rocm)" ;;
   esac
 
@@ -347,9 +394,9 @@ else
 fi
 args=${args# }
 
-note="loading $id  [override: $args]"
+note="loading $selection  [override: $args]"
 if ! curl -sS -m 10 "$LEM_API/models" 2>/dev/null | grep -q "\"id\"[[:space:]]*:[[:space:]]*\"$id\""; then
-  note="first load of $id: downloading weights (several minutes) then loading  [override: $args]"
+  note="first load of $selection: downloading weights (several minutes) then loading  [override: $args]"
 fi
 
 load_json=$(python3 -c 'import json, sys; print(json.dumps({"model_name": sys.argv[1], "llamacpp_args": sys.argv[2]}))' "$id" "$args")

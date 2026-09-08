@@ -220,6 +220,15 @@ export type SyntaxCheckResult = {
 };
 
 /**
+ * Returns whether a tool result represents a successful write/edit operation
+ * that should receive post-tool validation and Chezmoi staging checks.
+ */
+export function shouldRunPostToolChecks(toolName: unknown, isError: unknown): boolean {
+  if (toolName !== "write" && toolName !== "edit") return false;
+  return isError !== true;
+}
+
+/**
  * Validates configuration and code syntax across Python, Bash, JSON, JSONC,
  * TOML, YAML, and KDL without external npm bloat.
  * Skips Chezmoi .tmpl template files and unhandled extensions.

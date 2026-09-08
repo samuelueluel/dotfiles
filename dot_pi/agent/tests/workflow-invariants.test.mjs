@@ -11,6 +11,7 @@ import {
   checkDestructiveCommand,
   checkVaultShellAccess,
   isChezmoiManaged,
+  shouldRunPostToolChecks,
   autoHealSedCommand,
   validateFileSyntax,
   checkExplorePrompt,
@@ -114,6 +115,14 @@ test("isChezmoiManaged correctly identifies tracked vs untracked files", () => {
 
   assert.equal(isChezmoiManaged(managedFile), true);
   assert.equal(isChezmoiManaged(unmanagedFile), false);
+});
+
+test("post-tool checks only run for successful write and edit results", () => {
+  assert.equal(shouldRunPostToolChecks("edit", true), false);
+  assert.equal(shouldRunPostToolChecks("write", true), false);
+  assert.equal(shouldRunPostToolChecks("edit", false), true);
+  assert.equal(shouldRunPostToolChecks("write", undefined), true);
+  assert.equal(shouldRunPostToolChecks("read", false), false);
 });
 
 test("autoHealSedCommand rewrites macOS/BSD sed -i '' to GNU sed -i", () => {

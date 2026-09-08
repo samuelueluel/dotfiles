@@ -11,6 +11,7 @@ import {
   healZoteroWorkerInput,
   isChezmoiManaged,
   isDotfilesStaticPath,
+  shouldRunPostToolChecks,
   isSecretFilePath,
   isVaultNotePath,
   validateFileSyntax,
@@ -157,7 +158,9 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
 
   // Post-tool checks: Chezmoi staging reminder and syntax verification
   pi.on("tool_result", async (event) => {
-    if (event.toolName !== "write" && event.toolName !== "edit") return;
+    // Failed writes/edits did not establish a new file state. Do not validate
+    // the old file or emit a staging reminder for an operation that failed.
+    if (!shouldRunPostToolChecks(event.toolName, event.isError)) return;
     const rawPath = String((event.input as { path?: unknown }).path || "");
     if (!rawPath) return;
 

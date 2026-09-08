@@ -29,12 +29,17 @@ model_id=$("$MODEL_PICKER") || exit 1
 # and runtime settings as the ordinary pi command. No cloud model is a fallback.
 "$MODEL_LOADER" "$model_id"
 
+case "$model_id" in
+  UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm) pi_model_id="UD-Q4_K_XL" ;;
+  *) pi_model_id="$model_id" ;;
+esac
+
 PI_STATE_DIR="$HOME/.pi/running"
 mkdir -p "$PI_STATE_DIR"
 STATE_FILE="$PI_STATE_DIR/$$.state"
 export PI_STATE_FILE="$STATE_FILE"
 printf 'type=pi\nmodel=local/%s\nthinking=max\ncwd=Music\nsandbox=unsandboxed\n' \
-  "$model_id" > "$STATE_FILE"
+  "$pi_model_id" > "$STATE_FILE"
 trap 'rm -f "$STATE_FILE"' EXIT INT TERM
 
 printf '\033]2;Local Music Agent\007'
@@ -42,7 +47,7 @@ printf '\033]2;Local Music Agent\007'
 cd "$HOME"
 exec pi \
   --tui-mode fullscreen \
-  --model "local/$model_id" \
+  --model "local/$pi_model_id" \
   --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_MUSIC.md" \
   --no-skills \
   --skill /var/home/samuel/.agents/skills/music \
