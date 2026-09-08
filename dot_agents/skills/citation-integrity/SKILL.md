@@ -114,7 +114,6 @@ Review steps:
 
 - *Metadata formatting:* In evidence records and footnotes, use compact labels such as `journalArticle/article; review:checked`. Include only verified canonical `review:*` and `type:*` tags. Omit the tag section when none exist.
 - *API Facts:* Basic metadata claims (title, authors, year, key, collections) must be verified. The resolver can prove collection membership, but never proves an empirical finding.
-- *Multisource:* Using `/skill:multisource` changes how responses are structured; it never relaxes these evidence rules.
 
 ## Progressive Disclosure
 
