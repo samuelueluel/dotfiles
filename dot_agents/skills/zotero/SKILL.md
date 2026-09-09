@@ -49,12 +49,12 @@ Remember what each tool proves: REFERENCE proves bibliography appearances; IDENT
 
 For findings, mechanisms, estimates, equations, and "which paper?" questions, use this loop. If a paper is named, resolve its identity first.
 
-1. **Start with a focused search:** Call `zotero_semantic_search` with a clear query, `limit=5–8`, and `collection=<KEY>` when searching a specific collection. Known keys are in [collections](references/collections.md).
+1. **Start with one focused search:** Call `zotero_semantic_search` with a clear query, `limit=5–8`, and `collection=<KEY>` when searching a specific collection. Do not launch parallel near-duplicate opening queries. Known keys are in [collections](references/collections.md).
 2. **Check passage eligibility and context:**
    - Keep passages with `Rerank > 0`, then read the text. The score measures relevance, not truth or entailment.
    - Never treat passages marked `REF` as findings. Never substitute `Relevance` for `Rerank`.
    - A heading, contents list, or fragment is not enough unless it actually supports the claim. If the proposition, attribution, or necessary qualifications are missing, retrieve the smallest useful surrounding section before drafting.
-3. **Follow evidence gaps:** Before searching again, ask what missing information would actually change your answer. Avoid repetitive searches.
+3. **Follow evidence gaps:** Before searching again, ask what missing information would actually change your answer. Avoid repetitive searches. If a known item's outline is absent or its page is unknown, do not guess successive page ranges; use a narrower exact-item semantic query or the documented known-item sidecar locator.
 4. **Compare models carefully:** For empirical comparisons, note the outcome variable, sign (+/-), unit, sample, geography, and time horizon.
 5. **Verify only what needs it:**
    - For conceptual answers, adequate displayed passages are sufficient; check quotations verbatim and retain theorem hypotheses.
@@ -70,14 +70,20 @@ A collection scopes the retrieval corpus, not study geography. For difficult com
 
 ### Final evidence audit (ordinary RAG only)
 
-- **Submit:** Send one batch of 1–8 atomic claims to `zotero_audit_claims`, with 1–4 evidence references each. Select high-risk claims or those explicitly requested for audit.
+- **Submit:** Send one batch of 1–8 atomic claims to `zotero_audit_claims`, with 1–4 evidence references each. Select only the material high-risk claims or those explicitly requested for audit; the eight-claim cap is not a target.
+  - Atomic means one attributed result, estimand, null result, or comparison. Do not bundle program dates, sample size, effect magnitude, subgroup results, spillovers, and null outcomes into one claim.
   - Use exact parent item keys and truthful `semantic`, `pdf_page`, or `mineru_sidecar` routes. Never submit paths, arbitrary source text, or caller-supplied reranker scores.
-  - Preserve returned `chunk_id`, `content_hash`, and `index_generation` when available; never invent them from passage numbers.
-- **Deterministic check:** The audit rehydrates evidence, requires fresh raw `Rerank > 0` plus quote containment, verifies direct evidence for numbers, and checks comparison coverage. Use `escalation="none"` initially; use `escalation="bounded"` only for a specific unresolved evidence gap.
+  - For semantic evidence, reuse the exact successful search query unchanged. For every route, copy an exact contiguous substring from the returned evidence. Do not delete parentheticals or interleaved layout text, repair OCR, join fragments, normalize thresholds, or silently dehyphenate words. Final prose may paraphrase after the evidence passes.
+  - Preserve inequalities and dose thresholds literally: `over 5` is not `at least 5`. Keep bibliographic years and incidental dates out of the audited claim unless they are material and occur in its accepted evidence quote.
+  - Preserve returned `chunk_id`, `content_hash`, and `index_generation` when available; never invent them from passage numbers or omit them on a repair rerun.
+  - Use `risk_tags=["comparison"]` only for cross-item comparisons and submit validated evidence from at least two distinct item keys. Use `risk_tags=["within_item_comparison"]` for a comparison contained within one item. The tags are mutually exclusive.
+- **Deterministic check:** The audit rehydrates evidence, requires fresh raw `Rerank > 0` plus quote containment, verifies that numeric values and units occur inside accepted direct-evidence quotes, and checks comparison coverage. Use `escalation="none"` initially; use `escalation="bounded"` only for a specific unresolved evidence gap.
 - **Interpretation:** `supported` means the submitted evidence passed the deterministic evidence contract. It does not adjudicate claim wording, entailment, causal language, or omitted qualifications. Perform that final prose review in the main session under `citation-integrity`. `unsupported` reflects a deterministic contradiction such as a number/unit mismatch; `insufficient` means the evidence contract was not established.
-- **Retrieval failure:** `QUOTE_NOT_FOUND` on re-retrieval does not prove that the original passage lacked the quote.
-  - The current audit separates rejected candidate diagnostics from the retained evidence record. If a retained positive-Rerank record still reports `NONPOSITIVE_RERANK` or `QUOTE_NOT_FOUND`, verify the running service version and restart it before repeating the query; treat the conflict as deployment drift.
-  - Evidence previews retain the quoted text after normalization. If one does not, use one targeted read of the original item's page or permitted sidecar window instead of trusting the preview.
+- **Retrieval failure:** Interpret the exact failure code; never blanket-label audit failures as deployment drift.
+  - `QUOTE_NOT_FOUND` does not prove that the source lacks the claim. First compare the submitted quote with the raw returned evidence for reconstructed text, omitted parentheticals/layout labels, OCR repairs, or changed line-ending hyphens. Use one shorter exact substring or one targeted source read within the repair budget.
+  - `NUMBER_MISMATCH` and `UNIT_MISMATCH` require correction or omission; do not override them from memory. Check ranges, signs, inequality, units, and whether every reported number occurs inside the accepted direct-evidence quote.
+  - If the tool schema exposes legacy `check_mode`, returns `CHECKER_UNAVAILABLE`/`CHECKER_SKIPPED`, or a retained positive-Rerank record reports conflicting score/quote diagnostics, stop. Load [service operations](references/service-ops.md), verify/restart the deployed service, and do not spend the audit rerun on a stale deployment.
+  - Evidence previews must center the accepted quote. If a retained evidence preview omits it, treat that as a service/response-contract failure and use one targeted read instead of inferring source-level contradiction.
   - Do not polish queries repeatedly to raise scores; rechecks are not independent corroboration.
 - **Request-wide budget:** After the initial batch, allow at most one repair pass, with no more than three exact-item follow-up retrieval/read operations in total and at most one audit rerun.
   - Never broaden to titles, DOIs, collections, neighbors, related papers, or full-paper reads. Stop and qualify or omit unresolved claims.

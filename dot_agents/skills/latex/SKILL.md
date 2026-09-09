@@ -11,9 +11,9 @@ Pi uses its native readable terminal renderer for inline LaTeX. Display formulas
 
 ```text
 REQUEST
-├─ Short expression within prose ───────────────→ INLINE: `$...$` or `\(...\)`
-├─ Equation, fraction, matrix, or derivation ───→ DISPLAY: `$$...$$` or `\[...\]`
-└─ Literal LaTeX/.tex/Stata source ─────────────→ CODE: fenced code block
+├─ Short symbol, term, value, or incidental condition within prose ─→ INLINE: `$...$` or `\(...\)`
+├─ Complete or focal statement, or long/structured expression ─────→ DISPLAY: `$$...$$` or `\[...\]`
+└─ Literal LaTeX/.tex/Stata source ─────────────────────────────────→ CODE: fenced code block
 ```
 
 ## Core Rules
@@ -27,8 +27,9 @@ REQUEST
 ## Renderer Behavior and Common Constructs
 
 - **Delimiters:** Inline `$...$` or `\(...\)`, display `$$...$$` or `\[...\]`.
-- **Inline rendering:** Keep inline formulas short enough for one line. Pi's native parser keeps them in text flow and supports a narrower subset than MathJax.
-- **Display rendering:** Use display delimiters for fractions, equations, matrices, aligned expressions, and other multi-line math. pi-math renders these with MathJax as centered terminal images.
+- **Inline rendering:** Use inline math when the expression is a short fragment of a sentence: a variable, coefficient, value, label, or incidental condition. Keep it short enough for one line. Pi's native parser keeps it in text flow and supports a narrower subset than MathJax.
+- **Display rendering:** Use a display block when the math is the subject of the sentence or deserves independent visual attention. This includes regression equations, estimands, assumptions, identities, optimization problems, derivations, and formulas likely to be referenced as a unit. Also use display for long or visually tall expressions, matrices, cases, aligned expressions, and multi-line math. A small incidental fraction or condition can remain inline.
+- **Complete equations:** Display a complete or conceptually important equation even when it fits on one line. Always display a regression equation that defines the model, even when it fits on one line. Choose by rhetorical role and readability, not by syntax alone.
 - **Display environments:** Common environments such as `equation`, `align`, `aligned`, `gather`, matrices, `cases`, and `CD` are supported.
 - **Source preservation:** Rendering changes terminal display only. Do not rewrite a user's stored LaTeX merely to make the terminal output render.
 - **Terminal fallback:** If display formulas appear as raw LaTeX, check `/math-render status`; `/math-render on|off|clear` controls pi-math. Unsupported terminals, tmux, and screen intentionally use the source fallback.

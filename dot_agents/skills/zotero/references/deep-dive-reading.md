@@ -8,7 +8,7 @@ MinerU parses PDF documents into structured Markdown sidecars at `~/.config/zote
 
 This is an exceptional known-item fallback after collection-scoped semantic retrieval has identified an item key. For ordinary RAG, prefer targeted `zotero_semantic_search` and `zotero_read_pdf_pages`. Use sidecar shell extraction when page extraction is unavailable, a table is malformed/truncated, or a large technical work needs a precise section window.
 
-Targeted shell commands (`grep`, `sed`) directly on a known sidecar can recover exact data without loading an entire paper. Never use shell tools to parse MCP gateway temporary/spill files; rerun the MCP query with a narrower query or smaller limit instead.
+Targeted shell commands (`grep`, `sed`) directly on a known sidecar can recover exact data without loading an entire paper. When a PDF has no outline and a semantic passage provides no page locator, use an exact-item semantic refinement or a known-sidecar text locator; do not guess successive PDF page ranges. Never use shell tools to parse MCP gateway temporary/spill files; rerun the MCP query with a narrower query or smaller limit instead.
 
 ## Decision Rules & Extraction Patterns
 
