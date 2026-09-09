@@ -9,13 +9,12 @@ description: Creates, searches, and reviews permanent local Pi session summaries
 
 ```text
 REQUEST
-├─ "log this" / "/log"          → write or update one permanent summary
-├─ "what session did we ..."     → search permanent summaries, then report matches
-├─ "find the session where ..."  → search permanent summaries, then report matches
-├─ "where did we leave off"     → show recent permanent summaries and synthesize current state
-├─ "catch up"                    → show recent permanent summaries and synthesize current state
-└─ "session backlog" / "unlogged sessions" / "backfill summaries"
-                                → preview bounded candidates, then summarize only after confirmation
+├─ "log this" / "/log" ──→ WRITE: write or update one permanent summary
+├─ "what session did we ..." ──→ SEARCH: permanent summaries, then report matches
+├─ "find the session where ..." ──→ SEARCH: permanent summaries, then report matches
+├─ "where did we leave off" ──→ RECENT: show recent summaries and synthesize current state
+├─ "catch up" ──→ RECENT: show recent summaries and synthesize current state
+└─ "session backlog" / "unlogged sessions" / "backfill summaries" ──→ BACKLOG: preview bounded candidates, then summarize only after confirmation
 ```
 
 ## Non-Negotiable Rules

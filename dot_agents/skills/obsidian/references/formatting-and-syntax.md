@@ -1,6 +1,6 @@
 # Obsidian Formatting, Syntax & Frontmatter Schema
 
-Load this file when applying color tags, formatting headings, nesting lists, inserting wikilinks/callouts, or structuring YAML frontmatter. For tone, word choice, avoiding LLM buzzwords, and information density, see [prose style guide](prose-style-guide.md).
+**Load this file when** applying color tags, formatting headings, nesting lists, inserting wikilinks/callouts, or structuring YAML frontmatter. For tone, word choice, avoiding LLM buzzwords, and information density, load [prose style guide](prose-style-guide.md).
 
 ---
 

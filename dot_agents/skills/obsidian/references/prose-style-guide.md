@@ -1,6 +1,6 @@
 # Obsidian Note Prose & Style Guide
 
-Load this file when writing or editing note content in Obsidian. This guide sets the standards for tone, word choice, sentence structure, and information density.
+**Load this file when** writing or editing note content in Obsidian. This guide sets the standards for tone, word choice, sentence structure, and information density.
 
 **Scope:** Governs natural language prose in notes (descriptions, explanations, takeaways, and comments). Does not restrict code blocks, shell commands, variable names, LaTeX math, or programmatic syntax.
 
