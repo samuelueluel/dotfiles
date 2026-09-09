@@ -32,13 +32,13 @@ zotero-sidecar.sh reembed <COLLECTION_KEY...>         # Delete Chroma chunks fir
 
 ### MinerU CLI compatibility and upgrade guardrail
 
-The sidecar creator must call the production `zotero_mcp.mineru.run_mineru` path through `zotero-sidecar.sh`; do not copy a command line from a different MinerU virtual environment. The runner is intentionally ~={green}capability-aware=~:
+The sidecar creator must call the production `zotero_mcp.mineru.run_mineru` path through `zotero-sidecar.sh`; do not copy a command line from a different MinerU virtual environment. The runner is intentionally **capability-aware**:
 
 - It probes the selected binary's `--help` output and adds `-b/--backend` only when that binary advertises the option. MinerU 3.x (`mineru`) and the retained 1.x (`magic-pdf`) CLI are both supported.
 - It exports the configured `semantic_search.mineru.config_json` as `MINERU_TOOLS_CONFIG_JSON` and selects the matching legacy/new VRAM variable.
 - The managed patcher byte-synchronizes `mineru.py` on every application, so an installed package cannot silently retain an older patch after `sjust uv`.
 
-After changing the MCP tag, MinerU virtual environment, or MinerU config, run this ~={green}fast preflight=~ before a batch:
+After changing the MCP tag, MinerU virtual environment, or MinerU config, run this **fast preflight** before a batch:
 
 ```bash
 ZOTERO_LOCAL=true "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" - <<'PY'

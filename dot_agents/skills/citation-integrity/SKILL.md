@@ -5,26 +5,27 @@ description: Enforces evidence contracts for claims from Samuel's Zotero passage
 
 # Citation Integrity & Evidence Contracts
 
-## Claim-to-Evidence Playbook
-
-Apply this sequence separately to every material Zotero-grounded claim. This maps claims to evidence types; it does not replace the main Zotero skill's routing or the rules below.
+## Request-Routing Playbook
 
 ```text
 MATERIAL CLAIM
-→ classify the claim
-  ├─ finding / mechanism / definition ─→ positive-Rerank passage or direct source read
-  ├─ empirical number / table value ──→ exact passage + direct page verification when needed
-  ├─ source identity / scope ─────────→ resolve_exact_source (identity metadata only)
-  ├─ bibliography occurrence / count → zotero_search_bibliography_entries (raw entries / distinct citers)
-  ├─ graph relationship / ranking ───→ graph tool with explicit scope
-  └─ plain metadata fact ─────────────→ verified metadata lookup
-→ for a high-risk ordinary-RAG draft ─→ Zotero skill's bounded audit / capability fallback
-→ check that the chosen route is permitted to support this claim
-→ isolate the claim to its own source; comparisons require separate evidence per clause
-→ verify value, unit, sign (+/-), specification, attribution, and time horizon
-→ attach an internal evidence record naming the item and locator; render as a footnote
-→ if evidence is insufficient: retrieve stronger evidence, mark UNVERIFIED, or omit
+│
+├─ Classify the claim
+│  ├─ finding / mechanism / definition ──→ positive-Rerank passage or direct source read
+│  ├─ empirical number / table value ────→ exact passage + direct page verification when needed
+│  ├─ source identity / scope ────────────→ resolve_exact_source (identity metadata only)
+│  ├─ bibliography occurrence / count ────→ zotero_search_bibliography_entries (raw entries / distinct citers)
+│  ├─ graph relationship / ranking ───────→ graph tool with explicit scope
+│  └─ plain metadata fact ─────────────────→ verified metadata lookup
+├─ High-risk ordinary-RAG draft? ─────────→ Zotero skill's bounded audit / capability fallback
+├─ Is the route permitted for this claim? ─→ Continue only with that route
+├─ Is the claim a comparison? ────────────→ Keep each clause tied to its own source
+├─ Are values or attributes material? ────→ Verify value, unit, sign (+/-), specification, attribution, and time horizon
+├─ Is evidence sufficient? ───────────────→ Attach an internal evidence record and render it as a footnote
+└─ Evidence insufficient? ─────────────────→ Retrieve stronger evidence, mark UNVERIFIED, or omit
 ```
+
+Apply this sequence separately to every material Zotero-grounded claim. It maps claims to evidence types; it does not replace the main Zotero skill's routing or the rules below.
 
 Remember what each tool can and cannot prove:
 - The resolver proves only source identity and collection membership.

@@ -5,6 +5,17 @@ description: Recall-led exhaustive extraction over a frozen Zotero item scope us
 
 # Zotero Extract
 
+## Request-Routing Playbook
+
+```text
+REQUEST
+├─ Explicit `zotero-extract` request: new scope/run ──→ INIT: freeze scope → smoke test when required
+├─ Explicit `zotero-extract` request: existing/interrupted run
+│    └─→ RESUME: status → manifest --json → pending loop
+└─ Explicit `zotero-extract` request: zero pending
+     └─→ CLOSE: manifest → worklist → reduce (citation-integrity)
+```
+
 ## Non-Negotiable Rules
 
 - Every paper in the run must reach a final terminal state: `processed`, `excluded` (with reason), `unreadable` (with reason), `failed`, or `escalated`. The run ends only when zero items are pending.
@@ -21,16 +32,6 @@ description: Recall-led exhaustive extraction over a frozen Zotero item scope us
 - Concurrency follows `PI_SUBAGENTS_MAX_CONCURRENT` as exported by the session launcher; never hardcode a concurrency override.
 - Scope definition, verification, adjudication, and final synthesis always stay in the main session.
 
-## Request-Routing Playbook
-
-```text
-REQUEST
-├─ Explicit `zotero-extract` request: new scope/run ──→ INIT: freeze scope → smoke test when required
-├─ Explicit `zotero-extract` request: existing/interrupted run
-│    └─→ RESUME: status → manifest --json → pending loop
-└─ Explicit `zotero-extract` request: zero pending
-     └─→ CLOSE: manifest → worklist → reduce (citation-integrity)
-```
 
 Workflow boundary: `zotero` handles ordinary search, identity, metadata, and citation graphs. This skill starts only when extraction is explicitly chosen. The run operates on a frozen list of item keys. Synthesis happens in the main session only after all items are processed.
 

@@ -5,18 +5,6 @@ description: Manages Samuel's local Zotero library through MCP, including identi
 
 # Zotero
 
-## Non-Negotiable Rules
-
-- If Samuel asks for `zotero-extract` or asks for an exhaustive/complete collection review, route to the `zotero-extract` skill. Do not answer it with ordinary search or reduce the scope.
-- Keep ordinary Zotero work in the main session; never delegate it to subagents. (The only exception is collection extraction workers under `zotero-extract`). Identity resolution, verification, and synthesis always stay in the main session.
-- For claims about paper content or numbers, load and follow `~/.agents/skills/citation-integrity/SKILL.md`.
-- Match verification effort to the claim. Conceptual explanations, definitions, and ordinary quotations use passage checks; material empirical numbers, causal interpretations, disputed attributions, quantitative comparisons, and superlatives use targeted source verification and the final claim audit below. Explicit requests for automated claim auditing also use that audit. Do not use this tool inside `zotero-extract`.
-- Use the official `zotero_*` MCP tools. Never parse MCP internal files or temporary files with shell commands.
-- Do not call `advisor` for ordinary Zotero searches. This skill and `citation-integrity` govern retrieval.
-- Never upload PDF files to Zotero Cloud, call `zotero_attach_file`, or use `zotero_add_item` with a file. To add papers, read [library operations](references/library-ops.md) and attach local PDFs with `zotero-link`.
-- Never download, parse, or embed a paper just because it appears in a bibliography. Never delete a library item without Samuel's explicit confirmation.
-- Never run a host-wide `pkill llama-server`.
-
 ## Request-Routing Playbook
 
 ```text
@@ -35,6 +23,19 @@ REQUEST
 └─ Metadata or inventory? ─────────────────────────────────→ METADATA: metadata lookup / collection items
 ```
 
+## Non-Negotiable Rules
+
+- If Samuel asks for `zotero-extract` or asks for an exhaustive/complete collection review, route to the `zotero-extract` skill. Do not answer it with ordinary search or reduce the scope.
+- Keep ordinary Zotero work in the main session; never delegate it to subagents. (The only exception is collection extraction workers under `zotero-extract`). Identity resolution, verification, and synthesis always stay in the main session.
+- For claims about paper content or numbers, load and follow `~/.agents/skills/citation-integrity/SKILL.md`.
+- Match verification effort to the claim. Conceptual explanations, definitions, and ordinary quotations use passage checks; material empirical numbers, causal interpretations, disputed attributions, quantitative comparisons, and superlatives use targeted source verification and the final claim audit below. Explicit requests for automated claim auditing also use that audit. Do not use this tool inside `zotero-extract`.
+- Use the official `zotero_*` MCP tools. Never parse MCP internal files or temporary files with shell commands.
+- Do not call `advisor` for ordinary Zotero searches. This skill and `citation-integrity` govern retrieval.
+- Never upload PDF files to Zotero Cloud, call `zotero_attach_file`, or use `zotero_add_item` with a file. To add papers, read [library operations](references/library-ops.md) and attach local PDFs with `zotero-link`.
+- Never download, parse, or embed a paper just because it appears in a bibliography. Never delete a library item without Samuel's explicit confirmation.
+- Never run a host-wide `pkill llama-server`.
+
+
 Common tool chains:
 - Named paper findings: IDENTITY → CONTENT → VERIFY when numbers or missing context require it
 - Named number: IDENTITY → VERIFY
@@ -49,7 +50,7 @@ Remember what each tool proves: REFERENCE proves bibliography appearances; IDENT
 
 For findings, mechanisms, estimates, equations, and "which paper?" questions, use this loop. If a paper is named, resolve its identity first.
 
-1. **Start with one focused search:** Call `zotero_semantic_search` with a clear query, `limit=5–8`, and `collection=<KEY>` when searching a specific collection. Do not launch parallel near-duplicate opening queries. Known keys are in [collections](references/collections.md).
+1. **Start with one focused search:** Call `zotero_semantic_search` with a clear query, `limit=5–8`, and `collection=<KEY>` when searching a specific collection. Do not launch parallel near-duplicate opening queries. If you need a known collection key or its scope semantics, load [collections](references/collections.md).
 2. **Check passage eligibility and context:**
    - Keep passages with `Rerank > 0`, then read the text. The score measures relevance, not truth or entailment.
    - Never treat passages marked `REF` as findings. Never substitute `Relevance` for `Rerank`.

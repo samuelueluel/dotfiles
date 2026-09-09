@@ -6,21 +6,6 @@ disable-model-invocation: true
 
 # Skill Update & Maintenance
 
-## Non-Negotiable Rules
-
-1. **Always Follow skill-creation Standards:** All rules from `~/.agents/skills/skill-creation/SKILL.md` (plain language, line guidelines, decision trees, rules staying in SKILL.md, and vault syntax isolation) apply automatically whenever updating a skill.
-2. **Update in Place (No Tail-Appending, No Random Rewrites):** Never tack new rules onto the very bottom of a section or file. Put updates directly into the existing rule, step, or table row that covers that topic. Leave unrelated surrounding text untouched.
-3. **Ask Before Big Structural Changes (Tier 3):** If an edit reorganizes sections, redraws a decision tree, or rewrites multiple paragraphs, present a simple proposal in chat and get Samuel's approval before changing any files.
-4. **Keep Existing Safety Rules & Work with Hooks:** Never remove or weaken an existing "Never do X" rule unless Samuel explicitly asks for it.
-   - *Hook Optimization:* When a hook in `workflow-invariants.ts` or `Pi-Hooks.md` already blocks an action physically (such as direct vault edits or sudo), simplifying a long warning into a clean, direct tool instruction is approved.
-   - *Hook Offloading:* If an update reveals a recurring physical mistake that lacks a hook, **ask Samuel** whether to add a hook to `workflow-invariants.ts`.
-   - *Plain Language Expansion:* Expanding instructions into direct, active-voice sentences to make them simpler and easier for models to follow is encouraged. Never compress text into dense technical jargon or nested clauses just to save lines.
-5. **Rules Stay in SKILL.md:** Never move basic rules, negative boundaries, or output formatting requirements into `references/`. Keep them in `SKILL.md` where the agent will see them.
-6. **Vault Syntax Isolation:** Never use Obsidian highlight syntax (`~={green}...=~`) to style skill text, dotfiles, git commits, or terminal output. Use standard GitHub Markdown.
-7. **Make Edits Directly and Summarize Clearly:** For small and medium updates (Tiers 1 and 2), edit files directly, stage with chezmoi, and give a short bullet summary of what changed. Do not type out simulated diffs in chat; show a real `git diff` from `~/dotfiles` only if Samuel asks for it.
-8. **Chezmoi Synchronization:** Capture every modified skill file with `chezmoi add <path>`.
-9. **CPTR Limitation:** CPTR can inspect and draft diffs, but cannot edit skill files or run `chezmoi add`. Use a regular Pi session to apply approved edits.
-
 ## Request-Routing Playbook
 
 ```text
@@ -46,6 +31,22 @@ REQUEST INTENT
                                                          ├─ Obtain Samuel's conversational greenlight
                                                          └─ Phase 2: Draft diff against skill-creation checklist
 ```
+
+## Non-Negotiable Rules
+
+1. **Always Follow skill-creation Standards:** All rules from `~/.agents/skills/skill-creation/SKILL.md` (plain language, line guidelines, decision trees, rules staying in SKILL.md, and vault syntax isolation) apply automatically whenever updating a skill.
+2. **Update in Place (No Tail-Appending, No Random Rewrites):** Never tack new rules onto the very bottom of a section or file. Put updates directly into the existing rule, step, or table row that covers that topic. Leave unrelated surrounding text untouched.
+3. **Ask Before Big Structural Changes (Tier 3):** If an edit reorganizes sections, redraws a decision tree, or rewrites multiple paragraphs, present a simple proposal in chat and get Samuel's approval before changing any files.
+4. **Keep Existing Safety Rules & Work with Hooks:** Never remove or weaken an existing "Never do X" rule unless Samuel explicitly asks for it.
+   - *Hook Optimization:* When a hook in `workflow-invariants.ts` or `Pi-Hooks.md` already blocks an action physically (such as direct vault edits or sudo), simplifying a long warning into a clean, direct tool instruction is approved.
+   - *Hook Offloading:* If an update reveals a recurring physical mistake that lacks a hook, **ask Samuel** whether to add a hook to `workflow-invariants.ts`.
+   - *Plain Language Expansion:* Expanding instructions into direct, active-voice sentences to make them simpler and easier for models to follow is encouraged. Never compress text into dense technical jargon or nested clauses just to save lines.
+5. **Rules Stay in SKILL.md:** Never move basic rules, negative boundaries, or output formatting requirements into `references/`. Keep them in `SKILL.md` where the agent will see them.
+6. **Vault Syntax Isolation:** Never use Obsidian highlight syntax (`~={green}...=~`) to style skill text, dotfiles, git commits, or terminal output. Use standard GitHub Markdown.
+7. **Make Edits Directly and Summarize Clearly:** For small and medium updates (Tiers 1 and 2), edit files directly, stage with chezmoi, and give a short bullet summary of what changed. Do not type out simulated diffs in chat; show a real `git diff` from `~/dotfiles` only if Samuel asks for it.
+8. **Chezmoi Synchronization:** Capture every modified skill file with `chezmoi add <path>`.
+9. **CPTR Limitation:** CPTR can inspect and draft diffs, but cannot edit skill files or run `chezmoi add`. Use a regular Pi session to apply approved edits.
+
 
 ## The Execution Workflow
 

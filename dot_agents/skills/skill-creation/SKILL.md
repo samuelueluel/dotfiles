@@ -15,7 +15,7 @@ CPTR can inspect and draft skill changes, but cannot write to `~/.agents/skills/
 Good skills give models clear, dependable rules to follow so they do not guess or cut corners. Every skill should follow six core guidelines:
 
 1. **Clear Discovery in the Description:** The frontmatter `description:` is the only text the agent sees before choosing to load a skill. It must include exact trigger phrases, keywords, commands, and file patterns so the agent knows when to activate it.
-2. **Request-Routing Decision Trees:** When a skill handles multiple tasks or modes, place a top-down ASCII flowchart at the top of `SKILL.md`. This shows the agent which path to take at a glance. Use one main diagram; the numbered sections below then explain each step.
+2. **Request-Routing Decision Trees:** When a skill handles multiple tasks or modes, place one top-down ASCII flowchart immediately under the title in `SKILL.md`, before non-negotiable rules or workflow details. This shows the agent which path to take at a glance. Use one main diagram; the numbered sections below then explain each step.
 3. **Clear Rules and Hook Synergy:** State non-negotiable boundaries clearly ("Never guess regression specifications", "Always use TurboVault for vault notes") so the model does not cut corners.
    - **Reasoning Rules vs. Physical Tool Limits:** Distinguish thinking rules (how to interpret data, econometric rules, output formatting) from physical tool limits (file paths, blocked commands, read-only tools).
    - **Check Existing Hooks:** Look at active hooks in `10_Projects/Local-LLMs/Agents/Pi/Pi-Hooks.md` and `~/.pi/agent/lib/workflow-invariants-logic.ts`. If a hook already stops a bad action physically, state the proper tool instruction cleanly in `SKILL.md` without long defensive warnings.
@@ -61,12 +61,6 @@ description: Brief description of capability. Use when user asks to [action], me
 
 # Skill Name
 
-## Non-Negotiable Rules
-
-- Invariant 1 (Hard negative boundary: what NEVER to do).
-- Invariant 2 (Tooling constraint: required tools or subagent isolation).
-- Invariant 3 (Verification rule: read-before-write or output inspection).
-
 ## Request-Routing Playbook
 
 ```text
@@ -75,6 +69,12 @@ REQUEST
 ├─ Trigger B (Context / Keyword) ──→ MODE 2: tool_call_beta
 └─ Trigger C (Context / Keyword) ──→ MODE 3: tool_call_gamma (read-only)
 ```
+
+## Non-Negotiable Rules
+
+- Invariant 1 (Hard negative boundary: what NEVER to do).
+- Invariant 2 (Tooling constraint: required tools or subagent isolation).
+- Invariant 3 (Verification rule: read-before-write or output inspection).
 
 ## Workflows & Invariants
 
@@ -86,7 +86,7 @@ REQUEST
 
 ## Advanced Features & References
 
-- When encountering edge cases, see [references/troubleshooting.md](references/troubleshooting.md).
+- If a rare edge case needs troubleshooting, load [troubleshooting](references/troubleshooting.md).
 ```
 
 ## Description Requirements
@@ -133,7 +133,7 @@ First remove repeated explanations so each rule lives in one clear place. Then m
 - [ ] Physical tool limits checked against `Pi-Hooks.md` / `workflow-invariants.ts`; Samuel asked if a new hook is needed
 - [ ] All safety boundaries, rules, and output formatting stay in `SKILL.md` (never hidden in `references/`)
 - [ ] Multi-intent skills (3+ tasks) include an ASCII decision tree
-- [ ] Decision tree is top-down, straightforward, and wrapped in a fenced `text` code block
+- [ ] Decision tree appears immediately under the title, is top-down and straightforward, and is wrapped in a fenced `text` code block
 - [ ] Each rule lives in one place without repeating the same flowchart
 - [ ] Written in plain, direct English with clear active-voice instructions (no dense jargon packing)
 - [ ] Fast-path `SKILL.md` fits comfortably within ~150–200 lines (up to 250 if needed for clarity)
