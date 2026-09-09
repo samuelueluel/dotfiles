@@ -134,7 +134,7 @@ Use this section only after the core bounded RAG workflow exposes a concrete com
 
 ### Comparability
 
-For plausible leaders, establish the dimensions required by the question—commonly outcome, sign, unit, treatment dose, geography, horizon, and specification. Rank only sufficiently comparable estimates. If estimands differ, name a truthful dimension such as “largest reported nearby-spillover percentage” rather than asserting a universal winner.
+For plausible leaders, establish the dimensions required by the question—commonly outcome, sign, unit, treatment dose, geography, horizon, and specification. Rank only sufficiently comparable estimates. Name the dimension and candidate coverage, such as “largest nearby-spillover percentage among the comparable estimates retrieved.” If estimands are incompatible, report them separately rather than selecting a winner.
 
 ### Bounded candidate recall
 
@@ -142,7 +142,7 @@ Semantic top-k retrieval is not proof of exhaustive recall. When a missed candid
 
 ### Verification and stopping
 
-Verify the winning claim and only the challengers needed to justify or qualify it. Stop when the requested comparison is supported, units and context are verified, plausible challengers from bounded discovery are resolved, remaining incompatibilities are disclosed, and another call is unlikely to change the answer. Fetch metadata only for sources that will appear in the answer.
+Verify the winning claim and only the challengers needed to justify or qualify it. Stop when the requested comparison is supported, units and context are verified, plausible challengers from bounded discovery are resolved, remaining incompatibilities are disclosed, and another call is unlikely to change the answer. Apply the main skill's request-wide audit and repair budget; this guide does not grant extra retries. Bounded discovery supports a ranking among retrieved comparable estimates, not an exhaustive collection-wide maximum. Fetch missing metadata only for sources that will appear in the answer; reuse verified fields already returned.
 
 ## Topic-Conditioned Graph Discovery
 

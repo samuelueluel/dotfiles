@@ -18,7 +18,7 @@ MATERIAL CLAIM
   ├─ bibliography occurrence / count → zotero_search_bibliography_entries (raw entries / distinct citers)
   ├─ graph relationship / ranking ───→ graph tool with explicit scope
   └─ plain metadata fact ─────────────→ verified metadata lookup
-→ for a high-risk ordinary-RAG draft ─→ zotero_audit_claims after evidence retrieval/verification
+→ for a high-risk ordinary-RAG draft ─→ Zotero skill's bounded audit / capability fallback
 → check that the chosen route is permitted to support this claim
 → isolate the claim to its own source; comparisons require separate evidence per clause
 → verify value, unit, sign (+/-), specification, attribution, and time horizon
@@ -39,25 +39,26 @@ Follow these rules for every Zotero-grounded claim, including casual chat and li
 
 1. **Ground Every Claim:** Every finding, number, reference count, or graph metric must trace directly to its own retrieved source record.
 2. **Verify Numbers in the Source Text:** Confirm exact values, units, signs (+/-), samples, specifications, and time horizons directly in the cited text. If the passage does not show the exact number, read the actual PDF page with `zotero_read_pdf_pages` (or use a targeted MinerU sidecar extraction if the page tool fails). If you cannot verify the exact number, drop it or mark it `UNVERIFIED`.
-3. **Only Use Positive Rerank Scores:** Passages with a `Rerank` score of 0 or lower cannot support a claim about a paper's findings. Treat zero or negative scores as search clues only. Never make up a `Rerank` score.
+3. **Only Use Positive Rerank Scores:** Passages with a `Rerank` score of 0 or lower cannot support a claim about a paper's findings. Treat zero or negative scores as search clues only. Never make up a `Rerank` score. A positive score makes a passage eligible for inspection; it does not establish truth or entailment. Read sufficient context to verify the proposition, attribution, and necessary conditions. Check quotations verbatim. A higher score after re-querying is not independent corroboration.
 4. **Keep Sources Separate:** Never use one paper's evidence to back up a claim about a different paper. In comparisons between papers, give each claim its own separate footnote.
 5. **Handle Unclear References Carefully:** If a reference search returns ambiguous or unresolved results, state only that the raw text string appeared. Do not assume the paper identity or build graph links from it.
 6. **Do Not Cite Bibliography Sections as Findings:** Passages marked `REF` or containing reference lists only prove what a paper cited. They never prove the paper's own findings.
 7. **External References (`ext:*`):** External nodes contain basic metadata only and do not link to outgoing citations. Never infer a paper's findings from an external reference. Check your local library before claiming a paper is missing.
-8. **Admit Missing Evidence:** Say "No evidence found in the library" or mark the claim "Unverified" instead of guessing from memory.
-9. **Include Source Details in Evidence Notes:** In each footnote, include the verified `itemType` and `source_group` (e.g., `journalArticle/article`), along with any `review:*` or `type:*` tags. Only look up metadata for sources you actually cite. These tags describe the source—they do not prove the claim.
+8. **Admit Missing Evidence:** Say "No supporting evidence found in the retrieved passages" or mark the claim "Unverified" instead of guessing from memory. Without exhaustive coverage, limit rankings to the comparable estimates retrieved; do not imply a collection-wide winner. Check headings and connective prose as carefully as quotations: retain important hypotheses, remove overstatements, and label your own deductions as synthesis.
+9. **Keep Source Details Internally:** Retain verified `itemType`, `source_group`, and any canonical `review:*` or `type:*` tags in the internal evidence record. Reuse verified metadata already returned; look up missing fields only for sources you actually cite. These labels describe the source—they do not prove the claim. Ordinary footnotes use the concise format below; show diagnostic fields only when requested or material to the answer.
 10. **Use Truthful Retrieval Routes:**
     - Every claim must come from a valid tool route (`zotero_semantic_search`, `zotero_read_pdf_pages`, `zotero_get_item_fulltext`, or `mineru_sidecar`).
     - Never label sidecar or shell text as a page read, and do not use the vague label "direct PDF".
-    - Footnotes do not show internal tool names. Instead, show the exact location (e.g., `passage 12/40`, `p. 14`, `lines 45–60`, `Rerank +3.2`).
+    - Footnotes do not show internal tool names. Show the exact location (e.g., `passage 12/40`, `PDF p. 14`, `lines 45–60`). Distinguish printed page numbers from PDF page indices when known. Do not present an ambiguous page label as a verified PDF page; use the stable passage or section locator instead.
     - If your evidence comes from a weaker source (like a sidecar rather than the original PDF page), explain that directly in your text.
     - Never print raw curly-brace records (`{...}`) in chat; format them as standard footnotes.
 11. **Use the Resolver Only for Identity:** `zotero_resolve_exact_source` tells you whether a paper exists in a collection. It gives you the `item_key` to search, but it does not prove any findings. If the result is ambiguous or absent, report the conflict. Never use `related_matches` as evidence or silently switch to another paper.
-12. **Auditing High-Risk Claims:** When making critical or exact claims in regular Zotero searches, run `zotero_audit_claims` after gathering evidence and before writing your final answer.
-    - Check each claim against the tool's verdict: `supported` means you can cite it; `revise` means soften your wording; `unsupported` or `insufficient` means drop the claim or explain the gap.
+12. **Interpret Deterministic Claim Audits:** Follow the Zotero skill's high-risk triggers and request-wide repair budget. Conceptual explanations and ordinary quotations do not require an audit solely because they quote or compare sources.
+    - `zotero_audit_claims` validates evidence identity, freshness, route, quote, reranker, numeric, and comparison gates. `supported` means the evidence contract passed; it does not independently establish semantic entailment or correct claim wording. Review those inferences, qualifications, and causal language in the main session.
+    - For `unsupported` or `insufficient` results, retrieve stronger evidence within the repair budget, omit the claim, or explain the specific gap. Neither status alone establishes contradiction unless the deterministic reason identifies one, such as `NUMBER_MISMATCH` or `UNIT_MISMATCH`.
+    - A failed re-retrieval or quote-containment check is not proof that the original quote was absent. Resolve it with a targeted source read within the Zotero skill's repair budget. Unresolved evidence gaps still require qualification or omission.
     - Never cite the audit check itself as proof for a claim.
     - Do not use `zotero_audit_claims` inside `zotero-extract` collection runs.
-    - If the tool is not available on the current server, keep the existing strict evidence checks without widening your search.
 
 ## Human-Facing Evidence Presentation
 
@@ -66,14 +67,15 @@ For chat responses, use standard Markdown footnotes rather than raw curly-brace 
 - Put a `[^cN]` marker immediately after the supported clause. Number markers in order of appearance.
 - Reuse a marker only for the exact same source and page/passage locator. Different passages, pages, or sources receive separate markers.
 - Place one `### Evidence` block at the very end of your response, listing only the cited entries. Omit the block only if no evidence was cited.
-- Format each footnote with author/year, title when available, item key, locator (`passage`, `p.`, `lines`), `Rerank` when applicable, and source tags.
+- Format ordinary footnotes with author/year, title when available, item key, and exact passage, page, section, or line locator. Retain scores, route details, hashes, classifications, and tags internally; show them only for a requested evidence audit or when material to the answer. Do not print original/recheck score histories as corroboration.
+- Keep operational capability notes brief and before the final Evidence block. A conceptual answer that does not require an audit needs no audit-status note.
 - If web evidence is also present, combine the `[^wN]` and `[^cN]` definitions in this same final block while keeping the numbers distinct.
 
 ```markdown
 A paper reports the claimed mechanism.[^c1]
 
 ### Evidence
-[^c1]: Author — Title (Year); item KEY; passage 12/40, p. 14, Rerank +3.22; journalArticle/article; review:checked
+[^c1]: Author — Title (Year); item KEY; passage 12/40, PDF p. 14.
 ```
 
 Keep structured JSON and raw canonical evidence records unchanged for machine-facing background tasks; only human-facing chat responses use footnotes.
@@ -112,7 +114,7 @@ Review steps:
 | Bibliography occurrence | `zotero_search_bibliography_entries` | `{search_bibliography_entries → citing KEY, entry N, status, confidence, parse P}` |
 | Citation graph structure | `zotero_rank_works_by_inbound_citations` / neighbors | `{tool → scope, seed/target item keys, node kind, returned measure}` |
 
-- *Metadata formatting:* In evidence records and footnotes, use compact labels such as `journalArticle/article; review:checked`. Include only verified canonical `review:*` and `type:*` tags. Omit the tag section when none exist.
+- *Metadata formatting:* In internal evidence records and requested diagnostic footnotes, use compact labels such as `journalArticle/article; review:checked`. Include only verified canonical `review:*` and `type:*` tags. Omit the tag section when none exist.
 - *API Facts:* Basic metadata claims (title, authors, year, key, collections) must be verified. The resolver can prove collection membership, but never proves an empirical finding.
 
 ## Progressive Disclosure

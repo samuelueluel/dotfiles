@@ -17,5 +17,38 @@
         ]
       }
     ]
+  },
+  "workflow-invariants": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file|replace_file_content|view_file|invoke_subagent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /var/home/samuel/.gemini/hooks/agy-workflow-invariants.mjs pre",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /var/home/samuel/.gemini/hooks/agy-workflow-invariants.mjs post",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node /var/home/samuel/.gemini/hooks/agy-workflow-invariants.mjs pre-invocation",
+        "timeout": 5
+      }
+    ]
   }
 }

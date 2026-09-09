@@ -16,6 +16,9 @@ const IMAGE_FILE_RE = /\.(?:png|jpe?g|webp|gif)$/i;
 const MARKDOWN_PATCH_STATE = Symbol.for("pi-agent-beautify.markdown.patch");
 const USER_MESSAGE_PATCH_STATE = Symbol.for("pi-agent-beautify.user-message.patch");
 const PLAIN_CODE_LANGS = new Set(["text", "plain", "plaintext"]);
+// pi-math uses this synthetic fence only to force display-block layout. Its
+// image inserter owns the vertical spacing, so never turn it into a code panel.
+const PI_MATH_DISPLAY_LANGUAGE = "pi-math-4f9c";
 /** Left accent bar for user messages (1 terminal column). */
 const USER_MESSAGE_BAR = "▎";
 const OSC133_ZONE_START = "\x1b]133;A\x07";
@@ -187,6 +190,14 @@ function renderCodeTokenWithoutFences(
   const raw = typeof token.text === "string" ? token.text : "";
   const langRaw = typeof token.lang === "string" ? token.lang.trim() : "";
   const lang = langRaw.toLowerCase();
+
+  // pi-math replaces display formulas with a marker inside a synthetic fenced
+  // block. Return the marker as a plain line so pi-math can place the image;
+  // adding the normal panel padding here creates the gray bars around it.
+  if (lang === PI_MATH_DISPLAY_LANGUAGE) {
+    return raw.split("\n").map((line) => instance.applyDefaultStyle?.(line) ?? line);
+  }
+
   const lines: string[] = [];
   const indent = instance.theme.codeBlockIndent ?? "  ";
   const proto = Markdown.prototype as unknown as PatchedMarkdownPrototype;

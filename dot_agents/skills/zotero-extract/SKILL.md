@@ -53,10 +53,10 @@ An extraction inventory is independent of the semantic search database. If compl
 ## Operating Sequence
 
 1. **Confirm with Samuel:** The scope selector (collection key, explicit items, or items file), the inclusion rule (one clear sentence defining what qualifies), worker tier, and the run folder (defaults to `~/zotero-extraction-runs/<run-id>/`).
-2. **Init the run:** Run `zotero-extract init` with `--collection`, `--item`, or `--items-file` and `--rule "<rule>"`. Note the sidecar/text-layer breakdown it reports.
+2. **Init the run:** Run `zotero-extract init` with `--collection`, `--item`, or `--items-file` and `--rule "<rule>"`. Note the sidecar/text-layer breakdown it reports. Sidecars over the character budget escalate immediately at init, before any worker is dispatched. Cloud (`pihat`) runs may export `ZOTERO_EXTRACT_MAX_SOURCE_CHARS=600000` (workers there have ~320K-token windows with compaction near 256K tokens); keep the 400000 default on local runs.
 3. **Smoke test first:** For a new run or rule, test ~8 items across both sidecar and PDF routes, including a control paper that should test negative. Inspect the packets with Samuel before continuing.
 4. **Per-item loop:**
-   - Call `zotero-extract source RUNDIR KEY` to get the source path and route.
+   - Call `zotero-extract source RUNDIR KEY` to get the source path and route. If a sidecar was built after init (e.g. from a worklist pass), `source` adopts it automatically.
    - On `pihat`/`betahat`, dispatch the next batch of up to 4 pending papers to concurrent `Explore` subagents. On local `pi`/`beta`, dispatch one at a time.
    - Wait for the complete WorkerResultV1 outputs.
    - Check each result with `zotero-extract check-worker-result RUNDIR KEY RESULT.json`.
@@ -66,6 +66,8 @@ An extraction inventory is independent of the semantic search database. If compl
    - If quotes fail validation, re-brief the worker with the exact error. After two consecutive failures, mark the item failed (`zotero-extract mark failed`).
    - If a paper does not meet the rule, mark it excluded (`mark excluded --reason out_of_scope_per_rule`).
    - If a sidecar is unreadable, mark it escalated (`mark escalated --reason "needs local sidecar rebuild"`).
+   - If an item was closed by mistake, return it with `mark RUNDIR KEY pending --reason "<why>"` (any state except processed, which is final). The next `source` call revalidates hashes and picks up any sidecar built since closing.
+   - If an item escalated as `oversized_source` and the paper is worth extracting, carve it with `split-sidecar SIDECAR --max-chars N --out DIR`, dispatch one worker per part (part path in place of the source path; spans are part-local), remap spans by adding each part's `base_offset`, assemble one packet with quotes copied from the full sidecar at global offsets, and submit with `submit` (which revalidates everything verbatim). Each part performs its own omission pass; disclose the cross-part seam in synthesis.
 6. **Close:** When zero items are pending, report the final counts to Samuel. The `worklist` command lists items that need sidecars created.
 7. **Synthesize Findings:** Adjudicate conflicts and synthesize results in the main session. All final claims use the `citation-integrity` footnote format.
 

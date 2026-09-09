@@ -80,6 +80,10 @@ Rules:
   ordinary Explore search budget is not a completeness boundary for this
   explicit one-source assignment. Explore runs with `prompt_mode: replace`,
   giving each paper a clean, isolated context.
+- For oversized sources, `split-sidecar` carves section-aligned parts with
+  base offsets; workers run the unchanged WorkerResultV1 contract per part
+  file, and the orchestrator remaps spans (`global = local + base_offset`)
+  before assembling the packet for `submit`.
 
 ## Citation boundary
 
@@ -113,6 +117,7 @@ Workers emit packet fields only. They do not emit citation-integrity tokens, hum
 2. `submit-worker-result` failure → preserve the manifest unchanged and retry with a fresh complete result and the exact errors.
 3. Two consecutive failed submissions on one item → `zotero-extract mark RUNDIR KEY failed --reason "<violation summary>"`.
 4. Never add alias mapping, type coercion, fuzzy span/quote repair, weaken the schema, drop the omission pass, or trim source text to force acceptance.
+5. Mistakenly closed item → `zotero-extract mark RUNDIR KEY pending --reason "<why>"` (refused from `processed`); then run `source` again, which revalidates hashes and adopts a newly built sidecar automatically.
 
 Truncated or unparsable worker output (e.g. a turn-limit cutoff) is handled like
 a validation failure: discard it and restart a fresh worker from the unchanged

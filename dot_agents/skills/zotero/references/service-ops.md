@@ -1,11 +1,11 @@
 # Service Operations & Troubleshooting
 
-**Load this file when** resolving connection errors, recovering wedged services, operating with Zotero Desktop closed, or executing SQLite database diagnostics.
+**Load this file when** resolving retrieval or audit errors, recovering wedged services, operating with Zotero Desktop closed, or executing SQLite database diagnostics.
 
 ## Service Gating & Invariants
 
 - **Embedder (`127.0.0.1:8082`):** Quantized embedding model loaded into unified RAM. Ask Samuel to run `serve-embedder`; **never auto-start**.
-- **Reranker (`127.0.0.1:8083`):** Mandatory and fail-closed. If down, ask Samuel to run `serve-reranker`, then retry. Never substitute unranked results or remote models.
+- **Reranker (`127.0.0.1:8083`):** Mandatory for semantic evidence and fail-closed. If down, ask Samuel to run `serve-reranker`, then retry. Never substitute unranked results or remote models.
 - **Zotero Desktop (`127.0.0.1:23119`):** Required for metadata writes, CSL exports, and live full-text extraction. Read-only vector search works without Desktop (omitting live title/creator metadata).
 - **Live semantic tag filters:** Require readable local SQLite. After Zotero writes or sync, close Desktop and allow WAL checkpointing before relying on changed tags or item types; never retry without the supplied filter.
 - **VLM (`127.0.0.1:8084`):** Offline figure enrichment. Run `serve-vlm` for processing and `stop-vlm` immediately after to release RAM.
@@ -19,6 +19,7 @@
 | `HTTP 500` from `localhost:23119` metadata/enrichment | Zotero Desktop local API wedged | Ask Samuel to restart Zotero Desktop, then retry. |
 | `Local reranker endpoint failed` / `HTTP reranker error` | Reranker `:8083` down | Ask Samuel to run `serve-reranker`, then retry. |
 | Semantic results omit `Rerank` field | Stale service process or incomplete patch | Treat results as discovery-only; restart/repair service before citing evidence. |
+| Audit returns `QUOTE_NOT_FOUND`, or failure codes conflict with displayed scores | The current audit separates rejected-candidate diagnostics from retained evidence; a conflict usually indicates a stale service, mixed deployment, or response-contract drift | Verify the running package and restart the service before retrying. Preserve the deterministic result, use one targeted original-source read within the repair budget if needed, and do not infer fabrication. |
 | `Live tag-filtered semantic search requires local Zotero mode` | Local SQLite unavailable or not configured | Restore local SQLite access and retry the same filtered call; never silently fall back to unfiltered search. |
 | `Connection error in upsert` during indexing | Embedder wedged | Probe embedder responsiveness (below) and restart container. |
 | Missing Python module in tool | Outdated package environment | Run `sjust uv` to reinstall the exact fork from `~/.Uvfile`, then restart `zotero-mcp.service`. |

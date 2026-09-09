@@ -2,7 +2,7 @@
 
 **Load this file when** composing Zotero-grounded claims or formatting internal canonical evidence records for passages, direct source reads, bibliography entries, or graph structures.
 
-The brace-delimited forms below are internal canonical record formats for validation and adjudication. Never emit them as raw citation stamps in a human-facing response. For user-facing output, assign `[^c1]`, `[^c2]`, and so on immediately after supported claims, then collect readable entries retaining every field in one `### Evidence` block at the absolute end of the response. Keep the canonical records unchanged for machine-facing paths.
+The brace-delimited forms below are internal canonical record formats for validation and adjudication. Never emit them as raw citation stamps in a human-facing response. Follow the main skill's concise footnote format and final `### Evidence` block for chat. Retain the full records internally; include diagnostic fields in footnotes only when requested or material. Keep the canonical records unchanged for machine-facing paths.
 
 ## 1. Semantic-Passage Evidence
 
@@ -13,10 +13,11 @@ Use for substantive findings, mechanisms, definitions, formulas, and empirical e
 - **Rules:**
   - Quote or paraphrase only from the displayed `Matched Passage`.
   - Use the raw `Rerank` score; never substitute `Relevance` (`1 - distance`).
-  - Include page numbers only when present in the snippet or DCR breadcrumb; never invent pages.
+  - Include page numbers only when present in the snippet or DCR breadcrumb; never invent pages. Record whether they are printed page numbers or PDF page indices when established. If that mapping is ambiguous, use the passage/section locator in chat rather than claiming a verified PDF page.
   - Exclude passages marked `REF`, `References` breadcrumbs, or bibliography lists from substantive claims.
   - Derive author and year from item metadata or DCR prefixes.
-  - Verify native `itemType` and canonical `review:*` / `type:*` tags for final cited sources via item metadata; derive `source_group` from semantic output or the locked mapping. Retrieve this metadata once per final source, not for discarded candidates.
+  - Verify native `itemType` and canonical `review:*` / `type:*` tags for final cited sources; reuse verified returned metadata and fetch only missing fields. Derive `source_group` from semantic output or the locked mapping. Retrieve missing metadata once per final source, not for discarded candidates.
+  - Preserve machine-returned `chunk_id`, `content_hash`, and `index_generation` alongside the record when available. These are optional provenance fields; do not infer them from displayed passage numbers.
   - Include only canonical `review:*` and `type:*` tags. Omit the tag segment when none are present or retrieval fails; never copy legacy subject tags into the token.
 
 ## 2. Direct-Source Evidence

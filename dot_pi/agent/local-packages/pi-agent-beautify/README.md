@@ -25,15 +25,31 @@ This extension:
 - uses the same background as pi tool-execution panels (`toolPendingBg`)
 - `text` / `plain` / `plaintext` fences also get the panel background for emphasis
 
-### 3. Clipboard image chips
+### 3. pi-math compatibility
+
+The local fork exempts pi-math's synthetic `pi-math-4f9c` display blocks from the code-panel background and padding. pi-math owns the image placement and vertical spacing for those blocks; ordinary fenced code keeps the panel styling.
+
+This package is loaded from the Chezmoi-managed local path in `/var/home/samuel/.pi/agent/local-packages/pi-agent-beautify/`, so normal Pi/npm updates do not replace the patch. If the live copy is ever overwritten, restore it with:
+
+```bash
+chezmoi apply /var/home/samuel/.pi/agent/local-packages/pi-agent-beautify
+```
+
+Then run `/reload` in Pi. Verify the patch is present with:
+
+```bash
+grep -n 'PI_MATH_DISPLAY_LANGUAGE\|pi-math-4f9c' /var/home/samuel/.pi/agent/local-packages/pi-agent-beautify/src/index.ts
+```
+
+### 4. Clipboard image chips
 
 Clipboard `pi-clipboard-*` paths render as compact `[image1]` chips in the editor, then expand back to real paths before submit.
 
-### 4. User message accent bar
+### 5. User message accent bar
 
 User prompts get a soft blue left stripe (`▎`, theme `borderAccent` / blue) so they read clearly against assistant output — similar to modern chat UIs.
 
-### 5. CJK Markdown emphasis & bold fix
+### 6. CJK Markdown emphasis & bold fix
 
 Under the CommonMark specification, bold/italic delimiters (`**`, `*`, `~~`) fail to close when preceded by CJK/ASCII punctuation (like `）` or `)`) and directly followed by CJK characters without whitespace (e.g. `**概念（Concept）**是`).
 

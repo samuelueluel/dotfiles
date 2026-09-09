@@ -44,10 +44,11 @@ sed -n '<START_LINE>,<END_LINE>p' ~/.config/zotero-mcp/mineru-sidecars/<key>.md
 ```
 *Rule:* Sidecar search is known-item extraction, not corpus discovery. Use semantic search to identify the item first, then target its section header.
 
-### 4. Comprehensive Reading (Literature Reviews & Synthesis)
-When synthesizing full arguments or writing literature reviews:
+### 4. Comprehensive Reading (Whole-Argument Evaluation)
+When evaluating a paper's whole argument or fulfilling an explicit full-reading request:
 - Read the entire paper using `zotero_get_item_fulltext` (when Desktop is running) or read the sidecar in structured chunks.
 - Do not substitute grep fragments for comprehensive comprehension when evaluating full arguments.
+For a bounded literature overview, explanation, or a few examples, use adequate passages and targeted context reads instead. The phrase “literature review” alone does not require full-paper reads.
 
 ## Scanned PDFs vs. Sidecars
 

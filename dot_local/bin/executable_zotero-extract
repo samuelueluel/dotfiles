@@ -11,6 +11,9 @@ This is the deterministic-code tier of the exhaustive extraction workflow
      fail closed),
   3. validates worker evidence packets (schema + verbatim-quote-at-source
      checks) and tracks terminal states in a coverage manifest.
+  4. carves oversized sidecars into section-aligned parts with recorded
+     base offsets (split-sidecar) for the documented appendix path; the
+     orchestrator remaps part-local spans and submits one assembled packet.
 
 Every model-facing step — reading sidecars into context, extraction, omission
 passes, adjudication, synthesis — belongs to the agent session (pihat or pi),
@@ -26,10 +29,12 @@ Usage:
   zotero-extract check-worker-result RUNDIR KEY RESULT.json
   zotero-extract submit-worker-result RUNDIR KEY RESULT.json [--worker LABEL]
   zotero-extract mark RUNDIR KEY STATE --reason TEXT
-      (STATE = excluded | unreadable | failed | escalated)
+      (STATE = excluded | unreadable | failed | escalated | pending;
+       pending returns a mistakenly closed item to the queue — processed stays final)
   zotero-extract status RUNDIR
   zotero-extract manifest RUNDIR [--json]
   zotero-extract worklist RUNDIR
+  zotero-extract split-sidecar SIDECAR_PATH --out DIR [--max-chars N]
 
 Environment:
   ZOTERO_LOCAL_API             default http://127.0.0.1:23119/api/users/0
@@ -69,7 +74,7 @@ PAGE_SIZE = 100
 PAGE_CAP = 50000
 
 TERMINAL_STATES = ("processed", "excluded", "unreadable", "failed", "escalated")
-MARK_STATES = ("excluded", "unreadable", "failed", "escalated")
+MARK_STATES = ("excluded", "unreadable", "failed", "escalated", "pending")
 NON_PARENT_TYPES = {"attachment", "note", "annotation"}
 RECORD_KINDS = ("finding", "definition", "method", "estimate", "qualification")
 CONFIDENCES = ("high", "medium", "low")
@@ -207,7 +212,11 @@ def sidecar_for(key):
     """Return the sidecar path if a non-empty sidecar exists, else None."""
     p = sidecar_dir() / f"{key}.md"
     try:
-        if p.is_file() and p.read_text(encoding="utf-8", errors="replace").strip():
+        # stat only: init must not slurp every sidecar's full text into
+        # memory just to test non-emptiness. Byte size strictly bounds
+        # character count for UTF-8, so st_size > 0 is a safe gate; the
+        # source stage re-checks exact characters (and emptiness) on read.
+        if p.is_file() and p.stat().st_size > 0:
             return p
     except OSError:
         return None
@@ -275,6 +284,21 @@ def item_entry(order, key, title, item_type, date):
         entry["route_fidelity"] = "high"
         entry["source_path"] = str(sc)
         entry["source_sha256"] = sha256_file(sc)
+        # Fail fast on doomed sources: stat first, and only pay for a full
+        # read when the byte size suggests the character budget is blown
+        # (UTF-8 bytes always outnumber characters, so a small file is
+        # provably safe). Matches the source-stage escalation exactly.
+        try:
+            approx = sc.stat().st_size
+        except OSError:
+            approx = 0
+        if approx > max_source_chars():
+            text = sc.read_text(encoding="utf-8", errors="replace")
+            if len(text) > max_source_chars():
+                entry["state"] = "escalated"
+                entry["reason"] = (
+                    f"oversized_source: {len(text)} chars exceeds "
+                    f"{max_source_chars()}; unit processing not yet implemented")
     return entry
 
 
@@ -537,6 +561,19 @@ def cmd_source(rundir, key):
     if it["state"] != "pending":
         die(f"item {key} is not pending (state: {it['state']})")
 
+    # A sidecar built after init (e.g. from a worklist pass) upgrades the
+    # route automatically; the frozen route is a floor, not a ceiling.
+    sc = sidecar_for(key)
+    if sc is not None and it.get("extraction_route") != "mineru_sidecar":
+        it["extraction_route"] = "mineru_sidecar"
+        it["route_fidelity"] = "high"
+        it["source_path"] = str(sc)
+        it["source_sha256"] = sha256_file(sc)
+        it["updated_at"] = now()
+        save_manifest(rundir, m)
+        print(f"{PROG}: note: sidecar found for {key}; upgraded to mineru_sidecar",
+              file=sys.stderr)
+
     def escalate(reason):
         it["state"] = "escalated"
         it["reason"] = reason
@@ -551,22 +588,30 @@ def cmd_source(rundir, key):
             escalate(f"sidecar disappeared mid-run: {path}")
             die(f"sidecar vanished: {path}")
         text = path.read_text(encoding="utf-8", errors="replace")
-        if len(text) > max_source_chars():
-            escalate(f"oversized_source: {len(text)} chars exceeds "
-                     f"{max_source_chars()}; unit processing not yet implemented")
-            die(f"sidecar for {key} is oversized ({len(text)} chars); "
-                f"marked escalated")
-        h = sha256_file(path)
-        if h != it["source_sha256"]:
-            it["source_sha256"] = h
-            it["updated_at"] = now()
-            save_manifest(rundir, m)
-            print(f"{PROG}: note: sidecar changed since init; hash refreshed ({key})",
-                  file=sys.stderr)
-        print(json.dumps({"item_key": key, "extraction_route": "mineru_sidecar",
-                          "route_fidelity": "high", "source_path": str(path),
-                          "source_sha256": h}))
-        return
+        if text.strip():
+            if len(text) > max_source_chars():
+                escalate(f"oversized_source: {len(text)} chars exceeds "
+                         f"{max_source_chars()}; unit processing not yet implemented")
+                die(f"sidecar for {key} is oversized ({len(text)} chars); "
+                    f"marked escalated")
+            h = sha256_file(path)
+            if h != it["source_sha256"]:
+                it["source_sha256"] = h
+                it["updated_at"] = now()
+                save_manifest(rundir, m)
+                print(f"{PROG}: note: sidecar changed since init; hash refreshed ({key})",
+                      file=sys.stderr)
+            print(json.dumps({"item_key": key, "extraction_route": "mineru_sidecar",
+                              "route_fidelity": "high", "source_path": str(path),
+                              "source_sha256": h}))
+            return
+        print(f"{PROG}: note: sidecar for {key} is empty; falling back to PDF text layer",
+              file=sys.stderr)
+        it["extraction_route"] = None
+        it["route_fidelity"] = None
+        it["source_path"] = None
+        it["source_sha256"] = None
+        # fall through to the text-layer fallback below
 
     # text-layer fallback: resolve linked PDF(s), extract once, cache
     src = rundir / "sources" / f"{key}.txt"
@@ -981,6 +1026,88 @@ def cmd_submit_worker_result(rundir, key, result_path, worker):
 
 # ---------------------------------------------------------------- mark
 
+# ---------------------------------------------------------------- split-sidecar
+
+def split_markdown_sections(text, max_chars):
+    """Split text into section-aligned parts bounded by max_chars.
+
+    Returns a list of strings whose concatenation is exactly the input.
+    ATX headings (`#`..`######`) start new blocks; blocks pack greedily.
+    An over-long block splits on blank lines; an atomic paragraph above
+    the budget fails closed so no unit is silently truncated.
+    """
+    blocks, current = [], []
+    for line in text.splitlines(keepends=True):
+        if re.match(r"#{1,6}(?:\s+|$)", line.lstrip()) and current:
+            blocks.append(current)
+            current = []
+        current.append(line)
+    if current:
+        blocks.append(current)
+
+    parts, buf, buf_len = [], [], 0
+    for block in blocks:
+        btext = "".join(block)
+        pieces = ([btext] if len(btext) <= max_chars
+                  else re.split(r"(\n[ \t]*\n)", btext))
+        for piece in pieces:
+            if not piece:
+                continue
+            if len(piece) > max_chars:
+                die(f"cannot split: an atomic paragraph of {len(piece)} chars "
+                    f"exceeds --max-chars {max_chars}; raise the budget or "
+                    f"exclude the source")
+            if buf_len + len(piece) > max_chars and buf:
+                parts.append(list(buf))
+                del buf[:]
+                buf_len = 0
+            buf.append(piece)
+            buf_len += len(piece)
+    if buf:
+        parts.append(list(buf))
+    return ["".join(p) for p in parts]
+
+
+def cmd_split_sidecar(path, max_chars, outdir):
+    src = Path(path)
+    try:
+        text = src.read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        die(f"cannot read sidecar {path}: {e}")
+    if not text.strip():
+        die(f"sidecar is empty: {path}")
+    if max_chars < MIN_QUOTE_CHARS * 2:
+        die(f"--max-chars {max_chars} is too small to hold evidence spans")
+    outdir = Path(outdir)
+    if outdir.exists() and any(outdir.iterdir()):
+        die(f"output directory already exists and is not empty: {outdir}")
+    outdir.mkdir(parents=True, exist_ok=True)
+    pieces = split_markdown_sections(text, max_chars)
+    width = len(str(len(pieces)))
+    manifest_parts, offset = [], 0
+    for i, piece in enumerate(pieces, 1):
+        dest = outdir / f"part_{i:0{width}d}.md"
+        dest.write_text(piece, encoding="utf-8")
+        manifest_parts.append({
+            "part": i,
+            "path": str(dest),
+            "base_offset": offset,
+            "chars": len(piece),
+            "sha256": sha256_file(dest),
+        })
+        offset += len(piece)
+    print(json.dumps({
+        "source_path": str(src),
+        "source_sha256": sha256_file(src),
+        "source_chars": len(text),
+        "max_chars": max_chars,
+        "parts": manifest_parts,
+    }, ensure_ascii=False))
+    print(f"{PROG}: note: split {len(text)} chars into {len(pieces)} part(s); "
+          f"concatenation is exact, remap spans as global = local + base_offset",
+          file=sys.stderr)
+
+
 def cmd_mark(rundir, key, state, reason):
     if state not in MARK_STATES:
         die(f"state must be one of {MARK_STATES}", code=2)
@@ -992,11 +1119,17 @@ def cmd_mark(rundir, key, state, reason):
         die(f"item {key} is not part of this run")
     if it["state"] == "processed":
         die(f"item {key} is already processed; refused")
+    # "pending" is the return path for mistakenly closed items. Source
+    # fields are kept: the next `source` call revalidates hashes against
+    # disk and adopts any sidecar built since closing.
     it["state"] = state
     it["reason"] = reason.strip()
     it["updated_at"] = now()
     save_manifest(rundir, m)
-    print(f"marked {key}: {state} ({it['reason']})")
+    if state == "pending":
+        print(f"returned {key} to pending ({it['reason']})")
+    else:
+        print(f"marked {key}: {state} ({it['reason']})")
 
 
 # ---------------------------------------------------------------- reporting
@@ -1138,7 +1271,14 @@ def main():
     p.set_defaults(fn=lambda a: cmd_submit_worker_result(
         a.rundir, a.key, a.result, a.worker))
 
-    p = sub.add_parser("mark", help="mark a terminal non-success state")
+    p = sub.add_parser("split-sidecar",
+                        help="carve an oversized sidecar into section-aligned parts")
+    p.add_argument("path")
+    p.add_argument("--out", required=True)
+    p.add_argument("--max-chars", type=int, default=max_source_chars())
+    p.set_defaults(fn=lambda a: cmd_split_sidecar(a.path, a.max_chars, a.out))
+
+    p = sub.add_parser("mark", help="mark an item state, or return it to pending")
     p.add_argument("rundir")
     p.add_argument("key")
     p.add_argument("state", choices=MARK_STATES)
