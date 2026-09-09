@@ -394,6 +394,137 @@ export function healZoteroWorkerInput(input: Record<string, unknown>): {
 }
 
 /**
+ * Removes parenthetical citation years (e.g. "(2015)", "(2019a)") from
+ * `zotero_audit_claims` claim text. The audit's deterministic numeric gate
+ * treats every numeric token in claim text as requiring literal presence in
+ * evidence quotes, so conventional "Author (Year)" prose fails with
+ * NUMBER_MISMATCH even when all material numbers verify. Bare years
+ * ("1999 levels", "2010 to 2014"), parenthesized ranges ("(2010-2014)"),
+ * and statistics ("(n = 343)") are preserved; evidence quotes are never
+ * touched. Deletion-only: cannot manufacture a false `supported` verdict.
+ */
+const AUDIT_CITATION_YEAR_RE = /\(\d{4}[a-z]?\)/g;
+
+export function stripAuditClaimCitationYears(claims: unknown): {
+  claims: unknown;
+  changed: number;
+} {
+  const cleanOne = (text: string): string =>
+    text.replace(AUDIT_CITATION_YEAR_RE, "").replace(/[ \t]{2,}/g, " ").trim();
+  if (typeof claims === "string") {
+    try {
+      const parsed: unknown = JSON.parse(claims);
+      if (!Array.isArray(parsed)) return { claims, changed: 0 };
+      const inner = stripAuditClaimCitationYears(parsed);
+      if (inner.changed === 0) return { claims, changed: 0 };
+      return { claims: JSON.stringify(inner.claims), changed: inner.changed };
+    } catch {
+      return { claims, changed: 0 };
+    }
+  }
+  if (!Array.isArray(claims)) return { claims, changed: 0 };
+  let changed = 0;
+  const out = claims.map((claim) => {
+    if (!isRecord(claim) || typeof claim.text !== "string") return claim;
+    const cleaned = cleanOne(claim.text);
+    if (cleaned === claim.text) return claim;
+    changed += 1;
+    return { ...claim, text: cleaned };
+  });
+  return { claims: out, changed };
+}
+
+/**
+ * Repairs common Zotero MCP argument-shape mistakes before dispatch.
+ * Silent self-healing: only rewrites when the canonical argument is absent
+ * and the alias value parses cleanly; otherwise returns the input untouched
+ * so normal tool validation surfaces the error. Never mutates the caller
+ * object. Currently handles:
+ * - `collection` -> `collection_key` on list_collection_items and
+ *   search_bibliography_entries (semantic_search canonically uses
+ *   `collection` and is never touched).
+ * - `pages: "4-6"` / `pages: 4` -> `start_page` / `end_page` on
+ *   read_pdf_pages.
+ * - Parenthetical citation years in `zotero_audit_claims` claim text
+ *   (see `stripAuditClaimCitationYears`).
+ */
+export function healZoteroMcpArgs(
+  toolName: unknown,
+  input: unknown
+): {
+  healedInput: Record<string, unknown>;
+  wasHealed: boolean;
+} {
+  const record: Record<string, unknown> =
+    input && typeof input === "object" ? { ...(input as Record<string, unknown>) } : {};
+  const noHeal = { healedInput: record, wasHealed: false };
+  const { server, operation, args } = parseMcpCall(toolName, record);
+  if (server !== "zotero") return noHeal;
+  const healed = { ...args };
+  let wasHealed = false;
+
+  if (
+    (operation === "list_collection_items" || operation === "search_bibliography_entries") &&
+    healed.collection_key === undefined &&
+    typeof healed.collection === "string" &&
+    healed.collection.trim() !== ""
+  ) {
+    healed.collection_key = healed.collection;
+    delete healed.collection;
+    wasHealed = true;
+  }
+
+  if (
+    operation === "read_pdf_pages" &&
+    healed.start_page === undefined &&
+    healed.end_page === undefined &&
+    (typeof healed.pages === "string" || typeof healed.pages === "number")
+  ) {
+    const match = /^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(String(healed.pages));
+    if (match) {
+      const start = Number(match[1]);
+      const end = match[2] === undefined ? start : Number(match[2]);
+      if (Number.isSafeInteger(start) && start >= 1 && Number.isSafeInteger(end) && end >= start) {
+        healed.start_page = start;
+        if (match[2] !== undefined) healed.end_page = end;
+        delete healed.pages;
+        wasHealed = true;
+      }
+    }
+  }
+
+  if (operation === "audit_claims") {
+    const stripped = stripAuditClaimCitationYears(healed.claims);
+    if (stripped.changed > 0) {
+      healed.claims = stripped.claims;
+      wasHealed = true;
+    }
+  }
+
+  if (!wasHealed) return noHeal;
+  // Write the healed args back into the same slot parseMcpCall read from.
+  if (isRecord(record.args)) {
+    record.args = healed;
+  } else if (isRecord(record.arguments)) {
+    record.arguments = healed;
+  } else if (typeof record.args === "string") {
+    record.args = JSON.stringify(healed);
+  } else {
+    // Bare `zotero_*` tool path (the record itself is the args container)
+    // or malformed-arg fallback: replace wholesale to drop stale aliases.
+    for (const key of ["collection", "collection_key", "pages", "start_page", "end_page"]) {
+      delete record[key];
+    }
+    Object.assign(record, healed);
+  }
+  return { healedInput: record, wasHealed: true };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
  * Checks whether a shell command executed from within an Explore subagent
  * attempts filesystem mutation or redirection.
  */

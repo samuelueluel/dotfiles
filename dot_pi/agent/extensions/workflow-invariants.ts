@@ -10,6 +10,7 @@ import {
   checkVaultShellAccess,
   checkZoteroCloudUpload,
   checkZoteroSemanticResult,
+  healZoteroMcpArgs,
   healZoteroWorkerInput,
   isChezmoiManaged,
   isDotfilesStaticPath,
@@ -65,6 +66,20 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
 
       // 2. Auto-heal Zotero extraction workers
       const { healedInput, wasHealed } = healZoteroWorkerInput(input);
+      if (wasHealed) {
+        event.input = healedInput;
+      }
+    }
+
+    // MCP calls: silent Zotero argument-shape self-healing (alias repair).
+    // Never blocks; unparseable input passes through to normal validation.
+    if (
+      typeof event.toolName === "string" &&
+      (event.toolName === "mcp" ||
+        event.toolName === "mcp__zotero" ||
+        event.toolName.startsWith("zotero_"))
+    ) {
+      const { healedInput, wasHealed } = healZoteroMcpArgs(event.toolName, event.input);
       if (wasHealed) {
         event.input = healedInput;
       }

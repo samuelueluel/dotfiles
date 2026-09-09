@@ -17,6 +17,8 @@ import {
   checkExplorePrompt,
   checkZoteroCloudUpload,
   checkZoteroSemanticResult,
+  healZoteroMcpArgs,
+  stripAuditClaimCitationYears,
   healZoteroWorkerInput,
   checkExploreMutatingCommand,
   VAULT_ROOT,
@@ -358,3 +360,207 @@ test("checkZoteroSemanticResult annotates only all-non-positive rerank results",
   assert.equal(checkZoteroSemanticResult("mcp", { tool: "zotero_semantic_search", args: searchInput }, false, mixed), null);
 });
 
+
+test("healZoteroMcpArgs remaps collection alias on collection_key tools only", () => {
+  const input = { tool: "zotero_list_collection_items", args: { collection: "TRGBCDX5" } };
+  const { healedInput, wasHealed } = healZoteroMcpArgs("mcp__zotero", input);
+  assert.equal(wasHealed, true);
+  assert.deepEqual(healedInput.args, { collection_key: "TRGBCDX5" });
+  // Caller object is not mutated.
+  assert.deepEqual(input, { tool: "zotero_list_collection_items", args: { collection: "TRGBCDX5" } });
+
+  // search_bibliography_entries shares the collection_key schema.
+  const bib = healZoteroMcpArgs("mcp__zotero", { tool: "zotero_search_bibliography_entries", args: { collection: "TRGBCDX5" } });
+  assert.equal(bib.wasHealed, true);
+  assert.deepEqual(bib.healedInput.args, { collection_key: "TRGBCDX5" });
+
+  // semantic_search canonically uses `collection`: never touch it.
+  const sem = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_semantic_search",
+    args: { query: "demolitions", collection: "TRGBCDX5" },
+  });
+  assert.equal(sem.wasHealed, false);
+  assert.deepEqual(sem.healedInput.args, { query: "demolitions", collection: "TRGBCDX5" });
+
+  // Canonical present wins over the alias; blank aliases stay silent.
+  const canon = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_list_collection_items",
+    args: { collection_key: "A", collection: "B" },
+  });
+  assert.equal(canon.wasHealed, false);
+  const blank = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_list_collection_items",
+    args: { collection: "  " },
+  });
+  assert.equal(blank.wasHealed, false);
+});
+
+test("healZoteroMcpArgs parses pages ranges into start_page/end_page", () => {
+  const range = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_read_pdf_pages",
+    args: { item_key: "AZM6IY9A", pages: "4-6" },
+  });
+  assert.equal(range.wasHealed, true);
+  assert.deepEqual(range.healedInput.args, { item_key: "AZM6IY9A", start_page: 4, end_page: 6 });
+
+  const single = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_read_pdf_pages",
+    args: { item_key: "AZM6IY9A", pages: "4" },
+  });
+  assert.equal(single.wasHealed, true);
+  assert.deepEqual(single.healedInput.args, { item_key: "AZM6IY9A", start_page: 4 });
+
+  const numeric = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_read_pdf_pages",
+    args: { item_key: "AZM6IY9A", pages: 7 },
+  });
+  assert.equal(numeric.wasHealed, true);
+  assert.deepEqual(numeric.healedInput.args, { item_key: "AZM6IY9A", start_page: 7 });
+
+  // Unparseable, inverted, and zero ranges pass through to normal validation.
+  for (const pages of ["abc", "4-2", "0", "", "4-", "-6", 4.5]) {
+    const untouched = healZoteroMcpArgs("mcp__zotero", {
+      tool: "zotero_read_pdf_pages",
+      args: { item_key: "AZM6IY9A", pages },
+    });
+    assert.equal(untouched.wasHealed, false, `pages=${JSON.stringify(pages)} should not heal`);
+  }
+
+  // Explicit start_page wins over the alias.
+  const explicit = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_read_pdf_pages",
+    args: { item_key: "AZM6IY9A", start_page: 2, pages: "4-6" },
+  });
+  assert.equal(explicit.wasHealed, false);
+});
+
+test("healZoteroMcpArgs handles alternate call shapes and ignores other servers", () => {
+  // Non-namespaced mcp call with explicit server.
+  const viaMcp = healZoteroMcpArgs("mcp", {
+    tool: "zotero_list_collection_items",
+    server: "zotero",
+    args: { collection: "TRGBCDX5" },
+  });
+  assert.equal(viaMcp.wasHealed, true);
+  assert.deepEqual(viaMcp.healedInput.args, { collection_key: "TRGBCDX5" });
+
+  // Bare zotero_* tool name: the record itself is the args container.
+  const bare = healZoteroMcpArgs("zotero_read_pdf_pages", { item_key: "AZM6IY9A", pages: "4-6" });
+  assert.equal(bare.wasHealed, true);
+  assert.deepEqual(bare.healedInput, { item_key: "AZM6IY9A", start_page: 4, end_page: 6 });
+
+  // JSON-string args are re-serialized, not dropped.
+  const stringy = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_list_collection_items",
+    args: JSON.stringify({ collection: "TRGBCDX5" }),
+  });
+  assert.equal(stringy.wasHealed, true);
+  assert.deepEqual(JSON.parse(stringy.healedInput.args), { collection_key: "TRGBCDX5" });
+
+  // Other servers and tools pass through untouched.
+  const vault = healZoteroMcpArgs("mcp__turbovault", {
+    tool: "turbovault_read_note",
+    args: { path: "note.md" },
+  });
+  assert.equal(vault.wasHealed, false);
+  const other = healZoteroMcpArgs("bash", { command: "ls" });
+  assert.equal(other.wasHealed, false);
+  const empty = healZoteroMcpArgs("mcp__zotero", null);
+  assert.equal(empty.wasHealed, false);
+});
+
+test("healZoteroMcpArgs strips parenthetical citation years from audit claim text", () => {
+  const input = {
+    tool: "zotero_audit_claims",
+    args: {
+      claims: [
+        {
+          claim_id: "ah_local",
+          text: "Aliprantis and Hartley (2015) estimate reductions of 33% (theft) to 86% (shots fired), relative to 1999 crime levels.",
+          risk_tags: ["numeric"],
+          evidence: [
+            {
+              route: "pdf_page",
+              item_key: "TF4M6WXS",
+              page: 11,
+              quote: "ranging from a 33% reduction in theft to an 86% reduction in shots fired",
+            },
+          ],
+        },
+        {
+          claim_id: "larson",
+          text: "Larson et al. (2019a) estimate IRR 0.997 per demolition over 2010 to 2014 (n = 343 block groups).",
+          evidence: [],
+        },
+      ],
+    },
+  };
+  const { healedInput, wasHealed } = healZoteroMcpArgs("mcp__zotero", input);
+  assert.equal(wasHealed, true);
+  assert.equal(
+    healedInput.args.claims[0].text,
+    "Aliprantis and Hartley estimate reductions of 33% (theft) to 86% (shots fired), relative to 1999 crime levels."
+  );
+  assert.equal(
+    healedInput.args.claims[1].text,
+    "Larson et al. estimate IRR 0.997 per demolition over 2010 to 2014 (n = 343 block groups)."
+  );
+  // Evidence quotes are byte-identical; caller object is not mutated.
+  assert.equal(
+    healedInput.args.claims[0].evidence[0].quote,
+    "ranging from a 33% reduction in theft to an 86% reduction in shots fired"
+  );
+  assert.match(input.args.claims[0].text, /\(2015\)/);
+
+  // Bare years, parenthesized ranges, and statistics are preserved.
+  const clean = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_audit_claims",
+    args: {
+      claims: [
+        { claim_id: "k", text: "Crime fell 8.5% relative to 1999 levels over (2010-2014) (n = 343).", evidence: [] },
+      ],
+    },
+  });
+  assert.equal(clean.wasHealed, false);
+  assert.equal(
+    clean.healedInput.args.claims[0].text,
+    "Crime fell 8.5% relative to 1999 levels over (2010-2014) (n = 343)."
+  );
+
+  // Pure function reports per-claim change counts and skips non-records.
+  const direct = stripAuditClaimCitationYears([
+    { claim_id: "a", text: "Stacy (2018) finds 7.5%." },
+    { claim_id: "b", text: "No years here, just 7.5%." },
+    "not-a-record",
+  ]);
+  assert.equal(direct.changed, 1);
+  assert.equal(direct.claims[0].text, "Stacy finds 7.5%.");
+  assert.equal(direct.claims[1].text, "No years here, just 7.5%.");
+  assert.equal(direct.claims[2], "not-a-record");
+
+  // Gateway shape heals identically; JSON-string claims round-trip.
+  const viaMcp = healZoteroMcpArgs("mcp", {
+    tool: "zotero_audit_claims",
+    server: "zotero",
+    args: { claims: [{ claim_id: "k", text: "Sandler (2017) finds a decrease.", evidence: [] }] },
+  });
+  assert.equal(viaMcp.wasHealed, true);
+  assert.equal(viaMcp.healedInput.args.claims[0].text, "Sandler finds a decrease.");
+
+  const stringy = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_audit_claims",
+    args: {
+      claims: JSON.stringify([{ claim_id: "k", text: "Jay et al. (2019) find 11%.", evidence: [] }]),
+    },
+  });
+  assert.equal(stringy.wasHealed, true);
+  assert.deepEqual(JSON.parse(stringy.healedInput.args.claims), [
+    { claim_id: "k", text: "Jay et al. find 11%.", evidence: [] },
+  ]);
+
+  // Missing, non-array, and unparseable claims pass through untouched.
+  for (const claims of [undefined, null, "not-json{", { text: "x (2020)" }]) {
+    const untouched = healZoteroMcpArgs("mcp__zotero", { tool: "zotero_audit_claims", args: { claims } });
+    assert.equal(untouched.wasHealed, false);
+  }
+});

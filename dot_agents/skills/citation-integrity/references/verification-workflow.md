@@ -25,7 +25,8 @@ Before reporting any coefficient, standard error, sample size, percentage, or cu
 2. **Context Check:** Confirm units, sign, specification, comparison group, outcome variable, and time horizon.
 3. **Attribution Check:** Ensure the number belongs to the cited paper itself, not an in-text review of another study.
 4. **Context Escalation:** If a semantic snippet is truncated around a key table or note, verify the relevant page with `zotero_read_pdf_pages`; if page extraction is unavailable or malformed, use a targeted extraction from the known item's MinerU sidecar (keep provenance truthful internally; cite it by line range, never as a page read).
-5. **Failure Fallback:** If the exact number cannot be verified, drop it or explicitly label it `UNVERIFIED`.
+5. **Page-boundary sentences:** if the extraction ends one page mid-sentence and the continuation sits on the next page, no single `pdf_page` quote can pass the audit's containment check. Anchor the evidence with two `pdf_page` entries (one per page), each quoting its exact fragment. Treat `QUOTE_NOT_FOUND` at a page boundary as an extraction artifact, not source absence — try the split before dropping or rewriting the claim.
+6. **Failure Fallback:** If the exact number cannot be verified, drop it or explicitly label it `UNVERIFIED`.
 
 *Precedence Rule:* Verified source text always overrides model memory.
 

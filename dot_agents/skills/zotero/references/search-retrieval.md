@@ -121,6 +121,7 @@ Search candidate DOIs or title/author strings in `zotero_search_bibliography_ent
 
 ## Tool Constraints & Fallbacks
 
+- **Call shapes:** `zotero_list_collection_items` takes `collection_key` (not `collection`); pair with `include_subcollections=true` to match semantic-search scoping. `zotero_read_pdf_pages` takes `start_page` / `end_page` (not `pages`). A pre-tool hook silently repairs the `collection` alias and `"N-M"` page ranges; anything it cannot parse falls through to normal validation, so use the canonical shapes.
 - **Neighbor Depth:** `zotero_get_citation_neighbors` requires `depth=1` and returns direct neighbors only. Other values are rejected; multi-hop traversal is not implemented.
 - **Output Bounds:** Expanded citation-neighbor queries on broad textbooks can return hundreds of nodes. Use targeted `zotero_search_bibliography_entries` first.
 - **Collection Scope Filtering:**
