@@ -8,6 +8,8 @@ import {
   checkExplorePrompt,
   checkPrivilegedOrHostMutation,
   checkVaultShellAccess,
+  checkZoteroCloudUpload,
+  checkZoteroSemanticResult,
   healZoteroWorkerInput,
   isChezmoiManaged,
   isDotfilesStaticPath,
@@ -154,10 +156,33 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
         }
       }
     }
+
+    // 4. Zotero Cloud upload guard (zero-cloud-bytes policy)
+    if (typeof event.toolName === "string") {
+      const uploadCheck = checkZoteroCloudUpload(event.toolName, event.input);
+      if (uploadCheck.blocked) {
+        return {
+          block: true,
+          reason: `Blocked by policy: ${uploadCheck.reason} If this is required to accomplish your goal, stop and ask Samuel for help.`,
+        };
+      }
+    }
   });
 
   // Post-tool checks: Chezmoi staging reminder and syntax verification
   pi.on("tool_result", async (event) => {
+    // Zotero RAG footgun annotator: all-non-positive reranks read as no evidence.
+    // Silent on success, mixed/positive scores, errors, and non-search calls.
+    const rerankNote = checkZoteroSemanticResult(
+      event.toolName,
+      event.input,
+      event.isError,
+      (event as { content?: unknown }).content
+    );
+    if (rerankNote) {
+      event.content.push({ type: "text", text: rerankNote });
+    }
+
     // Failed writes/edits did not establish a new file state. Do not validate
     // the old file or emit a staging reminder for an operation that failed.
     if (!shouldRunPostToolChecks(event.toolName, event.isError)) return;

@@ -15,6 +15,8 @@ import {
   autoHealSedCommand,
   validateFileSyntax,
   checkExplorePrompt,
+  checkZoteroCloudUpload,
+  checkZoteroSemanticResult,
   healZoteroWorkerInput,
   checkExploreMutatingCommand,
   VAULT_ROOT,
@@ -278,5 +280,81 @@ test("checkExploreMutatingCommand blocks file redirection and mutating commands"
   assert.equal(checkExploreMutatingCommand("rg 'def foo' .").blocked, false);
   assert.equal(checkExploreMutatingCommand("fd -e kdl").blocked, false);
   assert.equal(checkExploreMutatingCommand("cat ~/.bashrc").blocked, false);
+});
+
+test("checkZoteroCloudUpload blocks cloud file uploads across MCP call shapes", () => {
+  // attach_file is blocked outright in every call shape
+  assert.equal(
+    checkZoteroCloudUpload("zotero_attach_file", { item_key: "ABCD2345", file_path: "/tmp/x.pdf" }).blocked,
+    true
+  );
+  assert.equal(
+    checkZoteroCloudUpload("mcp", { tool: "zotero_attach_file", args: { item_key: "ABCD2345", url: "https://x/y.pdf" } })
+      .blocked,
+    true
+  );
+  assert.equal(
+    checkZoteroCloudUpload("mcp__zotero", { tool: "attach_file", args: { item_key: "ABCD2345", file_path: "/tmp/x.pdf" } })
+      .blocked,
+    true
+  );
+
+  // add_item is blocked only for file ingestion
+  assert.equal(
+    checkZoteroCloudUpload("zotero_add_item", { source: "/tmp/paper.pdf", source_type: "file" }).blocked,
+    true
+  );
+  assert.equal(
+    checkZoteroCloudUpload("mcp", { tool: "zotero_add_item", args: { source: "/home/samuel/papers/paper.pdf" } }).blocked,
+    true
+  );
+
+  // DOI / URL / ISBN / inline BibTeX ingestion stays permitted
+  assert.equal(checkZoteroCloudUpload("zotero_add_item", { source: "10.1145/3708319" }).blocked, false);
+  assert.equal(
+    checkZoteroCloudUpload("mcp", { tool: "zotero_add_item", args: { source: "https://arxiv.org/abs/1234" } }).blocked,
+    false
+  );
+  assert.equal(
+    checkZoteroCloudUpload("zotero_add_item", { source: "@article{key, author={A}}", source_type: "bibtex" }).blocked,
+    false
+  );
+
+  // Non-zotero tools are untouched
+  assert.equal(checkZoteroCloudUpload("bash", { command: "ls" }).blocked, false);
+  assert.equal(
+    checkZoteroCloudUpload("mcp", { tool: "turbovault_read_note", args: { path: "x.md" } }).blocked,
+    false
+  );
+  assert.equal(checkZoteroCloudUpload("zotero_semantic_search", { query: "tax" }).blocked, false);
+});
+
+test("checkZoteroSemanticResult annotates only all-non-positive rerank results", () => {
+  const searchInput = { query: "tax" };
+  const allNegative = [
+    { type: "text", text: "## 1. Paper A\n**Rerank:** -6.77\n**Relevance:** 0.3" },
+    { type: "text", text: "## 2. Paper B\n**Rerank:** -8.44" },
+  ];
+  const note = checkZoteroSemanticResult("zotero_semantic_search", searchInput, false, allNegative);
+  assert.match(note ?? "", /Rerank Gate/);
+  assert.match(note ?? "", /All 2 returned/);
+
+  // Mixed and positive results stay silent
+  const mixed = [{ type: "text", text: "**Rerank:** +3.04\n**Rerank:** -0.32" }];
+  assert.equal(checkZoteroSemanticResult("zotero_semantic_search", searchInput, false, mixed), null);
+  const positive = [{ type: "text", text: "**Rerank:** +0.09" }];
+  assert.equal(checkZoteroSemanticResult("zotero_semantic_search", searchInput, false, positive), null);
+
+  // No rerank fields, errors, and non-search tools stay silent
+  assert.equal(
+    checkZoteroSemanticResult("zotero_semantic_search", searchInput, false, [{ type: "text", text: "No items found" }]),
+    null
+  );
+  assert.equal(checkZoteroSemanticResult("zotero_semantic_search", searchInput, true, allNegative), null);
+  assert.equal(
+    checkZoteroSemanticResult("zotero_resolve_exact_source", { source: "x" }, false, allNegative),
+    null
+  );
+  assert.equal(checkZoteroSemanticResult("mcp", { tool: "zotero_semantic_search", args: searchInput }, false, mixed), null);
 });
 

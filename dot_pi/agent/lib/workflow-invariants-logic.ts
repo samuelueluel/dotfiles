@@ -422,3 +422,162 @@ export function checkExploreMutatingCommand(command: string): CommandCheckResult
   return { blocked: false };
 }
 
+/**
+ * Normalizes an MCP invocation into a (server, operation, args) triple
+ * across the flattened (`zotero_*`), gateway (`mcp` with {tool, args}),
+ * and namespaced-proxy (`mcp__zotero` with {tool, args}) call shapes.
+ * Non-MCP calls yield an empty server and operation.
+ */
+export function parseMcpCall(
+  toolName: unknown,
+  input: unknown
+): { server: string; operation: string; args: Record<string, unknown> } {
+  const empty = { server: "", operation: "", args: {} as Record<string, unknown> };
+  if (typeof toolName !== "string" || !toolName) return empty;
+  const record =
+    input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+
+  if (toolName === "mcp__zotero") {
+    const op = typeof record.tool === "string" ? record.tool : "";
+    return { server: "zotero", operation: stripServerPrefix(op, "zotero"), args: mcpArgs(record) };
+  }
+  if (toolName === "mcp") {
+    const op = typeof record.tool === "string" ? record.tool : "";
+    const server =
+      typeof record.server === "string" && record.server.trim()
+        ? record.server.trim()
+        : op.startsWith("zotero_")
+          ? "zotero"
+          : op.startsWith("turbovault_")
+            ? "turbovault"
+            : "";
+    return { server, operation: stripServerPrefix(op, server), args: mcpArgs(record) };
+  }
+  if (toolName.startsWith("zotero_")) {
+    return { server: "zotero", operation: stripServerPrefix(toolName, "zotero"), args: record };
+  }
+  if (toolName.startsWith("turbovault_")) {
+    return { server: "turbovault", operation: stripServerPrefix(toolName, "turbovault"), args: record };
+  }
+  return empty;
+}
+
+function stripServerPrefix(operation: string, server: string): string {
+  let op = operation.trim();
+  if (!server) return op;
+  const prefix = `${server}_`;
+  while (op.startsWith(prefix)) op = op.slice(prefix.length);
+  return op;
+}
+
+function mcpArgs(record: Record<string, unknown>): Record<string, unknown> {
+  const nested = record.args ?? record.arguments;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>;
+  }
+  if (typeof nested === "string") {
+    try {
+      const parsed: unknown = JSON.parse(nested);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Fall through to the outer record for malformed proxy arguments.
+    }
+  }
+  return record;
+}
+
+const ZOTERO_DOCUMENT_EXTENSIONS = /\.(pdf|epub|djvu|doc|docx|odt|rtf|bib|bibtex)\s*$/i;
+
+/**
+ * Enforces the zero-cloud-bytes policy: blocks `attach_file` outright (its
+ * sole purpose is uploading file bytes) and blocks `add_item` only for file
+ * ingestion (explicit `source_type: 'file'` or an auto-detected absolute
+ * local document path). DOI/URL/ISBN/BibTeX ingestion is unaffected.
+ */
+export function checkZoteroCloudUpload(toolName: unknown, input: unknown): CommandCheckResult {
+  const { server, operation, args } = parseMcpCall(toolName, input);
+  if (server !== "zotero") return { blocked: false };
+
+  if (operation === "attach_file") {
+    return {
+      blocked: true,
+      reason:
+        "Uploading files to Zotero Cloud is prohibited (zero-cloud-bytes policy). " +
+        "Attach local PDFs with ~/.local/bin/zotero-link <item_key> <pdf_path> or ingest via zotero-auto-ingest.",
+    };
+  }
+
+  if (operation === "add_item") {
+    const sourceType = typeof args.source_type === "string" ? args.source_type.toLowerCase() : "auto";
+    if (sourceType === "file") {
+      return {
+        blocked: true,
+        reason:
+          "Ingesting a local file via zotero_add_item uploads its bytes to Zotero Cloud. " +
+          "Create the metadata record without the file, then attach it locally with ~/.local/bin/zotero-link <item_key> <pdf_path>.",
+      };
+    }
+    const source = typeof args.source === "string" ? args.source.trim() : "";
+    if (
+      (sourceType === "auto" || sourceType === "") &&
+      /^([/~]|(?:[A-Za-z]:)?[\\/])/.test(source) &&
+      ZOTERO_DOCUMENT_EXTENSIONS.test(source)
+    ) {
+      return {
+        blocked: true,
+        reason:
+          "This looks like local-file ingestion via zotero_add_item, which uploads file bytes to Zotero Cloud. " +
+          "Create the metadata record without the file, then attach it locally with ~/.local/bin/zotero-link <item_key> <pdf_path>.",
+      };
+    }
+  }
+
+  return { blocked: false };
+}
+
+/**
+ * Flags the all-non-positive rerank footgun: when a zotero_semantic_search
+ * result carries ≥1 Rerank score and every score is ≤ 0, the result reads as
+ * no supporting evidence. Returns annotation text, or null to stay silent
+ * (success path, mixed/positive scores, errors, and non-search calls).
+ */
+export function checkZoteroSemanticResult(
+  toolName: unknown,
+  input: unknown,
+  isError: unknown,
+  content: unknown
+): string | null {
+  if (isError === true) return null;
+  const { server, operation } = parseMcpCall(toolName, input);
+  if (server !== "zotero" || operation !== "semantic_search") return null;
+  const text = resultText(content);
+  if (!text) return null;
+  const scores: number[] = [];
+  const re = /\*{0,2}Rerank:\*{0,2}\s*([+-]?\d+(?:\.\d+)?)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) scores.push(Number(match[1]));
+  if (scores.length === 0) return null;
+  if (scores.some((score) => score > 0)) return null;
+  return (
+    `\n\n[Rerank Gate] All ${scores.length} returned passage(s) scored Rerank \u2264 0 — ` +
+    `treat this result as no supporting evidence. Do not cite these passages and do not use Relevance scores as substitutes; ` +
+    `narrow the query, bind an exact item filter, or verify directly.`
+  );
+}
+
+function resultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((item) =>
+        item && typeof item === "object" && typeof (item as Record<string, unknown>).text === "string"
+          ? String((item as Record<string, unknown>).text)
+          : ""
+      )
+      .join("\n");
+  }
+  return "";
+}
+

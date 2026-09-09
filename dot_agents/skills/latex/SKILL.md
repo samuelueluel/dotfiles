@@ -1,11 +1,20 @@
 ---
 name: latex
-description: Rules for writing math as delimited LaTeX in Pi chat. pi-math renders supported formulas as terminal images in compatible Pi TUI terminals and preserves source when rendering is unavailable. Use when math, equations, formulas, or statistical/econometric notation appears in conversation, and when deciding whether math should be inline, in a display block, or inside a code fence.
+description: Writes and formats mathematical notation as delimited LaTeX in Pi chat, using Pi's native inline renderer and pi-math display images with source-preserving fallback. Use when the user asks to write, format, or render math, equations, formulas, or statistical/econometric notation, or when choosing inline, display-block, or raw-source formatting.
 ---
 
 # LaTeX Math Rendering in Pi
 
-pi-math renders complete, supported LaTeX spans with MathJax and terminal images. Ghostty and Kitty can show inline formulas as real terminal cells and display formulas as centered image blocks. If image rendering is unavailable, disabled, or the formula fails MathJax or a safety limit, Pi leaves the original LaTeX visible. Stored messages and model context retain the original source.
+Pi uses its native readable terminal renderer for inline LaTeX. Display formulas use pi-math's MathJax terminal images and appear as centered blocks in compatible terminals. If rendering is unavailable, disabled, or a formula fails a parser or safety limit, Pi leaves the original LaTeX visible. Stored messages and model context retain the original source.
+
+## Request-Routing Playbook
+
+```text
+REQUEST
+├─ Short expression within prose ───────────────→ INLINE: `$...$` or `\(...\)`
+├─ Equation, fraction, matrix, or derivation ───→ DISPLAY: `$$...$$` or `\[...\]`
+└─ Literal LaTeX/.tex/Stata source ─────────────→ CODE: fenced code block
+```
 
 ## Core Rules
 
@@ -18,11 +27,13 @@ pi-math renders complete, supported LaTeX spans with MathJax and terminal images
 ## Renderer Behavior and Common Constructs
 
 - **Delimiters:** Inline `$...$` or `\(...\)`, display `$$...$$` or `\[...\]`.
+- **Inline rendering:** Keep inline formulas short enough for one line. Pi's native parser keeps them in text flow and supports a narrower subset than MathJax.
+- **Display rendering:** Use display delimiters for fractions, equations, matrices, aligned expressions, and other multi-line math. pi-math renders these with MathJax as centered terminal images.
 - **Display environments:** Common environments such as `equation`, `align`, `aligned`, `gather`, matrices, `cases`, and `CD` are supported.
-- **Source preservation:** Rendering is display-only. Do not rewrite a user's stored LaTeX merely to make the terminal image render.
-- **Terminal fallback:** If formulas appear as raw LaTeX, check `/math-render status`; `/math-render on|off|clear` controls the renderer. Unsupported terminals, tmux, and screen intentionally use the source fallback.
+- **Source preservation:** Rendering changes terminal display only. Do not rewrite a user's stored LaTeX merely to make the terminal output render.
+- **Terminal fallback:** If display formulas appear as raw LaTeX, check `/math-render status`; `/math-render on|off|clear` controls pi-math. Unsupported terminals, tmux, and screen intentionally use the source fallback.
 
-MathJax handles the layout, so use standard LaTeX rather than hand-built Unicode geometry:
+For display formulas, MathJax handles layout, so use standard LaTeX rather than hand-built Unicode geometry. Move complex inline formulas into display mode instead of forcing them into one line:
 
 - **Fractions:** `\frac{1}{N}`, `\tfrac{1}{2}`, `\dfrac{a}{b}`, `\frac{\partial y}{\partial x}`.
 - **Sub / Superscripts:** `x_{it+1}`, `e^{-\lambda t}`, `\hat{\beta}_{gmm}`, `(X'X)^{-1}`, `x'`.
@@ -45,7 +56,7 @@ pi-math accepts many standard MathJax constructs, but these replacements are use
 
 ## Broken vs. Fixed Examples
 
-| Broken (Raw or Plain Text) | Fixed (renders as a terminal image in compatible Pi TUI terminals) |
+| Broken (Raw or Plain Text) | Correct delimited source |
 |---|---|
 | `beta_1 = 0.5` | `$\beta_1 = 0.5$` |
 | `y_it = a_i + g_t + d*D_it` | `$y_{it} = \alpha_i + \gamma_t + \delta D_{it}$` |
@@ -53,4 +64,4 @@ pi-math accepts many standard MathJax constructs, but these replacements are use
 | `$$\hat{\beta} = (X'X)^{-1}X'y$$` inside code fence | `$$\hat{\beta} = (X'X)^{-1}X'y$$` outside fence |
 | `V = (G'WG)⁻¹ G'WΩ WG (G'WG)⁻¹` (bare Unicode) | `$V = (G'WG)^{-1}G'W\Omega WG(G'WG)^{-1}$` |
 | `ûᵢ = yᵢ - Xᵢβ̂` (combining Unicode marks) | `$\hat{u}_i = y_i - X_i\hat{\beta}$` |
-| `$$\sqrt{n}(\hat{\beta}-\beta) \xrightarrow{d} N(0,V)$$` | `$\sqrt{n}(\hat{\beta}-\beta) \overset{d}{\to} N(0, V)$` |
+| `$$\sqrt{n}(\hat{\beta}-\beta) \xrightarrow{d} N(0,V)$$` inside a code fence | `$$\sqrt{n}(\hat{\beta}-\beta) \overset{d}{\to} N(0, V)$$` outside a code fence |
