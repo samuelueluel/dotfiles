@@ -38,8 +38,6 @@
     },
     "npm:pi-tool-display",
     "npm:pi-ask-user",
-    "npm:pi-sessions",
-    "local-packages/session-tool-suppression",
     "local-packages/pi-permission-system",
     "npm:@tintinweb/pi-subagents",
     "local-packages/pi-agent-beautify",
@@ -90,26 +88,6 @@
     "agentToolAccess": "disabled",
     "contextGraphEnabled": false,
     "showStatus": false
-  },
-  "sessions": {
-    "messaging": {
-      "enable": false
-    },
-    "subagents": {
-      "enable": false
-    },
-    "handoff": {
-      "enable": true
-    },
-    "search": {
-      "enable": false
-    },
-    "ask": {
-      "enable": false
-    },
-    "autoTitle": {
-      "enable": true
-    }
   },
   "outputPad": 0
 }

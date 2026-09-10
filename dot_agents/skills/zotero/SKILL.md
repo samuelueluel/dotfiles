@@ -34,6 +34,9 @@ REQUEST
 - Never upload PDF files to Zotero Cloud, call `zotero_attach_file`, or use `zotero_add_item` with a file. To add papers, read [library operations](references/library-ops.md) and attach local PDFs with `zotero-link`.
 - Never download, parse, or embed a paper just because it appears in a bibliography. Never delete a library item without Samuel's explicit confirmation.
 - Never run a host-wide `pkill llama-server`.
+- **Maintenance safety:** Before stopping index processes, deleting Chroma chunks, archiving an index, or permitting a mass rebuild, load [index maintenance](references/index-maintenance.md), inspect the exact target, and obtain Samuel's explicit approval. Never use destructive recovery as routine cleanup.
+- **Database consistency:** Run graph/reference rebuilds only after Zotero Desktop is fully closed and WAL checkpointing has finished. Never treat an `immutable=1` read as current while a WAL may still be active.
+- **Use deterministic helpers:** Run the maintained tools under `scripts/` for MinerU preflight, process pausing, item-chunk deletion, BM25 rebuilds, and Chroma recovery. Do not copy long heredocs or raw destructive command sequences into the shell. The workflow-invariants hook blocks raw process-kill, chunk-deletion, Chroma-move, and mass-rebuild commands.
 
 
 Common tool chains:

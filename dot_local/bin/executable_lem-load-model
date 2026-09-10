@@ -84,7 +84,7 @@ curl -sS -m 5 "$LEM_API/health" >/dev/null 2>&1 \
   || die "Lemonade not reachable on $LEM_API (container up? try 'podman start lemonade')"
 
 args=""
-pi_thinking_level=""
+pi_thinking_level="unknown"
 fixed_parallel=0
 if [[ -n "$fixed_halo_backend" ]]; then
   if [[ -n "${LEM_HALO_BACKEND:-}" && "${LEM_HALO_BACKEND}" != "$fixed_halo_backend" ]]; then
@@ -210,8 +210,21 @@ case "$id" in
     # Tiel's trained MTP head is packaged in the MTP main GGUF; no separate
     # --spec-draft-model path is needed. Keep it on Nathan's Vulkan backend.
     fixed_parallel=1
-    pi_thinking_level="max"
-    args+=" --force-vulkan --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --reasoning on --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on"
+    args+=" --force-vulkan --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on"
+
+    mode=$(gum choose --header "thinking / reasoning mode" \
+      "on   On" \
+      "off  Off") || exit 1
+    case "${mode%%[ ]*}" in
+      on)
+        pi_thinking_level="on"
+        args+=" --reasoning on"
+        ;;
+      off)
+        pi_thinking_level="off"
+        args+=" --reasoning off --reasoning-budget 0"
+        ;;
+    esac
 
     mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
       "on  MTP" \
@@ -288,6 +301,25 @@ case "$id" in
     esac
     ;;
   DeepSeek-*)
+    effort=$(gum choose --header "thinking / reasoning effort" \
+      "max    Max" \
+      "high   High" \
+      "off    Off") || exit 1
+    case "${effort%%[ ]*}" in
+      max)
+        pi_thinking_level="max"
+        args+=" --reasoning on --reasoning-effort max"
+        ;;
+      high)
+        pi_thinking_level="high"
+        args+=" --reasoning on --reasoning-effort high"
+        ;;
+      off)
+        pi_thinking_level="off"
+        args+=" --reasoning off --reasoning-budget 0"
+        ;;
+    esac
+
     mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
       "on  MTP" \
       "off  None") || exit 1
@@ -303,6 +335,20 @@ case "$id" in
     esac
     ;;
   Qwen3.6-MoE-*)
+    mode=$(gum choose --header "thinking / reasoning mode" \
+      "on   On" \
+      "off  Off") || exit 1
+    case "${mode%%[ ]*}" in
+      on)
+        pi_thinking_level="on"
+        args+=" --reasoning on"
+        ;;
+      off)
+        pi_thinking_level="off"
+        args+=" --reasoning off --reasoning-budget 0"
+        ;;
+    esac
+
     mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
       "on  MTP" \
       "off  None") || exit 1
@@ -405,6 +451,9 @@ resp=$(gum spin --show-output --title "$note" -- \
   -H 'Content-Type: application/json' -d "$load_json")
 
 if printf '%s' "$resp" | grep -q '"status"[[:space:]]*:[[:space:]]*"success"'; then
+  if [[ -n "${LEM_THINKING_STATE_FILE:-}" ]]; then
+    printf '%s\n' "$pi_thinking_level" > "$LEM_THINKING_STATE_FILE"
+  fi
   printf '%s\n' "$resp"
   exit 0
 fi

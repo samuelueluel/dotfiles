@@ -1,10 +1,20 @@
 ---
 name: skill-creation
-description: Creates new agent skills with clear structure, decision trees, plain-language instructions, and guardrails. Use when the user asks to "create a skill", "write a skill", or "build a new skill".
+description: Creates, revises, and reviews agent skills with clear structure, decision trees, plain-language instructions, and guardrails. Use when the user asks to create, write, build, revise, audit, review, or check whether a skill complies with skill-creation guidelines.
 disable-model-invocation: true
 ---
 
 # Skill Creation
+
+## Request-Routing Playbook
+
+```text
+REQUEST
+├─ Create a new skill ─────────────────────────→ CREATE: define triggers → route modes → write → verify
+├─ Revise or clean up an existing skill ───────→ UPDATE: load skill-update → inspect whole directory → edit
+├─ Audit or check compliance without edits ────→ AUDIT: inspect whole directory → report findings by file
+└─ Mutation requested from CPTR/headless ───────→ DRAFT ONLY: propose changes; never claim files were saved
+```
 
 ## CPTR / Headless Limitation
 
@@ -12,7 +22,7 @@ CPTR can inspect and draft skill changes, but cannot write to `~/.agents/skills/
 
 ## Core Design Guidelines
 
-Good skills give models clear, dependable rules to follow so they do not guess or cut corners. Every skill should follow six core guidelines:
+Good skills give models clear, dependable rules to follow so they do not guess or cut corners. Every skill should follow seven core guidelines:
 
 1. **Clear Discovery in the Description:** The frontmatter `description:` is the only text the agent sees before choosing to load a skill. It must include exact trigger phrases, keywords, commands, and file patterns so the agent knows when to activate it.
 2. **Request-Routing Decision Trees:** When a skill handles multiple tasks or modes, place one top-down ASCII flowchart immediately under the title in `SKILL.md`, before non-negotiable rules or workflow details. This shows the agent which path to take at a glance. Use one main diagram; the numbered sections below then explain each step.
@@ -26,6 +36,7 @@ Good skills give models clear, dependable rules to follow so they do not guess o
    - **What to Move to References:** Keep all governing rules and workflows in `SKILL.md`. Move only large lookup tables, API schemas, full script code, and rare troubleshooting steps into `references/`.
 5. **Put Complex Shell Logic in Scripts:** Replace long or fragile shell commands with standalone helper scripts in `scripts/` or `~/.local/bin/`. This avoids syntax errors and keeps skill files short and readable.
 6. **Check Live State Instead of Hardcoding Dates or Counts:** Teach the agent to inspect current system state (such as running `chezmoi status` or querying live databases) rather than hardcoding temporary counts, dates, or file lists. Always read files before editing them.
+7. **Review the Whole Skill Directory:** When creating, revising, auditing, or checking compliance, inspect `SKILL.md` and every shipped file under `references/`, `scripts/`, and elsewhere in the skill directory. Never declare a skill compliant based on `SKILL.md` alone. Verify that its instructions, references, examples, and scripts agree.
 
 ## Skill Directory Structure
 
@@ -53,7 +64,7 @@ When a skill handles **3 or more distinct sub-intents, sub-modes, or caller doma
 
 ## SKILL.md Template
 
-```md
+````md
 ---
 name: skill-name
 description: Brief description of capability. Use when user asks to [action], mentions [keywords], or works with [filetypes/aliases].
@@ -87,7 +98,7 @@ REQUEST
 ## Advanced Features & References
 
 - If a rare edge case needs troubleshooting, load [troubleshooting](references/troubleshooting.md).
-```
+````
 
 ## Description Requirements
 
@@ -118,8 +129,22 @@ First remove repeated explanations so each rule lives in one clear place. Then m
 3. **Explain Links in `SKILL.md`:** Never list bare markdown links. Under `## Progressive Disclosure & Reference Routing`, pair every link with an explicit condition:
    - *Good:* `- If page extraction fails, tables are malformed, or OCR is unreadable, load [deep-dive reading](references/deep-dive-reading.md).`
    - *Bad:* `- See [deep-dive reading](references/deep-dive-reading.md).`
-4. **Use Relative Paths:** Always write links relative to the skill folder: `[topic](references/topic.md)`.
-5. **Keep Instructions Timeless:** Describe permanent commands, flags, and steps. Never hardcode temporary counts, dates, or process IDs that will soon be outdated.
+4. **Make Every Reference Reachable:** Link each directly loadable reference from `SKILL.md`. If one reference is only a dependency of another, link it from that parent reference and explain when to continue to it. Do not leave orphaned files.
+5. **Use Relative Paths:** Always write links relative to the skill folder: `[topic](references/topic.md)`.
+6. **Make the Body Scannable and Operational:** Use descriptive headings and short sections. State prerequisites before procedures. Make commands and examples complete enough to use safely, and explain non-obvious parameters or expected output.
+7. **Keep Terminology Consistent:** Tool names, paths, parameters, and terms must match `SKILL.md` and the other shipped files. References must not contradict the fast-path workflow.
+8. **Avoid Duplication and Hidden Rules:** Do not repeat governing instructions from `SKILL.md`, and never place a required safety boundary, routing rule, or output requirement only in a reference.
+9. **Split by Topic, Not an Arbitrary Length:** Split a reference when it becomes hard to navigate or covers distinct loading conditions. Do not split one coherent topic merely to meet a line target.
+10. **Keep Instructions Timeless:** Describe permanent commands, flags, and steps. Never hardcode temporary counts, dates, or process IDs that will soon be outdated.
+
+## Whole-Skill Compliance Reviews
+
+When asked to review, audit, or make a skill comply with these guidelines:
+1. List the complete skill directory so hidden, nested, or unlinked files are not missed.
+2. Read `SKILL.md` and every Markdown reference. Inspect scripts, examples, schemas, and other shipped files for consistency with the documented workflow.
+3. Check both directions: every documented link resolves, and every shipped reference is reachable through an explained loading route.
+4. Check for contradictions, stale commands, duplicated instructions, hidden governing rules, and mismatched terminology across files.
+5. Report findings by file. Do not claim full compliance until the whole directory has been checked.
 
 ## Markdown Standards & Vault Syntax Isolation
 
@@ -128,12 +153,14 @@ First remove repeated explanations so each rule lives in one clear place. Then m
 
 ## Review Checklist
 
-- [ ] Description includes clear trigger phrases ("Use when...")
+- [ ] Description is third-person, no more than 1024 characters, and uses exactly two purposeful sentences
+- [ ] Description's first sentence states capability; second sentence gives clear trigger phrases ("Use when...")
 - [ ] Rules separate thinking guidelines from physical tool limits
 - [ ] Physical tool limits checked against `Pi-Hooks.md` / `workflow-invariants.ts`; Samuel asked if a new hook is needed
 - [ ] All safety boundaries, rules, and output formatting stay in `SKILL.md` (never hidden in `references/`)
 - [ ] Multi-intent skills (3+ tasks) include an ASCII decision tree
 - [ ] Decision tree appears immediately under the title, is top-down and straightforward, and is wrapped in a fenced `text` code block
+- [ ] Decision tree uses box characters, maps each trigger to a mode and primary action/tool, and remains the single canonical router
 - [ ] Each rule lives in one place without repeating the same flowchart
 - [ ] Written in plain, direct English with clear active-voice instructions (no dense jargon packing)
 - [ ] Fast-path `SKILL.md` fits comfortably within ~150–200 lines (up to 250 if needed for clarity)
@@ -141,5 +168,10 @@ First remove repeated explanations so each rule lives in one clear place. Then m
 - [ ] Uses standard Markdown for skill prose; literal Obsidian highlight syntax appears only in code when documenting vault behavior
 - [ ] Long or complex shell commands moved into standalone scripts
 - [ ] Rare edge cases and detailed lookup tables moved to self-describing reference files
+- [ ] Complete skill directory inspected, including all references, scripts, examples, and other shipped files
+- [ ] Every documented link resolves, and no orphaned reference files remain
+- [ ] References use the required title and line-3 loading trigger
+- [ ] References are focused, scannable, operational, and consistent with `SKILL.md`
+- [ ] No governing rules are hidden only in references; no unnecessary duplication or contradictions remain
 - [ ] No temporary dates, counts, or time-sensitive snapshots baked into text
 - [ ] Tracked in Chezmoi (`chezmoi add ~/.agents/skills/<skill-name>/SKILL.md`)

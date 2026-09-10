@@ -12,8 +12,8 @@ disable-model-invocation: true
 REQUEST INTENT
 │
 ├─ "check <skill>" / "does <skill> need work?" ──→ READ-ONLY HEALTH CHECK
-│                                                  ├─ Read SKILL.md and references/
-│                                                  ├─ Silently audit against skill-creation rules
+│                                                  ├─ List and read the complete skill directory
+│                                                  ├─ Audit every shipped file against skill-creation rules
 │                                                  ├─ Report line count, status, or obsolete rules
 │                                                  └─ INVARIANT: Never mutate files during a check
 │
@@ -52,8 +52,10 @@ REQUEST INTENT
 
 ### Read-Only Health Check ("check <skill>" / "does <skill> need work?")
 - Triggered by casual questions ("Check the music skill", "How is session-log looking?", "Does X need maintenance?").
-- Read `SKILL.md` and any files in `references/`.
-- Check against `skill-creation` standards (plain language, line guidelines, rules staying in `SKILL.md`).
+- List the complete skill directory, including hidden and nested files.
+- Read `SKILL.md`, every Markdown reference, and every shipped script, example, schema, or other documentation file.
+- Check both directions: every documented link resolves, and every shipped reference is reachable through an explained loading route.
+- Check all files against `skill-creation` standards, including plain language, line guidelines, rule/reference separation, cross-file consistency, and hook alignment.
 - Report what you found in chat. Never modify files during a health check.
 
 ### Tier 1: Small In-Place Edit (Default)
@@ -87,6 +89,8 @@ REQUEST INTENT
 - [ ] Surrounding unaffected text kept intact without unnecessary rewriting
 - [ ] Instructions use plain, direct English (no dense jargon packing to save lines)
 - [ ] If Tier 3: proposal was approved in chat before modifying files
+- [ ] Complete skill directory inspected; no scripts, examples, schemas, or nested files skipped
+- [ ] Every reference is reachable, correctly triggered, and consistent with `SKILL.md`
 - [ ] All `skill-creation` rules followed (rules in `SKILL.md`, standard Markdown used)
 - [ ] Short summary provided (or real terminal `git diff` displayed for Tier 3 / on request)
 - [ ] Staged in Chezmoi (`chezmoi add ~/.agents/skills/<skill>/...`)

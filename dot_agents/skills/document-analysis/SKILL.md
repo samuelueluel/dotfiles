@@ -5,8 +5,6 @@ description: Enables analysis of private PDFs, DOCX files, images, text, and Mar
 
 # Private Document Analysis
 
-Use this skill for individual personal documents outside Zotero: legal, medical, employment, contract, billing, insurance, correspondence, manuals, images, and similar files.
-
 ## Request-Routing Playbook
 
 ```text
@@ -18,6 +16,8 @@ REQUEST
 ├─ Remove completed job ──────────────────────→ PURGE: dry-run → exact-ID confirmation
 └─ Literature/RAG request ─────────────────────→ SEPARATE ZOTERO WORKFLOW; never use this skill
 ```
+
+Use this skill for individual personal documents outside Zotero: legal, medical, employment, contract, billing, insurance, correspondence, manuals, images, and similar files.
 
 ## Non-Negotiable Rules
 

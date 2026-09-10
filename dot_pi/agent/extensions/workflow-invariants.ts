@@ -7,8 +7,10 @@ import {
   checkExploreMutatingCommand,
   checkExplorePrompt,
   checkPrivilegedOrHostMutation,
+  checkSessionSummaryStoreShellAccess,
   checkVaultShellAccess,
   checkZoteroCloudUpload,
+  checkZoteroIndexMutation,
   checkZoteroSemanticResult,
   healZoteroMcpArgs,
   healZoteroWorkerInput,
@@ -16,6 +18,7 @@ import {
   isDotfilesStaticPath,
   shouldRunPostToolChecks,
   isSecretFilePath,
+  isSessionSummaryStorePath,
   isVaultNotePath,
   validateFileSyntax,
   DOTFILES_ROOT,
@@ -98,6 +101,18 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
           };
         }
 
+        // Curated session summaries must go through piwork's validated store.
+        if (
+          (event.toolName === "write" || event.toolName === "edit") &&
+          isSessionSummaryStorePath(rawPath)
+        ) {
+          return {
+            block: true,
+            reason:
+              "Blocked by policy: Direct writes to session-summaries.json are prohibited. Use 'piwork summary log' or another validated 'piwork summary' persistence command.",
+          };
+        }
+
         // Chezmoi dotfiles repo static edit guard
         if ((event.toolName === "write" || event.toolName === "edit") && isDotfilesStaticPath(rawPath)) {
           return {
@@ -149,6 +164,24 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
             block: true,
             reason:
               "Blocked by policy: Direct shell operations on Obsidian vault notes are prohibited. Route note operations through TurboVault MCP tools. Access to .obsidian/ (CSS snippets, plugins) is permitted.",
+          };
+        }
+
+        // Protect the curated session-summary store from direct shell access.
+        const summaryStoreCheck = checkSessionSummaryStoreShellAccess(cmd);
+        if (summaryStoreCheck.blocked) {
+          return {
+            block: true,
+            reason: `Blocked by policy: ${summaryStoreCheck.reason}`,
+          };
+        }
+
+        // Require reviewed helpers for destructive Zotero index maintenance.
+        const zoteroIndexCheck = checkZoteroIndexMutation(cmd);
+        if (zoteroIndexCheck.blocked) {
+          return {
+            block: true,
+            reason: `Blocked by policy: ${zoteroIndexCheck.reason}`,
           };
         }
 

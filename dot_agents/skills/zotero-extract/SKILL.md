@@ -1,6 +1,6 @@
 ---
 name: zotero-extract
-description: Recall-led exhaustive extraction over a frozen Zotero item scope using the zotero-extract spine. Use when Samuel explicitly asks to use "zotero-extract" or requests ALL papers, every item, complete coverage, or an audit over an explicit collection or item list. Workers read full documents and emit validated evidence packets; a coverage manifest tracks every scoped item to a terminal state.
+description: Performs recall-led exhaustive extraction over a frozen Zotero item scope; workers read full documents, emit validated evidence packets, and move every scoped item to a terminal state. Use when Samuel explicitly asks for "zotero-extract", ALL papers, every item, complete coverage, or an audit over an explicit collection or item list.
 ---
 
 # Zotero Extract
@@ -27,9 +27,9 @@ REQUEST
 - No cloud OCR, no cloud embeddings, and no web downloads. Preprocessing stays completely local.
 - Sources with unresolvable issues (multiple conflicting PDFs, scanned pages without text, oversized files) fail closed and are marked `escalated`. Never force them through.
 - Never reprocess a finished paper; if a run is interrupted, resume from `pending`.
-- Run full collection extractions in `pihat`/`betahat`. On cloud sessions, use four concurrent `Explore` subagents to read papers whenever four or more items are pending. Packet submissions are always serial. Local `pi`/`beta` runs one worker at a time and is reserved for smoke tests or small test sets.
+- Run full collection extractions in `pihat`/`betahat`. Read the current `PI_SUBAGENTS_MAX_CONCURRENT` value and dispatch up to that many `Explore` workers when the pending set permits. If the value is missing or invalid, use one worker and report the fallback. Packet submissions are always serial. Reserve local `pi`/`beta` for smoke tests or small test sets.
 - Dispatch workers strictly as `Explore` subagents (`subagent_type: "Explore"`) with the `ZOTERO_EXTRACT_WORKER: FULL_DOCUMENT` prompt marker. Workers are read-only; runtime hooks automatically remove turn caps and block mutations.
-- Concurrency follows `PI_SUBAGENTS_MAX_CONCURRENT` as exported by the session launcher; never hardcode a concurrency override.
+- Concurrency follows the live `PI_SUBAGENTS_MAX_CONCURRENT` value exported by the session launcher; never hardcode a worker count or override.
 - Scope definition, verification, adjudication, and final synthesis always stay in the main session.
 
 
@@ -58,7 +58,7 @@ An extraction inventory is independent of the semantic search database. If compl
 3. **Smoke test first:** For a new run or rule, test ~8 items across both sidecar and PDF routes, including a control paper that should test negative. Inspect the packets with Samuel before continuing.
 4. **Per-item loop:**
    - Call `zotero-extract source RUNDIR KEY` to get the source path and route. If a sidecar was built after init (e.g. from a worklist pass), `source` adopts it automatically.
-   - On `pihat`/`betahat`, dispatch the next batch of up to 4 pending papers to concurrent `Explore` subagents. On local `pi`/`beta`, dispatch one at a time.
+   - On `pihat`/`betahat`, dispatch the next batch of pending papers up to the live `PI_SUBAGENTS_MAX_CONCURRENT` limit. On local `pi`/`beta`, use one worker at a time.
    - Wait for the complete WorkerResultV1 outputs.
    - Check each result with `zotero-extract check-worker-result RUNDIR KEY RESULT.json`.
    - Submit valid results serially with `zotero-extract submit-worker-result RUNDIR KEY RESULT.json --worker LABEL`.
@@ -85,7 +85,7 @@ A submitted packet contains candidate evidence for the main session. Before writ
 ## Worker Delegation & Concurrency
 
 - Workers run in subagents for context isolation: each paper's full text lives in a temporary child session, keeping the main chat history clean.
-- Concurrency follows `PI_SUBAGENTS_MAX_CONCURRENT`: `pihat`/`betahat` uses 4 parallel workers; local `pi`/`beta` uses 1 worker.
+- Read `PI_SUBAGENTS_MAX_CONCURRENT` before dispatch. Cloud sessions use up to that live limit; local `pi`/`beta` uses one worker at a time. If the variable is missing or invalid, default to one worker and disclose the fallback.
 - Dispatch workers as `Explore` subagents (`subagent_type: "Explore"`) with `ZOTERO_EXTRACT_WORKER: FULL_DOCUMENT` in the prompt. Do not set `max_turns`.
 - Workers emit only WorkerResultV1 data with exact character offsets. The CLI extracts the verbatim quotes and metadata.
 - Workers must finish with a status of `completed`. Discard stopped, aborted, or truncated workers and restart them fresh.

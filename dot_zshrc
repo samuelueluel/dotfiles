@@ -849,7 +849,31 @@ _pi_pick_local_model() {
 # Keep the historical helper name for pi/beta callers while sharing the
 # exact same loader implementation.
 _lem_preload() {
-  command lem-load-model "$@"
+  local _lem_state_file _lem_status=1 _lem_thinking=""
+  _lem_state_file=$(mktemp "${TMPDIR:-/tmp}/pi-lemonade-thinking.XXXXXX") || return 1
+  chmod 600 "$_lem_state_file" 2>/dev/null || true
+  unset PI_LOCAL_THINKING_LEVEL
+
+  {
+    LEM_THINKING_STATE_FILE="$_lem_state_file" command lem-load-model "$@"
+    _lem_status=$?
+  } always {
+    if (( _lem_status == 0 )); then
+      _lem_thinking="$(<"$_lem_state_file")"
+      case "$_lem_thinking" in
+        max|high|medium|low|off|on)
+          typeset -g PI_LOCAL_THINKING_LEVEL="$_lem_thinking"
+          ;;
+        *)
+          typeset -g PI_LOCAL_THINKING_LEVEL=unknown
+          ;;
+      esac
+    else
+      typeset -g PI_LOCAL_THINKING_LEVEL=unknown
+    fi
+    rm -f -- "$_lem_state_file"
+  }
+  return "$_lem_status"
 }
 
 # The subagents extension reads PI_SUBAGENTS_MAX_CONCURRENT at session start
@@ -887,7 +911,7 @@ pi() {
 
   case "${go%%[ ]*}" in
     no)
-      printf 'type=pi\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=unsandboxed\n' "$model_flag" "${PWD##*/}" > "$_state_file"
+      printf 'type=pi\nmodel=%s\nthinking=%s\ncwd=%s\nsandbox=unsandboxed\n' "$model_flag" "${PI_LOCAL_THINKING_LEVEL:-unknown}" "${PWD##*/}" > "$_state_file"
       printf '\033]2;π - %s\007' "${PWD##*/}"
       { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "$@" } \
         always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
@@ -908,7 +932,7 @@ pi() {
         echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
 
-      printf 'type=pi\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
+      printf 'type=pi\nmodel=%s\nthinking=%s\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${PI_LOCAL_THINKING_LEVEL:-unknown}" "${abs_target##*/}" "$level" > "$_state_file"
       printf '\033]2;π - %s\007' "${abs_target##*/}"
       { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "${@:2}" } \
         always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }

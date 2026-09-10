@@ -66,7 +66,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         },
@@ -104,7 +104,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         },
@@ -147,7 +147,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         },
@@ -168,7 +168,7 @@
             "medium": "medium",
             "high": "high",
             "xhigh": "xhigh",
-            "max": "xhigh"
+            "max": "max"
           }
         }
       ]
@@ -201,7 +201,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         },
@@ -225,7 +225,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         }
@@ -297,7 +297,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         },
@@ -335,7 +335,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         },
@@ -378,7 +378,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         },
@@ -399,7 +399,7 @@
             "medium": "medium",
             "high": "high",
             "xhigh": "xhigh",
-            "max": "xhigh"
+            "max": "max"
           }
         }
       ]
@@ -432,7 +432,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         },
@@ -456,7 +456,7 @@
             "low": "low",
             "medium": null,
             "high": "high",
-            "xhigh": "max",
+            "xhigh": null,
             "max": "max"
           }
         }
@@ -579,7 +579,7 @@
           "thinkingLevelMap": {
             "xhigh": "xhigh",
             "max": "max",
-            "minimal": "low"
+            "minimal": null
           },
           "compat": {
             "supportsOpenAIGrammarTools": true,
@@ -614,7 +614,7 @@
           "thinkingLevelMap": {
             "xhigh": "xhigh",
             "max": "max",
-            "minimal": "low"
+            "minimal": null
           },
           "compat": {
             "supportsOpenAIGrammarTools": true,
@@ -649,7 +649,7 @@
           "thinkingLevelMap": {
             "xhigh": "xhigh",
             "max": "max",
-            "minimal": "low"
+            "minimal": null
           },
           "compat": {
             "supportsOpenAIGrammarTools": true,
@@ -684,7 +684,7 @@
           "thinkingLevelMap": {
             "xhigh": "xhigh",
             "max": "max",
-            "minimal": "low"
+            "minimal": null
           },
           "compat": {
             "supportsOpenAIGrammarTools": true,
@@ -694,23 +694,53 @@
         }
       ],
       "modelOverrides": {
+        "gpt-5.3-codex-spark": {
+          "thinkingLevelMap": {
+            "minimal": null
+          }
+        },
         "gpt-5.4": {
-          "contextWindow": 320000
+          "contextWindow": 320000,
+          "thinkingLevelMap": {
+            "minimal": null
+          }
         },
         "gpt-5.4-mini": {
-          "contextWindow": 320000
+          "contextWindow": 320000,
+          "thinkingLevelMap": {
+            "minimal": null
+          }
         },
         "gpt-5.5": {
-          "contextWindow": 320000
+          "contextWindow": 320000,
+          "thinkingLevelMap": {
+            "minimal": null
+          }
         },
         "gpt-5.6-luna": {
-          "contextWindow": 320000
+          "contextWindow": 320000,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": null
+          }
         },
         "gpt-5.6-sol": {
-          "contextWindow": 320000
+          "contextWindow": 320000,
+          "thinkingLevelMap": {
+            "minimal": null
+          }
         },
         "gpt-5.6-terra": {
-          "contextWindow": 320000
+          "contextWindow": 320000,
+          "thinkingLevelMap": {
+            "minimal": null
+          }
+        },
+        "gpt-6-astra": {
+          "thinkingLevelMap": {
+            "minimal": null
+          }
         }
       }
     }

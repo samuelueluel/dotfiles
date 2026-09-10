@@ -5,8 +5,6 @@ description: Writes and formats mathematical notation as delimited LaTeX in Pi c
 
 # LaTeX Math Rendering in Pi
 
-Pi uses its native readable terminal renderer for inline LaTeX. Display formulas use pi-math's MathJax terminal images and appear as centered blocks in compatible terminals. If rendering is unavailable, disabled, or a formula fails a parser or safety limit, Pi leaves the original LaTeX visible. Stored messages and model context retain the original source.
-
 ## Request-Routing Playbook
 
 ```text
@@ -15,6 +13,8 @@ REQUEST
 ├─ Complete or focal statement, or long/structured expression ─────→ DISPLAY: `$$...$$` or `\[...\]`
 └─ Literal LaTeX/.tex/Stata source ─────────────────────────────────→ CODE: fenced code block
 ```
+
+Pi uses its native readable terminal renderer for inline LaTeX. Display formulas use pi-math's MathJax terminal images and appear as centered blocks in compatible terminals. If rendering is unavailable, disabled, or a formula fails a parser or safety limit, Pi leaves the original LaTeX visible. Stored messages and model context retain the original source.
 
 ## Core Rules
 

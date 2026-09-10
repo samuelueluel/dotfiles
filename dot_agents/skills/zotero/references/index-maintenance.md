@@ -38,24 +38,11 @@ The sidecar creator must call the production `zotero_mcp.mineru.run_mineru` path
 - It exports the configured `semantic_search.mineru.config_json` as `MINERU_TOOLS_CONFIG_JSON` and selects the matching legacy/new VRAM variable.
 - The managed patcher byte-synchronizes `mineru.py` on every application, so an installed package cannot silently retain an older patch after `sjust uv`.
 
-After changing the MCP tag, MinerU virtual environment, or MinerU config, run this **fast preflight** before a batch:
+After changing the MCP tag, MinerU virtual environment, or MinerU config, run the maintained fast preflight before a batch:
 
 ```bash
-ZOTERO_LOCAL=true "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" - <<'PY'
-from pathlib import Path
-from zotero_mcp.mineru import load_mineru_config, _build_mineru_invocation
-cfg = load_mineru_config()
-bin_path = Path(cfg["bin"])
-if not bin_path.exists():
-    raise SystemExit(f"MinerU binary missing: {bin_path}")
-cmd, env, modern = _build_mineru_invocation(
-    cfg, Path("/tmp/placeholder.pdf"), Path("/tmp/zotero-mineru-preflight")
-)
-print(f"binary={bin_path}")
-print(f"backend_flag_supported={modern}")
-print(f"command={' '.join(cmd)}")
-print(f"config_env={env.get('MINERU_TOOLS_CONFIG_JSON', 'default')}")
-PY
+ZOTERO_LOCAL=true "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" \
+  "$HOME/.agents/skills/zotero/scripts/mineru-preflight.py"
 ```
 
 The preflight catches the previous failure immediately: a legacy `magic-pdf` must report `backend_flag_supported=False` and its command must contain no `-b`; a modern `mineru` may report `True`. For higher confidence, run one representative single-item `create`, wait for its detached log to report `DONE`, require a non-empty `<key>.md`, and inspect the log for `No such option`, `Traceback`, or `(null): No such file or directory` before launching a batch.
@@ -104,21 +91,26 @@ If deadlocked (0% CPU or slow crawl), restart the container: `podman restart emb
 
 ## 3. Pausing & Resuming Batch Jobs
 
-1. **Terminate In-Flight Processes:**
+1. **Preview In-Flight Processes:** Run the helper without confirmation and inspect every matched process:
    ```bash
-   pkill -f "zotero-backfill-watchdog"
-   pkill -f "zotero-sidecar-watch"
-   pkill -f "update-db"
-   pkill -f "mineru"
+   "$HOME/.agents/skills/zotero/scripts/pause-sidecar-jobs.sh"
    ```
-2. **Clean Interrupted Chunks:**
-   ```python
-   from pathlib import Path
-   from zotero_mcp.chroma_client import create_chroma_client
-   cc = create_chroma_client(str(Path.home() / '.config' / 'zotero-mcp' / 'config.json'))
-   cc.delete_item_chunks('<IN_FLIGHT_KEY>')
+2. **Stop the Reviewed Processes:** After Samuel approves the displayed targets, rerun with `--confirm`:
+   ```bash
+   "$HOME/.agents/skills/zotero/scripts/pause-sidecar-jobs.sh" --confirm
    ```
-3. **Relaunch:** Re-run pipeline for remaining items.
+3. **Preview Interrupted-Item Cleanup:** Replace `<IN_FLIGHT_KEY>` with one exact parent item key. The first call is a dry run:
+   ```bash
+   "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" \
+     "$HOME/.agents/skills/zotero/scripts/delete-item-chunks.py" <IN_FLIGHT_KEY>
+   ```
+4. **Delete Only the Reviewed Item's Chunks:** After Samuel confirms that key, repeat it through the confirmation argument:
+   ```bash
+   "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" \
+     "$HOME/.agents/skills/zotero/scripts/delete-item-chunks.py" <IN_FLIGHT_KEY> \
+     --confirm-key <IN_FLIGHT_KEY>
+   ```
+5. **Relaunch:** Re-run the pipeline for the remaining items.
 
 ## 4. Item-Scoped Re-embed (No Full Rebuild)
 
@@ -136,46 +128,36 @@ ZOTERO_LOCAL=true "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/zotero-mcp-
 
 Completed `zotero-sidecar.sh embed` runs converge BM25 automatically. Rebuild manually after interrupted batches, classifier adjustments, or suspected drift:
 
-```python
-from pathlib import Path
-from zotero_mcp.chroma_client import create_chroma_client
-from zotero_mcp.sparse_index import BM25Index
-from zotero_mcp.semantic_search import is_bibliography_chunk
-
-config_path = str(Path.home() / '.config' / 'zotero-mcp' / 'config.json')
-index_path = str(Path.home() / '.config' / 'zotero-mcp' / 'bm25_index.json')
-
-cc = create_chroma_client(config_path)
-idx = BM25Index(index_path)
-docs = []
-for ids, doc_list, _ in cc.iter_documents():
-    for d, t in zip(ids, doc_list):
-        if t and not is_bibliography_chunk(t):
-            docs.append((d, t))
-idx.build(docs)
-idx.save()
-```
-Restart service:
 ```bash
+"$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" \
+  "$HOME/.agents/skills/zotero/scripts/rebuild-bm25.py"
 systemctl --user restart zotero-mcp.service
 ```
 
 ## 6. Re-keying Sidecars after Item Re-import
 
 When an item is re-imported under a new key with an identical PDF:
-1. Verify PDF MD5 matches between old and new items.
-2. Copy sidecar: `cp ~/.config/zotero-mcp/mineru-sidecars/<OLD>.md ~/.config/zotero-mcp/mineru-sidecars/<NEW>.md`
-3. Delete old chunks: `cc.delete_item_chunks('<OLD>')`
-4. Embed new item: `zotero-sidecar.sh embed <COLLECTION>`
-5. Rebuild BM25 index (§5) and remove the old sidecar file.
+1. Verify that the old and new PDF MD5 values match.
+2. Copy the sidecar: `cp ~/.config/zotero-mcp/mineru-sidecars/<OLD>.md ~/.config/zotero-mcp/mineru-sidecars/<NEW>.md`.
+3. Preview deletion of the old item's chunks with `delete-item-chunks.py <OLD>`. After Samuel confirms the old key, rerun with `--confirm-key <OLD>` as shown in §3.
+4. Embed the new item with `zotero-sidecar.sh embed <COLLECTION>` and verify its Chroma metadata and chunk count.
+5. Rebuild BM25 with the helper in §5. Remove the old sidecar only after the new item and sparse index verify successfully.
 
 ## 7. ChromaDB Corruption Recovery
 
-If ChromaDB encounters unrecoverable corruption:
-1. Stop service: `systemctl --user stop zotero-mcp.service`
-2. Archive damaged database: `mv ~/.config/zotero-mcp/chroma_db ~/.config/zotero-mcp/chroma_db.damaged-$(date +%Y%m%d)`
-3. Rebuild from sidecars: `zotero-mcp-server update-db --force-rebuild --allow-mass-deletion`
-4. Rebuild BM25 index (§5) and restart `zotero-mcp.service`.
+Use this only after confirming unrecoverable ChromaDB corruption. The helper previews its exact stop, archive, rebuild, BM25, and restart sequence by default:
+
+```bash
+"$HOME/.agents/skills/zotero/scripts/recover-chroma.sh"
+```
+
+Show the plan to Samuel. Run the confirmed recovery only after explicit approval:
+
+```bash
+"$HOME/.agents/skills/zotero/scripts/recover-chroma.sh" --confirm
+```
+
+The helper archives rather than deletes the damaged database and stops if rebuilding fails. Never run the underlying `--allow-mass-deletion` command directly.
 
 ## 8. Figure Schema Maintenance (`zotero-vlm-enrich.py`)
 

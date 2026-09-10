@@ -15,8 +15,13 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Iterator
 
+import pi_session_sqlite as session_db
+
 SUMMARY_INDEX_PATH = os.path.expanduser("~/.pi/agent/session-summaries.json")
 SUMMARY_LOCK_PATH = SUMMARY_INDEX_PATH + ".lock"
+SQLITE_INDEX_PATH = os.path.expanduser("~/.pi/agent/session-log.sqlite")
+_DEFAULT_SUMMARY_INDEX_PATH = SUMMARY_INDEX_PATH
+_INDEX_SYNCING = False
 FOLDERS_ROOT = os.path.expanduser("~/.pi/agent/folders")
 SESSIONS_ROOT = os.path.expanduser("~/.pi/agent/sessions")
 UNFILED_DIR = os.path.join(SESSIONS_ROOT, "--var-home-samuel--")
@@ -79,9 +84,45 @@ def _index_lock(exclusive: bool = False) -> Iterator[None]:
             fcntl.flock(lock, fcntl.LOCK_UN)
 
 
+def _effective_sqlite_path() -> str:
+    # Test and alternate stores get an adjacent database automatically; the
+    # production store uses the permanent Pi session-log path.
+    if SUMMARY_INDEX_PATH != _DEFAULT_SUMMARY_INDEX_PATH:
+        return os.path.join(os.path.dirname(SUMMARY_INDEX_PATH), "session-log.sqlite")
+    return SQLITE_INDEX_PATH
+
+
+def _sync_sqlite(store: dict[str, Any] | None = None) -> dict[str, int]:
+    global _INDEX_SYNCING
+    if _INDEX_SYNCING:
+        return {}
+    if store is None:
+        with _index_lock(False):
+            store = _read_store_unlocked()
+    _INDEX_SYNCING = True
+    try:
+        session_db.configure(
+            db_path=_effective_sqlite_path(),
+            folders_root=FOLDERS_ROOT,
+            sessions_root=SESSIONS_ROOT,
+        )
+        return session_db.sync(store.get("sessions", {}))
+    finally:
+        _INDEX_SYNCING = False
+
+
+def sync_index() -> dict[str, int]:
+    """Index every transcript and repair the SQLite summary projection."""
+    return _sync_sqlite()
+
+
 def load_store() -> dict[str, Any]:
     with _index_lock(False):
-        return _read_store_unlocked()
+        store = _read_store_unlocked()
+    # Indexing is automatic; summary creation is not. The returned object is
+    # still the JSON-shaped curated store, so Television never sees null rows.
+    _sync_sqlite(store)
+    return store
 
 
 def _write_store_unlocked(store: dict[str, Any]) -> None:
@@ -163,6 +204,9 @@ def set_summary(session_id: str, fields: dict[str, Any]) -> dict[str, Any]:
         record["updated_at"] = _as_text(supplied_updated_at) if supplied_updated_at else now
         store["sessions"][session_id] = record
         _write_store_unlocked(store)
+        # JSON remains authoritative. SQLite is repaired after the atomic JSON
+        # write, so a later sync can recover from a process crash in between.
+        _sync_sqlite(store)
         return record
 
 
@@ -442,18 +486,24 @@ def _score_record(record: dict[str, Any], query: str) -> float:
 
 
 def search_summaries(query: str, limit: int = 10) -> list[dict[str, Any]]:
-    query = str(query or "").strip()
-    records = []
-    for record in all_summaries():
-        score = _score_record(record, query)
-        if score > 0:
-            item = dict(record)
-            item["score"] = round(score, 3)
-            records.append(item)
-    records.sort(key=lambda item: (-float(item.get("score", 0)), item.get("updated_at", "")), reverse=False)
-    records = records[: max(1, int(limit))]
-    path_index = session_path_index() if records else {}
-    return [_hydrate_record(record, path_index) for record in records]
+    # Summary-first retrieval. Only if there are no curated matches do we
+    # search the automatically indexed transcript projection.
+    store = load_store()
+    del store  # load_store performs the sync and preserves JSON compatibility.
+    _configure_sqlite_for_queries()
+    records = session_db.search_summaries(query, limit)
+    if records:
+        path_index = session_path_index()
+        return [_hydrate_record(record, path_index) for record in records]
+    return session_db.search_transcripts(query, limit)
+
+
+def _configure_sqlite_for_queries() -> None:
+    session_db.configure(
+        db_path=_effective_sqlite_path(),
+        folders_root=FOLDERS_ROOT,
+        sessions_root=SESSIONS_ROOT,
+    )
 
 
 def recent_summaries(limit: int = 10) -> list[dict[str, Any]]:

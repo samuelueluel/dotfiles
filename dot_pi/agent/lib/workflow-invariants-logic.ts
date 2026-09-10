@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 export const VAULT_ROOT = path.join(os.homedir(), "Dropbox", "Sam-Obsidian-Vault");
 export const VAULT_OBSIDIAN_DIR = path.join(VAULT_ROOT, ".obsidian");
 export const DOTFILES_ROOT = path.join(os.homedir(), "dotfiles");
+export const SESSION_SUMMARY_STORE = path.join(os.homedir(), ".pi", "agent", "session-summaries.json");
 
 /**
  * Checks whether a path targets an Obsidian vault note rather than internal
@@ -56,6 +57,18 @@ export function isSecretFilePath(targetPath: string): boolean {
     /\/\.aws\/credentials$/.test(resolved) ||
     /\/\.config\/op\//.test(resolved)
   );
+}
+
+/**
+ * Protects the curated session-summary store from direct writes. The piwork
+ * persistence layer remains the only supported mutation route.
+ */
+export function isSessionSummaryStorePath(targetPath: string): boolean {
+  if (!targetPath) return false;
+  const expanded = targetPath.startsWith("~/")
+    ? path.join(os.homedir(), targetPath.slice(2))
+    : targetPath;
+  return path.resolve(expanded) === SESSION_SUMMARY_STORE;
 }
 
 export type CommandCheckResult = {
@@ -163,6 +176,50 @@ export function checkDestructiveCommand(command: string): CommandCheckResult {
   }
 
   return { blocked: false };
+}
+
+/**
+ * Blocks direct shell access to the curated session-summary store. Normal
+ * `piwork summary` commands do not name this implementation file and remain
+ * unaffected.
+ */
+export function checkSessionSummaryStoreShellAccess(command: string): CommandCheckResult {
+  if (!command || !command.includes("session-summaries.json")) return { blocked: false };
+  return {
+    blocked: true,
+    reason:
+      "Direct shell access to session-summaries.json is prohibited. Use the 'piwork summary' commands so validation and atomic persistence are preserved.",
+  };
+}
+
+/**
+ * Blocks raw destructive Zotero index operations. The maintained skill
+ * helpers provide dry-run and exact-confirmation gates for these workflows.
+ */
+export function checkZoteroIndexMutation(command: string): CommandCheckResult {
+  if (!command) return { blocked: false };
+
+  const massRebuild =
+    /\bupdate-db\b[^\n;&|]*--allow-mass-deletion\b/.test(command) ||
+    /--allow-mass-deletion\b[^\n;&|]*\bupdate-db\b/.test(command);
+  const directChunkDeletion = /\bdelete_item_chunks\s*\(/.test(command);
+  const rawProcessKill =
+    /\bpkill\b[^\n;&|]*-f\b[^\n;&|]*(?:zotero-backfill-watchdog|zotero-sidecar-watch|update-db|mineru)/.test(
+      command
+    );
+  const rawChromaMove =
+    /\bmv\b[^\n;&|]*(?:\.config\/zotero-mcp\/chroma_db|\$HOME\/\.config\/zotero-mcp\/chroma_db)/.test(
+      command
+    );
+
+  if (!massRebuild && !directChunkDeletion && !rawProcessKill && !rawChromaMove) {
+    return { blocked: false };
+  }
+  return {
+    blocked: true,
+    reason:
+      "Raw destructive Zotero index maintenance is prohibited. Use the reviewed helpers under ~/.agents/skills/zotero/scripts/ and their dry-run/confirmation gates.",
+  };
 }
 
 /**

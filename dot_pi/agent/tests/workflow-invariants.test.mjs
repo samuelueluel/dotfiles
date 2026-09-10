@@ -9,7 +9,9 @@ import {
   isSecretFilePath,
   checkPrivilegedOrHostMutation,
   checkDestructiveCommand,
+  checkSessionSummaryStoreShellAccess,
   checkVaultShellAccess,
+  checkZoteroIndexMutation,
   isChezmoiManaged,
   shouldRunPostToolChecks,
   autoHealSedCommand,
@@ -21,8 +23,10 @@ import {
   stripAuditClaimCitationYears,
   healZoteroWorkerInput,
   checkExploreMutatingCommand,
+  isSessionSummaryStorePath,
   VAULT_ROOT,
   DOTFILES_ROOT,
+  SESSION_SUMMARY_STORE,
 } from "../lib/workflow-invariants-logic.ts";
 
 test("isVaultNotePath blocks vault notes but permits .obsidian config, snippets, and plugins", () => {
@@ -111,6 +115,44 @@ test("checkVaultShellAccess blocks shell note access while permitting .obsidian 
   assert.equal(checkVaultShellAccess(noteCmd), true);
   assert.equal(checkVaultShellAccess(snippetCmd), false);
   assert.equal(checkVaultShellAccess(normalCmd), false);
+});
+
+test("session summary store guard blocks direct mutation routes", () => {
+  assert.equal(isSessionSummaryStorePath(SESSION_SUMMARY_STORE), true);
+  assert.equal(isSessionSummaryStorePath("~/.pi/agent/session-summaries.json"), true);
+  assert.equal(isSessionSummaryStorePath("~/.pi/agent/session-log.sqlite"), false);
+  assert.equal(
+    checkSessionSummaryStoreShellAccess("cat ~/.pi/agent/session-summaries.json").blocked,
+    true
+  );
+  assert.equal(
+    checkSessionSummaryStoreShellAccess("jq . ~/.pi/agent/session-summaries.json > /tmp/summaries.json").blocked,
+    true
+  );
+  assert.equal(checkSessionSummaryStoreShellAccess("piwork summary recent --json").blocked, false);
+});
+
+test("Zotero index mutation guard requires reviewed helper routes", () => {
+  assert.equal(
+    checkZoteroIndexMutation("zotero-mcp-server update-db --force-rebuild --allow-mass-deletion").blocked,
+    true
+  );
+  assert.equal(checkZoteroIndexMutation("cc.delete_item_chunks('ABCD2345')").blocked, true);
+  assert.equal(checkZoteroIndexMutation('pkill -f "mineru"').blocked, true);
+  assert.equal(
+    checkZoteroIndexMutation("mv ~/.config/zotero-mcp/chroma_db ~/.config/zotero-mcp/chroma_db.old").blocked,
+    true
+  );
+  assert.equal(
+    checkZoteroIndexMutation("~/.agents/skills/zotero/scripts/recover-chroma.sh --confirm").blocked,
+    false
+  );
+  assert.equal(
+    checkZoteroIndexMutation("~/.agents/skills/zotero/scripts/delete-item-chunks.py ABCD2345 --confirm-key ABCD2345").blocked,
+    false
+  );
+  assert.equal(checkZoteroIndexMutation("zotero-sidecar.sh embed TRGBCDX5").blocked, false);
+  assert.equal(checkZoteroIndexMutation("podman exec lemonade pkill -9 llama-server").blocked, false);
 });
 
 test("isChezmoiManaged correctly identifies tracked vs untracked files", () => {

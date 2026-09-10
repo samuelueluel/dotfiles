@@ -1,6 +1,6 @@
 ---
 name: obsidian
-description: Manage notes, documents, and folder organization in Samuel's Obsidian vault at ~/Dropbox/Sam-Obsidian-Vault/ using TurboVault MCP and the Hybrid Johnny.Decimal / PARA framework. Use when Samuel names Obsidian, the vault, or TurboVault, provides a vault path, says "remember this" or "save this", or asks to file, create, edit, move, or organize vault notes.
+description: Manages notes, documents, and folder organization in Samuel's Obsidian vault at ~/Dropbox/Sam-Obsidian-Vault/ using TurboVault MCP and the Hybrid Johnny.Decimal / PARA framework. Use when Samuel names Obsidian, the vault, or TurboVault, provides a vault path, says "remember this" or "save this", or asks to file, create, edit, move, or organize vault notes.
 ---
 
 # Obsidian Vault Management
@@ -31,7 +31,6 @@ The tree is the sole intent router. Execution location follows the general deleg
 - **Prose and tone:** Write for fast human scanning and reliable agent parsing. Use plain, direct English with high information density and natural professional flow. Never use LLM filler, throat-clearing, or buzzwords (such as "crucial", "delve", "testament", "vital", "it is important to note"). For prose guidance, load [prose style guide](references/prose-style-guide.md).
 - **Frontmatter:** Every note requires YAML frontmatter. Set `created: YYYY-MM-DDTHH:MM:SS` on creation and update `updated:` on edits, using local time without a timezone. Require a 1–2 sentence `description:` in `10_Projects/`, `20_Library/`, and `02_Memories/`.
 - **Tags:** Keep flat lowercase tags in frontmatter only; never use inline `#tags`. Prefer `pin`, `to-read`, `to-do`, `moc`, `python`, `stata`, `latex`, `linux`, `probability`, `econometrics`, `economics`, and `math`. Every `00_` hub note requires `moc`.
-- **CPTR/headless:** Read-only TurboVault operations are permitted, but blocked mutations were not saved and must never be reported as successful.
 
 ## Retrieval Workflow
 
