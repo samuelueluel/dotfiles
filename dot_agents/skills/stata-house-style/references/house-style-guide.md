@@ -1,117 +1,203 @@
 # Stata House Style Guide
 
-Load this file when reviewing visual standards, section outlines, comment rules, or line-wrapping conventions for Stata do-files.
+**Load this file when** reviewing visual standards, section outlines, comment roles, status labels, or spacing conventions for Stata do-files.
 
 ---
 
-## 1. Visual Structure and Outlines
+## 1. Visual Structure
 
-Stata do-files use a consistent outline so they are easy for people to skim and easy for tools to parse.
+### 1.1 Structural Width and Code Sprawl
 
-### 1.1. Column Width and Code Sprawl
+Format headers, banners, and prose comments at 64 columns by default or 72 columns for a wider layout. Active Stata commands may sprawl horizontally. Never split, wrap, trim, or reindent active code to satisfy a visual width.
 
-- **Headers, Banners, and Notes:** Formatted to a fixed column width (default: **64 columns**, which fits cleanly into half-screen editor splits on 14" displays; optionally 72 columns for full-width views).
-- **Active Code Lines (Let Code Sprawl):** Active Stata commands are **allowed to sprawl**. Long regression calls (`reghdfe`), detailed graphs (`twoway`), and complex variable transformations must never be split or wrapped just to fit column limits. Splitting active code can introduce whitespace bugs into macros and expressions. Only wrap lines if they already use `///` line continuations.
+Do not rewrap an existing `///` continuation chain. Stata joins physical lines while preserving intervening whitespace, so indentation can affect the constructed command.
 
-### 1.2. Section Banners
+### 1.2 Section Banners
 
-- **Level 1 (Major Sections):** Uppercase, bracketed titles enclosed in full-width ASCII `=` borders. Major integers take a trailing dot (`[1. ...]`).
-  ```stata
-  * ==============================================================
-  * [1. DATA INGESTION & HARMONIZATION]
-  * ==============================================================
-  ```
-- **Level 2 (Subsections):** Title Case, bracketed titles enclosed in full-width ASCII `-` borders. Decimal subsection numbers omit trailing dots (`[1.1 ...]`).
-  ```stata
-  * --------------------------------------------------------------
-  * [1.1 Merge Census Boundaries]
-  * --------------------------------------------------------------
-  ```
-- **Inline Comments and Labels:** Short notes (such as `// clean raw string` or `// drop unmatched`) must remain inline. Never promote short inline notes into banners.
+Use uppercase level-1 banners for major sections:
 
----
+```stata
+* ==============================================================
+* [1. DATA INGESTION & HARMONIZATION]
+* ==============================================================
+```
 
-## 2. Metadata Header Specification
+Use title-case level-2 banners for genuine subsections:
 
-Every production do-file must open with a standardized top-of-file metadata block at the standard column width. Multiple inputs or outputs are listed on separate lines without trailing punctuation:
+```stata
+* --------------------------------------------------------------
+* [1.1 Merge Census Boundaries]
+* --------------------------------------------------------------
+```
+
+Do not promote every short procedural comment to a banner. A banner should mark a section that contains several related operations.
+
+## 2. Metadata Header
+
+Every production do-file should open with a metadata header at the selected structural width:
 
 ```stata
 * ==============================================================
 * clean_tract_demographics.do
 *
-* Purpose : Harmonize 2010 and 2020 Census demographic tables at
+* Purpose : Harmonize decennial Census demographic tables at
 *           tract level.
 * Author  : Samuel Saltmarsh
-* Created : 2026-06-15
-* Updated : 2026-09-07
+* Created : YYYY-MM-DD
+* Updated : YYYY-MM-DD
 * Inputs  : data/raw/decennial_2010.dta
 *           data/raw/decennial_2020.dta
 * Outputs : data/clean/tract_demographics_panel.dta
-* Notes   : Census tract boundary crosswalk uses NHGIS
-*           2010-to-2020 weights.
+* Notes   : Tract boundaries use the NHGIS crosswalk.
 * ==============================================================
 ```
 
----
+List multiple inputs and outputs on separate lines. Keep substantive caveats in `Notes`; do not overload the header with a research diary.
 
-## 3. Comment Types and Placement
+## 3. Comment Selection
 
-Use the right comment style for each task:
+Choose comment syntax by role, not personal preference at each occurrence.
 
-- **1. Standalone Line Comments (`* `):**
-  - Use `* ` for standalone, single-line step comments (for example, `* 3.2 Correct survey miscodes` or `* Clean tract boundary indicators`).
-  - Stata recognizes `* ` across all environments: interactive console, do-files, and batch jobs.
-  - Never put `//` on its own line.
-- **2. Trailing Comments on Code Lines (`//`):**
-  - Use `//` for notes at the end of active code lines (for example, `replace type9 = 1 if TYPE == "S"  // single`).
-  - The styling script converts trailing `/* note */` comments into `// note`.
-  - Keep trailing notes short (under 50 characters). If an explanation needs more than 50 characters, put it before the command in a wrapped `/* ... */` block.
-- **3. Explanatory Notes and Blocks (`/* ... */`):**
-  - Short notes that fit within 64 columns stay on a single line:
-    ```stata
-    /* These have addresses in the separate variables, but not in addRes. */
-    ```
-  - For longer notes, use a block comment `/* ... */`. Put `/*` on its own line. Start intro sentences at the left edge (no indent). Indent bullet items with 2 spaces (`  - `) and indent continuation lines with 4 spaces:
-    ```stata
-    /*
-    Examine duplicate addresses:
-      - IT IS POSSIBLE TO HAVE THE SAME ADDRESSES ATTACHED TO
-        MULTIPLE PARCELS!
-      - Since parcels are unique, this means when an address is
-        associated to multiple parcels, it is the SOLE address
-        for each of those parcels.
-    */
-    ```
-  - For nested notes, use `>` (tier 1: 2-space indent) and `-` (tier 2: 4-space indent):
-    ```stata
-    /*
-    Identification & Inference Notes:
-      > Primary identification relies on cohort variation across
-        counties.
-      > Standard errors clustered at state level; see Cameron et al.
-        (2011).
-        - Clusters < 30 warrant wild bootstrap verification in
-          robustness do-file.
-    */
-    ```
-- **4. Old or Exploratory Code:**
-  - When keeping test code or alternative specifications for future reference, label them clearly in a comment block:
-    ```stata
-    /* [EXPLORATION: Fuzzy Address Matching via matchit]
-       Kept for reference; string similarity did not recover parcels.
-       keep if temp2 == 1
-       matchit idadd9 addResorig using ...
-    */
-    ```
-- **5. Line Continuations (`///`):**
-  - Use `///` only to continue long executable commands across multiple lines.
+### 3.1 Ordinary One-Line Prose: `* `
 
----
+Use `* ` for one neutral point that fits on one physical line:
 
-## 4. Spacing and Blank Lines
+```stata
+* Standardize parcel identifiers for merging.
+generate parcelMCM = parcelBTF
+```
 
-- **Major Sections (Level 1):** Exactly two blank lines before the opening border.
-- **Subsections (Level 2):** Exactly one blank line before the opening border.
-- **Consecutive Blank Lines:** No more than two blank lines in a row anywhere in the file.
-- **Trailing Spaces:** Remove trailing whitespace from every line.
-- **End of File:** End the file with exactly one newline.
+The prose line must:
+
+- express one point;
+- fit within the selected structural width;
+- directly describe the command or short command group below it;
+- contain no standardized status label.
+
+Do not use consecutive `* ` lines to wrap a paragraph. Use a multiline block instead.
+
+### 3.2 Disabled Single Commands: `*command`
+
+Use no space after `*` for one self-explanatory disabled command:
+
+```stata
+*browse if dupBTF > 0
+```
+
+Stata ignores the line whether or not a space follows `*`; the missing space is the house-style signal that the text is executable code. If the reason needs documentation or the command spans multiple physical lines, use a `DISABLED:` block.
+
+Never comment only the first line of a `///` chain. Either prefix every physical line or, preferably, enclose the complete command in a closed `DISABLED:` block.
+
+### 3.3 Short End-of-Line Notes: `//`
+
+Reserve `//` for short notes at the end of active code:
+
+```stata
+replace type9 = 1 if TYPE == "S"  // Single-family structure
+```
+
+Use two spaces before `//` and one space after it. Stata requires at least one preceding blank when `//` follows code. Move any long explanation above the command.
+
+Do not use `//` as a full-line prose comment even though Stata permits it.
+
+### 3.4 Continuation Syntax: `///`
+
+`///` comments out the rest of the physical line and joins the next line to the current command:
+
+```stata
+regress outcome treatment controls  ///
+    i.year i.tract
+```
+
+Treat `///` as executable syntax. Preserve its marker, physical line boundary, annotation, and following-line indentation exactly. Never insert a blank line into a continuation chain.
+
+### 3.5 Multiline and Structured Content: `/* ... */`
+
+Use a standalone block when prose:
+
+- requires two or more physical lines;
+- contains multiple distinct sentences;
+- contains paragraphs, bullets, or internal headings;
+- carries a standardized status label;
+- documents disabled or exploratory code.
+
+Use this layout:
+
+```stata
+/*
+NOTE: Duplicate addresses do not necessarily identify duplicate
+records.
+
+Findings:
+  - Some addresses cover a structure and adjacent empty lots.
+  - Some identify attached units on separate parcels.
+*/
+
+duplicates report addMCM
+```
+
+Put `/*` and `*/` on separate lines. Do not put an empty line immediately after `/*` or immediately before `*/`. Use an empty line between internal paragraphs or before headings such as `Findings:`. Put exactly one empty line after the closing delimiter.
+
+Do not use standalone one-line prose of the form `/* explanation */`; convert it to `* explanation` unless it is an inline code fragment.
+
+### 3.6 Inline `/* ... */` Fragments
+
+An enclosed comment may intentionally disable or annotate a fragment inside active code:
+
+```stata
+regress outcome treatment /* i.year */ controls
+```
+
+Inline block comments share an active physical line and are protected by the formatter. Do not rewrite them as `//`, move them, or adjust adjacent whitespace.
+
+## 4. Standardized Status Labels
+
+Labels appear only inside standalone `/* ... */` blocks. Never write `* NOTE:`, `* ISSUE:`, or another labeled star comment.
+
+| Label | Meaning |
+|---|---|
+| `NOTE:` | Durable context, caveat, or hazard |
+| `ISSUE:` | Unresolved work or a known defect |
+| `VERIFY:` | Empirical or data claim requiring confirmation |
+| `ASSUMPTION:` | Deliberate maintained assumption |
+| `DISABLED:` | Inactive code that might be restored |
+| `EXPLORATION:` | Provisional or rejected alternative retained for reference |
+
+Do not introduce `WARNING:`, `TODO:`, or `FIXME:`. Convert warnings to `NOTE:` and actionable defects or unfinished work to `ISSUE:`.
+
+A prose-only status block may be brief:
+
+```stata
+/*
+VERIFY: Confirm that the duplicate parcel records are exact
+copies.
+*/
+```
+
+Inactive commands require `DISABLED:` or `EXPLORATION:`, not `NOTE:`:
+
+```stata
+/*
+DISABLED: Manual duplicate inspection retained for data review.
+
+browse if dupBTF > 0
+list parcelBTF addBTF if dupBTF > 0
+*/
+```
+
+Always close disabled and exploratory blocks. Do not use an unclosed `/*` to disable the remainder of a file. Enclosed comments may be nested, which permits a disabled block to contain existing inline block comments.
+
+## 5. Mata Comments
+
+The beginning-of-line `*` form is not valid inside Mata. Use `//` or `/* ... */` in Mata code while retaining the same prose, label, and spacing distinctions where applicable.
+
+## 6. Vertical Spacing
+
+- Put exactly two blank lines before a level-1 banner unless it begins the file.
+- Put exactly one blank line before a level-2 banner.
+- Put one blank line before an ordinary `* ` step comment when it follows code.
+- Put no blank line between a `* ` comment and its associated code.
+- Put exactly one blank line after a standalone multiline `/* ... */` block.
+- Use no more than two consecutive blank lines anywhere.
+- Remove trailing whitespace only from blank and comment-only lines; preserve active physical lines exactly.
+- End the file with exactly one newline.

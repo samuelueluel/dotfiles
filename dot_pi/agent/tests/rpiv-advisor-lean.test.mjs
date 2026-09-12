@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
 const { createJiti } = require(`${process.env.HOME}/.pi/agent/npm/node_modules/.jiti-vMeKVizl/lib/jiti.cjs`);
@@ -12,9 +16,10 @@ const jiti = createJiti(`${process.env.HOME}/.pi/agent/npm`, {
 	},
 });
 const packageRoot = `${process.env.HOME}/.pi/agent/local-packages/rpiv-advisor-lean`;
-const { buildLeanAdvisorMessages, SCRIBE_SYSTEM_PROMPT } = await jiti.import(
+const { buildLeanAdvisorMessages, getWorkingGitDiff, DEFAULT_MAX_DIFF_CHARS, SCRIBE_SYSTEM_PROMPT } = await jiti.import(
 	`${packageRoot}/advisor/lean-scribe.ts`,
 );
+const { getMaxDiffChars } = await jiti.import(`${packageRoot}/advisor/config.ts`);
 const {
 	findLatestAdvisorCheckpoint,
 	findLatestAdvisorEvidence,
@@ -828,3 +833,84 @@ test("executeAdvisor attaches loaded protocol and enables restricted advisor too
 	assert.match(requests[0].messages[0].content[0].text, /EXECUTOR-READ-MUSIC-PROTOCOL/);
 	assert.match(requests[0].systemPrompt, /Local advisor preferences \(live file\)/);
 });
+
+test("getMaxDiffChars defaults to 24000 and respects configured integer", () => {
+	assert.equal(DEFAULT_MAX_DIFF_CHARS, 24_000);
+	assert.equal(getMaxDiffChars({}), 24_000);
+	assert.equal(getMaxDiffChars({ maxDiffChars: undefined }), 24_000);
+	assert.equal(getMaxDiffChars({ maxDiffChars: 0 }), 24_000);
+	assert.equal(getMaxDiffChars({ maxDiffChars: -500 }), 24_000);
+	assert.equal(getMaxDiffChars({ maxDiffChars: 3.14 }), 24_000);
+	assert.equal(getMaxDiffChars({ maxDiffChars: 32_000 }), 32_000);
+});
+
+test("getWorkingGitDiff formats diff with stat and truncates at maxChars", () => {
+	const tempDir = mkdtempSync(join(tmpdir(), "gitdiff-test-"));
+	try {
+		assert.equal(getWorkingGitDiff(tempDir), null);
+		execSync("git init -q", { cwd: tempDir });
+		execSync("git config user.email 'test@example.com'", { cwd: tempDir });
+		execSync("git config user.name 'Test'", { cwd: tempDir });
+		writeFileSync(join(tempDir, "sample.txt"), "line 1\nline 2\n");
+		execSync("git add sample.txt && git commit -qm 'initial'", { cwd: tempDir });
+
+		// Clean repository returns null
+		assert.equal(getWorkingGitDiff(tempDir), null);
+
+		// Modify tracked file
+		writeFileSync(join(tempDir, "sample.txt"), "line 1\nmodified line 2\nline 3\n");
+
+		const diff = getWorkingGitDiff(tempDir);
+		assert.ok(diff);
+		assert.match(diff, /sample\.txt \|/); // git diff --stat HEAD
+		assert.match(diff, /\+modified line 2/); // git diff HEAD
+		assert.match(diff, /\+line 3/);
+
+		// Truncation check
+		const truncated = getWorkingGitDiff(tempDir, 20);
+		assert.ok(truncated);
+		assert.ok(truncated.includes("[diff truncated]"));
+		assert.ok(truncated.length <= 50);
+	} finally {
+		rmSync(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("getWorkingGitDiff excludes noise data files and surfaces untracked scripts", () => {
+	const tempDir = mkdtempSync(join(tmpdir(), "gitdiff-hygiene-"));
+	try {
+		execSync("git init -q", { cwd: tempDir });
+		execSync("git config user.email 'test@example.com'", { cwd: tempDir });
+		execSync("git config user.name 'Test'", { cwd: tempDir });
+		writeFileSync(join(tempDir, "main.py"), "print('hello')\n");
+		execSync("git add main.py && git commit -qm 'initial'", { cwd: tempDir });
+
+		// Modify tracked file, create tracked or untracked noise data file, and untracked script
+		writeFileSync(join(tempDir, "main.py"), "print('hello world')\n");
+		writeFileSync(join(tempDir, "data.dta"), "binary data simulation\n");
+		writeFileSync(join(tempDir, "package-lock.json"), '{"lockfileVersion": 3}\n');
+		writeFileSync(join(tempDir, "analysis.do"), "summarize wage\n");
+
+		const diff = getWorkingGitDiff(tempDir);
+		assert.ok(diff);
+		// main.py tracked diff should appear
+		assert.match(diff, /\+print\('hello world'\)/);
+		// noise files (.dta, package-lock.json) should NOT appear in diff or untracked
+		assert.doesNotMatch(diff, /data\.dta/);
+		assert.doesNotMatch(diff, /package-lock\.json/);
+		// untracked analysis.do should appear in untracked section
+		assert.match(diff, /=== UNTRACKED FILES ===/);
+		assert.match(diff, /\+\+\+ b\/analysis\.do \(untracked\)/);
+		assert.match(diff, /summarize wage/);
+	} finally {
+		rmSync(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("advisor system prompt mandates autonomous verdict header", () => {
+	const systemPrompt = getAdvisorSystemPrompt();
+	assert.match(systemPrompt, /VERDICT: \[PROCEED \| PIVOT \| CIRCUIT_BREAKER\]/);
+	assert.match(systemPrompt, /Apply an autonomous execution bias/);
+	assert.match(systemPrompt, /CIRCUIT_BREAKER: Reserve strictly for catastrophic/);
+});
+

@@ -9,7 +9,7 @@ Samuel is a US-based PhD economist working in applied empirical economics, espec
 - Desktop: Niri on Wayland, zsh, and Ghostty.
 - Main tools include Zed, Yazi, Zen Browser, Obsidian, Dropbox, Zotero, Stata, MPD, and rmpc.
 - `pi` uses the local Lemonade server; `pihat` uses cloud models.
-- In general `pi` and `pihat` sessions, the Stata environment is not available. For actual Stata execution or empirical data work, direct Samuel to switch to `beta` or `betahat`.
+- `pi` and `pihat` start with Stata disabled: no Stata MCP connection, tool schemas, or Stata skills are loaded. In an unsandboxed interactive session, only Samuel may enable the dormant server with `/mcp enable stata` followed by `/reload`; the agent must never enable or disable MCP servers. Sandboxed `pi`/`pihat` sessions do not mount Stata. Otherwise, use `beta` or `betahat` for Stata execution and empirical data work.
 
 ## Routing
 

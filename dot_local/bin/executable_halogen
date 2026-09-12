@@ -1,0 +1,350 @@
+#!/usr/bin/env bash
+# Manage the Halogen Qwen3.8-Flash-Next server beside Lemonade.
+#
+# Halogen's .hgn checkpoint is not a Lemonade/llama.cpp model. This helper
+# keeps its OpenAI-compatible API on loopback and never downloads an image or
+# model implicitly.
+set -euo pipefail
+
+HALOGEN_CONTAINER=${HALOGEN_CONTAINER:-halogen}
+HALOGEN_IMAGE=${HALOGEN_IMAGE:-ghcr.io/peonist-ai/halogen-flash-server:0.5.8}
+HALOGEN_MODELS=${HALOGEN_MODELS:-$HOME/halogen-models}
+HALOGEN_API_PORT=${HALOGEN_API_PORT:-8731}
+HALOGEN_API=${HALOGEN_API:-http://127.0.0.1:${HALOGEN_API_PORT}}
+HALOGEN_MODEL_ID=${HALOGEN_MODEL_ID:-halogen-qwen3.8-flash-next}
+HALOGEN_CHECKPOINT_FILE=${HALOGEN_CHECKPOINT_FILE:-qwen38-flash-next-w4b.hgn}
+# Halogen and Lemonade both use most of this host's memory. Evict only
+# Lemonade's resident chat model before starting Halogen; keep its container up.
+HALOGEN_EVICT_LEMONADE=${HALOGEN_EVICT_LEMONADE:-1}
+HALOGEN_LEMONADE_CONTAINER=${HALOGEN_LEMONADE_CONTAINER:-lemonade}
+HALOGEN_LEMONADE_API=${HALOGEN_LEMONADE_API:-${LEM_API:-http://127.0.0.1:13305/api/v1}}
+HALOGEN_EVICT_TIMEOUT_S=${HALOGEN_EVICT_TIMEOUT_S:-120}
+# The model is large and cold starts are slow, but an accidental infinite wait
+# is worse than an explicit opt-in. Set 0 when an unbounded wait is intended.
+HALOGEN_WAIT_TIMEOUT_S=${HALOGEN_WAIT_TIMEOUT_S:-120}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  halogen start    Start the existing image and mounted model, without waiting
+  halogen ensure   Start it if needed and wait for /health to report ready
+  halogen status   Print the server health document, or the container state
+  halogen stop     Stop the container without removing it
+  halogen logs     Show container logs (extra arguments go to podman logs)
+
+Environment:
+  HALOGEN_MODELS       Host directory containing the .hgn checkpoint (default: ~/halogen-models)
+  HALOGEN_IMAGE        Image reference (default: ghcr.io/peonist-ai/halogen-flash-server:0.5.8)
+  HALOGEN_API_PORT     Loopback API port (default: 8731)
+  HALOGEN_API          Health URL (default: http://127.0.0.1:<port>)
+  HALOGEN_EVICT_LEMONADE  Evict Lemonade's resident LLM before start (default: 1; 0 opts out)
+  HALOGEN_LEMONADE_API   Lemonade API base URL (default: LEM_API or http://127.0.0.1:13305/api/v1)
+  HALOGEN_EVICT_TIMEOUT_S  Lemonade eviction timeout (default: 120 seconds)
+  HALOGEN_WAIT_TIMEOUT_S  Readiness timeout in seconds (default: 120; 0 waits without a deadline)
+EOF
+}
+
+die() {
+  printf 'halogen: %s\n' "$*" >&2
+  exit 1
+}
+
+require_podman() {
+  command -v podman >/dev/null 2>&1 || die "podman is required"
+}
+
+require_curl() {
+  command -v curl >/dev/null 2>&1 || die "curl is required"
+}
+
+require_python() {
+  command -v python3 >/dev/null 2>&1 || die "python3 is required to inspect Lemonade health"
+}
+
+container_state() {
+  podman inspect --format '{{.State.Status}}' "$HALOGEN_CONTAINER" 2>/dev/null || true
+}
+
+lemonade_state() {
+  podman inspect --format '{{.State.Status}}' "$HALOGEN_LEMONADE_CONTAINER" 2>/dev/null || true
+}
+
+health_document() {
+  local api=${HALOGEN_API%/}
+  curl -fsS --max-time 3 "$api/health"
+}
+
+model_dir() {
+  [[ -d "$HALOGEN_MODELS" ]] || die "model directory does not exist: $HALOGEN_MODELS"
+  realpath "$HALOGEN_MODELS"
+}
+
+require_model() {
+  local dir checkpoint overlay
+  dir=$(model_dir) || return $?
+  [[ "$HALOGEN_CHECKPOINT_FILE" != /* ]] || die "HALOGEN_CHECKPOINT_FILE must be relative to HALOGEN_MODELS"
+  checkpoint="$dir/$HALOGEN_CHECKPOINT_FILE"
+  [[ -f "$checkpoint" ]] || die "checkpoint missing: $checkpoint (download it explicitly with hf download)"
+  overlay="${checkpoint%.hgn}.overlay.hgn"
+  if [[ ! -f "$overlay" ]]; then
+    printf 'halogen: warning: quality sidecar missing: %s\n' "$overlay" >&2
+  fi
+  printf '%s\n' "$dir"
+}
+
+validate_eviction_settings() {
+  case "$HALOGEN_EVICT_LEMONADE" in
+    0|1) ;;
+    *) die "HALOGEN_EVICT_LEMONADE must be 0 or 1" ;;
+  esac
+  [[ "$HALOGEN_EVICT_TIMEOUT_S" =~ ^[0-9]+$ ]] \
+    || die "HALOGEN_EVICT_TIMEOUT_S must be a non-negative integer"
+}
+
+lemonade_llm_names() {
+  require_python
+  python3 -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+loaded = payload.get("all_models_loaded")
+if not isinstance(loaded, list):
+    raise SystemExit("health response has no all_models_loaded list")
+for entry in loaded:
+    if not isinstance(entry, dict) or entry.get("type") != "llm":
+        continue
+    name = entry.get("model_name")
+    if not isinstance(name, str) or not name:
+        raise SystemExit("health response contains an LLM without model_name")
+    print(name)
+'
+}
+
+lemonade_unload_payload() {
+  require_python
+  python3 -c 'import json, sys; print(json.dumps({"model_name": sys.argv[1]}))' "$1"
+}
+
+lemonade_health() {
+  local api=${HALOGEN_LEMONADE_API%/}
+  curl -fsS --max-time 5 "$api/health"
+}
+
+evict_lemonade_models() {
+  validate_eviction_settings
+  if [[ "$HALOGEN_EVICT_LEMONADE" == 0 ]]; then
+    printf 'halogen: Lemonade eviction disabled (HALOGEN_EVICT_LEMONADE=0)\n' >&2
+    return 0
+  fi
+
+  local state health names name response elapsed
+  state=$(lemonade_state)
+  case "$state" in
+    ""|created|configured|exited|stopped)
+      printf 'halogen: Lemonade container is %s; no resident model to evict\n' "${state:-absent}" >&2
+      return 0
+      ;;
+    running)
+      require_curl
+      health=$(lemonade_health) \
+        || die "Lemonade is running but health inspection failed at ${HALOGEN_LEMONADE_API%/}/health; stop it or set HALOGEN_EVICT_LEMONADE=0 to opt out"
+      names=$(printf '%s' "$health" | lemonade_llm_names) \
+        || die "Lemonade health response is malformed; refusing to start Halogen"
+      if [[ -z "$names" ]]; then
+        printf 'halogen: Lemonade has no resident LLM\n' >&2
+        return 0
+      fi
+
+      while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        printf 'halogen: unloading Lemonade model %s\n' "$name" >&2
+        response=$(curl -fsS --max-time 60 -X POST "${HALOGEN_LEMONADE_API%/}/unload" \
+          -H 'Content-Type: application/json' \
+          -d "$(lemonade_unload_payload "$name")") \
+          || die "failed to unload Lemonade model $name; refusing to start Halogen"
+        if ! printf '%s' "$response" | python3 -c '
+import json
+import sys
+
+value = json.load(sys.stdin)
+if value.get("status") == "error" and "not found" not in json.dumps(value).lower():
+    raise SystemExit(1)
+'; then
+          die "Lemonade rejected unload for model $name; refusing to start Halogen"
+        fi
+      done <<< "$names"
+      ;;
+    *)
+      die "Lemonade container is in unsupported state: $state; refusing to start Halogen"
+      ;;
+  esac
+
+  elapsed=0
+  while :; do
+    health=$(lemonade_health) \
+      || die "Lemonade health inspection failed while waiting for unload; Halogen was not started"
+    names=$(printf '%s' "$health" | lemonade_llm_names) \
+      || die "Lemonade health response is malformed while waiting for unload; Halogen was not started"
+    [[ -z "$names" ]] && {
+      printf 'halogen: Lemonade chat model evicted\n' >&2
+      return 0
+    }
+    if [[ "$HALOGEN_EVICT_TIMEOUT_S" != 0 ]] && (( elapsed >= HALOGEN_EVICT_TIMEOUT_S )); then
+      die "Lemonade did not unload its chat model within ${HALOGEN_EVICT_TIMEOUT_S}s; Halogen was not started"
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+}
+
+start_container() {
+  require_podman
+  local state dir
+  state=$(container_state)
+  case "$state" in
+    running)
+      printf 'halogen: container %s is already running\n' "$HALOGEN_CONTAINER"
+      return 0
+      ;;
+  esac
+
+  dir=$(require_model) || return $?
+  podman image exists "$HALOGEN_IMAGE" 2>/dev/null || die "image is not present: $HALOGEN_IMAGE (pull it explicitly first)"
+
+  case "$state" in
+    created|configured|exited|stopped|paused)
+      evict_lemonade_models
+      printf 'halogen: starting existing container %s\n' "$HALOGEN_CONTAINER"
+      podman start "$HALOGEN_CONTAINER" >/dev/null
+      return 0
+      ;;
+    "")
+      evict_lemonade_models
+      local -a args=(
+        run --detach
+        --name "$HALOGEN_CONTAINER"
+        --publish "127.0.0.1:${HALOGEN_API_PORT}:${HALOGEN_API_PORT}"
+        --device /dev/kfd
+        --device /dev/dri
+        --group-add keep-groups
+        --security-opt seccomp=unconfined
+        --ipc=host
+        --ulimit memlock=-1:-1
+        --volume "${dir}:/models:ro"
+        --env "HALOGEN_API_PORT=${HALOGEN_API_PORT}"
+        --env "HALOGEN_MODEL_ID=${HALOGEN_MODEL_ID}"
+        "$HALOGEN_IMAGE"
+      )
+      podman "${args[@]}"
+      ;;
+    *)
+      die "container $HALOGEN_CONTAINER is in unsupported state: $state"
+      ;;
+  esac
+}
+
+validate_wait_timeout() {
+  [[ "$HALOGEN_WAIT_TIMEOUT_S" =~ ^[0-9]+$ ]] \
+    || die "HALOGEN_WAIT_TIMEOUT_S must be a non-negative integer (0 disables the deadline)"
+}
+
+wait_for_health() {
+  validate_wait_timeout
+  require_curl
+  local elapsed=0 state
+  while ! health_document >/dev/null 2>&1; do
+    state=$(container_state)
+    [[ "$state" == running ]] || die "container stopped before Halogen became ready (state: ${state:-missing})"
+    if [[ "$HALOGEN_WAIT_TIMEOUT_S" != 0 ]] && (( elapsed >= HALOGEN_WAIT_TIMEOUT_S )); then
+      die "Halogen did not become ready within ${HALOGEN_WAIT_TIMEOUT_S}s; inspect with 'halogen logs'"
+    fi
+    if (( elapsed == 0 || elapsed % 30 == 0 )); then
+      printf 'halogen: waiting for /health (%ss elapsed; cold model load can take minutes)\n' "$elapsed" >&2
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  printf 'halogen: ready at %s/health\n' "${HALOGEN_API%/}"
+}
+
+start() {
+  start_container
+}
+
+ensure() {
+  validate_wait_timeout
+  start_container
+  wait_for_health
+}
+
+status() {
+  require_podman
+  require_curl
+  local health state
+  if health=$(health_document 2>/dev/null); then
+    printf '%s\n' "$health"
+    return 0
+  fi
+  state=$(container_state)
+  if [[ -n "$state" ]]; then
+    printf 'halogen: container %s is %s; /health is not ready\n' "$HALOGEN_CONTAINER" "$state" >&2
+  else
+    printf 'halogen: container %s does not exist; /health is not reachable\n' "$HALOGEN_CONTAINER" >&2
+  fi
+  return 1
+}
+
+stop() {
+  require_podman
+  local state
+  state=$(container_state)
+  if [[ -z "$state" ]]; then
+    printf 'halogen: container %s does not exist\n' "$HALOGEN_CONTAINER"
+    return 0
+  fi
+  if [[ "$state" != running && "$state" != paused ]]; then
+    printf 'halogen: container %s is already %s\n' "$HALOGEN_CONTAINER" "$state"
+    return 0
+  fi
+  podman stop --time 30 "$HALOGEN_CONTAINER"
+}
+
+logs() {
+  require_podman
+  if (($# == 0)); then
+    set -- --tail 100
+  fi
+  podman logs "$@" "$HALOGEN_CONTAINER"
+}
+
+case "${1:-}" in
+  start)
+    shift
+    (($# == 0)) || { usage >&2; exit 2; }
+    start
+    ;;
+  ensure)
+    shift
+    (($# == 0)) || { usage >&2; exit 2; }
+    ensure
+    ;;
+  status)
+    shift
+    (($# == 0)) || { usage >&2; exit 2; }
+    status
+    ;;
+  stop)
+    shift
+    (($# == 0)) || { usage >&2; exit 2; }
+    stop
+    ;;
+  logs)
+    shift
+    logs "$@"
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

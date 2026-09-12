@@ -44,17 +44,15 @@
           }
         },
         {
-          "id": "deepseek/deepseek-v4-flash-0731",
-          "name": "DeepSeek V4 Flash (US)",
+          "id": "deepseek/deepseek-v4.1-flash",
+          "name": "DeepSeek V4.1 Flash (US)",
           "reasoning": true,
+          "input": ["text", "image"],
           "contextWindow": 320000,
-          "maxTokens": 131072,
+          "maxTokens": 262144,
           "samplingParams": {
             "temperature": 1.0,
-            "top_p": 0.95,
-            "top_k": 20,
-            "min_p": 0.0,
-            "presence_penalty": 0.0
+            "top_p": 0.95
           },
           "compat": {
             "supportsDeveloperRole": false,
@@ -179,17 +177,15 @@
       "apiKey": "$OPENROUTER_API_KEY_DS",
       "models": [
         {
-          "id": "deepseek/deepseek-v4-flash-0731",
-          "name": "DeepSeek V4 Flash (CN)",
+          "id": "deepseek/deepseek-v4.1-flash",
+          "name": "DeepSeek V4.1 Flash (CN)",
           "reasoning": true,
+          "input": ["text", "image"],
           "contextWindow": 320000,
-          "maxTokens": 131072,
+          "maxTokens": 262144,
           "samplingParams": {
             "temperature": 1.0,
-            "top_p": 0.95,
-            "top_k": 20,
-            "min_p": 0.0,
-            "presence_penalty": 0.0
+            "top_p": 0.95
           },
           "compat": {
             "supportsDeveloperRole": false,
@@ -275,17 +271,15 @@
           }
         },
         {
-          "id": "deepseek/deepseek-v4-flash-0731",
-          "name": "DeepSeek V4 Flash (US / Max Context)",
+          "id": "deepseek/deepseek-v4.1-flash",
+          "name": "DeepSeek V4.1 Flash (US / Max Context)",
           "reasoning": true,
+          "input": ["text", "image"],
           "contextWindow": 1048576,
-          "maxTokens": 131072,
+          "maxTokens": 384000,
           "samplingParams": {
             "temperature": 1.0,
-            "top_p": 0.95,
-            "top_k": 20,
-            "min_p": 0.0,
-            "presence_penalty": 0.0
+            "top_p": 0.95
           },
           "compat": {
             "supportsDeveloperRole": false,
@@ -410,17 +404,15 @@
       "apiKey": "$OPENROUTER_API_KEY_DS",
       "models": [
         {
-          "id": "deepseek/deepseek-v4-flash-0731",
-          "name": "DeepSeek V4 Flash (CN / Max Context)",
+          "id": "deepseek/deepseek-v4.1-flash",
+          "name": "DeepSeek V4.1 Flash (CN / Max Context)",
           "reasoning": true,
+          "input": ["text", "image"],
           "contextWindow": 1048576,
-          "maxTokens": 131072,
+          "maxTokens": 384000,
           "samplingParams": {
             "temperature": 1.0,
-            "top_p": 0.95,
-            "top_k": 20,
-            "min_p": 0.0,
-            "presence_penalty": 0.0
+            "top_p": 0.95
           },
           "compat": {
             "supportsDeveloperRole": false,
@@ -486,32 +478,24 @@
           "maxTokens": 131072
         },
         {
-          "id": "DeepSeek-V4-Flash-Q2",
-          "name": "DeepSeek V4 Flash | Q2",
-          "reasoning": true,
-          "contextWindow": 131072,
-          "maxTokens": 131072
-        },
-        {
-          "id": "DeepSeek-V4-Flash-Q3",
-          "name": "DeepSeek V4 Flash | Q3",
-          "reasoning": true,
-          "contextWindow": 131072,
-          "maxTokens": 131072
-        },
-        {
-          "id": "DeepSeek-V4-Flash-Q2K",
-          "name": "DeepSeek V4 Flash | Q2_K_XL",
-          "reasoning": true,
-          "contextWindow": 131072,
-          "maxTokens": 131072
-        },
-        {
           "id": "Qwen3.8-27B-Q4",
           "name": "Qwen3.8 Dense 27B | Q4",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
+        },
+        {
+          "id": "Signal-3.8-27B-AP-Q4_K_XL",
+          "name": "Signal 3.8 27B | AP-Q4_K_XL",
+          "reasoning": true,
+          "contextWindow": 262144,
+          "maxTokens": 131072,
+          "samplingParams": {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0
+          }
         },
         {
           "id": "Qwen3.8-27B-Q6",
@@ -547,6 +531,40 @@
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
+        }
+      ]
+    },
+    "halogen": {
+      "baseUrl": "http://127.0.0.1:8731/v1",
+      "api": "openai-completions",
+      "apiKey": "dummy",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": true
+      },
+      "models": [
+        {
+          "id": "halogen-qwen3.8-flash-next",
+          "name": "Halogen | Qwen3.8 Flash Next",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 262144,
+          "maxTokens": 65536,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0,
+            "presence_penalty": 0.0
+          },
+          "thinkingLevelMap": {
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          }
         }
       ]
     },

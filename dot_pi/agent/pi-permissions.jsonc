@@ -24,8 +24,9 @@
     "todo": "allow",
     "signal_loop_success": "allow",
 
-    // Exact private-document bridge tools. No wildcard is intentional: the
-    // bridge validates job IDs, routes, sessions, and destructive confirmation.
+    // Exact private-document bridge and loader tools. No wildcard is intentional:
+    // the bridge validates job IDs, routes, sessions, and destructive confirmation.
+    "document_analysis_load": "allow",
     "document_analysis_list": "allow",
     "document_analysis_status": "allow",
     "document_analysis_attach": "allow",

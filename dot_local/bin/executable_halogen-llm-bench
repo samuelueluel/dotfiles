@@ -1,0 +1,672 @@
+#!/usr/bin/env python3
+"""HTTP benchmark adapter for Halogen using the LLM-Bench PP/TG protocol.
+
+This is deliberately separate from llm-bench: llm-bench manages Lemonade and
+reads llama.cpp/Prometheus timings. Halogen exposes a different API and emits
+its serving ledger through container logs.
+
+The benchmark uses a fresh system nonce for every measured task/depth/repetition/
+drafter cell. At deep depths, one fill request builds the context and one target
+request measures the new PP≈2048 suffix plus TG=182. The target request must
+show the expected cache hit; otherwise the cell is rejected.
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import math
+import os
+import platform
+import re
+import runpy
+import statistics
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+import uuid
+from pathlib import Path
+from typing import Any
+
+SCRIPT_VERSION = "0.2"
+DEFAULT_API = os.environ.get("HALOGEN_API", "http://127.0.0.1:8731")
+DEFAULT_CONTAINER = os.environ.get("HALOGEN_API_CTR", "halogen")
+DEFAULT_OUTDIR = Path.home() / ".local/share/ramalama/benchmarks"
+PP_TARGET = 2048
+TG_TARGET = 182
+
+LEDGER_RE = re.compile(
+    r"serve_api:\s+(?P<kind>\w+)\s+(?P<tokens>\d+)\s+tok in\s+"
+    r"(?P<decode_s>[\d.]+)s\s+=\s+(?P<rate>n/a|[\d.]+)(?:\s+t/s)?"
+    r"(?:\s+\|\s+(?P<rounds>\d+)\s+rounds,\s+"
+    r"commit\s+(?P<commit>[\d.]+)/round)?\s+\|\s+prompt\s+"
+    r"(?P<prompt>\d+)(?:\s+\((?P<cached>\d+)\s+cached\))?,\s+"
+    r"prefill\s+(?P<prefill>[\d.]+)s"
+)
+
+
+def load_protocol_text() -> dict[str, str]:
+    """Reuse the deployed LLM-Bench task text without modifying that tool."""
+    source = Path(os.environ.get("LLM_BENCH_SOURCE", str(Path.home() / ".local/bin/llm-bench")))
+    if not source.exists():
+        raise RuntimeError(f"LLM-Bench source not found: {source}")
+    values = runpy.run_path(str(source), run_name="halogen_llm_bench_protocol")
+    try:
+        return {
+            "prose": str(values["TASK_INSTRUCTIONS"]["prose"]),
+            "stata": str(values["TASK_INSTRUCTIONS"]["stata"]),
+        }
+    except (KeyError, TypeError) as exc:
+        raise RuntimeError(f"could not load task text from {source}") from exc
+
+
+def load_protocol_seeds() -> dict[str, str]:
+    source = Path(os.environ.get("LLM_BENCH_SOURCE", str(Path.home() / ".local/bin/llm-bench")))
+    values = runpy.run_path(str(source), run_name="halogen_llm_bench_protocol_seeds")
+    try:
+        return {
+            "prose": str(values["FILLER_SEEDS"]["prose"]),
+            "stata": str(values["FILLER_SEEDS"]["stata"]),
+        }
+    except (KeyError, TypeError) as exc:
+        raise RuntimeError(f"could not load filler text from {source}") from exc
+
+
+TASK_INSTRUCTIONS = load_protocol_text()
+FILLER_SEEDS = load_protocol_seeds()
+
+
+class BenchError(RuntimeError):
+    pass
+
+
+def now_iso() -> str:
+    return dt.datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()[:16]
+
+
+def parse_depth(value: str) -> int:
+    raw = value.strip().lower().replace(" ", "")
+    if raw.startswith("d"):
+        raw = raw[1:]
+    multiplier = 1
+    if raw.endswith("k"):
+        raw = raw[:-1]
+        multiplier = 1000
+    elif raw.endswith("m"):
+        raw = raw[:-1]
+        multiplier = 1_000_000
+    try:
+        result = int(float(raw) * multiplier)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid depth: {value}") from exc
+    if result < 0:
+        raise argparse.ArgumentTypeError("depth cannot be negative")
+    return result
+
+
+def parse_depths(value: str) -> list[int]:
+    values = [parse_depth(x) for x in value.split(",") if x.strip()]
+    if not values:
+        raise argparse.ArgumentTypeError("at least one depth is required")
+    return list(dict.fromkeys(values))
+
+
+def parse_tasks(value: str) -> list[str]:
+    aliases = {"code": "stata", "stata": "stata", "prose": "prose", "all": "both"}
+    result: list[str] = []
+    for part in value.split(","):
+        key = part.strip().lower()
+        if not key:
+            continue
+        if key == "both" or aliases.get(key) == "both":
+            result = ["prose", "stata"]
+            continue
+        task = aliases.get(key)
+        if task not in {"prose", "stata"}:
+            raise argparse.ArgumentTypeError(f"unknown task {part!r}; use prose, stata, or both")
+        if task not in result:
+            result.append(task)
+    if not result:
+        raise argparse.ArgumentTypeError("at least one task is required")
+    return result
+
+
+def json_request(url: str, payload: dict[str, Any] | None, timeout: float) -> dict[str, Any]:
+    data = json.dumps(payload).encode() if payload is not None else None
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"} if payload is not None else {},
+        method="POST" if payload is not None else "GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:1000]
+        raise BenchError(f"HTTP {exc.code} from {url}: {detail}") from exc
+    except Exception as exc:
+        raise BenchError(f"request failed for {url}: {exc}") from exc
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise BenchError(f"non-JSON response from {url}: {raw[:500]}") from exc
+    if not isinstance(value, dict):
+        raise BenchError(f"unexpected response from {url}")
+    return value
+
+
+def health(api: str) -> dict[str, Any]:
+    return json_request(api.rstrip("/") + "/health", None, 15)
+
+
+def ledger_entries(container: str) -> list[dict[str, Any]]:
+    result = subprocess.run(
+        ["podman", "logs", "--tail", "4000", container],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    entries: list[dict[str, Any]] = []
+    for line in (result.stdout + result.stderr).splitlines():
+        match = LEDGER_RE.search(line)
+        if not match:
+            continue
+        item = match.groupdict()
+        entries.append(
+            {
+                "kind": item["kind"],
+                "tokens": int(item["tokens"]),
+                "decode_s": float(item["decode_s"]),
+                "rate": None if item["rate"] == "n/a" else float(item["rate"]),
+                "rounds": int(item["rounds"]) if item["rounds"] else None,
+                "commit": float(item["commit"]) if item["commit"] else None,
+                "prompt_total": int(item["prompt"]),
+                "cached": int(item["cached"] or 0),
+                "prefill_s": float(item["prefill"]),
+            }
+        )
+    return entries
+
+
+def wait_idle(api: str, timeout: float) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    last: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        last = health(api)
+        if last.get("status") != "ok":
+            raise BenchError(f"Halogen is not healthy: {last}")
+        if not int(last.get("in_flight") or 0) and not int(last.get("queued") or 0):
+            return last
+        time.sleep(0.25)
+    raise BenchError(f"Halogen did not become idle: {last}")
+
+
+def wait_ledger(container: str, before: int, expected_kind: str, timeout: float) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        entries = ledger_entries(container)
+        if len(entries) > before:
+            new = entries[before:]
+            if len(new) != 1:
+                raise BenchError(
+                    f"unrelated or concurrent Halogen traffic detected: {len(new)} ledger lines"
+                )
+            entry = new[0]
+            if entry["kind"] != expected_kind:
+                raise BenchError(
+                    f"expected {expected_kind} ledger entry, got {entry['kind']}; "
+                    "another request may have used Halogen"
+                )
+            return entry
+        time.sleep(0.05)
+    raise BenchError("timed out waiting for Halogen's serving ledger")
+
+
+def system_for(nonce: str, effort: str) -> str:
+    return (
+        f"Cell nonce: {nonce}\n"
+        "You are a local throughput benchmark target. Follow the task request directly. "
+        "Do not emit chain-of-thought or hidden reasoning; provide only the requested answer content. "
+        "The benchmark records server timings, not answer quality.\n"
+        f"Reasoning effort request: {effort}."
+    )
+
+
+def make_body(
+    model: str,
+    system: str,
+    messages: list[dict[str, str]],
+    max_tokens: int,
+    drafter: str,
+    args: argparse.Namespace,
+    seed: int,
+) -> dict[str, Any]:
+    return {
+        "model": model,
+        "messages": [{"role": "system", "content": system}, *messages],
+        "max_tokens": max_tokens,
+        "enable_thinking": False,
+        "reasoning_effort": args.effort,
+        "drafter": drafter,
+        "temperature": args.temperature,
+        "top_p": args.top_p,
+        "top_k": args.top_k,
+        "min_p": args.min_p,
+        "presence_penalty": args.presence_penalty,
+        "seed": seed,
+    }
+
+
+def request(
+    api: str,
+    container: str,
+    body: dict[str, Any],
+    expected_kind: str,
+    timeout: float,
+) -> tuple[dict[str, Any], dict[str, Any], float]:
+    wait_idle(api, timeout=min(120.0, timeout))
+    before = len(ledger_entries(container))
+    started = time.monotonic()
+    response = json_request(api.rstrip("/") + "/v1/chat/completions", body, timeout)
+    wall = time.monotonic() - started
+    entry = wait_ledger(container, before, expected_kind, timeout=min(120.0, timeout))
+    return response, entry, wall
+
+
+def calibrate(api: str, container: str, model: str, task: str, args: argparse.Namespace) -> dict[str, float]:
+    seed = args.seed
+    one_user = "x"
+    long_user = "x " + FILLER_SEEDS[task] * 20
+    values = []
+    for index, user in enumerate((one_user, long_user)):
+        nonce = f"calibration-{task}-{index}-{uuid.uuid4().hex}"
+        body = make_body(
+            model,
+            system_for(nonce, args.effort),
+            [{"role": "user", "content": user}],
+            1,
+            "serial",
+            args,
+            seed + index,
+        )
+        response, entry, _ = request(api, container, body, "batch", args.request_timeout)
+        total = int((response.get("usage") or {}).get("prompt_tokens") or entry["prompt_total"])
+        values.append((len(user), total))
+    delta_chars = max(1, values[1][0] - values[0][0])
+    delta_tokens = max(1, values[1][1] - values[0][1])
+    cpt = max(0.5, delta_chars / delta_tokens)
+    return {"base_prompt_tokens": float(values[0][1]), "chars_per_token": cpt}
+
+
+def sized_text(task: str, user_tokens: int, estimate: dict[str, float], prefix: str) -> str:
+    seed = FILLER_SEEDS[task]
+    target_chars = max(len(prefix) + 1, int(user_tokens * estimate["chars_per_token"]))
+    text = prefix
+    unit = "\n\n" + seed
+    while len(text) < target_chars:
+        text += unit
+    return text[:target_chars]
+
+
+def usage_tokens(response: dict[str, Any], fallback: int) -> int:
+    usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+    return int(usage.get("prompt_tokens") or fallback)
+
+
+def cell(
+    api: str,
+    container: str,
+    model: str,
+    task: str,
+    depth: int,
+    rep: int,
+    drafter: str,
+    args: argparse.Namespace,
+    estimate: dict[str, float],
+) -> dict[str, Any]:
+    nonce = f"{task}-d{depth}-r{rep}-{drafter}-{uuid.uuid4().hex}"
+    system = system_for(nonce, args.effort)
+    fill: dict[str, Any] | None = None
+    prior: list[dict[str, str]] = []
+    kind = "batch" if drafter == "serial" else drafter
+    seed = args.seed + rep * 10000 + depth + (0 if task == "prose" else 1000) + (0 if drafter == "serial" else 5000)
+
+    if depth > 0:
+        fill_user_tokens = max(1, int(depth - estimate["base_prompt_tokens"] + 1))
+        filler = sized_text(
+            task,
+            fill_user_tokens,
+            estimate,
+            f"This is an isolated benchmark context cell. The nonce is {nonce}.\n\n",
+        )
+        fill_body = make_body(
+            model,
+            system,
+            [{"role": "user", "content": filler}],
+            1,
+            drafter,
+            args,
+            seed,
+        )
+        fill_response, fill_entry, fill_wall = request(
+            api, container, fill_body, kind, args.request_timeout
+        )
+        fill_total = usage_tokens(fill_response, fill_entry["prompt_total"])
+        fill_message = ((fill_response.get("choices") or [{}])[0].get("message") or {})
+        fill_content = str(fill_message.get("content") or "OK")
+        prior = [
+            {"role": "user", "content": filler},
+            {"role": "assistant", "content": fill_content},
+        ]
+        fill = {
+            "requested_depth": depth,
+            "prompt_total_tokens": fill_total,
+            "cached_tokens": fill_entry["cached"],
+            "new_prompt_tokens": max(0, fill_entry["prompt_total"] - fill_entry["cached"]),
+            "prefill_s": fill_entry["prefill_s"],
+            "prefill_tps": max(0.0, (fill_entry["prompt_total"] - fill_entry["cached"]) / max(fill_entry["prefill_s"], 1e-9)),
+            "wall_s": fill_wall,
+            "prompt_sha256": sha256_text(filler),
+        }
+        if fill_entry["cached"] > 32:
+            raise BenchError(f"fill unexpectedly reused {fill_entry['cached']} cached tokens")
+
+    target_user_tokens = max(1, int(PP_TARGET - estimate["base_prompt_tokens"] + 1)) if depth == 0 else PP_TARGET
+    target = sized_text(
+        task,
+        target_user_tokens,
+        estimate,
+        TASK_INSTRUCTIONS[task] + "\n\n",
+    )
+    target_body = make_body(
+        model,
+        system,
+        [*prior, {"role": "user", "content": target}],
+        TG_TARGET,
+        drafter,
+        args,
+        seed + 1,
+    )
+    target_response, target_entry, target_wall = request(
+        api, container, target_body, kind, args.request_timeout
+    )
+    completion = int(((target_response.get("usage") or {}).get("completion_tokens") or target_entry["tokens"]))
+    choice = (target_response.get("choices") or [{}])[0]
+    finish_reason = choice.get("finish_reason")
+    if completion < 1 or completion > TG_TARGET:
+        raise BenchError(f"invalid target completion count: {completion} (cap {TG_TARGET})")
+    cached = target_entry["cached"]
+    prompt_total = usage_tokens(target_response, target_entry["prompt_total"])
+    new_prompt = max(0, target_entry["prompt_total"] - cached)
+    cache_ok = cached <= 32 if depth == 0 else cached >= max(1, int((fill or {}).get("prompt_total_tokens", depth) * 0.90))
+    target_result = {
+        "prompt_total_tokens": prompt_total,
+        "cached_tokens": cached,
+        "new_prompt_tokens": new_prompt,
+        "completion_tokens": completion,
+        "max_tokens": TG_TARGET,
+        "finish_reason": finish_reason,
+        "cap_reached": completion == TG_TARGET,
+        "prefill_s": target_entry["prefill_s"],
+        "prefill_tps": max(0.0, new_prompt / max(target_entry["prefill_s"], 1e-9)),
+        "decode_s": target_entry["decode_s"],
+        "decode_tps": target_entry["rate"],
+        "commit_per_round": target_entry["commit"],
+        "wall_s": target_wall,
+        "prompt_sha256": sha256_text(target),
+        "cache_ok": cache_ok,
+    }
+    if not cache_ok:
+        raise BenchError(
+            f"cache check failed at d{depth}: cached={cached}, "
+            f"target={((fill or {}).get('prompt_total_tokens') or depth)}"
+        )
+    return {
+        "task": task,
+        "depth": depth,
+        "rep": rep,
+        "drafter": drafter,
+        "fill": fill,
+        "target": target_result,
+        "status": "ok",
+    }
+
+
+def metadata(api: str, model: str, health_doc: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    source = Path(os.environ.get("LLM_BENCH_SOURCE", str(Path.home() / ".local/bin/llm-bench")))
+    return {
+        "script": "halogen-llm-bench",
+        "script_version": SCRIPT_VERSION,
+        "started": now_iso(),
+        "api": api,
+        "model": model,
+        "container": args.container,
+        "protocol": {
+            "pp_target": PP_TARGET,
+            "tg_cap": TG_TARGET,
+            "tg_mode": "natural-stop",
+            "reasoning": "off",
+            "tasks": args.tasks,
+            "depths": args.depths,
+            "runs": args.runs,
+        },
+        "sampling": {
+            "temperature": args.temperature,
+            "top_p": args.top_p,
+            "top_k": args.top_k,
+            "min_p": args.min_p,
+            "presence_penalty": args.presence_penalty,
+            "seed_base": args.seed,
+        },
+        "health_at_start": health_doc,
+        "host": {
+            "hostname": platform.node(),
+            "platform": platform.platform(),
+            "python": platform.python_version(),
+        },
+        "llm_bench_source": str(source),
+        "llm_bench_source_sha256": sha256_file(source),
+        "cells": [],
+        "errors": [],
+    }
+
+
+def summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[tuple[str, int, str], list[dict[str, Any]]] = {}
+    for row in rows:
+        key = (row["task"], row["depth"], row["drafter"])
+        groups.setdefault(key, []).append(row)
+    out = []
+    for (task, depth, drafter), values in groups.items():
+        pp = [v["target"]["prefill_tps"] for v in values]
+        tg = [v["target"]["decode_tps"] for v in values if v["target"]["decode_tps"] is not None]
+        completions = [v["target"]["completion_tokens"] for v in values]
+        out.append({
+            "task": task,
+            "depth": depth,
+            "drafter": drafter,
+            "runs": len(values),
+            "pp_tps_mean": statistics.fmean(pp),
+            "pp_tps_median": statistics.median(pp),
+            "pp_tps_stdev": statistics.stdev(pp) if len(pp) > 1 else 0.0,
+            "tg_tps_mean": statistics.fmean(tg) if tg else None,
+            "tg_tps_median": statistics.median(tg) if tg else None,
+            "tg_tps_stdev": statistics.stdev(tg) if len(tg) > 1 else 0.0 if tg else None,
+            "completion_mean": statistics.fmean(completions),
+            "completion_min": min(completions),
+            "completion_max": max(completions),
+            "cap_rate": sum(v["target"]["cap_reached"] for v in values) / len(values),
+        })
+    return sorted(out, key=lambda x: (x["task"], x["depth"], x["drafter"]))
+
+
+def markdown(report: dict[str, Any], summaries: list[dict[str, Any]]) -> str:
+    p = report["protocol"]
+    s = report["sampling"]
+    lines = [
+        "# Halogen LLM benchmark",
+        "",
+        f"- Started: `{report['started']}`",
+        f"- Finished: `{report.get('finished', 'unknown')}`",
+        f"- Model: `{report['model']}`",
+        f"- API: `{report['api']}`",
+        f"- Protocol: `PP≈{p['pp_target']}` new, `TG≤{p['tg_cap']}` natural stop, reasoning `{p['reasoning']}`, runs/cell `{p['runs']}`",
+        f"- Tasks: `{', '.join(p['tasks'])}` · depths `{','.join('d'+str(x) for x in p['depths'])}`",
+        f"- Sampling: temperature `{s['temperature']}`, top_p `{s['top_p']}`, top_k `{s['top_k']}`, min_p `{s['min_p']}`",
+        "- Cache: fresh system nonce per measured cell; d0 requires no cache; deep rows require ≥90% fill-prefix cache reuse.",
+        "- Timing: Halogen serving ledger from container logs; PP is new uncached prompt tokens / prefill time; TG is engine decode rate.",
+        "- TG semantics: `max_tokens=182` is a cap; natural stops are retained and their actual completion lengths are shown.",
+        "",
+        "| Task | Depth | Drafter | Runs | PP t/s mean | PP median | TG t/s mean | TG median | TG tokens |",
+        "| :--- | ---: | :--- | ---: | ---: | ---: | ---: | ---: | :--- |",
+    ]
+    for row in summaries:
+        lines.append(
+            f"| {row['task']} | d{row['depth']} | {row['drafter']} | {row['runs']} | "
+            f"{row['pp_tps_mean']:.1f} ± {row['pp_tps_stdev']:.1f} | {row['pp_tps_median']:.1f} | "
+            f"{row['tg_tps_mean']:.1f} ± {row['tg_tps_stdev']:.1f} | {row['tg_tps_median']:.1f} | "
+            f"{row['completion_mean']:.0f} ({row['completion_min']}-{row['completion_max']}) |"
+            if row["tg_tps_mean"] is not None else
+            f"| {row['task']} | d{row['depth']} | {row['drafter']} | {row['runs']} | "
+            f"{row['pp_tps_mean']:.1f} ± {row['pp_tps_stdev']:.1f} | {row['pp_tps_median']:.1f} | — | — | "
+            f"{row['completion_mean']:.0f} ({row['completion_min']}-{row['completion_max']}) |"
+        )
+    if report["errors"]:
+        lines.extend(["", "## Errors", ""])
+        lines.extend(f"- {error}" for error in report["errors"])
+    return "\n".join(lines) + "\n"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Halogen HTTP adapter for the PP2048/TG182 LLM-Bench protocol")
+    parser.add_argument("--api", default=DEFAULT_API)
+    parser.add_argument("--container", default=DEFAULT_CONTAINER)
+    parser.add_argument("--model", default="halogen-qwen3.8-flash-next")
+    parser.add_argument("--tasks", default="both")
+    parser.add_argument("--depths", type=parse_depths, default=parse_depths("0,30k,60k"))
+    parser.add_argument("--runs", type=int, default=2)
+    parser.add_argument("--drafters", default="serial,mtp")
+    parser.add_argument("--effort", default="low")
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="sampling temperature; 0 keeps the exact-token benchmark greedy (default 0)",
+    )
+    parser.add_argument("--top-p", type=float, default=0.95)
+    parser.add_argument("--top-k", type=int, default=20)
+    parser.add_argument("--min-p", type=float, default=0.0)
+    parser.add_argument("--presence-penalty", type=float, default=0.0)
+    parser.add_argument("--seed", type=int, default=0x5EED0000)
+    parser.add_argument("--request-timeout", type=float, default=1800.0)
+    parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR)
+    parser.add_argument("--no-save", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    args.tasks = parse_tasks(args.tasks)
+    args.depths = list(args.depths)
+    drafters = [x.strip() for x in args.drafters.split(",") if x.strip()]
+    if not drafters:
+        raise SystemExit("at least one drafter is required")
+    if args.runs < 1:
+        raise SystemExit("--runs must be positive")
+
+    try:
+        start_health = wait_idle(args.api, 60)
+        if start_health.get("model") != args.model:
+            raise BenchError(f"Halogen model is {start_health.get('model')!r}, expected {args.model!r}")
+        available = set(start_health.get("drafters_available") or [])
+        missing = [x for x in drafters if x not in available]
+        if missing:
+            raise BenchError(f"requested drafters unavailable: {missing}; available={sorted(available)}")
+        report = metadata(args.api, args.model, start_health, args)
+        report["drafters"] = drafters
+        report["warm_state"] = "already-ready container; cold start excluded"
+        json_path: Path | None = None
+        md_path: Path | None = None
+        if not args.no_save:
+            args.outdir.mkdir(parents=True, exist_ok=True)
+            stamp = dt.datetime.now().astimezone().strftime("%Y-%m-%dT%H-%M-%S%z")
+            stem = args.outdir / f"{stamp}_halogen-llm-bench"
+            json_path = stem.with_suffix(".json")
+            md_path = stem.with_suffix(".md")
+            report["output_json"] = str(json_path)
+            report["output_markdown"] = str(md_path)
+
+        def checkpoint() -> None:
+            report["finished"] = now_iso()
+            report["summaries"] = summary(report["cells"])
+            if json_path is not None and md_path is not None:
+                json_path.write_text(json.dumps(report, indent=2) + "\n")
+                md_path.write_text(markdown(report, report["summaries"]))
+
+        if args.dry_run:
+            print(json.dumps(report, indent=2))
+            return 0
+
+        estimates = {}
+        for task in args.tasks:
+            print(f"calibrating {task} prompt size", flush=True)
+            estimates[task] = calibrate(args.api, args.container, args.model, task, args)
+            print(f"  {task}: {estimates[task]}", flush=True)
+
+        for task in args.tasks:
+            for depth in args.depths:
+                for rep in range(args.runs):
+                    for drafter in drafters:
+                        print(f"{task} d{depth} r{rep + 1}/{args.runs} {drafter}", flush=True)
+                        try:
+                            row = cell(
+                                args.api, args.container, args.model, task, depth, rep,
+                                drafter, args, estimates[task],
+                            )
+                            report["cells"].append(row)
+                            checkpoint()
+                            target = row["target"]
+                            print(
+                                f"  PP {target['prefill_tps']:.1f} t/s · TG "
+                                f"{target['decode_tps'] if target['decode_tps'] is not None else 'n/a'} t/s · "
+                                f"{target['completion_tokens']}/{target['max_tokens']} tokens "
+                                f"({target['finish_reason']}) · prompt "
+                                f"{target['prompt_total_tokens']} ({target['cached_tokens']} cached)",
+                                flush=True,
+                            )
+                        except BenchError as exc:
+                            message = f"{task} d{depth} r{rep + 1} {drafter}: {exc}"
+                            report["errors"].append(message)
+                            checkpoint()
+                            print(f"  ERROR: {exc}", file=sys.stderr, flush=True)
+                            raise
+
+        checkpoint()
+        text = markdown(report, report["summaries"])
+        if args.no_save:
+            print(text)
+        else:
+            print(f"saved {json_path}")
+            print(f"saved {md_path}")
+            print(text)
+        return 0
+    except BenchError as exc:
+        print(f"halogen-llm-bench: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

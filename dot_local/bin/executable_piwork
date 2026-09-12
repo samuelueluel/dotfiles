@@ -666,7 +666,7 @@ def cmd_new(folder_name=None, remaining_args=None):
     if not target_agent:
         agent_options = [
             "pihat    · Cloud frontier (GPT-5.6 Luna / Claude / DeepSeek)",
-            "pi       · Local models (Qwen / DeepSeek / Mistral)",
+            "pi       · Local models (Qwen / Mistral)",
             "betahat  · Stata container (Cloud frontier)",
             "beta     · Stata container (Local models)",
         ]

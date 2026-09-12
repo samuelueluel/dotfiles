@@ -1,40 +1,4 @@
 {
-  "DeepSeek-V4-Flash-Q2": {
-    "checkpoints": {
-      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-IQ2_XXS"
-    },
-    "labels": [
-      "custom",
-      "tool-calling"
-    ],
-    "recipe": "llamacpp",
-    "size": 84.6,
-    "suggested": true
-  },
-  "DeepSeek-V4-Flash-Q2K": {
-    "checkpoints": {
-      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-Q2_K_XL"
-    },
-    "labels": [
-      "custom",
-      "tool-calling"
-    ],
-    "recipe": "llamacpp",
-    "size": 90.2,
-    "suggested": true
-  },
-  "DeepSeek-V4-Flash-Q3": {
-    "checkpoints": {
-      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-IQ3_XXS"
-    },
-    "labels": [
-      "custom",
-      "tool-calling"
-    ],
-    "recipe": "llamacpp",
-    "size": 97.1,
-    "suggested": true
-  },
   "Qwen3.6-MoE-35B-Q8": {
     "checkpoints": {
       "main": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL",
@@ -126,6 +90,20 @@
     ],
     "recipe": "llamacpp",
     "size": 39.4,
+    "suggested": true
+  },
+  "Signal-3.8-27B-AP-Q4_K_XL": {
+    "checkpoints": {
+      "main": "agentionai/Signal-3.8-27B-GGUF:AP-Q4_K_XL"
+    },
+    "labels": [
+      "custom",
+      "mtp",
+      "reasoning",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 16.35,
     "suggested": true
   }
 }

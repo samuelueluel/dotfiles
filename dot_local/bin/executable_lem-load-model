@@ -2,13 +2,19 @@
 # Load one local Lemonade model using the same interactive settings used by
 # the normal pi/beta wrappers. The provider/model target is configured by the
 # caller; this command only handles Lemonade's resident local model.
+#
+# Menu standard (every model, same order, same column alignment):
+#   speculative decoding -> thinking / reasoning -> kv cache quantization
+#   (Q8 default) -> parallel slots (only when the model allows two slots).
+# The execution backend is pinned by the pi-pick-local-model row
+# (@halo-vulkan / @halo-rocm suffix) or by LEM_HALO_BACKEND; there is no
+# interactive backend menu.
 set -euo pipefail
 
 LEM_API=${LEM_API:-http://127.0.0.1:13305/api/v1}
 QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 QWEN38_FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 --presence-penalty 0.0 --repeat-penalty 1.0"
-DS4FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
 QWEN38_FLASH_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf"
 QWEN38_FLASH_FP4_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf"
@@ -20,8 +26,11 @@ usage() {
 Usage:
   lem-load-model MODEL_ID
 
-Load a local Lemonade model and choose speculative decoding, reasoning,
-KV-cache quantization, and parallel slots using gum.
+Load a local Lemonade model. Every model gets the same menu sequence:
+speculative decoding -> thinking / reasoning -> kv cache quantization
+(Q8 default) -> parallel slots (when the model allows two slots).
+The backend is pinned by the pi-pick-local-model row suffix
+(@halo-vulkan / @halo-rocm) or by LEM_HALO_BACKEND; no backend menu exists.
 EOF
 }
 
@@ -30,10 +39,65 @@ die() {
   exit 1
 }
 
+# --- standardized gum menus -------------------------------------------------
+# Headers and column alignment are identical for every model. Keys are padded
+# to the widest key in the menu so descriptions line up.
+
+menu_spec_mtp() {
+  gum choose --header "speculative decoding" --height 2 --selected "on       MTP" \
+    "on       MTP" \
+    "off      Base"
+}
+
+menu_spec_dense38() {
+  gum choose --header "speculative decoding" --height 3 --selected "dflash2  DFlash2" \
+    "dflash2  DFlash2" \
+    "on       MTP" \
+    "off      Base"
+}
+
+menu_thinking_effort() {
+  gum choose --header "thinking / reasoning" --height 4 --selected "xhigh  Xhigh" \
+    "xhigh  Xhigh" \
+    "medium Medium" \
+    "low    Low" \
+    "off    Off"
+}
+
+menu_thinking_onoff() {
+  gum choose --header "thinking / reasoning" --height 2 --selected "on     On" \
+    "on     On" \
+    "off    Off"
+}
+
+menu_kv_cache() {
+  gum choose --header "kv cache quantization" --height 2 --selected "q8   Q8_0" \
+    "q8   Q8_0" \
+    "f16  F16"
+}
+
+menu_parallel_slots() {
+  gum choose --header "parallel slots" --height 2 --selected "1" \
+    "1" \
+    "2"
+}
+
+append_kv_flags() {
+  local kv
+  kv=$(menu_kv_cache) || return 1
+  case "${kv%%[ ]*}" in
+    q8)  args+=" -ctk q8_0 -ctv q8_0" ;;
+    f16) args+=" -ctk f16 -ctv f16" ;;
+  esac
+}
+
 ensure_qwen38_flash_fp4_mtp() {
   local cache_root target part size
-  cache_root=$(podman volume inspect --format '{{.Mountpoint}}' lemonade-cache 2>/dev/null || true)
-  [[ -n "$cache_root" ]] || cache_root="$HOME/.local/share/containers/storage/volumes/lemonade-cache/_data"
+  # Primary cache volume is lemonade26-v108-cache; lemonade-cache is kept as a
+  # legacy fallback for older installs.
+  cache_root=$(podman volume inspect --format '{{.Mountpoint}}' lemonade26-v108-cache 2>/dev/null || true)
+  [[ -n "$cache_root" ]] || cache_root=$(podman volume inspect --format '{{.Mountpoint}}' lemonade-cache 2>/dev/null || true)
+  [[ -n "$cache_root" ]] || cache_root="$HOME/.local/share/containers/storage/volumes/lemonade26-v108-cache/_data"
   target="$cache_root/qwen3.8-flash-next/$(basename "$QWEN38_FLASH_FP4_MTP")"
   part="$target.part"
 
@@ -60,18 +124,15 @@ ensure_qwen38_flash_fp4_mtp() {
 selection=$1
 [[ "$selection" != *$'\n'* && "$selection" != *$'\r'* && "$selection" != *' '* ]] || die "model contains whitespace"
 
-# Backend-qualified Flash choices are launcher aliases, not Lemonade model IDs.
-# Keep the canonical ID for registry lookup and the OpenAI model name.
+# Backend-pinned selections carry an @halo-vulkan / @halo-rocm suffix from the
+# pi/beta picker. Keep the canonical ID for registry lookup and the OpenAI
+# model name.
 id="$selection"
 fixed_halo_backend=""
 case "$selection" in
-  UD-Q4_K_XL@halo-vulkan)
-    id="UD-Q4_K_XL"
-    fixed_halo_backend="halo-vulkan"
-    ;;
-  UD-Q4_K_XL@halo-rocm)
-    id="UD-Q4_K_XL"
-    fixed_halo_backend="halo-rocm"
+  *@halo-vulkan|*@halo-rocm)
+    id="${selection%@*}"
+    fixed_halo_backend="${selection##*@}"
     ;;
   *@*)
     die "unsupported model/backend selection: $selection"
@@ -86,14 +147,8 @@ curl -sS -m 5 "$LEM_API/health" >/dev/null 2>&1 \
 args=""
 pi_thinking_level="unknown"
 fixed_parallel=0
-if [[ -n "$fixed_halo_backend" ]]; then
-  if [[ -n "${LEM_HALO_BACKEND:-}" && "${LEM_HALO_BACKEND}" != "$fixed_halo_backend" ]]; then
-    die "$selection conflicts with LEM_HALO_BACKEND=${LEM_HALO_BACKEND}"
-  fi
-  halo_backend="$fixed_halo_backend"
-else
-  halo_backend="${LEM_HALO_BACKEND:-}"
-fi
+halo_backend="${fixed_halo_backend:-${LEM_HALO_BACKEND:-}}"
+
 case "$id" in
   Qwen3.8-Flash-Next-ROCmFP4*)
     # Agention's per-head ROCmFP4-FAST imatrix GGUF. This is not the
@@ -102,10 +157,8 @@ case "$id" in
     pi_thinking_level="max"
     args+=" --force-laurent --fit off -b 2048 -ub 512 -ngl 99 -fa on --reasoning on"
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
-      "on  MTP" \
-      "off  Base") || exit 1
-    case "${mtp%%[ ]*}" in
+    spec=$(menu_spec_mtp) || exit 1
+    case "${spec%%[ ]*}" in
       on)
         ensure_qwen38_flash_fp4_mtp
         args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_FP4_MTP --spec-draft-adaptive --spec-draft-n-min 2 --spec-draft-n-max 4 --n-gpu-layers-draft 99 -ctkd q8_0 -ctvd q8_0"
@@ -116,11 +169,7 @@ case "$id" in
     esac
 
     args+=" $QWEN38_FLASH_SAMPLING"
-    effort=$(gum choose --header "thinking / reasoning effort" \
-      "xhigh  Xhigh" \
-      "medium Medium" \
-      "low    Low" \
-      "off    Off") || exit 1
+    effort=$(menu_thinking_effort) || exit 1
     case "${effort%%[ ]*}" in
       xhigh)
         pi_thinking_level="max"
@@ -140,13 +189,7 @@ case "$id" in
         ;;
     esac
 
-    kv=$(gum choose --header "KV cache quantization" --selected "q8   Q8_0" \
-      "q8   Q8_0" \
-      "f16  F16") || exit 1
-    case "${kv%%[ ]*}" in
-      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
+    append_kv_flags || exit 1
     ;;
   UD-Q4_K_XL|UD-IQ4_XS|Qwen3.8-Flash-Next-*)
     # Qwen3.8-Flash-Next is a qwen4exp model with a very large PLE tensor.
@@ -154,18 +197,16 @@ case "$id" in
     # loading while selecting the requested runtime backend.
     fixed_parallel=1
     pi_thinking_level="max"
-    if [[ "$fixed_halo_backend" == "halo-vulkan" ]]; then
+    if [[ "$halo_backend" == "halo-vulkan" ]]; then
       args+=" --force-halo-vulkan --load-mode mmap --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
-    elif [[ "$fixed_halo_backend" == "halo-rocm" ]]; then
+    elif [[ "$halo_backend" == "halo-rocm" ]]; then
       args+=" --force-halo-rocm --load-mode mmap --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
     else
       args+=" --force-vulkan --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
     fi
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
-      "on  MTP" \
-      "off  Base") || exit 1
-    case "${mtp%%[ ]*}" in
+    spec=$(menu_spec_mtp) || exit 1
+    case "${spec%%[ ]*}" in
       on)
         args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_MTP --spec-draft-n-max 3 --spec-draft-p-min 0.75"
         ;;
@@ -174,11 +215,7 @@ case "$id" in
         ;;
     esac
 
-    effort=$(gum choose --header "thinking / reasoning effort" \
-      "xhigh  Xhigh" \
-      "medium Medium" \
-      "low    Low" \
-      "off    Off") || exit 1
+    effort=$(menu_thinking_effort) || exit 1
     case "${effort%%[ ]*}" in
       xhigh)
         pi_thinking_level="max"
@@ -198,13 +235,7 @@ case "$id" in
         ;;
     esac
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
-      "f16  F16" \
-      "q8   Q8_0") || exit 1
-    case "${kv%%[ ]*}" in
-      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
+    append_kv_flags || exit 1
     ;;
   Tiel-Coder-35B-A3B-MTP-Q8)
     # Tiel's trained MTP head is packaged in the MTP main GGUF; no separate
@@ -212,9 +243,7 @@ case "$id" in
     fixed_parallel=1
     args+=" --force-vulkan --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on"
 
-    mode=$(gum choose --header "thinking / reasoning mode" \
-      "on   On" \
-      "off  Off") || exit 1
+    mode=$(menu_thinking_onoff) || exit 1
     case "${mode%%[ ]*}" in
       on)
         pi_thinking_level="on"
@@ -226,10 +255,8 @@ case "$id" in
         ;;
     esac
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
-      "on  MTP" \
-      "off  Base") || exit 1
-    case "${mtp%%[ ]*}" in
+    spec=$(menu_spec_mtp) || exit 1
+    case "${spec%%[ ]*}" in
       on)
         args+=" --spec-type draft-mtp --spec-draft-n-max 3 --spec-draft-p-min 0.75"
         ;;
@@ -238,20 +265,49 @@ case "$id" in
         ;;
     esac
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
-      "f16  F16" \
-      "q8   Q8_0") || exit 1
-    case "${kv%%[ ]*}" in
-      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
+    append_kv_flags || exit 1
+    ;;
+  Signal-3.8-27B-AP-Q4_K_XL)
+    # Signal's GGUF contains the Qwen3.8 MTP draft head. The adaptive flag
+    # requires the halo-box Strix Vulkan engine, not Nathan's older Vulkan build.
+    fixed_parallel=1
+    args+=" --force-halo-vulkan -ngl 999 -fa on --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 256 -b 2048 -t 16 --temp 0.7 --top-p 0.95 --top-k 20 --min-p 0"
+
+    spec=$(menu_spec_mtp) || exit 1
+    case "${spec%%[ ]*}" in
+      on)
+        args+=" --spec-type draft-mtp --spec-draft-n-max 4 --spec-draft-adaptive"
+        ;;
+      off)
+        args+=" --spec-type none"
+        ;;
     esac
+
+    effort=$(menu_thinking_effort) || exit 1
+    case "${effort%%[ ]*}" in
+      xhigh)
+        pi_thinking_level="max"
+        args+=" --reasoning on"
+        ;;
+      medium)
+        pi_thinking_level="medium"
+        args+=" --reasoning on --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-medium.jinja"
+        ;;
+      low)
+        pi_thinking_level="low"
+        args+=" --reasoning on --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-low.jinja"
+        ;;
+      off)
+        pi_thinking_level="off"
+        args+=" --reasoning off --reasoning-budget 0 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
+        ;;
+    esac
+
+    append_kv_flags || exit 1
     ;;
   Qwen3.8-*)
-    mtp=$(gum choose --header "speculative decoding" --selected "dflash2  DFlash2" \
-      "dflash2  DFlash2" \
-      "on       MTP" \
-      "off      None") || exit 1
-    case "${mtp%%[ ]*}" in
+    spec=$(menu_spec_dense38) || exit 1
+    case "${spec%%[ ]*}" in
       dflash2)
         if [[ "$id" == *"ROCmFP4"* ]]; then
           args+=" --force-laurent --spec-type draft-dflash --spec-draft-model /root/.cache/huggingface/hub/models--agentionai--Qwen3.8-27B-DFlash2-ROCmFP4-FAST-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_0_ROCMFP4_FAST.gguf --spec-draft-adaptive --spec-draft-n-min 2 --spec-draft-n-max 6 -ctkd q8_0 -ctvd q8_0"
@@ -268,11 +324,7 @@ case "$id" in
         ;;
     esac
 
-    effort=$(gum choose --header "thinking / reasoning effort" \
-      "xhigh  Xhigh" \
-      "medium Medium" \
-      "low    Low" \
-      "off    Off") || exit 1
+    effort=$(menu_thinking_effort) || exit 1
     case "${effort%%[ ]*}" in
       xhigh)
         pi_thinking_level="max"
@@ -292,52 +344,10 @@ case "$id" in
         ;;
     esac
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
-      "f16  F16" \
-      "q8   Q8_0") || exit 1
-    case "${kv%%[ ]*}" in
-      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
-    ;;
-  DeepSeek-*)
-    effort=$(gum choose --header "thinking / reasoning effort" \
-      "max    Max" \
-      "high   High" \
-      "off    Off") || exit 1
-    case "${effort%%[ ]*}" in
-      max)
-        pi_thinking_level="max"
-        args+=" --reasoning on --reasoning-effort max"
-        ;;
-      high)
-        pi_thinking_level="high"
-        args+=" --reasoning on --reasoning-effort high"
-        ;;
-      off)
-        pi_thinking_level="off"
-        args+=" --reasoning off --reasoning-budget 0"
-        ;;
-    esac
-
-    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
-      "on  MTP" \
-      "off  None") || exit 1
-    [[ "${mtp%%[ ]*}" == "off" ]] && args+=" --spec-type none"
-    args+=" $DS4FLASH_SAMPLING"
-
-    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
-      "f16  F16" \
-      "q8   Q8_0") || exit 1
-    case "${kv%%[ ]*}" in
-      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
+    append_kv_flags || exit 1
     ;;
   Qwen3.6-MoE-*)
-    mode=$(gum choose --header "thinking / reasoning mode" \
-      "on   On" \
-      "off  Off") || exit 1
+    mode=$(menu_thinking_onoff) || exit 1
     case "${mode%%[ ]*}" in
       on)
         pi_thinking_level="on"
@@ -349,39 +359,41 @@ case "$id" in
         ;;
     esac
 
-    mtp=$(gum choose --header "speculative decoding" --selected "on  MTP" \
-      "on  MTP" \
-      "off  None") || exit 1
-    [[ "${mtp%%[ ]*}" == "off" ]] && args+=" --spec-type none"
+    spec=$(menu_spec_mtp) || exit 1
+    [[ "${spec%%[ ]*}" == "off" ]] && args+=" --spec-type none"
     args+=" $QWEN_SAMPLING"
 
-    kv=$(gum choose --header "KV cache quantization" --selected "f16  F16" \
-      "f16  F16" \
-      "q8   Q8_0") || exit 1
-    case "${kv%%[ ]*}" in
-      q8) args+=" -ctk q8_0 -ctv q8_0" ;;
-      f16) args+=" -ctk f16 -ctv f16" ;;
-    esac
+    append_kv_flags || exit 1
     ;;
   *)
     die "unsupported local model: $id"
     ;;
 esac
 
+# Backend resolution: the pi/beta picker pins the backend in the selection
+# suffix; scripted callers may still use LEM_HALO_BACKEND. ROCmFP4 models stay
+# pinned to Laurent, and halo backends are rejected for models that cannot
+# use them.
+if [[ -n "$fixed_halo_backend" && -n "${LEM_HALO_BACKEND:-}" && "${LEM_HALO_BACKEND}" != "$fixed_halo_backend" ]]; then
+  die "$selection conflicts with LEM_HALO_BACKEND=${LEM_HALO_BACKEND}"
+fi
+if [[ -n "$halo_backend" ]]; then
+  case "$id" in
+    Qwen3.8-27B-Q4|Qwen3.8-27B-Q6|UD-Q4_K_XL|UD-IQ4_XS|Qwen3.8-Flash-Next-*)
+      [[ "$id" != *ROCmFP4* ]] || die "$selection: ROCmFP4 models are pinned to the Laurent engine"
+      ;;
+    *)
+      die "$selection: halo backends are not supported for $id"
+      ;;
+  esac
+fi
+
 # The standard Qwen3.8 Q4/Q6 models can be compared across the current
 # engines and the halo-box builds. ROCmFP4 remains pinned to Laurent because
 # its quantization/layout is not assumed to work in the new fork.
 if [[ "$id" == Qwen3.8-* || "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS ]] && [[ "$id" != *ROCmFP4* ]]; then
-  if [[ -z "$halo_backend" ]]; then
-    halo_backend=$(gum choose --header "Qwen3.8 backend" \
-      --selected "current     existing Nathan/Laurent path" \
-      "current     existing Nathan/Laurent path" \
-      "halo-vulkan halo-box Vulkan/RADV" \
-      "halo-rocm   halo-box ROCm/HIP") || exit 1
-    halo_backend="${halo_backend%%[ ]*}"
-  fi
   case "$halo_backend" in
-    current|default) ;;
+    ""|current|default) ;;
     halo-vulkan)
       # The fixed Flash aliases already emitted their dispatch flag. For the
       # generic Flash choice, replace the current Nathan-only flags instead of
@@ -390,14 +402,14 @@ if [[ "$id" == Qwen3.8-* || "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS ]] && [[ "
         args="${args/ --force-vulkan/}"
         args="${args/ --tensor-read-lazy auto/}"
       fi
-      [[ "$fixed_halo_backend" == "halo-vulkan" ]] || args+=" --force-halo-vulkan"
+      [[ "$args" == *"--force-halo-vulkan"* ]] || args+=" --force-halo-vulkan"
       ;;
     halo-rocm)
       if [[ "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS || "$id" == Qwen3.8-Flash-Next-* ]]; then
         args="${args/ --force-vulkan/}"
         args="${args/ --tensor-read-lazy auto/}"
       fi
-      [[ "$fixed_halo_backend" == "halo-rocm" ]] || args+=" --force-halo-rocm"
+      [[ "$args" == *"--force-halo-rocm"* ]] || args+=" --force-halo-rocm"
       ;;
     *) die "unsupported LEM_HALO_BACKEND: $halo_backend (use current, halo-vulkan, or halo-rocm)" ;;
   esac
@@ -435,7 +447,7 @@ fi
 if (( fixed_parallel )); then
   args+=" --parallel 1"
 else
-  par=$(gum choose --header "parallel slots" --selected "1" "1" "2") || exit 1
+  par=$(menu_parallel_slots) || exit 1
   args+=" --parallel $par"
 fi
 args=${args# }

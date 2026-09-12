@@ -41,6 +41,7 @@ import { getAdvisorSystemPrompt } from "./prompt.js";
 import { collectActiveProtocolContext, renderActiveProtocolContext } from "./protocol.js";
 import {
 	getAdvisorProtocolMode,
+	getMaxDiffChars,
 	getMaxSkillToolRounds,
 	loadAdvisorConfig,
 	type ProtocolMode,
@@ -246,6 +247,7 @@ export async function executeAdvisor(
 			priorEvidence,
 			protocolText,
 			protocolFiles: activeProtocol.files.map((file) => file.path),
+			maxDiffChars: getMaxDiffChars(advisorCfg),
 		});
 
 		const inventoryMessage = getInventoryMessage(pi.getAllTools());

@@ -69,6 +69,10 @@
 - AI: Lemonade unload all models | lem-unload
 - AI: Lemonade logs (downloads / activity) | podman logs --tail 20 lemonade
 - AI: Restart Lemonade (reload recipe/registry) | podman restart lemonade
+- AI: Halogen status | halogen status
+- AI: Halogen start | halogen start
+- AI: Halogen ensure (wait for health) | halogen ensure
+- AI: Halogen stop | halogen stop
 
 - AI: Serve autocomplete model (background) | serve-autocomplete
 - AI: Stop autocomplete model | stop-autocomplete

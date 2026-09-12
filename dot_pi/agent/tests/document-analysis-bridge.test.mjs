@@ -191,9 +191,10 @@ test("binds jobs atomically and rejects session mismatches, duplicates, and syml
 });
 
 
-test("headless policy names only the exact document bridge tools", () => {
+test("headless policy names only the exact document bridge and loader tools", () => {
   const names = [...bridgePolicy.DOCUMENT_ANALYSIS_TOOL_NAMES];
-  assert.equal(names.length, 8);
+  assert.equal(names.length, 9);
+  assert.equal(names[0], bridgePolicy.DOCUMENT_ANALYSIS_LOADER_TOOL_NAME);
   for (const name of names) assert.equal(bridgePolicy.isDocumentAnalysisBridgeTool(name), true);
   assert.equal(bridgePolicy.isDocumentAnalysisBridgeTool("document_analysis_evil"), false);
   assert.equal(bridgePolicy.isDocumentAnalysisBridgeTool("bash"), false);
@@ -207,18 +208,27 @@ test("registered bridge tools use fixed argv and fail closed before execution", 
   const wrapper = join(temp, "bridge-harness.ts");
   const bridgePath = resolve(new URL("../extensions/document-analysis-bridge.ts", import.meta.url).pathname);
   const permissionPath = resolve(new URL("../extensions/permission-mode.ts", import.meta.url).pathname);
+  const activationPath = resolve(new URL("../lib/tool-activation.ts", import.meta.url).pathname);
   const wrapperSource = `
 import bridge from ${JSON.stringify(bridgePath)};
 import permission from ${JSON.stringify(permissionPath)};
+import { filterToolNamesForActivation, registerToolActivationReconciler, setPermissionAllowedTools } from ${JSON.stringify(activationPath)};
 
 export default function (pi) {
   const tools = new Map();
   const calls = [];
   const toolCallHandlers = [];
+  const sessionStartHandlers = [];
+  let activeTools = ["read", "bash", "edit", "write", "document_analysis_load", "web_search"];
   const largeList = JSON.stringify({ payload: "x".repeat(60 * 1024) + "BRIDGE_LARGE_PAYLOAD_TAIL" });
   const fakePi = {
     registerTool(definition) { tools.set(definition.name, definition); },
-    on(name, handler) { if (name === "tool_call") toolCallHandlers.push(handler); },
+    getActiveTools() { return activeTools; },
+    setActiveTools(names) { activeTools = [...names]; },
+    on(name, handler) {
+      if (name === "tool_call") toolCallHandlers.push(handler);
+      if (name === "session_start") sessionStartHandlers.push(handler);
+    },
     registerCommand() {},
     async exec(...args) {
       calls.push(args);
@@ -229,12 +239,25 @@ export default function (pi) {
   };
   bridge(fakePi);
   permission(fakePi);
+  for (const handler of sessionStartHandlers) handler();
+  setPermissionAllowedTools(fakePi, [
+    "read", "bash", "edit", "write", "document_analysis_load",
+    "document_analysis_list", "document_analysis_status", "document_analysis_attach",
+    "document_analysis_show", "document_analysis_ingest", "document_analysis_enrich",
+    "document_analysis_archive", "document_analysis_delete", "web_search",
+  ]);
+  registerToolActivationReconciler(fakePi, "pi-permission-system", (names) => {
+    fakePi.setActiveTools(filterToolNamesForActivation(fakePi, names));
+  });
   pi.registerCommand("bridge-harness", {
     handler: async (_args, ctx) => {
       const local = {
         model: { provider: "local", id: "Qwen3.6-MoE-35B-Q8", baseUrl: "http://127.0.0.1:13305/api/v1" },
         sessionManager: { getSessionId: () => "harness-session" },
       };
+      const initialActiveDocumentTools = activeTools.filter((name) => name.startsWith("document_analysis_"));
+      const load = await tools.get("document_analysis_load").execute("load-call", {}, undefined, undefined, local);
+      const loadedActiveDocumentTools = activeTools.filter((name) => name.startsWith("document_analysis_")).sort();
       const status = await tools.get("document_analysis_status").execute("status-call", { job_id: "job-123" }, undefined, undefined, local);
       const list = await tools.get("document_analysis_list").execute("list-call", { status: "ready" }, undefined, undefined, local);
       const listText = list.content?.[0]?.text ?? "";
@@ -281,8 +304,12 @@ export default function (pi) {
       const bashSafeGuard = await policy({ toolName: "bash", input: { command: "ls" } }, cloudPolicyContext);
       const filesystemGuard = await policy({ toolName: "openwebui_filesystem_read_file", input: { path: "document-analysis/jobs/job-123/manifest.json" } }, cloudPolicyContext);
       const bridgeAllowed = await policy({ toolName: "document_analysis_list", input: {} }, cloudPolicyContext);
+      const loaderAllowed = await policy({ toolName: "document_analysis_load", input: {} }, cloudPolicyContext);
       ctx.ui.notify("DOCUMENT_BRIDGE_HARNESS:" + JSON.stringify({
         names: [...tools.keys()].sort(),
+        initialActiveDocumentTools,
+        loadedActiveDocumentTools,
+        loadText: load.content?.[0]?.text ?? "",
         calls: calls.map(([command, args]) => ({ command, args })),
         status_ok: Boolean(status && list),
         largeArtifactTail,
@@ -298,6 +325,7 @@ export default function (pi) {
         bashAllGuarded: Boolean(bashSafeGuard?.block),
         filesystemGuarded: Boolean(filesystemGuard?.block),
         bridgeAllowed: bridgeAllowed === undefined || Object.keys(bridgeAllowed).length === 0,
+        loaderAllowed: loaderAllowed === undefined || Object.keys(loaderAllowed).length === 0,
       }), "info");
     },
   });
@@ -350,6 +378,9 @@ export default function (pi) {
   }
 
   assert.deepEqual(result.names, [...bridgePolicy.DOCUMENT_ANALYSIS_TOOL_NAMES].sort());
+  assert.deepEqual(result.initialActiveDocumentTools, [bridgePolicy.DOCUMENT_ANALYSIS_LOADER_TOOL_NAME]);
+  assert.deepEqual(result.loadedActiveDocumentTools, [...bridgePolicy.DOCUMENT_ANALYSIS_TOOL_NAMES].sort());
+  assert.match(result.loadText, /Loaded document-analysis tools/);
   assert.equal(result.status_ok, true);
   assert.equal(result.largeArtifactTail, true);
   assert.equal(result.largeArtifactTruncated, false);
@@ -364,6 +395,7 @@ export default function (pi) {
   assert.equal(result.bashAllGuarded, true);
   assert.equal(result.filesystemGuarded, true);
   assert.equal(result.bridgeAllowed, true);
+  assert.equal(result.loaderAllowed, true);
   assert.deepEqual(result.calls, [
     { command: "/var/home/samuel/.local/bin/document-analysis", args: ["--root", "/var/home/samuel/OpenWebUI-Access-Folder/document-analysis", "status", "job-123"] },
     { command: "/var/home/samuel/.local/bin/document-analysis", args: ["--root", "/var/home/samuel/OpenWebUI-Access-Folder/document-analysis", "list", "--status", "ready"] },

@@ -1,0 +1,16 @@
+{
+  "name": "pi-math-safe",
+  "version": "0.5.4-local.1",
+  "description": "Locally hardened display-only terminal math renderer for Pi.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "mathjax-full": "^3.2.2"
+  }
+}

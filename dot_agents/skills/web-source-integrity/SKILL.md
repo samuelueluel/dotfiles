@@ -9,10 +9,13 @@ description: Enforces source selection, claim-level verification, bottom-of-resp
 
 ```text
 REQUEST
-├─ Broad, uncertain, or multi-angle question ──→ MODE 1: web_search discovery
-├─ Search results need page evidence ──────────→ MODE 2: web_search(includeContent: true) → get_search_content
-├─ User supplies or agent knows a URL ─────────→ MODE 3: fetch_content
-└─ One atomic claim needs verification ────────→ MODE 4: source_check(fetchContent: true)
+├─ Routine lookup, syntax check, or local pi/beta ─────────→ INLINE: Mode 1/2/3/4 directly
+├─ Deep multi-source audit reading 4+ full texts (pihat) ──→ SUBAGENT: Explore (up to 4-fanout)
+│
+├─ Broad, uncertain, or multi-angle question ──────────────→ MODE 1: web_search discovery
+├─ Search results need page evidence ──────────────────────→ MODE 2: web_search(includeContent: true) → get_search_content
+├─ User supplies or agent knows a URL ─────────────────────→ MODE 3: fetch_content
+└─ One atomic claim needs verification ────────────────────→ MODE 4: source_check(fetchContent: true)
 ```
 
 ## Non-Negotiable Rules
@@ -33,7 +36,14 @@ REQUEST
 
 ### Mode 1: Broad Search
 
-Use `web_search` for open-ended questions, current events, or discovering candidate links. For complex questions, try searching from multiple angles rather than repeating similar keywords. Note the returned `responseId` and candidate URLs.
+Use `web_search` for open-ended questions, current events, or discovering candidate links. For complex questions, batch 2–3 distinct queries in parallel using `queries: [...]` rather than repeating single keywords. Note the returned `responseId` and candidate URLs.
+
+Select the `provider` argument based on query intent:
+- **Exact strings, compiler/runtime errors, CLI flags, Stata syntax, dotfiles**: Set `provider: "searxng"`. This uses the local Google CSE / DuckDuckGo index with exact token matching, zero latency, and zero token cost.
+- **Explanatory "how-to", feature comparisons, multi-page doc synthesis, architectural trade-offs**: Set `provider: "openai"`. This routes to OpenAI search (Codex-backed) for grounded narrative answers.
+- **Academic literature discovery, working papers, conceptual essays, "find similar"**: Set `provider: "exa"`. This uses neural semantic embeddings to surface conceptually linked sources.
+- **High-stakes corroboration**: Pass `provider: ["searxng", "exa"]` for simultaneous keyword and neural coverage.
+- **Routine or unclassified lookups**: Omit `provider` to use the configured fallback cascade (`searxng` → `openai` → `exa`).
 
 The search tool returns a synthesized summary. Use it to find promising links, but remember it does not replace reading the actual page.
 
@@ -45,13 +55,18 @@ Use this route when the best source is not known in advance but the search respo
 
 ### Mode 3: Known-URL Reading
 
-Use `fetch_content` for a specified URL or a short list of selected URLs. Use `readable` for normal evidence extraction, `raw` when exact HTTP text matters, and `answer` only when a page-local question is the requested task. Inspect the returned content; do not treat the fetch operation itself as proof that the page supports the claim.
+Use `fetch_content` for a specified URL or a short list of selected URLs. For GitHub repository URLs, `fetch_content` automatically clones the repository locally under `/tmp/pi-github-repos`; inspect source files directly with `read` and `grep` rather than scraping web views. Use `readable` for normal evidence extraction, `raw` when exact HTTP text matters, and `answer` only when a page-local question is the requested task. Inspect the returned content; do not treat the fetch operation itself as proof that the page supports the claim.
 
 ### Mode 4: Atomic Claim Verification
 
 Use `source_check` when the task is to check one claim, date, number, or assertion against web sources. Set `fetchContent: true` when exact passage extraction is needed. Treat its result as a bounded verification artifact, not as permission to generalize beyond the checked claim.
 
 Do not automatically run every route. Choose the shortest route that reaches adequate evidence: discovery → targeted reading → verification only when the claim or stakes require it.
+
+### Execution Topology (Inline vs. Subagent Delegation)
+
+- **Default to INLINE:** Run all modes directly in the main session for routine lookups, syntax/error checks, conceptual how-to synthesis, and all local `pi`/`beta` sessions (avoiding local slot contention).
+- **Subagent Delegation (`pihat`/`betahat` only):** For deep multi-source audits where reading 4+ full papers, repositories, or extensive doc sites would bloat the parent context window, dispatch parallel `Explore` subagents (up to 4-fanout). Each child agent must follow Mode 2/3 and return a structured evidence packet with direct findings, verified URLs, and verbatim quotes.
 
 ## Evidence and Citation Contract
 

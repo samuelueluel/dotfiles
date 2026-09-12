@@ -1,4 +1,6 @@
 import { execSync } from "node:child_process";
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import type { AssistantMessage, Message, Model, TextContent, Usage } from "@earendil-works/pi-ai";
 import { serializeConversation, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { stripInflightAdvisorCall } from "./context.js";
@@ -104,7 +106,69 @@ function transcript(messages: Message[]): string {
 	return serializeConversation(messages);
 }
 
-function getWorkingGitDiff(cwd: string): string | null {
+export const DEFAULT_MAX_DIFF_CHARS = 24_000;
+
+const NOISE_PATHSPECS = [
+	":(exclude)*.dta",
+	":(exclude)*.csv",
+	":(exclude)*.parquet",
+	":(exclude)*.feather",
+	":(exclude)*.rds",
+	":(exclude)*.raw",
+	":(exclude)*.lock*",
+	":(exclude)*package-lock.json",
+	":(exclude)*.min.*",
+];
+
+const EXCLUDE_ARGS = NOISE_PATHSPECS.map((p) => `"${p}"`).join(" ");
+
+function getUntrackedSummary(cwd: string, statusLines: string[]): string | null {
+	const untrackedPaths = statusLines
+		.filter((line) => line.startsWith("?? "))
+		.map((line) => line.slice(3).trim())
+		.filter((file) => {
+			const lower = file.toLowerCase();
+			return (
+				!lower.endsWith(".dta") &&
+				!lower.endsWith(".csv") &&
+				!lower.endsWith(".parquet") &&
+				!lower.endsWith(".feather") &&
+				!lower.endsWith(".rds") &&
+				!lower.endsWith(".raw") &&
+				!lower.endsWith(".lock") &&
+				!lower.endsWith(".lockb") &&
+				!lower.includes("package-lock") &&
+				!lower.includes(".min.")
+			);
+		});
+	if (untrackedPaths.length === 0) return null;
+
+	const entries: string[] = [];
+	for (const relPath of untrackedPaths.slice(0, 5)) {
+		const fullPath = join(cwd, relPath);
+		try {
+			const stats = statSync(fullPath);
+			if (stats.isDirectory()) {
+				entries.push(`- ${relPath}/ (untracked directory)`);
+			} else if (stats.isFile()) {
+				if (stats.size <= 4_000) {
+					const content = readFileSync(fullPath, "utf8");
+					entries.push(`--- /dev/null\n+++ b/${relPath} (untracked)\n${content.trimEnd()}`);
+				} else {
+					entries.push(`- ${relPath} (untracked file, ${stats.size} bytes)`);
+				}
+			}
+		} catch {
+			entries.push(`- ${relPath} (untracked)`);
+		}
+	}
+	if (untrackedPaths.length > 5) {
+		entries.push(`... and ${untrackedPaths.length - 5} more untracked files`);
+	}
+	return entries.join("\n\n");
+}
+
+export function getWorkingGitDiff(cwd: string, maxChars = DEFAULT_MAX_DIFF_CHARS): string | null {
 	try {
 		const status = execSync("git status --porcelain", {
 			cwd,
@@ -113,14 +177,39 @@ function getWorkingGitDiff(cwd: string): string | null {
 			stdio: ["ignore", "pipe", "ignore"],
 		}).trim();
 		if (!status) return null;
-		const diff = execSync("git diff HEAD", {
-			cwd,
-			encoding: "utf8",
-			timeout: 3000,
-			stdio: ["ignore", "pipe", "ignore"],
-		}).trim();
-		if (!diff) return null;
-		return diff.length > 3500 ? `${diff.slice(0, 3500)}\n... [diff truncated]` : diff;
+
+		const statusLines = status.split("\n");
+		let stat = "";
+		let diff = "";
+		try {
+			stat = execSync(`git diff --stat HEAD -- ${EXCLUDE_ARGS}`, {
+				cwd,
+				encoding: "utf8",
+				timeout: 2000,
+				stdio: ["ignore", "pipe", "ignore"],
+			}).trim();
+
+			diff = execSync(`git diff HEAD -- ${EXCLUDE_ARGS}`, {
+				cwd,
+				encoding: "utf8",
+				timeout: 3000,
+				stdio: ["ignore", "pipe", "ignore"],
+			}).trim();
+		} catch {
+			// HEAD might not exist or diff may fail
+		}
+
+		const untracked = getUntrackedSummary(cwd, statusLines);
+		const sections: string[] = [];
+		if (stat) sections.push(stat);
+		if (diff) sections.push(diff);
+		if (untracked) sections.push(`=== UNTRACKED FILES ===\n${untracked}`);
+		if (sections.length === 0) return null;
+
+		const payload = sections.join("\n\n");
+		return payload.length > maxChars
+			? `${payload.slice(0, maxChars)}\n... [diff truncated]`
+			: payload;
 	} catch {
 		return null;
 	}
@@ -216,6 +305,7 @@ export async function buildLeanAdvisorMessages(opts: {
 	priorEvidence?: string;
 	protocolText?: string;
 	protocolFiles?: string[];
+	maxDiffChars?: number;
 }): Promise<LeanResult> {
 	const {
 		ctx,
@@ -234,6 +324,7 @@ export async function buildLeanAdvisorMessages(opts: {
 		priorEvidence,
 		protocolText,
 		protocolFiles,
+		maxDiffChars,
 	} = opts;
 
 	// Native tool-call blocks are useful to the executor but brittle in a sliced
@@ -335,7 +426,7 @@ export async function buildLeanAdvisorMessages(opts: {
 		evidence,
 		priorEvidence,
 		activityMessages: advisorActivityMessages,
-		gitDiff: getWorkingGitDiff(ctx.cwd),
+		gitDiff: getWorkingGitDiff(ctx.cwd, maxDiffChars),
 		checkpointUpdated,
 		protocolText,
 	});

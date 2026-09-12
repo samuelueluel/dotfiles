@@ -1,7 +1,7 @@
 {
   "name": "pi-smart-compact",
-  "version": "9.6.2-local.1",
-  "description": "Local pi-smart-compact fork with a five-minute automatic-compaction watchdog.",
+  "version": "9.6.2-local.2",
+  "description": "Local pi-smart-compact fork with unconstrained model reasoning and configurable execution watchdogs.",
   "type": "module",
   "main": "./dist/index.js",
   "files": [

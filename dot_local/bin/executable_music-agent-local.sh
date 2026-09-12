@@ -30,7 +30,7 @@ model_id=$("$MODEL_PICKER") || exit 1
 "$MODEL_LOADER" "$model_id"
 
 case "$model_id" in
-  UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm) pi_model_id="UD-Q4_K_XL" ;;
+  *@halo-vulkan|*@halo-rocm) pi_model_id="${model_id%@*}" ;;
   *) pi_model_id="$model_id" ;;
 esac
 

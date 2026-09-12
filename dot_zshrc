@@ -294,8 +294,6 @@ model-check() {
       _m=$(grep    '^model=' "$_f" | cut -d= -f2)
       _t=$(grep    '^thinking=' "$_f" | cut -d= -f2)
       case "${_m:l}" in
-        *deepseek-v4-pro*)   _short="dsv4pro" ;;
-        *deepseek-v4-flash*) _short="dsv4fl"  ;;
         *qwen3.8-flash-next-rocmfp4*) _short="flash38fp4" ;;
         *claude-opus-4*)     _short="opus"    ;;
         *claude-opus-5*)     _short="opus5"   ;;
@@ -692,8 +690,6 @@ def banner(title, extra=""):
 
 def short_model(m):
     ml = m.lower()
-    if "deepseek-v4-pro" in ml: return "dsv4pro"
-    if "deepseek-v4-flash" in ml: return "dsv4fl"
     if "claude-opus-4" in ml: return "opus"
     if "claude-opus-5" in ml: return "opus5"
     if "claude-sonnet-5" in ml: return "sonnet5"
@@ -846,6 +842,21 @@ _pi_pick_local_model() {
   command pi-pick-local-model "$@"
 }
 
+_halogen_healthy() {
+  command -v curl >/dev/null 2>&1 || return 1
+  local api="${HALOGEN_API:-http://127.0.0.1:8731}"
+  api="${api%/}"
+  curl -fsS --max-time 2 "$api/health" >/dev/null 2>&1
+}
+
+_pi_cloud_model_scope() {
+  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-5.6*:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
+  if _halogen_healthy; then
+    scope+=',halogen/halogen-qwen3.8-flash-next'
+  fi
+  print -r -- "$scope"
+}
+
 # Keep the historical helper name for pi/beta callers while sharing the
 # exact same loader implementation.
 _lem_preload() {
@@ -889,15 +900,25 @@ pi() {
   _pi_nonstata_skills
   _pi_theme_args
 
-  local model_id
+  local model_id pi_model_id model_flag
   model_id=$(_pi_pick_local_model) || return 1
-  _lem_preload "$model_id" || return 1
-  local pi_model_id
   case "$model_id" in
-    UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm) pi_model_id="UD-Q4_K_XL" ;;
-    *) pi_model_id="$model_id" ;;
+    halogen/*)
+      command halogen ensure || return 1
+      pi_model_id="$model_id"
+      typeset -g PI_LOCAL_THINKING_LEVEL=unknown
+      model_flag="$pi_model_id"
+      ;;
+    *)
+      command halogen stop || return 1
+      _lem_preload "$model_id" || return 1
+      case "$model_id" in
+        *@halo-vulkan|*@halo-rocm) pi_model_id="${model_id%@*}" ;;
+        *) pi_model_id="$model_id" ;;
+      esac
+      model_flag="local/$pi_model_id"
+      ;;
   esac
-  local model_flag="local/$pi_model_id"
 
   local go
   go=$(gum choose --header "pi · run in container?" \
@@ -949,8 +970,8 @@ pihat() {
   # openrouter-us (US key) = everything else. Model + thinking level via /model
   # and Shift+Tab; per-model sampling via samplingParams.
   local model_flag="${PIHAT_MODEL:-openai-codex/gpt-5.6-luna}"
-  # Scope /model to curated cloud providers (local hidden by default; Tab toggles all/scoped)
-  local model_scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-5.6*:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
+  # Expose Halogen only while its engine-aware /health endpoint is ready.
+  local model_scope="$(_pi_cloud_model_scope)"
 
   local go
   go=$(gum choose --header "pihat · run in container?" \
@@ -1001,15 +1022,25 @@ beta() {
   abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
   [[ -d "$abs_target" ]] || { echo "Error: '$target' is not a directory."; return 1; }
 
-  local model_id
+  local model_id pi_model_id model_flag
   model_id=$(_pi_pick_local_model) || return 1
-  _lem_preload "$model_id" || return 1
-  local pi_model_id
   case "$model_id" in
-    UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm) pi_model_id="UD-Q4_K_XL" ;;
-    *) pi_model_id="$model_id" ;;
+    halogen/*)
+      command halogen ensure || return 1
+      pi_model_id="$model_id"
+      typeset -g PI_LOCAL_THINKING_LEVEL=unknown
+      model_flag="$pi_model_id"
+      ;;
+    *)
+      command halogen stop || return 1
+      _lem_preload "$model_id" || return 1
+      case "$model_id" in
+        *@halo-vulkan|*@halo-rocm) pi_model_id="${model_id%@*}" ;;
+        *) pi_model_id="$model_id" ;;
+      esac
+      model_flag="local/$pi_model_id"
+      ;;
   esac
-  local model_flag="local/$pi_model_id"
 
   local level
   level=$(gum choose --header "beta · isolation level" \
@@ -1037,8 +1068,8 @@ betahat() {
   # openrouter-us (US key) = everything else. Model + thinking level via /model
   # and Shift+Tab; per-model sampling via samplingParams.
   local model_flag="${BETAHAT_MODEL:-openai-codex/gpt-5.6-luna}"
-  # Scope /model to curated cloud providers (local hidden by default; Tab toggles all/scoped)
-  local model_scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-5.6*:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
+  # Expose Halogen only while its engine-aware /health endpoint is ready.
+  local model_scope="$(_pi_cloud_model_scope)"
 
   local target="${1:-$PWD}" abs_target
   abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }

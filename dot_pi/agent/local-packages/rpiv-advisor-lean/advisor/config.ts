@@ -29,10 +29,13 @@ export interface AdvisorConfig {
 	maxSkillToolRounds?: number;
 	/** Relative to advisor.json, or an absolute path, for live reviewer preferences. */
 	systemPromptFile?: string;
+	/** Maximum characters of working git diff sent to the advisor (defaults to 24,000). */
+	maxDiffChars?: number;
 }
 
 export const DEFAULT_PROTOCOL_MODE: ProtocolMode = "both";
 export const DEFAULT_MAX_SKILL_TOOL_ROUNDS = 2;
+export const DEFAULT_MAX_DIFF_CHARS = 24_000;
 
 export function getAdvisorProtocolMode(config: AdvisorConfig): ProtocolMode {
 	return config.protocolMode === "attach" || config.protocolMode === "tools" || config.protocolMode === "both"
@@ -43,6 +46,13 @@ export function getAdvisorProtocolMode(config: AdvisorConfig): ProtocolMode {
 export function getMaxSkillToolRounds(config: AdvisorConfig): number {
 	if (!Number.isInteger(config.maxSkillToolRounds)) return DEFAULT_MAX_SKILL_TOOL_ROUNDS;
 	return Math.max(0, Math.min(3, config.maxSkillToolRounds as number));
+}
+
+export function getMaxDiffChars(config: AdvisorConfig): number {
+	if (!Number.isInteger(config.maxDiffChars) || (config.maxDiffChars as number) <= 0) {
+		return DEFAULT_MAX_DIFF_CHARS;
+	}
+	return config.maxDiffChars as number;
 }
 
 /** Resolve the optional live prompt file without reading it. */

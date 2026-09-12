@@ -1,6 +1,4 @@
 {
-  "modelKey": "openai-codex/gpt-5.6-sol",
-  "effort": "xhigh",
   "scribeModelKey": "openai-codex/gpt-5.6-luna",
   "scribeEffort": "xhigh",
   "protocolMode": "both",
@@ -13,7 +11,9 @@
       "Call `advisor` the moment you encounter a DECISION FORK: a data anomaly, an ambiguous requirement, an architectural trade-off, or an empirical specification choice. State the observed facts and your proposed plan in `question` and pass relevant excerpts in `evidence`.",
       "Call `advisor` when stuck — repeated tool failures, unexpected regression results, or non-converging edits.",
       "Call `advisor` before declaring the task complete. Make your changes durable first, and pass the `git diff` or summary output in `evidence` for a final verification check.",
-      "Give the advisor's guidance serious weight, and summarize the key takeaway in your next visible message to the user."
+      "Give the advisor's guidance serious weight. Follow the advisor's VERDICT: if `PIVOT`, immediately execute the provided alternative plan autonomously; if `CIRCUIT_BREAKER`, stop tool execution immediately and output a clear Markdown terminal debrief detailing the blocker, attempts, files on disk, and the morning decision needed."
     ]
-  }
+  },
+  "modelKey": "openai-codex/gpt-5.6-sol",
+  "effort": "xhigh"
 }

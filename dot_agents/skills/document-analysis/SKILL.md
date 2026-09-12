@@ -1,6 +1,6 @@
 ---
 name: document-analysis
-description: Enables analysis of private PDFs, DOCX files, images, text, and Markdown through the isolated document-analysis pipeline. Use when the user asks to analyze, inspect, read, OCR, summarize, or discuss a personal document, or mentions the document-analysis inbox, job ID, or skill.
+description: Enables analysis of private PDFs, DOCX files, images, text, and Markdown through the isolated document-analysis pipeline, with local OCR and visual enrichment. Use when the user asks to analyze, inspect, read, OCR, summarize, or discuss a personal document, places a file in the document-analysis inbox, mentions a document-analysis job ID, or invokes this skill.
 ---
 
 # Private Document Analysis
@@ -9,8 +9,8 @@ description: Enables analysis of private PDFs, DOCX files, images, text, and Mar
 
 ```text
 REQUEST
-├─ Supported file named or placed in inbox ──→ AUTO ANALYSIS: ingest → enrich(all) → quality → normalized → answer
-├─ Existing explicit job ID ─────────────────→ RESUME: attach → enrich(all) → quality → normalized → answer
+├─ Supported file named or placed in inbox ──→ LOAD: document_analysis_load → AUTO ANALYSIS: ingest → enrich(all) → quality → normalized → answer
+├─ Existing explicit job ID ─────────────────→ LOAD: document_analysis_load → RESUME: attach → enrich(all) → quality → normalized → answer
 ├─ OCR/vision unavailable or incomplete ─────→ LOUD FAILURE: warn prominently; do not claim full analysis
 ├─ Retain completed job ──────────────────────→ ARCHIVE: archive exact job ID
 ├─ Remove completed job ──────────────────────→ PURGE: dry-run → exact-ID confirmation
@@ -27,6 +27,7 @@ Use this skill for individual personal documents outside Zotero: legal, medical,
 - Never use Zotero tools, sidecars, databases, or Zotero RAG for this workflow. Never guess or select a "latest" job automatically.
 - Always use exact filenames and explicit job IDs. Block path traversal (`../`), symlinks, password-protected PDFs, and files outside the canonical folder.
 - Use only the official `document_analysis_*` tools. Do not bypass them with Bash, `run_command`, or regular file reads. Direct filesystem access to the workspace is blocked on cloud routes.
+- When the operation tools are not visible, call `document_analysis_load` before any other document-analysis operation. The loader only activates registered bridge tools; it does not read or preprocess the document.
 - Never claim success until you inspect the actual tool output. Never archive or delete a job that failed or is still processing.
 
 ## Canonical Workspace and Routes
@@ -52,7 +53,7 @@ Enrichment always runs locally. `document_analysis_enrich` only ever calls local
 ## Automatic Analysis Procedure
 
 1. Identify one exact supported inbox filename. If the user provides a path, make sure it points directly inside `inbox/`; do not search for similar filenames.
-2. Call `document_analysis_ingest` (or run host `document-analysis ingest`) and save the returned job ID. If the job already exists, call `document_analysis_attach` first.
+2. If the operation tools are not visible, call `document_analysis_load`. Then call `document_analysis_ingest` (or run host `document-analysis ingest`) and save the returned job ID. If the job already exists, call `document_analysis_attach` first.
 3. Immediately call `document_analysis_enrich` for that job with `stage="all"`. Do this automatically for every document; never wait for the user to ask for OCR or vision. The tool safely skips stages that do not apply to that file format and reuses finished pages.
 4. Inspect the enrichment result and job status. `stage="all"` runs OCR on scanned pages and images, builds a visual list of every page, and inspects difficult or important sections. Image-only PDFs send every page through MinerU; mixed PDFs only send weak pages.
 5. If OCR fails or is incomplete, stop and explain the issue before relying on the recovered text. If visual analysis fails or is unavailable, stop substantive analysis and show this exact warning: `VISUAL ANALYSIS IS INCOMPLETE — run serve-vlm in a host terminal, then ask me to retry enrichment.`
@@ -88,7 +89,7 @@ document-analysis delete <job-id> --confirm <job-id>
 
 ## pihat and Cloud Routes
 
-The bridge exposes eight exact tools: `document_analysis_list`, `document_analysis_status`, `document_analysis_attach`, `document_analysis_show`, `document_analysis_ingest`, `document_analysis_enrich`, `document_analysis_archive`, and `document_analysis_delete`.
+The bridge exposes one loader plus eight exact operation tools: `document_analysis_load`, `document_analysis_list`, `document_analysis_status`, `document_analysis_attach`, `document_analysis_show`, `document_analysis_ingest`, `document_analysis_enrich`, `document_analysis_archive`, and `document_analysis_delete`. Call `document_analysis_load` when the operation tools are not visible; it only activates their registered definitions and does not access document content.
 
 When using `pihat`, the cloud model can read normalized, OCR, and vision artifacts because Samuel has authorized it. However, the helper, MinerU, and VLM stay completely local. Direct filesystem tools (`read`, `bash`, `grep`, `find`, `ls`) cannot touch the workspace on cloud routes; you must use the bridge tools.
 

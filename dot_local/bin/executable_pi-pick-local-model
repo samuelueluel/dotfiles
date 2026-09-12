@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Shared local-model picker for pi, beta, and dedicated local agents.
+#
+# One grouped, single-column menu that always fits on one page. Rows are
+# grouped by base model (finetunes stay adjacent to their base family) and
+# pin the execution backend as a column, so callers never need a separate
+# backend menu: halo rows emit "<canonical-id>@halo-vulkan" / "@halo-rocm"
+# and every other row emits the canonical Lemonade model ID.
 set -euo pipefail
 
 usage() {
@@ -9,17 +15,23 @@ Usage:
   pi-pick-local-model --validate MODEL_ID
   pi-pick-local-model --canonical-only
 
-Choose or validate a local Lemonade model using the same model IDs as pi.
+Choose or validate a local model using the same model IDs as pi.
+Halo rows carry an @halo-vulkan / @halo-rocm backend suffix.
+--canonical-only omits halo/halogen variant rows (benchmark canonical set).
 EOF
 }
 
 is_valid_model() {
   case "$1" in
     Qwen3.8-27B-Q4|Qwen3.8-27B-Q6|Qwen3.8-27B-ROCmFP4|\
+    Qwen3.8-27B-Q4@halo-vulkan|Qwen3.8-27B-Q4@halo-rocm|\
+    Qwen3.8-27B-Q6@halo-vulkan|Qwen3.8-27B-Q6@halo-rocm|\
+    Signal-3.8-27B-AP-Q4_K_XL|\
     UD-Q4_K_XL|UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm|\
-    UD-IQ4_XS|Qwen3.8-Flash-Next-ROCmFP4|\
-    Qwen3.6-MoE-35B-Q8|Tiel-Coder-35B-A3B-MTP-Q8|\
-    DeepSeek-V4-Flash-Q2|DeepSeek-V4-Flash-Q2K|DeepSeek-V4-Flash-Q3)
+    UD-IQ4_XS|UD-IQ4_XS@halo-vulkan|UD-IQ4_XS@halo-rocm|\
+    Qwen3.8-Flash-Next-ROCmFP4|\
+    halogen/halogen-qwen3.8-flash-next|\
+    Qwen3.6-MoE-35B-Q8|Tiel-Coder-35B-A3B-MTP-Q8)
       return 0
       ;;
     *)
@@ -34,10 +46,10 @@ if [[ "${1:-}" == "--validate" ]]; then
   exit $?
 fi
 
-include_backend_aliases=1
+canonical_only=0
 if [[ "${1:-}" == "--canonical-only" ]]; then
   [[ $# -eq 1 ]] || { usage >&2; exit 2; }
-  include_backend_aliases=0
+  canonical_only=1
 else
   [[ $# -eq 0 ]] || { usage >&2; exit 2; }
 fi
@@ -52,45 +64,63 @@ export GUM_CHOOSE_CURSOR_FOREGROUND="#1AAAD4"
 export GUM_CHOOSE_SELECTED_FOREGROUND="#1AAAD4"
 export GUM_CHOOSE_HEADER_FOREGROUND="#DA9E8A"
 
-model_choices=(
-  "dense38-q4   Qwen3.8 Dense 27B | Q4"
-  "dense38-q6   Qwen3.8 Dense 27B | Q6"
-  "dense38-fp4  Qwen3.8 Dense 27B | ROCmFP4"
-  "flash38-next Qwen3.8 Flash Next | Q4"
-)
-if (( include_backend_aliases )); then
-  model_choices+=(
-    "flash38-halo-vk   Qwen3.8 Flash Next | Q4_K_XL | Halo Vulkan"
-    "flash38-halo-rocm Qwen3.8 Flash Next | Q4_K_XL | Halo ROCm"
-  )
-fi
-model_choices+=(
-  "flash38-iq4  Qwen3.8 Flash Next | IQ4_XS"
-  "flash38-fp4  Qwen3.8 Flash Next | ROCmFP4"
-  "moe-q8       Qwen3.6 MoE 35B | Q8"
-  "tiel-q8      Tiel Coder 35B A3B | Q8"
-  "dsv4fl-q2    DeepSeek V4 Flash | Q2"
-  "dsv4fl-q2k   DeepSeek V4 Flash | Q2_K_XL"
-  "dsv4fl-q3    DeepSeek V4 Flash | Q3"
-)
-choice=$(gum choose --header "select model" "${model_choices[@]}") || exit 1
+# Row registry: key | base model | quant | backend, grouped by base model.
+# Signal (Qwen3.8-27B finetune) sits with the dense family; Tiel (Qwen3.6
+# finetune) sits with the MoE family. canonical=1 rows form the
+# --canonical-only benchmark set (current-path backends only).
+_keys=(dense38-q4 dense38-q4-hv dense38-q4-hr dense38-q6 dense38-q6-hv dense38-q6-hr \
+       dense38-fp4 signal38-q4xl \
+       flash38-next flash38-next-hv flash38-next-hr flash38-iq4 flash38-iq4-hv flash38-iq4-hr \
+       flash38-fp4 halogen-flash \
+       moe-q8 tiel-q8)
+_models=("Qwen3.8 Dense 27B" "Qwen3.8 Dense 27B" "Qwen3.8 Dense 27B" \
+         "Qwen3.8 Dense 27B" "Qwen3.8 Dense 27B" "Qwen3.8 Dense 27B" \
+         "Qwen3.8 Dense 27B" "Signal 3.8 27B" \
+         "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" \
+         "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" \
+         "Qwen3.8 Flash-Next" "Halogen Flash-Next" \
+         "Qwen3.6 MoE 35B" "Tiel Coder 35B")
+_quants=(UD-Q4_K_XL UD-Q4_K_XL UD-Q4_K_XL UD-Q6_K_XL UD-Q6_K_XL UD-Q6_K_XL \
+         ROCmFP4 AP-Q4_K_XL \
+         UD-Q4_K_XL UD-Q4_K_XL UD-Q4_K_XL UD-IQ4_XS UD-IQ4_XS UD-IQ4_XS \
+         ROCmFP4 W4B \
+         UD-Q8_K_XL UD-Q8_K_XL)
+_backends=(nathan-vulkan halo-vulkan halo-rocm nathan-vulkan halo-vulkan halo-rocm \
+           laurent-fp4 halo-vulkan \
+           nathan-vulkan halo-vulkan halo-rocm nathan-vulkan halo-vulkan halo-rocm \
+           laurent-fp4 halogen \
+           nathan-vulkan nathan-vulkan)
+_ids=(Qwen3.8-27B-Q4 "Qwen3.8-27B-Q4@halo-vulkan" "Qwen3.8-27B-Q4@halo-rocm" \
+      Qwen3.8-27B-Q6 "Qwen3.8-27B-Q6@halo-vulkan" "Qwen3.8-27B-Q6@halo-rocm" \
+      Qwen3.8-27B-ROCmFP4 Signal-3.8-27B-AP-Q4_K_XL \
+      UD-Q4_K_XL "UD-Q4_K_XL@halo-vulkan" "UD-Q4_K_XL@halo-rocm" \
+      UD-IQ4_XS "UD-IQ4_XS@halo-vulkan" "UD-IQ4_XS@halo-rocm" \
+      Qwen3.8-Flash-Next-ROCmFP4 halogen/halogen-qwen3.8-flash-next \
+      Qwen3.6-MoE-35B-Q8 Tiel-Coder-35B-A3B-MTP-Q8)
+_canonical=(1 0 0 1 0 0 1 1 \
+            1 0 0 1 0 0 1 0 \
+            1 1)
 
-case "${choice%%[[:space:]]*}" in
-  dense38-q4)   printf '%s\n' "Qwen3.8-27B-Q4" ;;
-  dense38-q6)   printf '%s\n' "Qwen3.8-27B-Q6" ;;
-  flash38-next)      printf '%s\n' "UD-Q4_K_XL" ;;
-  flash38-halo-vk)   printf '%s\n' "UD-Q4_K_XL@halo-vulkan" ;;
-  flash38-halo-rocm) printf '%s\n' "UD-Q4_K_XL@halo-rocm" ;;
-  flash38-iq4)       printf '%s\n' "UD-IQ4_XS" ;;
-  flash38-fp4)  printf '%s\n' "Qwen3.8-Flash-Next-ROCmFP4" ;;
-  dense38-fp4)  printf '%s\n' "Qwen3.8-27B-ROCmFP4" ;;
-  moe-q8)       printf '%s\n' "Qwen3.6-MoE-35B-Q8" ;;
-  tiel-q8)      printf '%s\n' "Tiel-Coder-35B-A3B-MTP-Q8" ;;
-  dsv4fl-q2)    printf '%s\n' "DeepSeek-V4-Flash-Q2" ;;
-  dsv4fl-q2k)   printf '%s\n' "DeepSeek-V4-Flash-Q2K" ;;
-  dsv4fl-q3)    printf '%s\n' "DeepSeek-V4-Flash-Q3" ;;
-  *)
-    printf 'pi-pick-local-model: unrecognized selection\n' >&2
-    exit 1
-    ;;
-esac
+W_KEY=15 W_MODEL=18 W_QUANT=10
+rows=()
+shown=()
+for i in "${!_keys[@]}"; do
+  (( canonical_only && ! ${_canonical[$i]} )) && continue
+  printf -v row '%-*s  %-*s  %-*s  %s' \
+    "$W_KEY" "${_keys[$i]}" "$W_MODEL" "${_models[$i]}" "$W_QUANT" "${_quants[$i]}" "${_backends[$i]}"
+  rows+=("$row")
+  shown+=("$i")
+done
+
+# Explicit height keeps the whole menu on one page in one column; gum choose
+# otherwise paginates at a default height of 10.
+choice=$(gum choose --header "select model" --height "${#rows[@]}" "${rows[@]}") || exit 1
+
+for j in "${!rows[@]}"; do
+  if [[ "$choice" == "${rows[$j]}" ]]; then
+    printf '%s\n' "${_ids[${shown[$j]}]}"
+    exit 0
+  fi
+done
+printf 'pi-pick-local-model: unrecognized selection\n' >&2
+exit 1

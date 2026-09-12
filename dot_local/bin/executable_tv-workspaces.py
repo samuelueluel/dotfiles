@@ -321,7 +321,7 @@ def cmd_preview(target):
         print("Press Enter to launch a brand new conversation.")
         print("You will choose your agent environment:")
         print("  • \033[1mpihat\033[0m   (Cloud frontier - GPT-5.6 Luna / Claude / DeepSeek) [Default]")
-        print("  • \033[1mpi\033[0m      (Local models - Qwen / DeepSeek / Mistral)")
+        print("  • \033[1mpi\033[0m      (Local models - Qwen / Mistral)")
         print("  • \033[1mbetahat\033[0m (Stata container + Cloud frontier)")
         print("  • \033[1mbeta\033[0m    (Stata container + Local models)")
         print("\nAll subsequent messages in this session will automatically be stored in this workspace folder.\n")

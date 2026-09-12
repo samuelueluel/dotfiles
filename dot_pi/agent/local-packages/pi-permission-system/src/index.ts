@@ -1,6 +1,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { join } from "node:path";
+import {
+  filterToolNamesForActivation,
+  registerToolActivationReconciler,
+  resetToolActivationGroups,
+  setPermissionAllowedTools,
+} from "../../../lib/tool-activation.ts";
 
 type ExtensionFactory = (pi: ExtensionAPI) => void | Promise<void>;
 type SessionShutdownEvent = {
@@ -70,6 +76,28 @@ async function isInChildSessionContext(): Promise<boolean> {
  * real process-shutdown reason.
  */
 export default async function processPermissionSystem(pi: ExtensionAPI): Promise<void> {
+  // The installed permission package owns the final active-tool reconciliation.
+  // Keep its permission result authoritative while preserving capability groups
+  // that intentionally remain inactive until their loader is called.
+  resetToolActivationGroups(pi);
+  const originalSetActiveTools = pi.setActiveTools.bind(pi);
+  let reconciling = false;
+  const applyPermissionAndActivation = (names: readonly string[]) => {
+    if (reconciling) {
+      originalSetActiveTools([...names]);
+      return;
+    }
+    reconciling = true;
+    try {
+      originalSetActiveTools(filterToolNamesForActivation(pi, names));
+    } finally {
+      reconciling = false;
+    }
+  };
+  registerToolActivationReconciler(pi, "pi-permission-system", (names) => {
+    applyPermissionAndActivation(names);
+  });
+
   const registry = getProcessWrapperRegistry();
   const token = registry.nextToken++;
   registry.activeTokens.add(token);
@@ -87,6 +115,15 @@ export default async function processPermissionSystem(pi: ExtensionAPI): Promise
 
     const wrappedPi = new Proxy(pi as ExtensionAPI, {
       get(target, property, receiver) {
+        if (property === "setActiveTools") {
+          return (names: string[]) => {
+            // The installed package passes its permission-allowed set here.
+            // Record it for loaders, then apply capability activation without
+            // allowing an inactive group back into the model-facing surface.
+            const permittedAndActive = setPermissionAllowedTools(target, names);
+            applyPermissionAndActivation(permittedAndActive);
+          };
+        }
         if (property !== "on") {
           const value = Reflect.get(target, property, receiver);
           return typeof value === "function" ? value.bind(target) : value;

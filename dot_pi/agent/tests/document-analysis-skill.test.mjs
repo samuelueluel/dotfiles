@@ -18,6 +18,13 @@ for (const candidate of skillPathCandidates) {
 assert.ok(skillPath, "document-analysis skill not found in source or deployed layout");
 const skill = await readFile(skillPath, "utf8");
 
+test("document-analysis skill loads the bridge before operation tools", () => {
+  assert.match(skill, /document_analysis_load/);
+  const loadStep = skill.indexOf("document_analysis_load");
+  const ingestStep = skill.indexOf("document_analysis_ingest");
+  assert.ok(loadStep >= 0 && loadStep < ingestStep);
+});
+
 test("document-analysis skill mandates automatic full enrichment", () => {
   assert.match(skill, /Immediately call `document_analysis_enrich`.*`stage="all"`/s);
   assert.match(skill, /never wait for the user to ask for OCR or vision/);

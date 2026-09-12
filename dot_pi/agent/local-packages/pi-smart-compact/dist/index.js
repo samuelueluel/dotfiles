@@ -3339,10 +3339,6 @@ async function completeChatGptCodex(model, body, opts) {
     let final;
     for await (const event of events) {
       visibleChars += streamedChars(event);
-      if (!watchdogReason && opts.maxTokens && visibleChars > opts.maxTokens * 3) {
-        watchdogReason = "visible-output";
-        controller.abort("codex-visible-output-cap");
-      }
       if (event.type === "done")
         final = event.message;
       else if (event.type === "error")
@@ -4718,11 +4714,10 @@ function effectiveBudget(configured, modeDefault, override) {
     return override;
   if (configured <= 0)
     return modeDefault;
-  return Math.min(configured, modeDefault);
+  return configured;
 }
 function resolveCallBudget(configured, mode, override, automatic = false) {
-  const budget = effectiveBudget(configured, MODE_POLICIES[mode].maxLlmCalls, override);
-  return automatic ? Math.min(budget, AUTO_TRIGGER_MAX_LLM_CALLS) : budget;
+  return effectiveBudget(configured, MODE_POLICIES[mode].maxLlmCalls, override);
 }
 
 // src/ui/overlays.ts

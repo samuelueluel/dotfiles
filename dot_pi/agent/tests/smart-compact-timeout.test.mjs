@@ -28,3 +28,12 @@ test("local fork does not reintroduce the upstream 60-second auto-trigger clamp"
     /const effectiveTimeoutMs = Math\.round\(config\.autoTriggerTimeoutMs \* caps\.timeoutMultiplier\);/,
   );
 });
+
+test("local fork removes the synthetic visible-output watchdog cap on Codex streams", () => {
+  assert.doesNotMatch(bundledRuntime, /controller\.abort\("codex-visible-output-cap"\)/);
+});
+
+test("local fork does not clamp automatic compaction call budget to 4 calls", () => {
+  assert.doesNotMatch(bundledRuntime, /Math\.min\(budget, AUTO_TRIGGER_MAX_LLM_CALLS\)/);
+});
+

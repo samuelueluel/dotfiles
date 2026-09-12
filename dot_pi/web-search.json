@@ -1,5 +1,19 @@
 {
   "workflow": "none",
-  "provider": "exa",
-  "searxngBaseUrl": "http://localhost:8888"
+  "searxngBaseUrl": "http://localhost:8888",
+  "searchRouting": {
+    "providers": [
+      "searxng",
+      "openai",
+      "exa"
+    ],
+    "useCurrentModel": true,
+    "fallbackOn": [
+      "unsupported",
+      "transient",
+      "quota",
+      "network",
+      "invalid-response"
+    ]
+  }
 }

@@ -15,6 +15,16 @@ import {
   routeFor,
   validJobId,
 } from "../lib/document-analysis-bridge-logic.ts";
+import {
+  DOCUMENT_ANALYSIS_ACTIVATION_GROUP,
+  DOCUMENT_ANALYSIS_LOADER_TOOL_NAME,
+  DOCUMENT_ANALYSIS_OPERATION_TOOL_NAMES,
+} from "../lib/document-analysis-bridge-policy.ts";
+import {
+  activateToolActivationGroup,
+  assertToolActivationReady,
+  registerToolActivationGroup,
+} from "../lib/tool-activation.ts";
 
 const CANONICAL_ROOT = DOCUMENT_ANALYSIS_ROOT;
 const COMMAND = "/var/home/samuel/.local/bin/document-analysis";
@@ -86,10 +96,25 @@ function resultDetails(operation: string, jobId: string | undefined, ctx: Extens
 
 export default function documentAnalysisBridge(pi: ExtensionAPI): void {
   pi.registerTool({
+    name: DOCUMENT_ANALYSIS_LOADER_TOOL_NAME,
+    label: "Document Analysis: Load",
+    description: "Load the private document-analysis tools for this session before using them. This only activates registered tools; it does not read a document or run the host helper.",
+    parameters: Type.Object({}),
+    async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+      requireKnownRoute(ctx);
+      requireSessionId(ctx);
+      const added = activateToolActivationGroup(pi, DOCUMENT_ANALYSIS_ACTIVATION_GROUP);
+      return {
+        content: [{ type: "text", text: added.length > 0 ? `Loaded document-analysis tools: ${added.join(", ")}` : "Document-analysis tools are already loaded." }],
+        details: { ...resultDetails("load", undefined, ctx), added },
+      };
+    },
+  });
+
+  pi.registerTool({
     name: "document_analysis_list",
     label: "Document Analysis: List",
     description: "List document-analysis jobs without reading document content. This exact bridge works on a known local or cloud Pi route; use it only to obtain explicit job IDs and never infer or choose a latest job.",
-    promptSnippet: "List private document-analysis jobs without document content",
     parameters: Type.Object({
       status: Type.Optional(StringEnum(STATUS_FILTERS)),
     }),
@@ -220,5 +245,20 @@ export default function documentAnalysisBridge(pi: ExtensionAPI): void {
       const value = await runCli(pi, "delete", deletion.args, signal, 60_000);
       return { content: [{ type: "text", text: resultText("delete", value) }], details: resultDetails("delete", jobId, ctx) };
     },
+  });
+
+  // Register after all operation tools exist. If permission loaded first, its
+  // reconciler can now immediately remove the default-inactive schemas.
+  registerToolActivationGroup(pi, {
+    id: DOCUMENT_ANALYSIS_ACTIVATION_GROUP,
+    owner: "document-analysis-bridge",
+    tools: DOCUMENT_ANALYSIS_OPERATION_TOOL_NAMES,
+    defaultActive: false,
+  });
+
+  // Missing permission reconciliation is a hard failure, not a permissive
+  // fallback: an unfiltered provider request must never contain these schemas.
+  pi.on("before_provider_request", () => {
+    assertToolActivationReady(pi);
   });
 }

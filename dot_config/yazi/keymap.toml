@@ -35,6 +35,8 @@ prepend_keymap = [
 	{ on = "<A-7>", run = "tab_switch 6", desc = "Switch to tab 7" },
 	{ on = "<A-8>", run = "tab_switch 7", desc = "Switch to tab 8" },
 	{ on = "<A-9>", run = "tab_switch 8", desc = "Switch to tab 9" },
+	{ on = "<A-,>", run = "tab_swap -1", desc = "Move tab left" },
+	{ on = "<A-.>", run = "tab_swap 1", desc = "Move tab right" },
 	{ on = "1", run = "noop" },
 	{ on = "2", run = "noop" },
 	{ on = "3", run = "noop" },
