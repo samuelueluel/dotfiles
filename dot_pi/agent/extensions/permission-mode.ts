@@ -726,10 +726,9 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     // its in-memory yolo state aligned with this window before its handler runs.
     synchronizeModeWithBackend(ctx);
 
-    // Plan mode is the read-only boundary. Active-tool filtering hides mutating
-    // tools from the model; this check also stops stale context, forged calls,
-    // and calls already queued before /plan. Blocked calls never execute, so an
-    // earlier permission prompt from the policy layer cannot turn into a write.
+    // Plan mode is the read-only boundary. Active-tool filtering hides
+    // mutating tools from the model; this check also stops stale context,
+    // forged calls, and calls already queued before /plan.
     if (currentMode === "plan" && !isPlanPermittedCall(event.toolName, event.input)) {
       return { block: true, reason: PLAN_MODE_BLOCK_REASON(event.toolName) };
     }

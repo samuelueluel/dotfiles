@@ -55,6 +55,7 @@
     "extensions/session-state.ts",
     "extensions/subagent-profile.ts",
     "extensions/permission-mode.ts",
+    "extensions/save-plan.ts",
     "extensions/powerline-footer.ts",
     "extensions/todo-reminders.ts",
     "extensions/workflow-invariants.ts"
