@@ -8,13 +8,13 @@ import { isSafeBashCommand } from "../lib/bash-policy.ts";
  * Compatibility layer for the old modes.ts extension.
  *
  * pi-permission-system owns tool/path/MCP/skill permissions. This extension
- * keeps the three process-local modes Samuel uses: manual, autoask, and auto.
+ * keeps the four process-local modes Samuel uses: manual, plan, autoask, and auto.
  * Manual mode also retains the old conservative Bash guard because
  * pi-permission-system's bash rules are wildcard-based and cannot safely
  * express the old structured read-only parser.
  */
 
-export type Mode = "manual" | "autoask" | "auto";
+export type Mode = "manual" | "plan" | "autoask" | "auto";
 
 export const AUTO_MODE_GUIDANCE = [
   "AUTO mode overrides general or bundled skill instructions that require `ask_user`.",
@@ -30,7 +30,19 @@ export const AUTO_MODE_BLOCK_REASON = [
   "If no safe continuation exists, stop and report the blocker.",
 ].join(" ");
 
+export const PLAN_MODE_GUIDANCE = [
+  "PLAN mode is read-only: gather context and design the plan, do not carry it out.",
+  "File mutation, configuration changes, and every other state-changing operation stay unavailable until Samuel leaves plan mode.",
+  "Describe the intended changes, the files and commands involved, and the trade-offs instead of performing them.",
+  "Use `ask_user` when the plan depends on a decision that cannot be inferred safely.",
+  "To execute the plan, Samuel switches with /manual, /autoask, or /auto. Never switch permission modes yourself.",
+].join("\n");
+
+export const PLAN_MODE_BLOCK_REASON = (toolName: string): string =>
+  `PLAN mode is read-only: '${toolName}' is blocked. Ask Samuel to switch to /manual, /autoask, or /auto before making changes.`;
+
 const ASK_USER_TOOL_NAME = "ask_user";
+const AGENT_TOOL_NAME = "Agent";
 
 export const PERMISSION_MODE_STATE_KEY = Symbol.for("samuel.pi.permission-mode.state");
 
@@ -55,7 +67,9 @@ function getProcessModeState(): ProcessModeState {
 }
 
 function isAutomaticMode(mode: Mode): boolean {
-  return mode !== "manual";
+  // Plan mode is intentionally not automatic: it keeps YOLO off so a read-only
+  // gap in the allowlist below can never be auto-approved into a mutation.
+  return mode === "autoask" || mode === "auto";
 }
 
 type PermissionSystemRuntime = {
@@ -222,7 +236,7 @@ function permissionRuntime(): PermissionSystemRuntime | undefined {
 
 function requestedStartupMode(): Mode | undefined {
   const requested = process.env.PI_DEFAULT_MODE?.trim().toLowerCase();
-  if (requested === "auto" || requested === "autoask" || requested === "manual") return requested;
+  if (requested === "auto" || requested === "autoask" || requested === "manual" || requested === "plan") return requested;
   if (process.argv.includes("-a") || process.argv.includes("--approve")) return "auto";
   return undefined;
 }
@@ -332,9 +346,147 @@ function isReadOnlyMcpCall(toolName: string, input: unknown): boolean {
   return isReadOnlyMcpOperation(operation, getMcpServerName(toolName, input), input);
 }
 
+/**
+ * Plan mode is deny-by-default: only tools verified as read-only stay available.
+ * Every mutating tool is excluded on purpose, including ones the broad Bash and
+ * MCP policy rules would otherwise let through unprompted. Verified exclusions:
+ * `preview_export` writes render artifacts to disk and `steer_subagent` can
+ * redirect a full-privilege child spawned before plan mode. Kept on purpose:
+ * `todo` because its state lives in the session transcript,
+ * `signal_loop_success` because blocking it would leave a running loop unable to
+ * terminate, and `smart_compact` because compaction is context maintenance and
+ * not a change to any of Samuel's own files, config, or repositories.
+ */
+export const PLAN_ALLOWED_TOOLS = new Set([
+  // Built-in read-only inspection.
+  "read",
+  "grep",
+  "find",
+  "ls",
+  // Web research and retrieval.
+  "web_search",
+  "fetch_content",
+  "get_search_content",
+  "source_check",
+  "answer",
+  // Planning, review, and control signals.
+  "todo",
+  "advisor",
+  "signal_loop_success",
+  "smart_recall",
+  "smart_compact",
+  ASK_USER_TOOL_NAME,
+  // Read-only retrieval of child results; steering a child stays blocked.
+  "get_subagent_result",
+  // Read-only document-analysis bridge tools. attach/ingest/enrich/archive/delete stay blocked.
+  "document_analysis_list",
+  "document_analysis_status",
+  "document_analysis_show",
+]);
+
+/** Subagent types whose own tool whitelist is read-only, so delegation stays safe in plan mode. */
+export const PLAN_READONLY_SUBAGENT_TYPES = new Set(["explore"]);
+
+function getBashCommand(input: unknown): string {
+  if (!input || typeof input !== "object") return "";
+  const raw = (input as Record<string, unknown>).command;
+  return typeof raw === "string" ? raw : "";
+}
+
+function getPlanSubagentType(input: unknown): string {
+  if (!input || typeof input !== "object") return "";
+  const raw = (input as Record<string, unknown>).subagent_type;
+  return typeof raw === "string" ? raw.trim().toLowerCase() : "";
+}
+
+/** Read-only generic `mcp` proxy verbs. Anything unclassified fails closed. */
+export const PLAN_READONLY_MCP_ACTIONS = new Set([
+  "status",
+  "list",
+  "search",
+  "describe",
+  "connect",
+  "instructions",
+  "ui-messages",
+]);
+
+/** Proxy verbs that install endpoints or mint credentials. */
+const PLAN_BLOCKED_MCP_ACTIONS = new Set(["install", "auth-start", "auth-complete"]);
+
+/**
+ * A planning session may delegate discovery, but not create durable state or
+ * wake a privileged worker. `schedule` queues work that outlives the session and
+ * a `worktree` isolation checkout writes to disk, so both are refused. `resume`
+ * is refused because the declared `subagent_type` is not authoritative for the
+ * agent being resumed, so an `Explore` label could reattach a full-privilege
+ * child that was spawned before plan mode.
+ */
+function isPlanAgentCall(input: unknown): boolean {
+  if (!input || typeof input !== "object") return false;
+  const record = input as Record<string, unknown>;
+  if (isBlockingStringField(record, "schedule")) return false;
+  if (isBlockingStringField(record, "resume")) return false;
+  if (typeof record.isolation === "string" && record.isolation.trim().toLowerCase() === "worktree") return false;
+  return PLAN_READONLY_SUBAGENT_TYPES.has(getPlanSubagentType(input));
+}
+
+/** True when the field is a non-empty string or a non-null non-string value. */
+function isBlockingStringField(record: Record<string, unknown>, key: string): boolean {
+  const value = record[key];
+  if (typeof value === "string") return value.trim() !== "";
+  return value !== undefined && value !== null && typeof value !== "string";
+}
+
+/**
+ * The generic `mcp` proxy carries its own verbs outside the forwarded tool name,
+ * so an install or auth action must not pass just because the forwarded
+ * operation is empty.
+ */
+function isPlanMcpProxyCall(input: unknown): boolean {
+  if (!input || typeof input !== "object") return false;
+  const record = input as Record<string, unknown>;
+  const action = typeof record.action === "string" ? record.action.trim().toLowerCase() : "";
+  if (action) {
+    return !PLAN_BLOCKED_MCP_ACTIONS.has(action) && PLAN_READONLY_MCP_ACTIONS.has(action);
+  }
+
+  const selectorKeys = ["describe", "search", "connect", "instructions"] as const;
+  if (selectorKeys.some((key) => typeof record[key] === "string")) return true;
+
+  const operation = getMcpToolName(input);
+  // A bare proxy call reports status or lists one server's tools.
+  if (!operation) return true;
+  return isReadOnlyMcpOperation(operation, getMcpServerName("mcp", input), input);
+}
+
+/**
+ * The interactive Bash "safe to auto-approve" set is not the same as read-only:
+ * `time` and `env` execute arbitrary arguments. Plan mode uses the headless
+ * strictness, which rejects those wrappers along with interactive pagers.
+ */
+function isPlanPermittedCall(toolName: string, input: unknown): boolean {
+  if (toolName === "bash") return isSafeBashCommand(getBashCommand(input), true);
+  if (toolName === "mcp") return isPlanMcpProxyCall(input);
+  if (isMcpToolCall(toolName)) return isReadOnlyMcpCall(toolName, input);
+  if (toolName === AGENT_TOOL_NAME) return isPlanAgentCall(input);
+  return PLAN_ALLOWED_TOOLS.has(toolName);
+}
+
+/** Names that may stay in the model-facing tool surface during plan mode. */
+function isPlanSurfaceTool(toolName: string): boolean {
+  return PLAN_ALLOWED_TOOLS.has(toolName)
+    || toolName === "bash"
+    || toolName === AGENT_TOOL_NAME
+    || isMcpToolCall(toolName);
+}
+
+function sameToolList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((name, index) => name === b[index]);
+}
+
 function setStatus(ctx: ExtensionContext, mode: Mode): void {
   if (!ctx.hasUI) return;
-  const color = mode === "manual" ? "muted" : "success";
+  const color = mode === "plan" ? "warning" : mode === "manual" ? "muted" : "success";
   ctx.ui.setStatus("modes-ext", ctx.ui.theme.fg(color, `mode: ${mode}`));
 }
 
@@ -349,6 +501,34 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
   // restores the prior policy-filtered state without re-enabling a tool that
   // was already hidden by another policy.
   let askUserWasActiveBeforeAuto: boolean | undefined;
+  // The permission-filtered tool surface captured before entering plan mode, so
+  // leaving plan restores exactly what Samuel had rather than a recomputed set.
+  // The baseline must track the upstream surface and never our own filtered
+  // output, or a tool discovered while planning gets dropped and a tool that
+  // policy later withdrew gets resurrected on exit.
+  let toolsBeforePlan: string[] | undefined;
+  let lastAppliedPlanSurface: readonly string[] | undefined;
+
+  const synchronizePlanToolSurface = (): void => {
+    if (currentMode === "plan") {
+      const current = pi.getActiveTools();
+      if (lastAppliedPlanSurface === undefined || !sameToolList(current, lastAppliedPlanSurface)) {
+        toolsBeforePlan = current;
+      }
+
+      const desired = [...new Set(current.filter(isPlanSurfaceTool))];
+      lastAppliedPlanSurface = desired;
+      if (!sameToolList(current, desired)) pi.setActiveTools(desired);
+      return;
+    }
+
+    if (toolsBeforePlan !== undefined) {
+      const restored = toolsBeforePlan;
+      toolsBeforePlan = undefined;
+      lastAppliedPlanSurface = undefined;
+      pi.setActiveTools(restored);
+    }
+  };
 
   const synchronizeAskUserToolVisibility = (): void => {
     const activeTools = pi.getActiveTools();
@@ -422,13 +602,16 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     processState.mode = mode;
     processState.initialized = true;
     currentMode = mode;
+    synchronizePlanToolSurface();
     synchronizeAskUserToolVisibility();
     setStatus(ctx, mode);
     const message = mode === "auto"
       ? "Switched to auto mode (non-interactive)"
       : mode === "autoask"
         ? "Switched to autoask mode (automatic permissions; questions allowed)"
-        : "Switched to manual mode";
+        : mode === "plan"
+          ? "Switched to plan mode (read-only; questions allowed)"
+          : "Switched to manual mode";
     notify(ctx, message, mode === "manual" ? "info" : "success");
     return true;
   };
@@ -446,6 +629,7 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     }
     currentMode = processState.mode ?? "manual";
     synchronizeModeWithBackend(ctx);
+    synchronizePlanToolSurface();
     synchronizeAskUserToolVisibility();
   });
 
@@ -462,26 +646,33 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     }
     currentMode = processState.mode ?? currentMode;
     synchronizeModeWithBackend(ctx);
+    synchronizePlanToolSurface();
     synchronizeAskUserToolVisibility();
     // Let later package handlers refresh first, then reapply an explicit mode.
     setTimeout(() => {
       synchronizeModeWithBackend(ctx);
+      synchronizePlanToolSurface();
       synchronizeAskUserToolVisibility();
     }, 0);
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
     synchronizeModeWithBackend(ctx);
+    synchronizePlanToolSurface();
     synchronizeAskUserToolVisibility();
     // pi-permission-system refreshes its config in its own handler. Reapply
     // after that handler so the next tool call sees this window's mode.
     setTimeout(() => {
       synchronizeModeWithBackend(ctx);
+      synchronizePlanToolSurface();
       synchronizeAskUserToolVisibility();
     }, 0);
 
     if (currentMode === "auto") {
       return { systemPrompt: `${event.systemPrompt}\n\n${AUTO_MODE_GUIDANCE}` };
+    }
+    if (currentMode === "plan") {
+      return { systemPrompt: `${event.systemPrompt}\n\n${PLAN_MODE_GUIDANCE}` };
     }
     return {};
   });
@@ -490,6 +681,13 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     description: "Switch to manual permission mode",
     handler: async (_args, ctx) => {
       applyMode("manual", ctx);
+    },
+  });
+
+  pi.registerCommand("plan", {
+    description: "Switch to read-only plan mode: research and design, no changes",
+    handler: async (_args, ctx) => {
+      applyMode("plan", ctx);
     },
   });
 
@@ -512,7 +710,7 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     handler: async (args, ctx) => {
       synchronizeModeWithBackend(ctx);
       const requested = args.trim().toLowerCase();
-      if (requested === "manual" || requested === "autoask" || requested === "auto") {
+      if (requested === "manual" || requested === "plan" || requested === "autoask" || requested === "auto") {
         applyMode(requested, ctx);
         return;
       }
@@ -527,6 +725,14 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     // The permission package refreshes its config during lifecycle events. Keep
     // its in-memory yolo state aligned with this window before its handler runs.
     synchronizeModeWithBackend(ctx);
+
+    // Plan mode is the read-only boundary. Active-tool filtering hides mutating
+    // tools from the model; this check also stops stale context, forged calls,
+    // and calls already queued before /plan. Blocked calls never execute, so an
+    // earlier permission prompt from the policy layer cannot turn into a write.
+    if (currentMode === "plan" && !isPlanPermittedCall(event.toolName, event.input)) {
+      return { block: true, reason: PLAN_MODE_BLOCK_REASON(event.toolName) };
+    }
 
     // Tool visibility is the primary guard. This second check handles stale
     // model context, forged calls, and calls already queued before /auto.
@@ -580,7 +786,7 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
       if (isReadOnlyMcpCall(event.toolName, event.input)) return {};
 
       // Explore subagents are strictly read-only: hard-block mutating MCP operations
-      // regardless of active permission mode (manual, autoask, or auto).
+      // regardless of active permission mode (manual, plan, autoask, or auto).
       const isExplore = ctx.getSystemPrompt?.()?.includes("STRICT READ-ONLY SEARCH SPECIALIST");
       if (isExplore) {
         return {

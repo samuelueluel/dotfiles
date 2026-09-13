@@ -131,19 +131,7 @@ Search candidate DOIs or title/author strings in `zotero_search_bibliography_ent
 
 ## Difficult Comparisons and Superlatives
 
-Use this section only after the core bounded RAG workflow exposes a concrete comparability or candidate-recall problem.
-
-### Comparability
-
-For plausible leaders, establish the dimensions required by the question—commonly outcome, sign, unit, treatment dose, geography, horizon, and specification. Rank only sufficiently comparable estimates. Name the dimension and candidate coverage, such as “largest nearby-spillover percentage among the comparable estimates retrieved.” If estimands are incompatible, report them separately rather than selecting a winner.
-
-### Bounded candidate recall
-
-Semantic top-k retrieval is not proof of exhaustive recall. When a missed candidate could plausibly change a collection-wide superlative, run one orthogonal collection-scoped metadata or lexical search over discriminating title or abstract terms. Union plausible candidates with the semantic shortlist. Enumerate the collection only when targeted discovery leaves a concrete completeness problem or the user requests an audit.
-
-### Verification and stopping
-
-Verify the winning claim and only the challengers needed to justify or qualify it. Stop when the requested comparison is supported, units and context are verified, plausible challengers from bounded discovery are resolved, remaining incompatibilities are disclosed, and another call is unlikely to change the answer. Apply the main skill's request-wide audit and repair budget; this guide does not grant extra retries. Bounded discovery supports a ranking among retrieved comparable estimates, not an exhaustive collection-wide maximum. Fetch missing metadata only for sources that will appear in the answer; reuse verified fields already returned.
+Follow the ranking workflow in [the research skill](../../zotero-research/SKILL.md). This reference adds filter and scope details, not another verification pass. For bounded inventory, use `zotero_list_collection_items(collection_key=..., detail="summary", include_subcollections=true)` and follow its pagination. For a targeted recall check, keep the same collection and descendant scope on metadata search.
 
 ## Topic-Conditioned Graph Discovery
 

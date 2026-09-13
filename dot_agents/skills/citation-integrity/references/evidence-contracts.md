@@ -16,7 +16,7 @@ Use for substantive findings, mechanisms, definitions, formulas, and empirical e
   - Include page numbers only when present in the snippet or DCR breadcrumb; never invent pages. Record whether they are printed page numbers or PDF page indices when established. If that mapping is ambiguous, use the passage/section locator in chat rather than claiming a verified PDF page.
   - Exclude passages marked `REF`, `References` breadcrumbs, or bibliography lists from substantive claims.
   - Derive author and year from item metadata or DCR prefixes.
-  - Verify native `itemType` and canonical `review:*` / `type:*` tags for final cited sources; reuse verified returned metadata and fetch only missing fields. Derive `source_group` from semantic output or the locked mapping. Retrieve missing metadata once per final source, not for discarded candidates.
+  - Retain native `itemType` and canonical `review:*` / `type:*` tags when returned. Derive `source_group` from semantic output or the documented mapping when possible. Do not query solely to populate these internal labels; fetch missing citation identity only for final cited sources.
   - Preserve machine-returned `chunk_id`, `content_hash`, and `index_generation` alongside the record when available. These are optional provenance fields; do not infer them from displayed passage numbers.
   - Include only canonical `review:*` and `type:*` tags. Omit the tag segment when none are present or retrieval fails; never copy legacy subject tags into the token.
 
@@ -83,7 +83,7 @@ Use for inbound-citation rankings, direct citation neighbors, and bibliographic 
 
 ## 6. Metadata API Facts & Token Labels
 
-Plain metadata (title, creators, year, item key, tags, collection membership, attachment status) are API facts and require verification. The resolver may verify an identity or collection-membership claim, but it cannot replace substantive passage/page evidence. For substantive local Zotero claims, include these compact source labels inside the evidence token:
+Plain metadata (title, creators, year, item key, tags, collection membership, attachment status) are API facts and require verification. The resolver may verify an identity or collection-membership claim, but it cannot replace substantive passage/page evidence. For substantive local Zotero claims, retain these compact source labels inside the evidence token when already available:
 
 - Native `itemType` (for example, `journalArticle`, `preprint`, `report`).
 - Derived `source_group` (`article`, `unpublished`, `institutional`, `reference`, `web-media`, or `other`).

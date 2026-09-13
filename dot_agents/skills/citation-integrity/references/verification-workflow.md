@@ -25,7 +25,7 @@ Before reporting any coefficient, standard error, sample size, percentage, or cu
 2. **Context Check:** Confirm units, sign, specification, comparison group, outcome variable, and time horizon.
 3. **Attribution Check:** Ensure the number belongs to the cited paper itself, not an in-text review of another study.
 4. **Context Escalation:** If a semantic snippet is truncated around a key table or note, verify the relevant page with `zotero_read_pdf_pages`; if page extraction is unavailable or malformed, use a targeted extraction from the known item's MinerU sidecar (keep provenance truthful internally; cite it by line range, never as a page read).
-5. **Page-boundary sentences:** if the extraction ends one page mid-sentence and the continuation sits on the next page, no single `pdf_page` quote can pass the audit's containment check. Anchor the evidence with two `pdf_page` entries (one per page), each quoting its exact fragment. Treat `QUOTE_NOT_FOUND` at a page boundary as an extraction artifact, not source absence — try the split before dropping or rewriting the claim.
+5. **Page-boundary sentences:** Read the continuation when needed for meaning. Only for an explicitly requested automated audit, use separate exact page-fragment references if a spanning quote fails containment. Ordinary reading does not require audit payloads.
 6. **Failure Fallback:** If the exact number cannot be verified, drop it or explicitly label it `UNVERIFIED`.
 
 *Precedence Rule:* Verified source text always overrides model memory.
@@ -38,14 +38,7 @@ When making comparative statements (e.g., “Paper A finds X, whereas Paper B fi
 - Attach separate canonical tokens to each distinct clause.
 - Never use one source's passage or graph metric to support another paper's finding.
 
-For “largest,” “smallest,” or “strongest” claims:
-1. Use the adaptive, collection-scoped workflow in the Zotero skill. Begin with semantic discovery, then follow only material evidence gaps.
-2. Compare the dimensions required by the question—commonly outcome, sign, units, treatment dose, geography, time horizon, and specification—without imposing a universal ledger.
-3. When a missed candidate could plausibly change a collection-wide superlative, permit one cheap orthogonal lexical/metadata recall check. Enumerate the collection only when targeted discovery leaves a concrete completeness problem or the user requests an audit.
-4. Rank only sufficiently comparable estimates. Without exhaustive coverage, say “largest among the comparable estimates retrieved” and name the dimension (for example, local shots-fired reduction). If estimates are incompatible, explain the difference instead of selecting a winner.
-5. Directly verify the winning estimate's exact table/prose and any plausible challenger needed to justify the ranking.
-6. Stop when the ranking is stable and another retrieval is unlikely to change it; disclose unresolved incompatibilities rather than searching indefinitely.
-7. Fetch missing native `itemType` and canonical tags only for sources actually cited; reuse already verified fields. Keep classification in the internal evidence record and use the main skill's concise footnotes.
+For “largest,” “smallest,” or “strongest,” use the [Zotero research ranking workflow](../../zotero-research/SKILL.md). Keep the comparison metric explicit, resolve plausible challengers from bounded discovery, and verify the decisive result and its necessary context once. Do not add a separate audit pass or metadata calls solely to fill internal labels.
 
 ## Figure & Table Schema Handling
 
@@ -64,7 +57,7 @@ Before expanding a Zotero RAG query, ask:
 - If page extraction is malformed, would a precise known-item sidecar window resolve it?
 - Am I fetching metadata only for final cited sources?
 - If MCP output is oversized, can I narrow the request or use the sanctioned known-item fallback rather than parse a temporary transport file?
-- After the retrieval, did the answer change? Repeated uninformative follow-ups are a strong signal to stop. Follow the Zotero skill's shared audit/repair budget; do not treat this checklist as permission for extra retries.
+- After the retrieval, did the answer change? Repeated uninformative follow-ups are a strong signal to stop. For an explicitly requested automated audit, the Zotero repair budget applies; ordinary RAG uses the search stopping rule.
 - Does the final prose preserve important conditions and avoid stronger wording than the sources, including in headings and connective sentences?
 
 ## Canonical Failure Statements

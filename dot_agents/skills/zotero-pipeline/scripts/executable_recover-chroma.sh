@@ -5,7 +5,7 @@ config_dir="$HOME/.config/zotero-mcp"
 database="$config_dir/chroma_db"
 server="$HOME/.local/share/uv/tools/zotero-mcp-server/bin/zotero-mcp-server"
 python="$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python"
-rebuild_bm25="$HOME/.agents/skills/zotero/scripts/rebuild-bm25.py"
+rebuild_bm25="$HOME/.agents/skills/zotero-pipeline/scripts/rebuild-bm25.py"
 
 if [[ ${1:-} != "--confirm" ]]; then
   echo "Recovery plan:" >&2

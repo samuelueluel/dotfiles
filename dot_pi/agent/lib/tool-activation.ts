@@ -347,7 +347,21 @@ export function activateToolActivationGroup(pi: ToolHost, id: string): string[] 
   group.active = true;
 
   try {
-    reconciler.reconcile([...allowed]);
+    // Target the smallest surface that adds this group's tools: everything
+    // currently active that policy still allows, plus the group's own allowed
+    // tools, in allowed-list order. Reconciling to the full allowlist here
+    // would resurrect tools that other extensions deliberately withdrew after
+    // policy filtering (the advisor blocklist strip, ask_user in /auto), so
+    // activation must preserve withdrawals. The real reconciler applies group
+    // filtering itself, but computing the target here keeps the invariant
+    // local and testable.
+    const previouslyActive = new Set(before);
+    const activationTarget = [...allowed].filter((name) => {
+      if (!previouslyActive.has(name) && state.ownerByTool.get(name) !== id) return false;
+      const ownerGroup = state.ownerByTool.get(name);
+      return ownerGroup === undefined || state.groups.get(ownerGroup)?.active === true;
+    });
+    reconciler.reconcile(activationTarget);
     const after = pi.getActiveTools();
     const expected = group.tools.filter((name) => allowed.has(name));
     const missing = expected.filter((name) => !after.includes(name));
@@ -363,7 +377,9 @@ export function activateToolActivationGroup(pi: ToolHost, id: string): string[] 
     // cannot leave a capability marked active for a later provider request.
     group.active = previousActive;
     try {
-      reconciler.reconcile([...allowed]);
+      // Transactional rollback restores the exact pre-attempt surface rather
+      // than the full allowlist, for the same withdrawal-preservation reason.
+      reconciler.reconcile([...before]);
     } catch {
       // The deterministic error below is more useful than masking it with a
       // second failure from a broken setter.

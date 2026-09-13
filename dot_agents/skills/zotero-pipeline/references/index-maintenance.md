@@ -42,7 +42,7 @@ After changing the MCP tag, MinerU virtual environment, or MinerU config, run th
 
 ```bash
 ZOTERO_LOCAL=true "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" \
-  "$HOME/.agents/skills/zotero/scripts/mineru-preflight.py"
+  "$HOME/.agents/skills/zotero-pipeline/scripts/mineru-preflight.py"
 ```
 
 The preflight catches the previous failure immediately: a legacy `magic-pdf` must report `backend_flag_supported=False` and its command must contain no `-b`; a modern `mineru` may report `True`. For higher confidence, run one representative single-item `create`, wait for its detached log to report `DONE`, require a non-empty `<key>.md`, and inspect the log for `No such option`, `Traceback`, or `(null): No such file or directory` before launching a batch.
@@ -93,21 +93,21 @@ If deadlocked (0% CPU or slow crawl), restart the container: `podman restart emb
 
 1. **Preview In-Flight Processes:** Run the helper without confirmation and inspect every matched process:
    ```bash
-   "$HOME/.agents/skills/zotero/scripts/pause-sidecar-jobs.sh"
+   "$HOME/.agents/skills/zotero-pipeline/scripts/pause-sidecar-jobs.sh"
    ```
 2. **Stop the Reviewed Processes:** After Samuel approves the displayed targets, rerun with `--confirm`:
    ```bash
-   "$HOME/.agents/skills/zotero/scripts/pause-sidecar-jobs.sh" --confirm
+   "$HOME/.agents/skills/zotero-pipeline/scripts/pause-sidecar-jobs.sh" --confirm
    ```
 3. **Preview Interrupted-Item Cleanup:** Replace `<IN_FLIGHT_KEY>` with one exact parent item key. The first call is a dry run:
    ```bash
    "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" \
-     "$HOME/.agents/skills/zotero/scripts/delete-item-chunks.py" <IN_FLIGHT_KEY>
+     "$HOME/.agents/skills/zotero-pipeline/scripts/delete-item-chunks.py" <IN_FLIGHT_KEY>
    ```
 4. **Delete Only the Reviewed Item's Chunks:** After Samuel confirms that key, repeat it through the confirmation argument:
    ```bash
    "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" \
-     "$HOME/.agents/skills/zotero/scripts/delete-item-chunks.py" <IN_FLIGHT_KEY> \
+     "$HOME/.agents/skills/zotero-pipeline/scripts/delete-item-chunks.py" <IN_FLIGHT_KEY> \
      --confirm-key <IN_FLIGHT_KEY>
    ```
 5. **Relaunch:** Re-run the pipeline for the remaining items.
@@ -130,7 +130,7 @@ Completed `zotero-sidecar.sh embed` runs converge BM25 automatically. Rebuild ma
 
 ```bash
 "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/python" \
-  "$HOME/.agents/skills/zotero/scripts/rebuild-bm25.py"
+  "$HOME/.agents/skills/zotero-pipeline/scripts/rebuild-bm25.py"
 systemctl --user restart zotero-mcp.service
 ```
 
@@ -148,13 +148,13 @@ When an item is re-imported under a new key with an identical PDF:
 Use this only after confirming unrecoverable ChromaDB corruption. The helper previews its exact stop, archive, rebuild, BM25, and restart sequence by default:
 
 ```bash
-"$HOME/.agents/skills/zotero/scripts/recover-chroma.sh"
+"$HOME/.agents/skills/zotero-pipeline/scripts/recover-chroma.sh"
 ```
 
 Show the plan to Samuel. Run the confirmed recovery only after explicit approval:
 
 ```bash
-"$HOME/.agents/skills/zotero/scripts/recover-chroma.sh" --confirm
+"$HOME/.agents/skills/zotero-pipeline/scripts/recover-chroma.sh" --confirm
 ```
 
 The helper archives rather than deletes the damaged database and stops if rebuilding fails. Never run the underlying `--allow-mass-deletion` command directly.

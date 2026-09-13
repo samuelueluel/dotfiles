@@ -8,7 +8,7 @@ MinerU parses PDF documents into structured Markdown sidecars at `~/.config/zote
 
 This is an exceptional known-item fallback after collection-scoped semantic retrieval has identified an item key. For ordinary RAG, prefer targeted `zotero_semantic_search` and `zotero_read_pdf_pages`. Use sidecar shell extraction when page extraction is unavailable, a table is malformed/truncated, or a large technical work needs a precise section window.
 
-Targeted shell commands (`grep`, `sed`) directly on a known sidecar can recover exact data without loading an entire paper. When a PDF has no outline and a semantic passage provides no page locator, use an exact-item semantic refinement or a known-sidecar text locator; do not guess successive PDF page ranges. Never use shell tools to parse MCP gateway temporary/spill files; rerun the MCP query with a narrower query or smaller limit instead.
+Targeted shell commands (`grep`, `sed`) directly on a known sidecar can recover exact data without loading an entire paper. When a PDF has no outline and a semantic passage provides no page locator, use an exact-item semantic refinement or a known-sidecar text locator. Sidecar line counts and passage numbers are not PDF-page mappings; cite the line window when no mapping is available. Never use shell tools to parse MCP gateway temporary/spill files; rerun the MCP query with a narrower query or smaller limit instead.
 
 ## Decision Rules & Extraction Patterns
 
@@ -52,7 +52,7 @@ For a bounded literature overview, explanation, or a few examples, use adequate 
 
 ## Scanned PDFs vs. Sidecars
 
-For native text-layer PDFs, prefer `zotero_read_pdf_pages` (call shape: `item_key`, `start_page`, optional `end_page`; all PDF-page indices, not printed numbers) when exact page context or a numerical/table claim must be verified. Switch to the OCR-processed sidecar when page extraction reports no text layer, is malformed or truncated, or a precise known-item window is substantially cheaper than loading broad text. Use page layout tools only when visual structure itself matters. Track the actual evidence route internally; format tokens according to `citation-integrity` and disclose weaker-than-page evidence in prose.
+For native text-layer PDFs, prefer `zotero_read_pdf_pages` (call shape: `item_key`, `start_page`, optional `end_page`; all PDF-page indices, not printed numbers) when exact page context or a numerical/table claim must be verified. Switch to the OCR-processed sidecar when page extraction reports no text layer, is malformed or truncated, or a precise known-item window is substantially cheaper than loading broad text. When extraction drops signs or interleaves columns, inspect the rendered page with an available visual tool or locate unambiguous prose in the same source. Do not infer a sign from the apparent size of a coefficient. If neither route resolves the value, leave it unverified. Track the actual evidence route internally; format tokens according to `citation-integrity` and disclose weaker-than-page evidence in prose.
 
 ## Batch Extraction Across Papers
 

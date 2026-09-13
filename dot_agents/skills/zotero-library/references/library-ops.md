@@ -83,4 +83,4 @@ When filing lecture notes or textbooks into `Methods` (`2QWMWY2P`) or `Mathemati
 1. Update `itemType` from `preprint` to `journalArticle`.
 2. Update `DOI` to the journal DOI; add `publicationTitle`, `volume`, `issue`, and `pages`.
 3. Linked PDF attachment and BBT citekey are preserved automatically.
-4. If title changed, run `zotero-sidecar.sh reembed <COLLECTION>` to refresh DCR vector prefixes.
+4. Metadata-only edits do not require a collection rebuild. If the source PDF or indexed text changes, refresh the exact affected item through the item-scoped route in [index maintenance](../../zotero-pipeline/references/index-maintenance.md).

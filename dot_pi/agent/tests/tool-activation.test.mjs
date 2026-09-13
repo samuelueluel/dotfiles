@@ -151,6 +151,34 @@ test("permission-denied tools stay absent and a fresh session does not use a sta
   await emit(hosts.handlers, "session_shutdown", contextB);
 });
 
+test("activating a group does not resurrect tools another extension withdrew", async () => {
+  const hosts = makeHosts();
+  const sessionId = `tool-activation-withdraw-${process.pid}-${Date.now()}`;
+  const context = { sessionManager: { getSessionId: () => sessionId } };
+  activation.registerToolActivationGroup(hosts.bridge, group);
+  activation.resetToolActivationGroups(hosts.permission);
+  await emit(hosts.handlers, "session_start", context);
+  // `advisor` is policy-allowed, so the old full-allowlist reconcile would
+  // bring it back on activation. It models any tool another extension
+  // deliberately removed after policy filtering (advisor blocklist strip,
+  // ask_user in /auto).
+  installPermissionReconciler(hosts, [...allowedNames, "advisor"]);
+  hosts.permission.setActiveTools(["read", "document_analysis_load", "Agent"]);
+
+  const added = activation.activateToolActivationGroup(hosts.bridge, group.id);
+  assert.deepEqual(added, ["document_analysis_list"]);
+  assert.deepEqual(
+    hosts.active(),
+    ["read", "document_analysis_load", "document_analysis_list", "Agent"],
+  );
+  assert.equal(hosts.active().includes("advisor"), false, "withdrawn tool must stay withdrawn");
+
+  // Idempotent reload keeps the withdrawal in place.
+  assert.deepEqual(activation.activateToolActivationGroup(hosts.bridge, group.id), []);
+  assert.equal(hosts.active().includes("advisor"), false);
+  await emit(hosts.handlers, "session_shutdown", context);
+});
+
 test("activation groups reject ambiguous ownership", () => {
   const hosts = makeHosts().bridge;
   activation.registerToolActivationGroup(hosts, {
