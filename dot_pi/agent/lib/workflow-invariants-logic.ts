@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { isSensitiveShellCommand } from "./bash-policy.ts";
 
 const require = createRequire(import.meta.url);
 
@@ -75,6 +76,19 @@ export type CommandCheckResult = {
   blocked: boolean;
   reason?: string;
 };
+
+/**
+ * Blocks shell references to private credential locations. The Bash classifier
+ * also rejects these in plan/manual safe mode; this invariant covers automatic
+ * modes and stale/forged calls before they reach the shell.
+ */
+export function checkSecretShellAccess(command: string): CommandCheckResult {
+  if (!isSensitiveShellCommand(command)) return { blocked: false };
+  return {
+    blocked: true,
+    reason: "Access to private SSH, GPG, cloud, or password-manager credentials is prohibited.",
+  };
+}
 
 /**
  * Checks whether a shell command attempts host-level package management,

@@ -7,6 +7,7 @@ import {
   checkExploreMutatingCommand,
   checkExplorePrompt,
   checkPrivilegedOrHostMutation,
+  checkSecretShellAccess,
   checkSessionSummaryStoreShellAccess,
   checkVaultShellAccess,
   checkZoteroCloudUpload,
@@ -156,6 +157,15 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
         const healed = autoHealSedCommand(cmd);
         if (healed !== cmd) {
           (event.input as { command: string }).command = healed;
+        }
+
+        // Block private credential access through Bash as well as path tools.
+        const secretShellCheck = checkSecretShellAccess(cmd);
+        if (secretShellCheck.blocked) {
+          return {
+            block: true,
+            reason: `Blocked by policy: ${secretShellCheck.reason}`,
+          };
         }
 
         // Check vault access in shell

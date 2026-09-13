@@ -7,6 +7,7 @@ import {
   isVaultNotePath,
   isDotfilesStaticPath,
   isSecretFilePath,
+  checkSecretShellAccess,
   checkPrivilegedOrHostMutation,
   checkDestructiveCommand,
   checkSessionSummaryStoreShellAccess,
@@ -61,6 +62,23 @@ test("isSecretFilePath detects private credentials and SSH keys", () => {
   assert.equal(isSecretFilePath(path.join(os.homedir(), ".aws", "credentials")), true);
   assert.equal(isSecretFilePath(path.join(os.homedir(), ".gnupg", "secring.gpg")), true);
   assert.equal(isSecretFilePath(path.join(os.homedir(), ".config", "ghostty", "config")), false);
+});
+
+test("checkSecretShellAccess blocks private credential paths in Bash", () => {
+  for (const command of [
+    "cat ~/.ssh/id_ed25519",
+    `cat ${os.homedir()}/.ssh/id_rsa`,
+    'cat "$HOME"/.gnupg/secring.gpg',
+    "cat ${HOME}/.aws/credentials",
+    "cat ~/.config/op/item",
+    "cat ./.ssh/id_ed25519",
+  ]) {
+    assert.equal(checkSecretShellAccess(command).blocked, true, command);
+  }
+
+  for (const command of ["cat ~/.config/ghostty/config", "cat /tmp/input.txt"]) {
+    assert.equal(checkSecretShellAccess(command).blocked, false, command);
+  }
 });
 
 test("checkPrivilegedOrHostMutation blocks sudo, package managers, and chezmoi apply", () => {

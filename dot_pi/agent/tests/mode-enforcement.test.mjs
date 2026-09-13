@@ -304,12 +304,29 @@ test("plan allows only headless-strict read-only Bash and blocks exec wrappers",
     await harness.command("plan");
     const toolCall = harness.handlers.get("tool_call");
 
-    for (const command of ["ls -la", "rg permission /var/home/samuel/.pi/agent", "cat notes.md | wc -l"]) {
+    for (const command of [
+      "ls -la",
+      "rg permission /var/home/samuel/.pi/agent",
+      "cat notes.md | wc -l",
+      "cat notes.md 2>/dev/null",
+      "pwd && cat notes.md",
+    ]) {
       const allowed = await toolCall({ toolName: "bash", toolCallId: `plan-${command}`, input: { command } }, harness.context);
       assert.notEqual(allowed?.block, true, `${command} should be allowed in plan mode`);
     }
 
-    for (const command of ["rm -rf /tmp/plan-mode-test", "touch /tmp/plan-mode-marker", "time ls", "env whoami"]) {
+    for (const command of [
+      "rm -rf /tmp/plan-mode-test",
+      "touch /tmp/plan-mode-marker",
+      "time ls",
+      "env whoami",
+      "sort --output=/tmp/plan-mode-result input.txt",
+      "/tmp/cat README.md",
+      "LD_PRELOAD=/tmp/plan-mode-helper.so cat README.md",
+      "cat ~/.ssh/id_ed25519",
+      "pwd; cat notes.md",
+      "pwd & cat notes.md",
+    ]) {
       const blocked = await toolCall({ toolName: "bash", toolCallId: `plan-${command}`, input: { command } }, harness.context);
       assert.equal(blocked?.block, true, `${command} must be blocked in plan mode`);
       assert.match(blocked.reason, /PLAN mode is read-only/);
