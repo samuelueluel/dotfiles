@@ -70,7 +70,7 @@ class SessionSummaryTests(unittest.TestCase):
         for index in range(message_count):
             role = "user" if index % 2 == 0 else "assistant"
             entries.append({"type": "message", "message": {"role": role, "content": f"{title} message {index}"}})
-        path.write_text("\n".join(json.dumps(entry) for entry in entries) + "\n", encoding="utf-8")
+        path.write_text("\n".join(json.dumps(entry, separators=(",", ":")) for entry in entries) + "\n", encoding="utf-8")
         os.utime(path, (mtime, mtime))
         return path
 
@@ -136,6 +136,59 @@ class SessionSummaryTests(unittest.TestCase):
         meta = {"id": "s1", "title": "Session title"}
         display = tv.session_display(meta, "Unfiled", "now", {"sessions": {"s1": record}})
         self.assertIn("ultra-rare-next-step-token", display)
+
+    def test_television_prefers_curated_summary_title(self) -> None:
+        meta = {"id": "s1", "title": "The initial user prompt"}
+        self.assertEqual(
+            tv.effective_session_title(meta, {"title": "Curated session title"}),
+            "Curated session title",
+        )
+        self.assertEqual(
+            tv.effective_session_title(meta, {"title": "  "}),
+            "The initial user prompt",
+        )
+        display = tv.session_display(
+            meta,
+            "Unfiled",
+            "now",
+            {"sessions": {"s1": {"title": "Curated session title"}}},
+        )
+        self.assertIn("Curated session title", display)
+        self.assertNotIn("The initial user prompt", display)
+
+    def test_television_folder_and_session_previews_use_curated_title(self) -> None:
+        now = time.time() - 3600
+        path = self.write_transcript(
+            "sessions/unfiled/curated-title.jsonl",
+            "s1",
+            "The initial user prompt",
+            2,
+            now,
+        )
+        summary.set_summary(
+            "s1",
+            {"title": "Curated preview title", "transcript_path": str(path)},
+        )
+        original_unfiled = tv.UNFILED_DIR
+        original_folders = tv.FOLDERS_DIR
+        tv.UNFILED_DIR = summary.UNFILED_DIR
+        tv.FOLDERS_DIR = summary.FOLDERS_ROOT
+        try:
+            folder_output = io.StringIO()
+            with contextlib.redirect_stdout(folder_output):
+                tv.cmd_preview("folder:Unfiled")
+            session_output = io.StringIO()
+            with contextlib.redirect_stdout(session_output):
+                tv.cmd_preview(f"session:{path}")
+        finally:
+            tv.UNFILED_DIR = original_unfiled
+            tv.FOLDERS_DIR = original_folders
+
+        self.assertIn("Curated preview title", folder_output.getvalue())
+        self.assertNotIn("The initial user prompt", folder_output.getvalue())
+        session_lines = session_output.getvalue().splitlines()
+        self.assertIn("Curated preview title", session_lines[0])
+        self.assertNotIn("The initial user prompt", session_lines[0])
 
     def test_backlog_scans_filed_and_unfiled_and_excludes_existing(self) -> None:
         now = time.time()

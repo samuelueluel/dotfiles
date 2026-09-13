@@ -186,28 +186,41 @@ def normalize_record(session_id: str, fields: dict[str, Any]) -> dict[str, Any]:
     return record
 
 
-def set_summary(session_id: str, fields: dict[str, Any]) -> dict[str, Any]:
-    session_id = str(session_id).strip()
-    if not session_id:
-        raise ValueError("session ID is required")
+def set_summaries(records: Iterable[tuple[str, dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Persist multiple summaries with one JSON write and one SQLite sync."""
+    pending = list(records)
+    if not pending:
+        return []
+
+    prepared: list[dict[str, Any]] = []
     with _index_lock(True):
         store = _read_store_unlocked()
-        existing = store["sessions"].get(session_id, {})
-        if not isinstance(existing, dict):
-            existing = {}
-        record = dict(existing)
-        record.update(normalize_record(session_id, fields))
-        record.setdefault("keywords", [])
-        now = _now()
-        record.setdefault("logged_at", now)
-        supplied_updated_at = fields.get("updated_at")
-        record["updated_at"] = _as_text(supplied_updated_at) if supplied_updated_at else now
-        store["sessions"][session_id] = record
+        for raw_session_id, fields in pending:
+            session_id = str(raw_session_id).strip()
+            if not session_id:
+                raise ValueError("session ID is required")
+            existing = store["sessions"].get(session_id, {})
+            if not isinstance(existing, dict):
+                existing = {}
+            record = dict(existing)
+            record.update(normalize_record(session_id, fields))
+            record.setdefault("keywords", [])
+            now = _now()
+            record.setdefault("logged_at", now)
+            supplied_updated_at = fields.get("updated_at")
+            record["updated_at"] = _as_text(supplied_updated_at) if supplied_updated_at else now
+            store["sessions"][session_id] = record
+            prepared.append(record)
+
         _write_store_unlocked(store)
         # JSON remains authoritative. SQLite is repaired after the atomic JSON
         # write, so a later sync can recover from a process crash in between.
         _sync_sqlite(store)
-        return record
+    return prepared
+
+
+def set_summary(session_id: str, fields: dict[str, Any]) -> dict[str, Any]:
+    return set_summaries([(session_id, fields)])[0]
 
 
 def get_summary(session_id: str) -> dict[str, Any] | None:

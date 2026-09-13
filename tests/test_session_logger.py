@@ -8,6 +8,8 @@ import io
 import json
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -64,6 +66,15 @@ class SessionLoggerTests(unittest.TestCase):
             {"type": "session", "id": "logger-session", "cwd": "/tmp/project"},
             {"type": "message", "message": {"role": "user", "content": "Build the logger test."}},
             {"type": "message", "message": {"role": "assistant", "content": "Created test_logger.py."}},
+        ]
+        path.write_text("\n".join(json.dumps(entry) for entry in entries) + "\n", encoding="utf-8")
+        return path
+
+    def write_batch_transcript(self, session_id: str) -> Path:
+        path = Path(self.tempdir.name) / "sessions" / "unfiled" / f"{session_id}.jsonl"
+        entries = [
+            {"type": "session", "id": session_id, "cwd": "/tmp/project"},
+            {"type": "message", "message": {"role": "user", "content": f"Work on {session_id}."}},
         ]
         path.write_text("\n".join(json.dumps(entry) for entry in entries) + "\n", encoding="utf-8")
         return path
@@ -184,6 +195,7 @@ class SessionLoggerTests(unittest.TestCase):
         def fake_runner(command, **kwargs):
             seen["command"] = command
             seen["input"] = kwargs["input"]
+            seen["timeout"] = kwargs["timeout"]
             return CompletedProcess(command, 0, '{"title":"Logger test","summary":"Created the test.","outcomes":"Added the test.","artifacts":"test_logger.py","open_items":"","keywords":["logger","test"]}', "")
 
         draft = logger.run_logger(str(path), runner=fake_runner, pi_path="/bin/pi", flusher=flushed.append)
@@ -203,6 +215,9 @@ class SessionLoggerTests(unittest.TestCase):
             logger.prepare_transcript(path.read_text(encoding="utf-8")),
         )
         self.assertLessEqual(len(seen["input"]), logger.LOGGER_MAX_TRANSCRIPT_CHARS)
+        self.assertEqual(seen["timeout"], 900)
+        self.assertEqual(logger.LOGGER_TIMEOUT_SECONDS, 900)
+        self.assertEqual(logger.LOGGER_MAX_TRANSCRIPT_CHARS, 1_500_000)
 
         logger.run_logger(
             str(path),
@@ -260,6 +275,75 @@ class SessionLoggerTests(unittest.TestCase):
         self.assertEqual(stored["where_it_lives"], "test_session_logger.py")
         self.assertEqual(stored["next_up"], "")
         self.assertEqual(stored["transcript_path"], str(path.resolve()))
+
+    def test_log_batch_caps_workers_isolates_failure_and_persists_once_in_input_order(self) -> None:
+        candidates = []
+        for index in range(6):
+            session_id = f"batch-{index}"
+            path = self.write_batch_transcript(session_id)
+            candidates.append({
+                "session_id": session_id,
+                "workspace": "Unfiled",
+                "transcript_path": str(path),
+            })
+
+        state = {"active": 0, "max_active": 0}
+        state_lock = threading.Lock()
+        persistence_calls = []
+        original_logger = piwork.run_logger
+        original_persist = piwork.set_summaries
+
+        def fake_logger(transcript_path, **_kwargs):
+            session_id = Path(transcript_path).stem
+            with state_lock:
+                state["active"] += 1
+                state["max_active"] = max(state["max_active"], state["active"])
+            try:
+                time.sleep(0.01 * (6 - int(session_id.rsplit("-", 1)[1])))
+                if session_id == "batch-3":
+                    raise RuntimeError("synthetic logger failure")
+                return {
+                    "title": f"Curated {session_id}",
+                    "summary": f"Summary {session_id}.",
+                    "outcomes": f"Outcome {session_id}.",
+                    "artifacts": "",
+                    "open_items": "",
+                    "keywords": [session_id],
+                }
+            finally:
+                with state_lock:
+                    state["active"] -= 1
+
+        def tracking_persist(records):
+            persistence_calls.append([session_id for session_id, _fields in records])
+            return original_persist(records)
+
+        piwork.run_logger = fake_logger
+        piwork.set_summaries = tracking_persist
+        try:
+            report = piwork.log_summary_batch(candidates, workers=99)
+        finally:
+            piwork.run_logger = original_logger
+            piwork.set_summaries = original_persist
+
+        self.assertEqual(report["workers"], 4)
+        self.assertEqual(state["max_active"], 4)
+        self.assertEqual([item["session_id"] for item in report["created"]], ["batch-0", "batch-1", "batch-2", "batch-4", "batch-5"])
+        self.assertEqual([item["session_id"] for item in report["failed"]], ["batch-3"])
+        self.assertEqual(persistence_calls, [["batch-0", "batch-1", "batch-2", "batch-4", "batch-5"]])
+        self.assertEqual(summary.get_summary("batch-0")["title"], "Curated batch-0")
+        self.assertEqual(summary.get_summary("batch-5")["title"], "Curated batch-5")
+
+        with self.assertRaisesRegex(ValueError, "at most 10"):
+            piwork.log_summary_batch([{}] * 11)
+
+        duplicate_report = piwork.log_summary_batch(
+            [candidates[0], candidates[1], candidates[1]], workers=4
+        )
+        self.assertEqual(
+            [item["status"] for item in duplicate_report["results"]],
+            ["skipped_existing", "skipped_existing", "skipped_duplicate"],
+        )
 
     def test_parent_fallback_requires_explicit_approval_and_persists_all_fields(self) -> None:
         path = self.write_transcript()

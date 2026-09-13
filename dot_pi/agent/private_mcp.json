@@ -19,13 +19,22 @@
       ],
       "lifecycle": "lazy",
       "disabled": true,
+      "includeTools": [
+        "stata_run",
+        "stata_inspect_data",
+        "stata_get_results",
+        "stata_read_log",
+        "stata_load_data",
+        "stata_manage_graphs",
+        "stata_estimation_plan"
+      ],
       "env": {
         "STATA_PATH": "/usr/local/stata19/stata-mp",
         "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact"
       }
     },
     "turbovault": {
-      "command": "turbovault",
+      "command": "/var/home/samuel/.local/bin/turbovault",
       "args": [
         "--vault",
         "/var/home/samuel/Dropbox/Sam-Obsidian-Vault",
@@ -55,6 +64,10 @@
         "turbovault_inspect_frontmatter",
         "turbovault_search_by_frontmatter",
         "turbovault_semantic_search",
+        "turbovault_embedding_index_status",
+        "turbovault_reindex_embeddings",
+        "turbovault_embedding_search",
+        "turbovault_hybrid_search",
         "turbovault_manage_tags",
         "turbovault_update_frontmatter",
         "turbovault_list_templates",

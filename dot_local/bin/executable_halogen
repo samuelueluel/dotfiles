@@ -7,12 +7,18 @@
 set -euo pipefail
 
 HALOGEN_CONTAINER=${HALOGEN_CONTAINER:-halogen}
-HALOGEN_IMAGE=${HALOGEN_IMAGE:-ghcr.io/peonist-ai/halogen-flash-server:0.5.8}
+HALOGEN_IMAGE=${HALOGEN_IMAGE:-ghcr.io/peonist-ai/halogen-flash-server:0.6.3}
 HALOGEN_MODELS=${HALOGEN_MODELS:-$HOME/halogen-models}
 HALOGEN_API_PORT=${HALOGEN_API_PORT:-8731}
 HALOGEN_API=${HALOGEN_API:-http://127.0.0.1:${HALOGEN_API_PORT}}
 HALOGEN_MODEL_ID=${HALOGEN_MODEL_ID:-halogen-qwen3.8-flash-next}
 HALOGEN_CHECKPOINT_FILE=${HALOGEN_CHECKPOINT_FILE:-qwen38-flash-next-w4b.hgn}
+HALOGEN_FLASH_PIN_TRUNK=${HALOGEN_FLASH_PIN_TRUNK:-1}
+HALOGEN_MAX_TOK=${HALOGEN_MAX_TOK:-16384}
+HALOGEN_PREFILL_CHUNK=${HALOGEN_PREFILL_CHUNK:-16384}
+HALOGEN_KV_POOL_POSITIONS=${HALOGEN_KV_POOL_POSITIONS:-262144}
+HALOGEN_MAX_TOKENS_DEFAULT=${HALOGEN_MAX_TOKENS_DEFAULT:-8192}
+HALOGEN_MAX_TOKENS_CAP=${HALOGEN_MAX_TOKENS_CAP:-65536}
 # Halogen and Lemonade both use most of this host's memory. Evict only
 # Lemonade's resident chat model before starting Halogen; keep its container up.
 HALOGEN_EVICT_LEMONADE=${HALOGEN_EVICT_LEMONADE:-1}
@@ -34,8 +40,14 @@ Usage:
 
 Environment:
   HALOGEN_MODELS       Host directory containing the .hgn checkpoint (default: ~/halogen-models)
-  HALOGEN_IMAGE        Image reference (default: ghcr.io/peonist-ai/halogen-flash-server:0.5.8)
+  HALOGEN_IMAGE        Image reference (default: ghcr.io/peonist-ai/halogen-flash-server:0.6.3)
   HALOGEN_API_PORT     Loopback API port (default: 8731)
+  HALOGEN_FLASH_PIN_TRUNK  Lock weights in RAM; 0 costs several times decode speed (default: 1)
+  HALOGEN_MAX_TOK      Prefill arena size (default: 16384)
+  HALOGEN_PREFILL_CHUNK  Prefill call width; must equal MAX_TOK (default: 16384)
+  HALOGEN_KV_POOL_POSITIONS  Shared KV pool positions (default: 262144)
+  HALOGEN_MAX_TOKENS_DEFAULT  Default request budget (default: 8192)
+  HALOGEN_MAX_TOKENS_CAP  Maximum request budget (default: 65536)
   HALOGEN_API          Health URL (default: http://127.0.0.1:<port>)
   HALOGEN_EVICT_LEMONADE  Evict Lemonade's resident LLM before start (default: 1; 0 opts out)
   HALOGEN_LEMONADE_API   Lemonade API base URL (default: LEM_API or http://127.0.0.1:13305/api/v1)
@@ -224,6 +236,7 @@ start_container() {
       local -a args=(
         run --detach
         --name "$HALOGEN_CONTAINER"
+        --restart unless-stopped
         --publish "127.0.0.1:${HALOGEN_API_PORT}:${HALOGEN_API_PORT}"
         --device /dev/kfd
         --device /dev/dri
@@ -234,6 +247,12 @@ start_container() {
         --volume "${dir}:/models:ro"
         --env "HALOGEN_API_PORT=${HALOGEN_API_PORT}"
         --env "HALOGEN_MODEL_ID=${HALOGEN_MODEL_ID}"
+        --env "HALOGEN_FLASH_PIN_TRUNK=${HALOGEN_FLASH_PIN_TRUNK}"
+        --env "HALOGEN_MAX_TOK=${HALOGEN_MAX_TOK}"
+        --env "HALOGEN_PREFILL_CHUNK=${HALOGEN_PREFILL_CHUNK}"
+        --env "HALOGEN_KV_POOL_POSITIONS=${HALOGEN_KV_POOL_POSITIONS}"
+        --env "HALOGEN_MAX_TOKENS_DEFAULT=${HALOGEN_MAX_TOKENS_DEFAULT}"
+        --env "HALOGEN_MAX_TOKENS_CAP=${HALOGEN_MAX_TOKENS_CAP}"
         "$HALOGEN_IMAGE"
       )
       podman "${args[@]}"

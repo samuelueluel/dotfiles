@@ -139,9 +139,19 @@ def get_summary(meta, summary_store):
     return record if isinstance(record, dict) else {}
 
 
+def effective_session_title(meta, summary):
+    """Prefer the curated logger title over the transcript's initial prompt."""
+    curated_title = summary.get("title", "") if isinstance(summary, dict) else ""
+    curated_title = str(curated_title or "").strip()
+    if curated_title:
+        return curated_title
+    return meta.get("title") or "Untitled conversation"
+
+
 def session_display(meta, folder, rel_time, summary_store):
     summary = get_summary(meta, summary_store)
-    display = f"  [{folder}] {rel_time:<8} {meta['title']}"
+    title = effective_session_title(meta, summary)
+    display = f"  [{folder}] {rel_time:<8} {title}"
     snippet = summary_search_text(summary, limit=None)
     if snippet:
         display += f" — {snippet}"
@@ -297,9 +307,10 @@ def cmd_preview(target):
                 meta = parse_session_meta(f)
                 rel_time = format_relative_time(meta["mtime"])
                 summary = get_summary(meta, summary_store)
+                title = effective_session_title(meta, summary)
                 snippet = summary_search_text(summary, limit=140)
                 suffix = f" — {snippet}" if snippet else ""
-                print(f" • \033[32m{rel_time:<8}\033[0m {meta['title']}{suffix}")
+                print(f" • \033[32m{rel_time:<8}\033[0m {title}{suffix}")
 
         print("\n" + "─" * 50)
         print("\033[1;33mActions:\033[0m")
@@ -364,6 +375,7 @@ def cmd_preview(target):
 
         meta = parse_session_meta(session_path)
         summary = get_summary(meta, load_store())
+        title = effective_session_title(meta, summary)
         rel_time = format_relative_time(meta["mtime"])
         dt = datetime.fromtimestamp(meta["mtime"]).strftime("%Y-%m-%d %H:%M")
 
@@ -371,7 +383,7 @@ def cmd_preview(target):
         parent = os.path.dirname(session_path)
         folder = os.path.basename(parent) if parent != UNFILED_DIR else "Unfiled"
 
-        print(f"\033[1;36m{meta['title']}\033[0m")
+        print(f"\033[1;36m{title}\033[0m")
         print(f"\033[2mFolder: {folder}  │  Updated: {dt} ({rel_time})  │  Turns: {meta['turn_count']}\033[0m")
         print(f"\033[2mCWD: {meta['cwd']}  │  ID: {meta['id'][:12]}...\033[0m\n")
 

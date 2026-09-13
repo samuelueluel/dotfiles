@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import time
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -25,8 +26,10 @@ from pi_session_summary import (  # noqa: E402
     backlog_summaries,
     find_session_path,
     get_summary,
+    load_store,
     recent_summaries,
     search_summaries,
+    set_summaries,
     set_summary,
     sync_index,
     workspace_for_path,
@@ -34,6 +37,8 @@ from pi_session_summary import (  # noqa: E402
 
 FOLDERS_DIR = os.path.expanduser("~/.pi/agent/folders")
 UNFILED_DIR = os.path.expanduser("~/.pi/agent/sessions/--var-home-samuel--")
+MAX_LOGGER_WORKERS = 4
+MAX_LOGGER_BATCH = 10
 
 def ensure_dirs():
     os.makedirs(FOLDERS_DIR, exist_ok=True)
@@ -190,20 +195,15 @@ def _summary_record_from_args(args):
     return set_summary(args.session_id, payload)
 
 
-def _resolve_logger_target(args):
-    session_id = str(getattr(args, "session_id", "") or os.environ.get("PI_SESSION_ID", "")).strip()
-    transcript_path = str(
-        getattr(args, "transcript_path", "") or os.environ.get("PI_SESSION_FILE", "")
-    ).strip()
+def _resolve_logger_target_values(session_id, transcript_path=""):
+    session_id = str(session_id or "").strip()
+    transcript_path = str(transcript_path or "").strip()
     if transcript_path:
         transcript_path = os.path.realpath(os.path.expanduser(transcript_path))
     elif session_id:
         transcript_path = find_session_path(session_id)
     if not session_id or not transcript_path:
-        raise ValueError(
-            "session logger requires an explicit session ID and transcript path "
-            "(or PI_SESSION_ID and PI_SESSION_FILE)"
-        )
+        raise ValueError("session logger requires an explicit session ID and transcript path")
     if not os.path.isfile(transcript_path):
         raise FileNotFoundError(f"transcript not found: {transcript_path}")
     metadata = parse_session_meta(transcript_path)
@@ -215,6 +215,22 @@ def _resolve_logger_target(args):
     if not discovered_id:
         raise ValueError("transcript has no readable full session UUID")
     return session_id, transcript_path, metadata
+
+
+def _resolve_logger_target(args):
+    session_id = str(getattr(args, "session_id", "") or os.environ.get("PI_SESSION_ID", "")).strip()
+    transcript_path = str(
+        getattr(args, "transcript_path", "") or os.environ.get("PI_SESSION_FILE", "")
+    ).strip()
+    try:
+        return _resolve_logger_target_values(session_id, transcript_path)
+    except ValueError as exc:
+        if not session_id or not transcript_path:
+            raise ValueError(
+                "session logger requires an explicit session ID and transcript path "
+                "(or PI_SESSION_ID and PI_SESSION_FILE)"
+            ) from exc
+        raise
 
 
 def _logger_draft_to_storage_fields(draft):
@@ -253,6 +269,131 @@ def _log_summary_with_dedicated_model(args):
     if metadata.get("first_prompt"):
         fields["initial_prompt"] = metadata["first_prompt"]
     return set_summary(session_id, fields)
+
+
+def _run_batch_logger_job(job):
+    draft = run_logger(
+        job["transcript_path"],
+        existing_summary=job["existing_summary"],
+        thinking=job["thinking"],
+    )
+    return {"index": job["index"], "status": "drafted", "draft": draft}
+
+
+def _batch_result_base(candidate, status):
+    return {
+        "session_id": str(candidate.get("session_id") or "").strip(),
+        "workspace": str(candidate.get("workspace") or "").strip(),
+        "transcript_path": str(candidate.get("transcript_path") or "").strip(),
+        "status": status,
+    }
+
+
+def log_summary_batch(candidates, *, workers=4, thinking="high"):
+    """Generate up to four logger drafts concurrently, then persist atomically."""
+    if not isinstance(candidates, list):
+        raise ValueError("log-batch input must contain a candidate list")
+    if len(candidates) > MAX_LOGGER_BATCH:
+        raise ValueError(f"log-batch accepts at most {MAX_LOGGER_BATCH} candidates")
+    if thinking not in ("high", "max"):
+        raise ValueError("session logger thinking must be high or max")
+    worker_count = max(1, min(int(workers), MAX_LOGGER_WORKERS))
+    summary_store = load_store()
+    existing_sessions = summary_store.get("sessions", {})
+    if not isinstance(existing_sessions, dict):
+        existing_sessions = {}
+
+    ordered = {}
+    jobs = []
+    seen_ids = set()
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            ordered[index] = {"session_id": "", "workspace": "", "transcript_path": "", "status": "failed", "error": "candidate must be an object"}
+            continue
+        result_base = _batch_result_base(candidate, "failed")
+        session_id = result_base["session_id"]
+        if not session_id:
+            result_base["error"] = "candidate is missing session_id"
+            ordered[index] = result_base
+            continue
+        if session_id in seen_ids:
+            result_base["status"] = "skipped_duplicate"
+            ordered[index] = result_base
+            continue
+        seen_ids.add(session_id)
+        if session_id in existing_sessions:
+            result_base["status"] = "skipped_existing"
+            ordered[index] = result_base
+            continue
+        try:
+            resolved_id, transcript_path, metadata = _resolve_logger_target_values(
+                session_id, result_base["transcript_path"]
+            )
+        except Exception as exc:
+            result_base["error"] = str(exc)
+            ordered[index] = result_base
+            continue
+        jobs.append({
+            "index": index,
+            "session_id": resolved_id,
+            "transcript_path": transcript_path,
+            "workspace": workspace_for_path(transcript_path),
+            "metadata": metadata,
+            "existing_summary": {},
+            "thinking": thinking,
+        })
+
+    with ThreadPoolExecutor(max_workers=worker_count) as pool:
+        futures = {pool.submit(_run_batch_logger_job, job): job for job in jobs}
+        for future, job in futures.items():
+            try:
+                result = future.result()
+            except Exception as exc:
+                result = {
+                    "index": job["index"],
+                    "status": "failed",
+                    "error": str(exc),
+                }
+            result.setdefault("session_id", job["session_id"])
+            result.setdefault("workspace", job["workspace"])
+            result.setdefault("transcript_path", job["transcript_path"])
+            ordered[job["index"]] = result
+
+    drafted = [ordered[index] for index in sorted(ordered) if ordered[index].get("status") == "drafted"]
+    if drafted:
+        fields_to_persist = []
+        for result in drafted:
+            job = next(job for job in jobs if job["index"] == result["index"])
+            fields = _logger_draft_to_storage_fields(result["draft"])
+            fields["transcript_path"] = job["transcript_path"]
+            fields["workspace"] = job["workspace"]
+            if job["metadata"].get("first_prompt"):
+                fields["initial_prompt"] = job["metadata"]["first_prompt"]
+            fields_to_persist.append((job["session_id"], fields))
+        try:
+            persisted = set_summaries(fields_to_persist)
+        except Exception as exc:
+            for result in drafted:
+                result["status"] = "failed_persistence"
+                result.pop("draft", None)
+                result["error"] = str(exc)
+        else:
+            persisted_by_id = {record["session_id"]: record for record in persisted}
+            for result in drafted:
+                record = persisted_by_id[result["session_id"]]
+                result["status"] = "created"
+                result["record"] = record
+                result.pop("draft", None)
+
+    results = [ordered[index] for index in range(len(candidates))]
+    return {
+        "workers": worker_count,
+        "requested": len(candidates),
+        "created": [result["record"] for result in results if result.get("status") == "created"],
+        "skipped": [result for result in results if result.get("status", "").startswith("skipped_")],
+        "failed": [result for result in results if result.get("status", "").startswith("failed")],
+        "results": results,
+    }
 
 
 def _print_summary_record(record, include_score=False):
@@ -301,6 +442,18 @@ def _print_backlog_report(report):
         print(f"Use --limit N to inspect a different bounded batch; {total - returned} candidate(s) are not shown.")
 
 
+def _print_batch_report(report):
+    print(f"Logger workers: {report['workers']}")
+    print(f"Created: {len(report['created'])}  Skipped: {len(report['skipped'])}  Failed: {len(report['failed'])}")
+    for result in report["results"]:
+        status = result.get("status", "unknown")
+        title = result.get("record", {}).get("title", "")
+        label = f" · {title}" if title else ""
+        print(f"[{status}] {result.get('workspace', '')} · {result.get('session_id', '')}{label}")
+        if result.get("error"):
+            print(f"  Error: {result['error']}")
+
+
 def cmd_summary(argv):
     parser = argparse.ArgumentParser(prog="piwork summary")
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -330,6 +483,15 @@ def cmd_summary(argv):
     log_parser.add_argument("--fallback-json", help="validated parent draft; requires explicit approval")
     log_parser.add_argument("--parent-fallback-approved", action="store_true")
     log_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    batch_parser = subparsers.add_parser(
+        "log-batch",
+        help="generate up to four logger drafts concurrently and persist them atomically",
+    )
+    batch_parser.add_argument("--stdin", action="store_true", help="read a backlog JSON object or candidate array from stdin")
+    batch_parser.add_argument("--workers", type=int, default=4)
+    batch_parser.add_argument("--thinking", choices=("high", "max"), default="high")
+    batch_parser.add_argument("--json", action="store_true", dest="json_output")
 
     get_parser = subparsers.add_parser("get", help="show one summary")
     get_parser.add_argument("session_id")
@@ -370,6 +532,18 @@ def cmd_summary(argv):
             print(json.dumps(record, ensure_ascii=False, indent=2))
         else:
             _print_summary_record(record)
+        return
+
+    if args.action == "log-batch":
+        if not args.stdin:
+            raise ValueError("summary log-batch requires --stdin")
+        payload = json.load(sys.stdin)
+        candidates = payload.get("candidates", []) if isinstance(payload, dict) else payload
+        report = log_summary_batch(candidates, workers=args.workers, thinking=args.thinking)
+        if args.json_output:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            _print_batch_report(report)
         return
 
     if args.action == "get":
