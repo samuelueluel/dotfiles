@@ -232,7 +232,7 @@ export function checkZoteroIndexMutation(command: string): CommandCheckResult {
   return {
     blocked: true,
     reason:
-      "Raw destructive Zotero index maintenance is prohibited. Use the reviewed helpers under ~/.agents/skills/zotero/scripts/ and their dry-run/confirmation gates.",
+      "Raw destructive Zotero index maintenance is prohibited. Use the reviewed helpers under ~/.agents/skills/zotero-pipeline/scripts/ and their dry-run/confirmation gates.",
   };
 }
 

@@ -15,6 +15,9 @@ const jiti = createJiti(`${process.env.HOME}/.pi/agent/npm`, {
 const modeModule = await jiti.import(
   resolve(new URL("../extensions/permission-mode.ts", import.meta.url).pathname),
 );
+const intakeState = await jiti.import(
+  resolve(new URL("../lib/plan-workflow-state.ts", import.meta.url).pathname),
+);
 
 const PLAN_TOOL_SURFACE = [
   "read",
@@ -247,6 +250,35 @@ test("plan disables YOLO, keeps ask_user, and drops mutating tools from the surf
     assert.equal(harness.activeTools().includes("document_analysis_delete"), false);
   } finally {
     await harness.settle();
+    harness.cleanup();
+  }
+});
+
+test("plan intake permits only todo calls until the intake turn settles", async () => {
+  intakeState.clearAllPlanIntakes();
+  const harness = createHarness(["read", "bash", "todo", "mcp"]);
+  try {
+    intakeState.beginPlanIntake({
+      sessionId: "mode-enforcement-test",
+      planPath: "02_Memories/Saved-Plans/Test.md",
+      planTitle: "Test",
+      expectedStepIds: ["U1"],
+    });
+
+    const todo = await harness.handlers.get("tool_call")(
+      { toolName: "todo", toolCallId: "todo-call", input: { action: "list" } },
+      harness.context,
+    );
+    assert.notEqual(todo?.block, true);
+
+    const blocked = await harness.handlers.get("tool_call")(
+      { toolName: "bash", toolCallId: "execution-call", input: { command: "stata-mp -b do analysis.do" } },
+      harness.context,
+    );
+    assert.equal(blocked.block, true);
+    assert.match(blocked.reason, /only todo calls are permitted/);
+  } finally {
+    intakeState.clearAllPlanIntakes();
     harness.cleanup();
   }
 });

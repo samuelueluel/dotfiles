@@ -116,12 +116,14 @@ def sync_index() -> dict[str, int]:
     return _sync_sqlite()
 
 
-def load_store() -> dict[str, Any]:
+def load_store(*, sync: bool = True) -> dict[str, Any]:
     with _index_lock(False):
         store = _read_store_unlocked()
     # Indexing is automatic; summary creation is not. The returned object is
-    # still the JSON-shaped curated store, so Television never sees null rows.
-    _sync_sqlite(store)
+    # still the JSON-shaped curated store, so callers can opt out of the
+    # expensive transcript sync on read-only hot paths such as Television.
+    if sync:
+        _sync_sqlite(store)
     return store
 
 

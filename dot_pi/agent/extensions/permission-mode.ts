@@ -3,6 +3,7 @@ import { SESSION_RUNTIME_OWNED } from "../lib/session-runtime.js";
 import { documentRootAccess, routeFor } from "../lib/document-analysis-bridge-logic.ts";
 import { DOCUMENT_ANALYSIS_TOOL_NAMES } from "../lib/document-analysis-bridge-policy.ts";
 import { isSafeBashCommand } from "../lib/bash-policy.ts";
+import { getPlanIntake } from "../lib/plan-workflow-state.ts";
 
 /**
  * Compatibility layer for the old modes.ts extension.
@@ -725,6 +726,24 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     // The permission package refreshes its config during lifecycle events. Keep
     // its in-memory yolo state aligned with this window before its handler runs.
     synchronizeModeWithBackend(ctx);
+
+    // Plan intake is a stricter temporary boundary than plan mode: the worker
+    // may only materialize the already-validated execution units into rpiv-todo.
+    // This prevents a load request from turning into an execution request even
+    // when the surrounding session is manual, autoask, or auto.
+    let activeSessionId: string | undefined;
+    try {
+      activeSessionId = ctx.sessionManager.getSessionId();
+    } catch {
+      activeSessionId = undefined;
+    }
+    const planIntake = getPlanIntake(activeSessionId);
+    if (planIntake && event.toolName !== "todo") {
+      return {
+        block: true,
+        reason: `Plan intake is active for '${planIntake.planPath}': only todo calls are permitted until intake completes.`,
+      };
+    }
 
     // Plan mode is the read-only boundary. Active-tool filtering hides
     // mutating tools from the model; this check also stops stale context,

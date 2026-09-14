@@ -16,6 +16,10 @@ Each claim has `claim_id`, `text`, `risk_tags`, and 1–4 `evidence` references.
 
 The audit does not accept caller-supplied source bodies, filesystem paths, or reranker scores. Numeric claims require direct-page evidence or the supported weaker sidecar fallback, with values and units inside the accepted quotes.
 
+Copy quotes from complete text, not previews: expand a semantic hit with `zotero_read_passage` before submitting `semantic` evidence. For `mineru_sidecar`, copy the quote and line locators from `zotero_find_in_item`.
+
+The lookup's `source_hash` is passed back as `expected_hash` for lookup continuations. The deployed audit evidence schema instead accepts optional `content_hash`; it has no `source_hash` field. Do not rename hashes by assumption. Omit optional hash fields unless their compatibility with the audit route is established.
+
 - `risk_tags=["comparison"]` requires evidence from at least two distinct items.
 - `risk_tags=["within_item_comparison"]` applies within one item. These tags are mutually exclusive.
 - `escalation="none"` is the initial setting. `"bounded"` is available for a specific unresolved gap within the main skill's repair budget.
@@ -26,7 +30,7 @@ The audit does not accept caller-supplied source bodies, filesystem paths, or re
 
 | Result | Meaning and next step |
 |---|---|
-| `QUOTE_NOT_FOUND` | Compare the quote with the returned text for OCR repairs, omitted layout text, or changed hyphenation. A shorter exact quote or one targeted read may resolve it. It does not establish source absence. |
+| `QUOTE_NOT_FOUND` | Compare the quote with the returned text for OCR repairs, omitted layout text, or changed hyphenation. A shorter exact quote, or re-reading the passage with `zotero_read_passage` or `zotero_find_in_item`, may resolve it. It does not establish source absence. |
 | `NUMBER_MISMATCH` / `UNIT_MISMATCH` | Check signs, ranges, thresholds, and whether the submitted quote contains the stated value and unit. Correct or omit the claim. |
 | `check_mode`, `CHECKER_UNAVAILABLE`, or `CHECKER_SKIPPED` | Legacy deployment. Stop the audit; do not consume the rerun trying different wording. |
 | Retained evidence preview omits its quote, or score diagnostics conflict | Response-contract problem. Do not infer fabrication or a source-level contradiction. |

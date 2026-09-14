@@ -139,6 +139,11 @@ def get_summary(meta, summary_store):
     return record if isinstance(record, dict) else {}
 
 
+def load_picker_store():
+    """Read curated summaries without reindexing every transcript per TV call."""
+    return load_store(sync=False)
+
+
 def effective_session_title(meta, summary):
     """Prefer the curated logger title over the transcript's initial prompt."""
     curated_title = summary.get("title", "") if isinstance(summary, dict) else ""
@@ -186,7 +191,7 @@ def print_summary_sections(record):
 def cmd_source():
     os.makedirs(FOLDERS_DIR, exist_ok=True)
     os.makedirs(UNFILED_DIR, exist_ok=True)
-    summary_store = load_store()
+    summary_store = load_picker_store()
     live_ids = set()
     live_paths = set()
 
@@ -259,7 +264,7 @@ def cmd_source():
 def cmd_list_folder(folder):
     os.makedirs(FOLDERS_DIR, exist_ok=True)
     os.makedirs(UNFILED_DIR, exist_ok=True)
-    summary_store = load_store()
+    summary_store = load_picker_store()
 
     if folder == "Unfiled":
         files = glob.glob(os.path.join(UNFILED_DIR, "*.jsonl"))
@@ -292,7 +297,7 @@ def cmd_preview(target):
 
         files = glob.glob(os.path.join(fdir, "*.jsonl"))
         files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
-        summary_store = load_store()
+        summary_store = load_picker_store()
 
         print(f"\033[1;36m📁 Project Folder: {folder}\033[0m")
         print(f"\033[2mPath: {fdir}\033[0m")
@@ -347,7 +352,7 @@ def cmd_preview(target):
 
     if target.startswith("summary:"):
         session_id = target[8:]
-        record = load_store().get("sessions", {}).get(session_id, {})
+        record = load_picker_store().get("sessions", {}).get(session_id, {})
         if not isinstance(record, dict):
             print("Summary not found.")
             return
@@ -374,7 +379,7 @@ def cmd_preview(target):
             return
 
         meta = parse_session_meta(session_path)
-        summary = get_summary(meta, load_store())
+        summary = get_summary(meta, load_picker_store())
         title = effective_session_title(meta, summary)
         rel_time = format_relative_time(meta["mtime"])
         dt = datetime.fromtimestamp(meta["mtime"]).strftime("%Y-%m-%d %H:%M")

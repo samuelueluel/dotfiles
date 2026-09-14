@@ -2,44 +2,30 @@
 
 **Load this file when** handling exact-source edge cases, semantic filters, difficult comparisons, citation counts, external references, or citation-graph scopes.
 
-## Exact-Source Identity Obligation
+## Collection Inventory for Comparisons
 
-Apply this procedure only when the request names a particular source or item. It is a transient obligation for the current task, not a permanent candidate ledger.
+For a ranking task, prefer `zotero_list_collection_items(collection_key=..., detail="summary", include_subcollections=true)` and follow the returned pagination. Inspect its deployed schema for pagination parameters. This checks candidate coverage without fetching every abstract or full record.
 
-### 1. Detect an exact-source request
+For a targeted metadata recall check, keep the same collection and descendant scope. The [research skill](../SKILL.md) governs challenger resolution and qualified rankings.
 
-Trigger it when the user supplies a title, author/title/year combination, DOI, Better BibTeX citation key, Zotero item key, or language such as “in this paper.” Do not trigger it merely because the topic is narrow; “find papers about…” and collection-wide comparisons are discovery tasks.
+## Exact-Source API Details
 
-### 2. Resolve identity before substantive retrieval
+For a user-named source, the [research skill](../SKILL.md) governs identity resolution and binding subsequent evidence to the verified item. A narrow topic or collection-wide comparison is not an exact-source request.
 
-Use `zotero_resolve_exact_source` for the first identity check. Pass the original request in `source`; pass `title`, `author`, `year`, `doi`, `citation_key`, or `item_key` explicitly when available, and pass `collection_key` when scope matters. The tool performs metadata-only lookup and returns `identity_status`, `exact_matches`, `ambiguous_matches`, `related_matches`, `conflicts`, and `collection_scope`; each match summary includes `in_requested_scope` and `scope_basis` for interpreting a requested collection. Preserve the original target exactly: do not delete qualifiers, “repair” the title using a related result, or turn a related result into a new exact-source query during the same task.
+Pass the original identifier in `source` to `zotero_resolve_exact_source`. When available, also supply explicit `title`, `author`, `year`, `doi`, `citation_key`, or `item_key` fields, and `collection_key` for a scoped request. Results include `identity_status`, match lists, `conflicts`, and `collection_scope`. Each match's `in_requested_scope` and `scope_basis` describe its membership.
 
-If the resolver is unavailable, use the narrowest legacy route:
+If the resolver is unavailable, these legacy lookups can establish identity:
 
-- item key: `zotero_get_item_metadata`;
-- Better BibTeX key: `zotero_find_item_by_citation_key`;
-- title/author/year or DOI fragment: `zotero_search_items`, then metadata for plausible exact candidates;
-- collection membership: use the resolver's `in_requested_scope` and `scope_basis` fields when present; otherwise use the collection-scoped lookup. Do not infer non-membership from an empty `collections` display field.
+| Known identifier | Targeted lookup |
+|---|---|
+| Item key | `zotero_get_item_metadata` |
+| Better BibTeX key | `zotero_find_item_by_citation_key` |
+| Title/author/year or DOI | `zotero_search_items`, then metadata for plausible exact matches |
+| Collection membership | A collection-scoped lookup with the requested descendant scope |
 
-Read the resolver's exact-match status separately from any related-results field. The ordinary `zotero_search_items` tool may return simplified or semantically related records after reporting that the original exact search found no result. Those records do not satisfy identity.
+`zotero_search_items` may return simplified or semantic fallback matches after an exact search miss. These are related records, not resolved identity. An empty metadata `collections` field does not establish non-membership.
 
-Treat the resolver's `identity_status` as authoritative for the identity phase:
-
-- `exact`: the identifiers and metadata resolve to one record, and the record is in scope when a collection is specified;
-- `ambiguous`: multiple plausible records remain, or identifiers conflict (for example, a real title paired with another item's DOI);
-- `absent`: a bounded exact metadata check finds no in-scope record matching the requested identity.
-
-Do not use a semantic RAG score, shared author, similar title, or topical relevance as an identity match. The resolver is an identity gate, not evidence for the source's findings. For `ambiguous`, stop source-specific retrieval until the identity is clarified; conditional results must be labeled by item. For `absent`, stop source-specific retrieval entirely: do not call semantic search, full text, outline, graph, or another broad metadata fallback to answer from a neighbor. The resolver's `related_matches` are metadata-only context and must not be given substantive findings. Do not issue another resolver call for a related title unless the user explicitly changes or clarifies the target, or separately asks about that related work.
-
-### 3. Bind evidence to identity
-
-For `exact`, prefer a direct source route. When semantic search is needed to locate a passage, pass the resolver's verified key as an exact identity scope: `filters={"item_keys": ["<KEY>"]}`. This restricts both dense and sparse retrieval to that paper's chunks at query time; an empty result means no passage in the verified item matched the query — fall back to direct reading rather than removing the filter to admit neighbors. Substantive evidence and the final token must cite that same key. Do not silently combine a working paper, published version, or related study with the named record.
-
-For `ambiguous`, present the competing records or metadata conflict and ask for clarification or give conditional answers explicitly labeled by item. For an identifier conflict, state that no in-scope record satisfies the full supplied identity. Do not merge findings.
-
-For `absent`, report that the requested source or source-specific evidence was not found. Never answer the named-source question from a semantic neighbor. Related records may be offered separately as metadata-only related works, but must not be presented as the requested source. When a collection was requested, use each related match's `in_requested_scope` and `scope_basis`; do not call it out-of-scope from an empty `collections` display field. If the user later asks about one of those works, begin a new explicitly labeled source task.
-
-Identity absence is not claim absence. If the source is `exact` but the requested finding is not present in its retrieved evidence, state that the source-specific claim was not established rather than substituting another paper.
+Once identity is verified, `filters={"item_keys": ["<KEY>"]}` binds semantic retrieval to that parent item. A search miss within this scope is a finding-retrieval gap, not identity absence.
 
 ## Unified Semantic-Search Filters
 
@@ -63,7 +49,7 @@ Fields combine with `AND`. Multiple native types or source groups are alternativ
 
 The default paper RAG excludes `note`, `thesis`, `case`, `bill`, `hearing`, `statute`, `patent`, `attachment`, and `annotation`. `type:textbook` is a subtype of native `itemType=book`; `type:lecture-notes` has no single implied native type. Do not duplicate native item types as tags or invent credibility, standing, research-role, publication-status, or subject tags. The only review tags are `review:unreviewed`, `review:skimmed`, and `review:checked`.
 
-Type, source-group, tag, and collection scopes use parent Zotero `item_key` identity. Tags and native types are resolved from the local SQLite snapshot at query time, and the same item-key scope reaches dense and BM25 retrieval, so changes do not require re-embedding. After Zotero writes or sync, close Desktop and allow WAL checkpointing before relying on newly changed metadata. If live tag filtering cannot access local SQLite, report the failure rather than returning unfiltered results.
+Type, source-group, tag, and collection scopes use parent Zotero `item_key` identity. Tags and native types are resolved from the local SQLite snapshot at query time, and the same item-key scope reaches dense and BM25 retrieval, so changes do not require re-embedding. If live tag filtering cannot access local SQLite, report the failure rather than returning unfiltered results. For diagnosed metadata freshness or SQLite/WAL problems after writes or sync, load [pipeline service operations](../../zotero-pipeline/references/service-ops.md); ordinary retrieval does not require closing Zotero Desktop.
 
 Minimal patterns:
 
@@ -78,7 +64,7 @@ Results may report `Source Group`, but tags and source groups are user/query met
 
 ## Retrieval Architecture: Evidence Layer vs. Judgment Layer
 
-1. **Passage RAG (`zotero_semantic_search`):** Dense vector + BM25 search over local MinerU sidecars, reranked by `:8083`. Supports substantive claims, estimates, and equations. Exposes raw `Rerank` scores.
+1. **Passage RAG (`zotero_semantic_search`):** Dense vector + BM25 search over local MinerU sidecars, reranked by `:8083`. Supports substantive claims, estimates, and equations. Exposes raw `Rerank` scores. Expand an existing hit with `zotero_read_passage` (no new score) rather than searching again.
 2. **Reference Index (`zotero_search_bibliography_entries`) — Evidence Layer:** BM25 index over raw sidecar bibliography strings (`bm25_reference_index.json`). Returns exact sidecar text without judging correctness. Use for exact citation counts and literal string matches.
 3. **Citation Graph (`zotero_rank_works_by_inbound_citations`, `zotero_get_citation_neighbors`, `zotero_find_bibliographically_coupled_papers`) — Judgment Layer:** In-memory graph (`citation_graph.sqlite`) built from resolved library items and confident external references.
 
@@ -115,23 +101,19 @@ Search candidate DOIs or title/author strings in `zotero_search_bibliography_ent
 
 | Membership State | Identification Method | Graph Visibility | Routing |
 |---|---|---|---|
-| **In scoped collection** | `zotero_list_collection_items`; item `Collections` contains key | All scopes; closed `collection` limits both ends to members | Closed scope for internal structure; `zotero_search_bibliography_entries(collection_key=...)` for counts |
-| **In library, outside collection** | `zotero_search_items` finds item; `Collections` lacks key | `collection-expanded` as a *resolved* target; `library` / `library-expanded` | Counted as a resolved node (NOT `ext:*`); expanded citation-neighbor query to view as target |
-| **Outside library entirely** | No `zotero_search_items` match; `zotero_search_bibliography_entries` returns `external_reference` | `collection-expanded` / `library-expanded` only, as `ext:doi:*` or `ext:meta:*` | Counted via `ext:*` edges; verify metadata via `zotero_search_bibliography_entries`; never infer findings |
+| **In scoped collection** | Scoped inventory or resolver membership, including descendants when requested | All scopes; closed `collection` limits both ends to members | Closed scope for internal structure; `zotero_search_bibliography_entries(collection_key=...)` for counts |
+| **In library, outside collection** | Verified library identity plus exclusion from the requested collection subtree; a missing parent collection key alone is insufficient | `collection-expanded` as a *resolved* target; `library` / `library-expanded` | Counted as a resolved node (NOT `ext:*`); expanded citation-neighbor query to view as target |
+| **Outside library entirely** | Bounded exact library identity check establishes absence; an `external_reference` label alone is insufficient | `collection-expanded` / `library-expanded` only, as `ext:doi:*` or `ext:meta:*` | Counted via `ext:*` edges; verify metadata via `zotero_search_bibliography_entries`; never infer findings |
 
 ## Tool Constraints & Fallbacks
 
-- **Call shapes:** `zotero_list_collection_items` takes `collection_key` (not `collection`); pair with `include_subcollections=true` to match semantic-search scoping. `zotero_read_pdf_pages` takes `start_page` / `end_page` (not `pages`). A pre-tool hook silently repairs the `collection` alias and `"N-M"` page ranges; anything it cannot parse falls through to normal validation, so use the canonical shapes.
+- **Call shapes:** `zotero_list_collection_items` takes `collection_key` (not `collection`); pair with `include_subcollections=true` to match semantic-search scoping. `zotero_read_pdf_pages` takes `start_page` / `end_page` (not `pages`). `zotero_read_passage` takes the `evidence_id` returned by `semantic_search` (`neighbors` 0–2, `max_chars` 256–16000). `zotero_find_in_item` takes `item_key` plus a literal `query` (no regex; personal library only); `query=null` reads lines. A pre-tool hook silently repairs the `collection` alias and `"N-M"` page ranges; anything it cannot parse falls through to normal validation, so use the canonical shapes.
 - **Neighbor Depth:** `zotero_get_citation_neighbors` requires `depth=1` and returns direct neighbors only. Other values are rejected; multi-hop traversal is not implemented.
 - **Output Bounds:** Expanded citation-neighbor queries on broad textbooks can return hundreds of nodes. Use targeted `zotero_search_bibliography_entries` first.
 - **Collection Scope Filtering:**
   - `semantic_search(collection=...)` dynamically includes child subcollections.
   - `zotero_search_bibliography_entries(collection_key=...)` filters citing sources by direct collection membership only.
 - **Bibliographic Coupling (`zotero_find_bibliographically_coupled_papers`):** Couples on **resolved** outgoing citations. If a seed paper has few resolved outgoing references (e.g., older citations without DOIs), results may be empty. Fall back to citing papers via `zotero_get_citation_neighbors` or semantic search on key terms.
-
-## Difficult Comparisons and Superlatives
-
-Follow the ranking workflow in [the research skill](../../zotero-research/SKILL.md). This reference adds filter and scope details, not another verification pass. For bounded inventory, use `zotero_list_collection_items(collection_key=..., detail="summary", include_subcollections=true)` and follow its pagination. For a targeted recall check, keep the same collection and descendant scope on metadata search.
 
 ## Topic-Conditioned Graph Discovery
 

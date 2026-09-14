@@ -1,70 +1,52 @@
-# Verification Workflow & Gating Rules
+# Evidence Verification Diagnostics
 
-**Load this file when** verifying empirical numbers, evaluating reranker scores, handling figure schemas, isolating cross-paper claims, or reporting failure states.
+**Load this file when** resolving unclear numeric extraction, interpreting figure schemas, or diagnosing missing or ineligible reranker evidence.
 
-## Passage-Score Confidence Gate
+The [citation integrity skill](../SKILL.md) governs evidence eligibility and statistical reporting. The [research skill](../../zotero-research/SKILL.md) governs route selection, stopping, and service-failure boundaries. This reference is not another mandatory verification pass.
 
-The local `bge-reranker-v2-m3` endpoint returns raw cross-encoder scores:
+## Reranker Output
 
-| Raw `Rerank` Score | Retrieval Gate | Permitted Usage |
-|---|---|---|
-| `> 0` | Eligible candidate | Inspect passage text, attribution, and qualifications before using it. Not a truth or entailment score. |
-| `-2` to `0` | Weak match | Diagnostic/discovery only; cannot support a substantive claim. Use a stronger hit or direct source read. |
-| `-4` to `-2` | Marginal / Noisy | Exclude from substantive claims. |
-| `≤ -4` | Irrelevant | Discard. |
+Raw cross-encoder scores are query-dependent relevance signals, not calibrated confidence in a claim. The main skill's positive-score gate applies:
 
-- **Score Interpretation:** Raw reranker scores are query-dependent relevance signals, not calibrated confidence in a claim. A higher recheck score is not independent corroboration. A contents list or truncated sentence can score positively without supporting the proposed claim.
-- **Dense Relevance Warning:** `Relevance = 1 - dense distance` is an uncalibrated similarity measure and cannot substitute for `Rerank`.
-- **Missing Score:** If `Rerank` is absent from semantic output, treat as an instrumentation failure. Repair the service or fall back to a direct source read (`zotero_read_pdf_pages` / `zotero_get_item_fulltext`). Never fabricate scores.
+| Displayed result | Interpretation |
+|---|---|
+| `Rerank > 0` | Eligible for inspection; attribution and context still determine what it supports |
+| `Rerank <= 0` | Discovery clue only; a direct-source read may independently verify the finding |
+| `Rerank` missing | Semantic result is discovery-only; use available bounded direct reading or report the limitation |
+| `Relevance` present without `Rerank` | Dense similarity is not a replacement for the missing score |
 
-## Number Verification Checklist
+A positive score on a contents heading or clipped sentence does not supply its missing content. A higher score after re-querying does not independently corroborate the source.
 
-Before reporting any coefficient, standard error, sample size, percentage, or currency figure:
+For a missing-score case, bounded direct routes include `zotero_read_pdf_pages` and `zotero_find_in_item`. Service diagnosis is separate from answering the research question; the research skill prohibits automatic service startup or repair.
 
-1. **Exact Match:** Locate the exact value verbatim in the retrieved passage or direct page.
-2. **Context Check:** Confirm units, sign, specification, comparison group, outcome variable, and time horizon.
-3. **Attribution Check:** Ensure the number belongs to the cited paper itself, not an in-text review of another study.
-4. **Context Escalation:** If a semantic snippet is truncated around a key table or note, verify the relevant page with `zotero_read_pdf_pages`; if page extraction is unavailable or malformed, use a targeted extraction from the known item's MinerU sidecar (keep provenance truthful internally; cite it by line range, never as a page read).
-5. **Page-boundary sentences:** Read the continuation when needed for meaning. Only for an explicitly requested automated audit, use separate exact page-fragment references if a spanning quote fails containment. Ordinary reading does not require audit payloads.
-6. **Failure Fallback:** If the exact number cannot be verified, drop it or explicitly label it `UNVERIFIED`.
+## Extraction Problems
 
-*Precedence Rule:* Verified source text always overrides model memory.
+| Symptom | Useful next step |
+|---|---|
+| Search preview ends before the estimate or note | Expand the existing `evidence_id` with `zotero_read_passage` |
+| Expanded passage or sidecar window is still truncated | Continue from the returned locator rather than repeating the lookup |
+| Decisive table's PDF page is known | Read that page directly |
+| No PDF locator, but exact item and result phrase are known | Use a bounded `zotero_find_in_item` window and disclose the sidecar route |
+| Signs or columns are missing from extracted table text | Look for unambiguous source prose or inspect a page image if available |
+| Estimate and uncertainty appear on different scales | Check table notes and the main skill's statistical-reporting rules |
+| Reported CI and p-value appear inconsistent | Check whether they use the same inferential procedure; otherwise disclose the discrepancy |
+| Sentence crosses a page boundary | Read the continuation needed for meaning |
 
-## Cross-Paper Isolation & Superlative Claims
+For tool parameters and continuation examples, load [targeted reading](../../zotero-research/references/deep-dive-reading.md). Complete, unambiguous prose may suffice without another page read, but both prose and PDF text layers can contain errors.
 
-When making comparative statements (e.g., “Paper A finds X, whereas Paper B finds Y”):
-- Retrieve and verify claim X independently from Paper A.
-- Retrieve and verify claim Y independently from Paper B.
-- Attach separate canonical tokens to each distinct clause.
-- Never use one source's passage or graph metric to support another paper's finding.
+For an explicitly requested automated audit only, separate exact fragments can resolve quote-containment failures across page boundaries; see [audit API details](../../zotero-research/references/claim-audit.md). Ordinary reading does not require audit payloads.
 
-For “largest,” “smallest,” or “strongest,” use the [Zotero research ranking workflow](../../zotero-research/SKILL.md). Keep the comparison metric explicit, resolve plausible challengers from bounded discovery, and verify the decisive result and its necessary context once. Do not add a separate audit pass or metadata calls solely to fill internal labels.
+## Generated Figure Schemas
 
-## Figure & Table Schema Handling
+A `[Figure Schema]` block describes a figure for discovery. Useful source evidence may be in its caption, surrounding prose, a table, or the page image itself. A reranker score for the chunk does not turn a generated schema into observed numerical data.
 
-A `[Figure Schema]` block serves as a discovery beacon, not standalone evidence.
-- The displayed `Rerank` score reflects the raw cross-encoder evaluation.
-- Verify empirical claims against figure captions, surrounding prose, HTML table cells, or `zotero_read_pdf_pages` output.
-- Never infer quantitative estimates from schema YAML alone.
+## Failure Phrasing Examples
 
-## Retrieval Efficiency Checks
+Use only the statement warranted by the retrieved evidence:
 
-Before expanding a Zotero RAG query, ask:
-- What does the current evidence support?
-- What unresolved issue could materially change or qualify the answer?
-- What is the cheapest reliable retrieval that resolves that issue?
-- Is a page read sufficient instead of an outline or full-text read?
-- If page extraction is malformed, would a precise known-item sidecar window resolve it?
-- Am I fetching metadata only for final cited sources?
-- If MCP output is oversized, can I narrow the request or use the sanctioned known-item fallback rather than parse a temporary transport file?
-- After the retrieval, did the answer change? Repeated uninformative follow-ups are a strong signal to stop. For an explicitly requested automated audit, the Zotero repair budget applies; ordinary RAG uses the search stopping rule.
-- Does the final prose preserve important conditions and avoid stronger wording than the sources, including in headings and connective sentences?
-
-## Canonical Failure Statements
-
-When evidence is incomplete, weak, or absent, use explicit standard phrasing:
-- *"No supporting evidence found in the retrieved passages."*
-- *"The best semantic match has weak negative reranker evidence (`Rerank: -0.85`)."*
-- *"The bibliography occurrence is unresolved, so no verified entity identity exists."*
-- *"The number was not located in the retrieved source text and is unverified."*
-- *"The citation graph may be incomplete due to missing sidecars; audit coverage before asserting structural claims."*
+- “No supporting evidence found in the retrieved passages.”
+- “The estimate is available, but its SE was not retrieved.”
+- “The checked table reports p < 0.05, not an exact p-value.”
+- “The extracted table's sign is unclear; this estimate remains unverified.”
+- “The bibliography occurrence is unresolved, so the target identity is not established.”
+- “These are graph-edge counts, not raw bibliography occurrence counts.”

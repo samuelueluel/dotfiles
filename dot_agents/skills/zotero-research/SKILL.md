@@ -27,11 +27,12 @@ REQUEST
 - Do not supply a paper's estimates, setting, specification, or mechanism from model memory.
 - Read existing sources only. Library changes belong to [library management](../zotero-library/SKILL.md); parsing, embedding, and recovery belong to [pipeline operations](../zotero-pipeline/SKILL.md).
 - Never download or embed a paper merely because it appears in a bibliography.
-- Use known-item sidecars for targeted source reading or location. Never shell-parse MCP internal files or gateway temporary output.
+- Use known-item sidecars for targeted source reading or location through `zotero_find_in_item`. Never shell-parse sidecars, MCP internal files, or gateway temporary output.
 
 ## 1. Research: Discover, Read, Answer
 
 The goal is a supported answer, not completion of a fixed tool sequence.
+Before retrieval, identify the requested comparison and statistical fields. For each estimate you report, provide the requested fields or distinguish “not reported in the checked result” from “not retrieved.” Requested uncertainty statistics remain unresolved facts even when they cannot change the ranking.
 
 ### Discover
 
@@ -42,17 +43,22 @@ For a verified named source, also pass `filters={"item_keys": ["<KEY>"]}`.
 Inspect the displayed evidence:
 - Only positive `Rerank` passages are eligible semantic evidence. `Relevance` is not a substitute.
 - Reference-list passages establish citations, not findings.
-- A clipped preview or heading identifies where to look; it may not answer the question.
-- Search limits count items, not necessarily passages. Raising the limit on an exact-item query may still return only one preview.
+- A clipped preview or heading identifies where to look; expand that exact hit with `zotero_read_passage` instead of searching again.
+- Search limits count items, not passages. Raising a limit never reveals more text inside a preview.
+- Before re-searching an item you have already searched, name the specific missing fact the earlier hits did not supply. Re-running queries that already returned adequate hits is waste, not thoroughness.
 
 ### Read the missing context
 
 Use the smallest available operation that resolves the missing fact:
 - Adequate source text already in context: use it; make no new call.
+- Clipped or partial preview of an existing hit: call `zotero_read_passage(evidence_id=...)`; add `neighbors=1` when adjacent context is needed. Never rerun a search to see the same passage in full.
+- Condensing search output into working notes: keep the `evidence_id` (or `chunk_id` + `content_hash`) for any hit you may need to expand. If a handle is lost, recover it with one scoped exact-item search; never sweep synonyms to rediscover a passage you already saw.
+- Truncated passage or sidecar window: continue that window using the returned character or line locator. Do not repeat the search or guess a new location.
 - Known PDF-page locator: call `zotero_read_pdf_pages(item_key=..., start_page=..., end_page=...)`.
-- Named item but no useful passage: try one focused exact-item semantic search.
-- Repeated preview, missing page locator, or malformed extraction: load [targeted reading](references/deep-dive-reading.md), then locate and read a bounded known-item sidecar window.
-- Whole-argument evaluation or explicit full-read request: read the full source, not grep fragments.
+- Specific literal fact (number, quote, table label, heading) in a resolved item: call `zotero_find_in_item(item_key=..., query="...")` for a bounded sidecar lookup with line locators (personal library only).
+- Conceptual gap and no useful passage: try one focused exact-item semantic search.
+- Exact table extraction, continuation syntax, scanned or malformed pages, or route-selection doubt: load [targeted reading](references/deep-dive-reading.md).
+- Whole-argument evaluation or explicit full-read request: read the full source, not fragments.
 
 An outline can locate a section when available. Never infer PDF pages from passage numbers, sidecar line counts, or apparent paper length.
 Inspect an unknown tool schema rather than guessing arguments. Do not cycle through synonymous queries when the same inadequate preview returns.
@@ -65,14 +71,14 @@ Read the decisive result and necessary surrounding notes once.
 Confirm the outcome, sign, unit, treatment, setting, specification, and horizon that matter to the answer.
 A complete positive-Rerank passage can support incidental details without another page read.
 
-If extraction loses signs or columns, find unambiguous prose or inspect a rendered page with an available tool.
+PDF-page text extraction is not visual inspection. If extraction loses signs or columns, find unambiguous prose or inspect a rendered page image with an available tool.
 Never silently repair a table. If the value remains unclear, omit it or label it unverified.
 Statistical insignificance is not proof of zero effect. A plausible explanation is not an established mechanism; label your interpretation as such.
 
 ### Stop and answer
 
-Before a follow-up, ask internally: **What fact is missing, and could it change the answer?**
-If there is no answer-changing gap, answer now. Omit optional claims instead of researching them solely to fill a table.
+Before a follow-up, ask internally: **What fact is missing: a requested detail, necessary context, or a ranking-changing result?**
+If none is missing, answer now. If a requested detail cannot be resolved, disclose that gap. Omit optional claims instead of researching them solely to fill a table.
 Reuse evidence already read. Do not retrieve it again for reassurance, a higher score, or citation bookkeeping.
 Do not expand graphs or read full papers merely to feel thorough. Do not call `advisor` for ordinary searches.
 
@@ -80,24 +86,25 @@ Do not expand graphs or read full papers merely to feel thorough. Do not call `a
 
 For a ranking question, add three judgments to the research workflow:
 
-1. **Choose the comparison.** Separate overall outcomes from subtypes, counts from percentages, per-unit from program effects, and local from aggregate outcomes. Separate main estimates from subgroup, dosage, and robustness maxima. State a useful interpretation; ask only if ambiguity prevents a useful answer.
-2. **Check candidate coverage.** Supplement semantic discovery with a bounded collection inventory or an orthogonal scoped metadata search. Include descendants consistently and follow inventory pagination when needed. Titles identify plausible challengers, not their findings.
+1. **Choose the comparison.** Separate overall outcomes from subtypes, counts from percentages, per-unit from program effects, and local from aggregate outcomes. Separate main estimates from subgroup, dosage, and robustness maxima. After discovery, if plausible interpretations of “largest” would produce different answers, ask the user to choose the comparison before extracting detailed statistics. Otherwise, state the comparison and proceed.
+2. **Check candidate coverage.** Supplement semantic discovery with a bounded collection inventory or an orthogonal scoped metadata search. Prefer a summary inventory, not full metadata for every item. Include descendants consistently and follow pagination. Titles identify plausible challengers, not their findings. For inventory parameters, load [search and retrieval](references/search-retrieval.md).
 3. **Resolve challengers.** Keep one short internal shortlist of item keys and relevant estimates or missing facts. Read only enough to classify each as comparable, a different estimand, outside the question, or unresolved. An irrelevant passage does not resolve a candidate.
+4. **Report uncertainty consistently.** For every estimate in a comparison, give its available SE, CI, or p-value, or mark it "not in the checked result." Never leave an uncertainty cell silently blank.
 
 Prioritize the leading estimate and the challenger most likely to change the conclusion.
 Do not discard a difficult large estimate in favor of an easily retrieved small one.
 Percentages with different outcomes, doses, or denominators are not automatically comparable.
-If reporting a numerical maximum across unlike estimates, call it the largest reported percentage among those checked; name its outcome and denominator, not the strongest overall effect.
+If reporting a numerical maximum across unlike estimates, call it the largest reported percentage among those checked; name its outcome and denominator, not the strongest overall effect. Put this qualification in the opening answer, not only a closing coverage note.
 Any normalization must be justified and labeled as your calculation; do not assume linear scaling.
 Once relevant challengers are resolved, stop. An unresolved challenger requires a qualified ranking.
 Bounded discovery does not justify an unqualified collection-wide superlative or require exhaustive full-document extraction.
 
 ## 3. Identity, References, and Graphs
 
-For a user-named source, call `zotero_resolve_exact_source` with the original identifier and requested collection scope.
+For a user-named source, call `zotero_resolve_exact_source` with the original identifier and requested collection scope. Preserve supplied qualifiers; never repair a conflicting identity using a related match or silently combine working-paper and published versions.
 - `exact`: bind subsequent reads to the returned key; reuse its metadata.
 - `ambiguous`: disclose the conflict and clarify; do not choose by semantic relevance.
-- `absent`: report absence and stop the named-source task. Related matches are not substitutes.
+- `absent`: report absence and stop the named-source task. Related matches are metadata-only context, not substitutes. Do not resolve or retrieve a related source unless the user separately requests it or changes the target.
 If the resolver is unavailable, a uniquely verified exact metadata lookup may bind identity. Never silently substitute versions.
 Ordinary metadata reads needed for research do not require loading the library-management skill.
 
@@ -120,6 +127,7 @@ External nodes supply metadata and incoming relationships, not source findings o
 
 Use `zotero_audit_claims` only when Samuel explicitly requests automated auditing, never inside `zotero-extract`.
 Load [audit API details](references/claim-audit.md); submit up to eight atomic claims with literal quotes and truthful evidence routes.
+Build quotes from complete text first: expand semantic hits with `zotero_read_passage` and sidecar evidence with `zotero_find_in_item` before submitting, rather than copying from truncated previews.
 Reuse successful queries unchanged. Never repair quotes, invent provenance, or tune scores to force acceptance.
 Allow one repair pass: up to three targeted retrievals and one audit rerun. On legacy schemas or capability failure, report the problem and stop the audit.
 An audit validates its evidence contract, not entailment, causal identification, or comparability.
