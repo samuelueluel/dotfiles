@@ -1,139 +1,177 @@
 ---
 name: zotero-research
-description: Answers questions about stored Zotero papers using scoped agentic retrieval, source verification, quantitative comparisons, bibliography search, and citation graphs. Use when Samuel asks about findings in Zotero, his library or a collection, names a stored paper, requests passage RAG, or compares papers' effects.
+description: Answers questions about stored Zotero papers through scoped retrieval, source reading, quantitative comparisons, bibliography searches, and citation graphs. Use when Samuel asks about findings in Zotero, his library or a collection, names a stored paper, requests passage RAG, or asks which paper finds the largest effect.
 ---
 
 # Zotero Research
 
-## Request-Routing Playbook
+## Choose the Workflow
 
-```text
-REQUEST
-├─ Explicit exhaustive extraction or complete collection review? → EXTRACTION: load zotero-extract
-├─ Explicit automated claim audit? ─────────────────────────────→ AUDIT: bounded audit_claims workflow
-├─ Named paper, DOI, citation key, or item key? ─────────────────→ IDENTITY: resolve_exact_source → read that item
-├─ Largest, smallest, or strongest finding? ─────────────────────→ COMPARE: discover → check challengers
-├─ Findings, mechanisms, or substantive question? ───────────────→ RESEARCH: semantic_search → targeted source reading
-├─ Bibliography appearances or citation counts? ─────────────────→ REFERENCES: search_bibliography_entries
-└─ Citation relationships or network structure? ────────────────→ GRAPH: neighbors, coupling, or inbound ranking
-```
+Use every row that applies. A request may need more than one workflow; do not drop any part of it.
 
-## Boundaries
+| If the user asks to… | Action | Guidance |
+|---|---|---|
+| Read every paper in a collection or explicit list | Use `zotero-extract` | [Extraction skill](../zotero-extract/SKILL.md) |
+| Explicitly run an automated evidence audit | Use the bounded `zotero_audit_claims` workflow | Section 6 |
+| Find or read a named paper, DOI, citation key, or item key | Use `zotero_resolve_exact_source`, then read the exact paper | Section 4 |
+| Compare findings or identify the largest, smallest, or strongest effect | Find candidates, choose the comparison basis, and check papers that could change the answer | Sections 1–3 |
+| Answer a substantive question about stored papers | Use `zotero_semantic_search` within scope, then read supporting passages | Sections 1 and 3 |
+| Find or count mentions of a work in bibliographies | Use `zotero_search_bibliography_entries` | Section 5 |
+| Examine citation relationships or rank papers by citations | Use scoped citation tools | Section 5 |
 
-- Use official Zotero MCP tools. Keep ordinary research in the main session; only explicit `zotero-extract` work uses extraction workers.
-- Load [citation integrity](../citation-integrity/SKILL.md) for source-grounded claims. Apply it while reading, not through an extra audit pass.
-- Preserve every requested collection, item, and metadata filter. A collection defines the source corpus, not necessarily study geography.
-- Metadata, bibliography entries, and graph relationships do not establish empirical findings. Metadata abstracts guide retrieval; check findings in source passages or source text.
-- Do not supply a paper's estimates, setting, specification, or mechanism from model memory.
-- Read existing sources only. Library changes belong to [library management](../zotero-library/SKILL.md); parsing, embedding, and recovery belong to [pipeline operations](../zotero-pipeline/SKILL.md).
-- Never download or embed a paper merely because it appears in a bibliography.
-- Use known-item sidecars for targeted source reading or location through `zotero_find_in_item`. Never shell-parse sidecars, MCP internal files, or gateway temporary output.
+## What This Skill Covers
 
-## 1. Research: Discover, Read, Answer
+- This skill governs which papers to check, what to read next, and when to stop.
+- Load [citation integrity](../citation-integrity/SKILL.md) for source-grounded answers. It governs what can support a claim, statistical interpretation, where the evidence came from, and footnotes; apply it while reading, not as an extra audit pass.
+- Use official Zotero MCP tools. Keep ordinary research in the main session; use extraction workers only through explicitly requested [zotero-extract](../zotero-extract/SKILL.md).
+- Preserve the requested library, collection and subcollections, exact items, and metadata filters. Collection membership determines which papers are in scope, not study geography.
+- Read existing sources only. For requested metadata changes, load [library management](../zotero-library/SKILL.md); for requested parsing, indexing, or recovery, load [pipeline operations](../zotero-pipeline/SKILL.md).
+- Never download or embed a paper just because it appears in a bibliography. Do not invent tags or change metadata during research.
+- Read known-item sidecars through `zotero_find_in_item`. Never shell-parse sidecars, MCP internal files, or gateway temporary output.
+- Inspect unfamiliar tool schemas before calling them. Use returned locators and current capabilities, not guessed parameters or assumed tools.
 
-The goal is a supported answer, not completion of a fixed tool sequence.
-Before retrieval, identify the requested comparison and statistical fields. For each estimate you report, provide the requested fields or distinguish “not reported in the checked result” from “not retrieved.” Requested uncertainty statistics remain unresolved facts even when they cannot change the ranking.
+## 1. Find Relevant Papers Within the Requested Scope
 
-### Discover
+Identify the requested outcome, comparison, and statistical fields before retrieval.
+For a named source, complete section 4 first. For a ranking, use section 2 after initial discovery.
 
-Start with one focused `zotero_semantic_search`, normally `limit=5–8`.
-Pass `collection=<KEY>` when scoped; load [collection keys](../zotero-library/references/collections.md) if needed.
-For a verified named source, also pass `filters={"item_keys": ["<KEY>"]}`.
+1. Start with one focused `zotero_semantic_search`, normally `limit=5–8`.
+2. Pass `collection=<KEY>` for collection scope and `filters={"item_keys": ["<KEY>"]}` for verified exact items.
+3. Inspect the best passages for candidate results. Titles and metadata abstracts guide discovery; they are not verified findings.
+4. Keep each useful `evidence_id` with its item key and the fact still needed. Keep these evidence IDs when shortening working notes.
 
-Inspect the displayed evidence:
-- Only positive `Rerank` passages are eligible semantic evidence. `Relevance` is not a substitute.
-- Reference-list passages establish citations, not findings.
-- A clipped preview or heading identifies where to look; expand that exact hit with `zotero_read_passage` instead of searching again.
-- Search limits count items, not passages. Raising a limit never reveals more text inside a preview.
-- Before re-searching an item you have already searched, name the specific missing fact the earlier hits did not supply. Re-running queries that already returned adequate hits is waste, not thoroughness.
+Search limits count distinct items, not passages. Increasing the limit cannot expand a preview.
+If an evidence ID is lost, recover it with one search restricted to that exact item. Do not repeat searches with different wording to recover the same passage.
+For unknown collection keys, load [collection keys](../zotero-library/references/collections.md).
 
-### Read the missing context
+## 2. Compare or Rank Findings
 
-Use the smallest available operation that resolves the missing fact:
-- Adequate source text already in context: use it; make no new call.
-- Clipped or partial preview of an existing hit: call `zotero_read_passage(evidence_id=...)`; add `neighbors=1` when adjacent context is needed. Never rerun a search to see the same passage in full.
-- Condensing search output into working notes: keep the `evidence_id` (or `chunk_id` + `content_hash`) for any hit you may need to expand. If a handle is lost, recover it with one scoped exact-item search; never sweep synonyms to rediscover a passage you already saw.
-- Truncated passage or sidecar window: continue that window using the returned character or line locator. Do not repeat the search or guess a new location.
-- Known PDF-page locator: call `zotero_read_pdf_pages(item_key=..., start_page=..., end_page=...)`.
-- Specific literal fact (number, quote, table label, heading) in a resolved item: call `zotero_find_in_item(item_key=..., query="...")` for a bounded sidecar lookup with line locators (personal library only).
-- Conceptual gap and no useful passage: try one focused exact-item semantic search.
-- Exact table extraction, continuation syntax, scanned or malformed pages, or route-selection doubt: load [targeted reading](references/deep-dive-reading.md).
-- Whole-argument evaluation or explicit full-read request: read the full source, not fragments.
+### Choose what is being ranked
 
-An outline can locate a section when available. Never infer PDF pages from passage numbers, sidecar line counts, or apparent paper length.
-Inspect an unknown tool schema rather than guessing arguments. Do not cycle through synonymous queries when the same inadequate preview returns.
-After two uninformative attempts on one gap, change the retrieval route or report the gap unresolved. Failed retrieval does not prove the source lacks a finding.
-If a sidecar or local path is unavailable, report the access limitation; do not broaden scope or initiate processing automatically.
+Before detailed statistical extraction, distinguish:
+- Overall outcomes from subtypes or components.
+- Counts, rates, percentages, and their baseline denominators.
+- Per-unit effects from whole-program effects; for example, buildings, housing units, and demolition events are different doses.
+- Local area effects from aggregate effects and outcomes for displaced individuals.
+- Main estimates from subgroup, dosage, dynamic, and robustness maxima.
 
-### Verify what matters
+If the user authorizes judgment, choose and state a comparison basis within the requested scope. Do not exclude an allowed outcome or population merely because its estimate uses a different scale.
+Otherwise, if the user needs one ranking and plausible definitions would select different winners, ask one focused question.
+If the user requests comparisons under multiple definitions, label each comparison separately.
+When the comparison basis is otherwise clear, state it and proceed. Never imply that unlike percentages measure the same effect.
 
-Read the decisive result and necessary surrounding notes once.
-Confirm the outcome, sign, unit, treatment, setting, specification, and horizon that matter to the answer.
-A complete positive-Rerank passage can support incidental details without another page read.
+### Check for Papers That Could Change the Answer
 
-PDF-page text extraction is not visual inspection. If extraction loses signs or columns, find unambiguous prose or inspect a rendered page image with an available tool.
-Never silently repair a table. If the value remains unclear, omit it or label it unverified.
-Statistical insignificance is not proof of zero effect. A plausible explanation is not an established mechanism; label your interpretation as such.
+Supplement semantic search with a bounded collection inventory or a differently targeted metadata search within the same scope.
+Use `zotero_list_collection_items(collection_key=..., detail="summary", include_subcollections=true)` to match semantic scope; follow pagination.
+Do not fetch full metadata for every item. Inventory titles identify papers worth checking, not their findings.
 
-### Stop and answer
+Keep a short internal shortlist: item key, result or missing fact, and one of these states:
+- **Comparable:** source evidence establishes an estimate on the selected basis.
+- **Different estimand:** the source reports a relevant effect, but it measures a different outcome, treatment, population, or time horizon from the selected comparison.
+- **Outside the question:** source evidence establishes why it does not qualify.
+- **Unresolved:** the source or relevant result has not been adequately checked.
 
-Before a follow-up, ask internally: **What fact is missing: a requested detail, necessary context, or a ranking-changing result?**
-If none is missing, answer now. If a requested detail cannot be resolved, disclose that gap. Omit optional claims instead of researching them solely to fill a table.
-Reuse evidence already read. Do not retrieve it again for reassurance, a higher score, or citation bookkeeping.
-Do not expand graphs or read full papers merely to feel thorough. Do not call `advisor` for ordinary searches.
+A missing hit, negative rerank score, or irrelevant passage leaves a candidate unresolved; it does not exclude the paper.
+Read the source's own results, not only its discussion of another paper. Do not classify a paper as model-only from a clipped introduction.
+Prioritize the apparent leader and the other paper most likely to change the answer. Do not discard a difficult large estimate for an easily retrieved small one.
+Use section 3 to resolve each gap; do not perform an exhaustive extraction unless requested.
 
-## 2. Comparing Papers
+### State What the Comparison Established
 
-For a ranking question, add three judgments to the research workflow:
+Apply citation-integrity's scale and inference rules before ranking.
+If a paper has not been adequately checked and could plausibly change the ranking, state that uncertainty. A limited search does not establish a collection-wide maximum.
+Describe the ranking using the measure actually compared and the papers checked—for example, **largest reported percentage among those checked** when comparing percentages. State material differences in outcome, treatment dose, denominator, and time horizon.
+Once the leader and relevant alternatives are supported, stop extracting statistics for papers that will only be named.
 
-1. **Choose the comparison.** Separate overall outcomes from subtypes, counts from percentages, per-unit from program effects, and local from aggregate outcomes. Separate main estimates from subgroup, dosage, and robustness maxima. After discovery, if plausible interpretations of “largest” would produce different answers, ask the user to choose the comparison before extracting detailed statistics. Otherwise, state the comparison and proceed.
-2. **Check candidate coverage.** Supplement semantic discovery with a bounded collection inventory or an orthogonal scoped metadata search. Prefer a summary inventory, not full metadata for every item. Include descendants consistently and follow pagination. Titles identify plausible challengers, not their findings. For inventory parameters, load [search and retrieval](references/search-retrieval.md).
-3. **Resolve challengers.** Keep one short internal shortlist of item keys and relevant estimates or missing facts. Read only enough to classify each as comparable, a different estimand, outside the question, or unresolved. An irrelevant passage does not resolve a candidate.
-4. **Report uncertainty consistently.** For every estimate in a comparison, give its available SE, CI, or p-value, or mark it "not in the checked result." Never leave an uncertainty cell silently blank.
+## 3. Read the Missing Evidence, Then Stop
 
-Prioritize the leading estimate and the challenger most likely to change the conclusion.
-Do not discard a difficult large estimate in favor of an easily retrieved small one.
-Percentages with different outcomes, doses, or denominators are not automatically comparable.
-If reporting a numerical maximum across unlike estimates, call it the largest reported percentage among those checked; name its outcome and denominator, not the strongest overall effect. Put this qualification in the opening answer, not only a closing coverage note.
-Any normalization must be justified and labeled as your calculation; do not assume linear scaling.
-Once relevant challengers are resolved, stop. An unresolved challenger requires a qualified ranking.
-Bounded discovery does not justify an unqualified collection-wide superlative or require exhaustive full-document extraction.
+Before each follow-up, identify internally the missing requested detail, necessary context, or result that could change the ranking.
+If none remains, answer. Do not retrieve again for reassurance, a better rerank score, or citation bookkeeping.
 
-## 3. Identity, References, and Graphs
+| Evidence state | Smallest useful next action |
+|---|---|
+| Adequate source text already in context | Use it; no new call |
+| Useful hit is clipped or ends at a heading | `zotero_read_passage(evidence_id=...)`; add `neighbors=1` for adjacent context |
+| Passage or sidecar window is truncated | Continue from its returned character or line locator |
+| Exact phrase, table label, or heading in a known item | Bounded `zotero_find_in_item(item_key=..., query=...)`; use `zotero_find_in_pdf` when a verified PDF-page locator is needed |
+| Actual PDF page is known | `zotero_read_pdf_pages(item_key=..., start_page=..., end_page=...)` |
+| Text is ambiguous because layout, signs, columns, or a figure matter | `zotero_render_pdf_page(item_key=..., page=..., region=...)` for actual image inspection |
+| Conceptual fact is missing and no useful passage exists | One focused exact-item semantic search |
+| Whole-argument evaluation or explicit full-read request | Read the full source, using fulltext or complete staged windows |
 
-For a user-named source, call `zotero_resolve_exact_source` with the original identifier and requested collection scope. Preserve supplied qualifiers; never repair a conflicting identity using a related match or silently combine working-paper and published versions.
-- `exact`: bind subsequent reads to the returned key; reuse its metadata.
-- `ambiguous`: disclose the conflict and clarify; do not choose by semantic relevance.
-- `absent`: report absence and stop the named-source task. Related matches are metadata-only context, not substitutes. Do not resolve or retrieve a related source unless the user separately requests it or changes the target.
-If the resolver is unavailable, a uniquely verified exact metadata lookup may bind identity. Never silently substitute versions.
-Ordinary metadata reads needed for research do not require loading the library-management skill.
+Before re-searching an item, identify what the previous hit did not supply. Never rerun a search merely to see that hit in full.
+After two uninformative attempts to find the same missing fact, use a different search or reading method, or report that the fact remains unresolved.
+Do not cycle through synonymous queries that return the same inadequate preview.
 
-For advanced filters, bibliography queries, or graph parameters, load [search and retrieval](references/search-retrieval.md).
-Keep graph scope explicit. Inbound graph edges are not raw bibliography occurrence counts or hub centrality.
-An external or unresolved bibliography entry does not prove absence from the library; verify identity before labeling it absent.
-External nodes supply metadata and incoming relationships, not source findings or outgoing bibliographies.
+Use an outline or an available location tool to find the actual PDF page index.
+Never infer PDF pages or source locations from passage numbers, sidecar length, or apparent paper length.
+If no PDF page index is available, read a precise sidecar window and identify its source location as required by citation integrity.
+For sidecar continuations, pass the returned `source_hash` as `expected_hash` to reject changed text.
+For `zotero_find_in_pdf`, page numbers are one-based PDF indices, not printed labels, sidecar lines, or indexed offsets. It searches only the authoritative PDF text layer and reports `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage is not evidence of absence. Its windows are verbatim extracted page text. Use `zotero_render_pdf_page` only for unresolved visual ambiguity; coordinates, extracted text, and generated descriptions are not image inspection.
+For lookup and continuation examples, load [source-reading details](references/deep-dive-reading.md).
 
-## 4. Answer Format
+Reuse a result and its notes once they are adequately verified. Read another representation only to resolve a specific remaining uncertainty. Follow citation integrity when extracted table text is ambiguous; do not silently repair it.
+Still retrieve the requested SE, CI, or p-value, even if it cannot change the ranking.
+If the requested uncertainty measure cannot be retrieved, say so. Omit optional numerical claims instead of researching them just to fill a table.
+Do not expand graphs, read whole papers, or call `advisor` merely to feel thorough.
 
-- Lead with the answer and its essential qualification. For “which paper?”, usually give the candidate and one necessary comparison, not a literature-review table.
-- Keep candidate ledgers, search plans, repeated deliberation, and speculative recollections out of commentary. Report only meaningful progress or blockers.
-- Put a Markdown footnote marker immediately after each source-grounded claim, including table entries.
-- End with one `### Evidence` block containing only cited entries: author/year, title, item key, and actual PDF page, passage, section, or sidecar lines.
-- Reuse metadata already returned. Fetch missing citation identity only for papers actually cited, not internal classification fields.
-- Never present sidecar lines as PDF pages. Disclose weaker sidecar evidence as required by citation integrity.
-- Check the lead and comparisons for overstatement. Do not imply coverage, page verification, or automated auditing that did not occur.
+## 4. Find the Exact Named Paper
 
-## 5. Explicit Audits and Retrieval Failures
+Call `zotero_resolve_exact_source` with the user's original identifier and requested collection scope.
+Preserve the supplied title, author, year, DOI, citation key, and version details. Never use a related paper to resolve conflicting identifiers.
 
-Use `zotero_audit_claims` only when Samuel explicitly requests automated auditing, never inside `zotero-extract`.
-Load [audit API details](references/claim-audit.md); submit up to eight atomic claims with literal quotes and truthful evidence routes.
-Build quotes from complete text first: expand semantic hits with `zotero_read_passage` and sidecar evidence with `zotero_find_in_item` before submitting, rather than copying from truncated previews.
-Reuse successful queries unchanged. Never repair quotes, invent provenance, or tune scores to force acceptance.
-Allow one repair pass: up to three targeted retrievals and one audit rerun. On legacy schemas or capability failure, report the problem and stop the audit.
-An audit validates its evidence contract, not entailment, causal identification, or comparability.
+- **Exact:** bind subsequent reads to the returned parent key and reuse its metadata.
+- **Ambiguous:** disclose the conflict and ask; do not choose by semantic relevance.
+- **Absent:** report absence in the requested scope and stop the named-source task.
 
-Research errors are not authorization to rebuild, reinstall, or start services.
-If the embedder or reranker is unavailable, ask Samuel to run `serve-embedder` or `serve-reranker`; never auto-start them or substitute unranked semantic evidence.
-Missing `Rerank` makes semantic output discovery-only; verified direct reading remains a valid evidence route.
-If metadata or filters fail, report the failure and retry without weakening scope. Use index status only after a readiness/index error.
-For diagnosed infrastructure problems, load [pipeline operations](../zotero-pipeline/SKILL.md), not for an ordinary relevance miss.
+`related_matches` are not substitutes. Do not resolve or read a related source unless the user separately requests it or changes the target.
+Never silently combine working-paper and published versions.
+If the resolver is unavailable, a uniquely verified exact metadata lookup may establish identity and scope.
+An empty collection list in metadata, or a missing parent-collection key, does not prove that the paper is absent from the collection and its subcollections.
+Ordinary metadata reads do not require the library-management skill.
+For identifier fields, fallback lookups, or advanced filters, load [identity and scope details](references/search-retrieval.md).
+
+## 5. Find Bibliography Mentions and Citation Relationships
+
+To find bibliography mentions, query `zotero_search_bibliography_entries` within the requested set of citing papers.
+Distinguish the number of mentions from the number of distinct citing papers. Check whether the response is capped before claiming a total.
+Semantic search includes the collection and its subcollections; bibliography `collection_key` filtering includes only direct members. Preserve the requested scope explicitly rather than assuming the tools search the same papers.
+
+For network questions, choose the requested measure and pass an explicit graph scope:
+- `zotero_get_citation_neighbors`: direct cited/citing neighbors, `depth=1`.
+- `zotero_find_bibliographically_coupled_papers`: shared resolved references.
+- `zotero_rank_works_by_inbound_citations`: resolved inbound edges, not raw citation totals or hub centrality.
+
+An external or unresolved reference does not establish absence from the library. Verify metadata identity before labeling it absent.
+Never infer a cited work's findings or outgoing bibliography from an external node.
+If substantive findings are needed, return to source reading for the identified paper.
+For scope tables, resolution fields, and bounded query examples, load [bibliography and graph details](references/bibliography-graphs.md).
+
+## 6. Run an Automated Evidence Audit Only When Asked
+
+Use `zotero_audit_claims` only when Samuel explicitly requests an automated evidence-contract audit, never inside `zotero-extract`.
+A request to verify estimates or consider significance is ordinary research, not audit authorization.
+
+1. Load [audit payload and errors](references/claim-audit.md) and inspect the deployed schema.
+2. Submit up to eight claims, each covering one result or comparison, with literal quotes and an accurate description of where the evidence came from; start with `escalation="none"`.
+3. Expand clipped semantic hits and sidecar windows before copying quotes. Reuse successful queries unchanged.
+4. Allow one request-wide repair pass: at most three targeted retrievals and one audit rerun, including any tool-side bounded escalation.
+5. On a legacy schema or capability failure, report the problem and stop the audit.
+
+Never repair quotes, invent provenance, or tune scores or thresholds to force acceptance.
+Passing the audit does not establish that the source supports the claim, identifies a causal effect, makes estimates comparable, or covers all relevant papers. The audit checks only its specified evidence requirements; do not cite it as source evidence.
+
+## 7. Answer and Handle Access Failures
+
+Lead with the answer and the qualification needed to interpret it. Use citation-integrity's footnote format.
+For “which paper?”, give the leading estimate and one or two relevant alternative papers, not a literature review.
+If the user also requests an eligible-paper list, identify the remaining papers without unnecessary numerical summaries.
+Keep ledgers, repeated deliberation, and speculative recollections out of commentary; report only meaningful progress or blockers.
+Check that the opening claim does not overstate which papers and findings were checked. Never imply verification or auditing that did not occur.
+
+Research errors do not authorize rebuilding, reinstalling, starting services, or processing missing files.
+If an embedder or reranker is unavailable, ask Samuel to run `serve-embedder` or `serve-reranker`; never auto-start them.
+If metadata or filters fail, report the error and retry without weakening scope. Use index status only after a readiness/index error.
+Missing sidecars or inaccessible attachments are access limitations, not negative findings.
+For diagnosed infrastructure failures, load [pipeline operations](../zotero-pipeline/SKILL.md). An irrelevant search result does not mean the retrieval service is broken.

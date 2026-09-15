@@ -1,64 +1,89 @@
-# Targeted Reading: Routes for Exact Source Content
+# Expand Passages, Find Tables, and Continue Reading
 
-**Load this file when** extracting coefficients or table notes, continuing truncated results, or choosing between indexed passages, sidecars, extracted PDF text, and page images.
+**Load this file when** expanding a retrieved passage, continuing truncated text, locating a table, or checking damaged extracted text.
 
-## Choose the Route for the Missing Fact
+[Zotero research](../SKILL.md), section 3, explains what to read next. Choose the example that fits the missing evidence; do not run every example for each claim.
 
-The [research skill](../SKILL.md) governs retrieval and stopping; [citation integrity](../../citation-integrity/SKILL.md) governs numerical verification and provenance. These are alternatives, not a ladder to climb on every claim:
+## Expand an Existing Hit
 
-| Evidence already available | Smallest useful operation |
-|---|---|
-| A useful search preview is clipped | Expand its `evidence_id` with `zotero_read_passage` |
-| A passage or sidecar window is truncated | Continue from the returned locator; examples below |
-| The decisive table's PDF page is known | Read that page directly with `zotero_read_pdf_pages` |
-| An exact item and literal phrase are known, but no page locator | Locate the phrase with `zotero_find_in_item` |
-| PDF text has broken signs or columns | Read unambiguous surrounding prose, or inspect a page image if a visual tool is available |
-
-`zotero_read_pdf_pages` returns extracted PDF-page text, not a visual inspection. A page text layer can also lose signs and columns. Sidecars are MinerU's OCR-and-parse reconstruction; indexed passages may come from those same sidecars. Agreement between these views is not independent corroboration.
-
-When a PDF locator is unavailable, an outline or another available location tool may supply one. Otherwise use a precise sidecar window with the qualification required by citation integrity; do not estimate a page from passage numbers or document length.
-
-## Expand and Continue an Indexed Passage
-
-`zotero_read_passage` reads the stored anchor without embedding or reranking. Its default is the anchor alone; `neighbors=1` or `2` adds adjacent chunks within a total `max_chars` budget (256–16000, default 8000).
+Use the returned evidence ID. Neighbor chunks are useful when the hit ends at a table heading or omits its notes.
 
 ```python
 zotero_read_passage(evidence_id=hit_evidence_id, neighbors=1, max_chars=8000)
-# If the anchor is truncated, copy the returned next_char_start:
-zotero_read_passage(evidence_id=hit_evidence_id, start_char=next_char_start, max_chars=8000)
+# For a truncated anchor, copy the returned continuation offset:
+zotero_read_passage(evidence_id=hit_evidence_id, start_char=next_char_start,
+                    max_chars=8000)
 ```
 
-Offsets are zero-based characters within the stored chunk, not source-file characters or PDF pages. Expansion preserves the original hit's provenance and adds no new reranker score.
+`read_passage` accepts neighbors 0–2 and a total text budget of 256–16000 characters.
+Offsets refer to the stored anchor chunk. Each returned neighbor has its own evidence ID and source location.
+The tool checks the active library and rejects changed or missing evidence; it does not switch libraries.
 
-## Locate and Continue a Sidecar Window
+## Locate a Table or Phrase in a Sidecar
 
-`zotero_find_in_item` supports personal-library sidecars only. It accepts one case-insensitive literal phrase, not regex. Prefer a distinctive table label or result phrase over a common word such as `crime`.
+A short distinctive phrase usually works better than a common word such as `crime`.
+Literal lookup is case-insensitive, not semantic or regex-based; the existing sidecar must be in the personal library.
 
 ```python
-zotero_find_in_item(item_key=item_key, query="Table 5", context_lines=2,
-                   max_matches=3, max_chars=6000)
+zotero_find_in_item(item_key=item_key, query="Table 5", context_lines=1,
+                   max_matches=3, max_chars=16000)
 ```
 
-`max_chars` (256–16000) is a total budget across all windows. Large `context_lines` can spend it on prose before reaching a table. Use the returned locations to read the desired window rather than repeating the lookup with synonyms.
+`context_lines` accepts 0–20, `max_matches` 1–10, and `max_chars` 256–16000.
+The character limit covers all returned windows and is spent in document order across matches, so prose cross-references can use it up before the table window completes.
+When the target is a table, request the full 16000-character budget with narrow context (`context_lines=1`, `max_matches=3`): one minified HTML table line can run several thousand characters with no line breaks.
+Once the table is located, prefer the line-range read shown in the next section; it returns the table and its notes exactly, with no budget sharing across matches.
+A literal search for a number can fail because math markup inserts spaces between its digits. A known table label or source phrase can locate the relevant text instead.
+
+## Continue the Located Window
+
+Use the returned `source_hash` as `expected_hash` so a changed source is rejected.
 
 ```python
-# Continue a long truncated HTML table line from the returned source offset:
-zotero_find_in_item(item_key=item_key, query=None,
-                   start_char=next_char_start, expected_hash=source_hash,
-                   max_chars=8000)
-# Or read a known bounded line range:
+# A long HTML table can occupy one line; continue by source character offset.
+zotero_find_in_item(item_key=item_key, query=None, start_char=next_char_start,
+                   expected_hash=source_hash, max_chars=8000)
+# Or read a line range already located in the returned source:
 zotero_find_in_item(item_key=item_key, query=None, start_line=table_start_line,
-                   end_line=table_end_line, expected_hash=source_hash, max_chars=8000)
+                   end_line=table_end_line, expected_hash=source_hash,
+                   max_chars=8000)
 ```
 
-Lines are one-based; source character offsets are zero-based. Reuse the returned `source_hash` as `expected_hash` on follow-ups. Do not pass an indexed-passage offset to a sidecar lookup.
+Sidecar lines are one-based; source character offsets are zero-based with exclusive ends.
+These offsets differ from `read_passage` chunk offsets. Continue using the source location returned by the same tool; do not transfer offsets between tools.
 
-## Tables and Statistical Scales
+## Read or Render a Located PDF Page
 
-Sidecar tables commonly contain HTML rows and cells. Parentheses often contain standard errors, but they may instead contain confidence intervals, t-statistics, or another quantity; read the table notes before assigning meaning. Establish row and column alignment before using a cell.
+First use the literal PDF route when an exact phrase, heading, or table label must be tied to a PDF page:
 
-The main citation skill governs verification and calculated uncertainty. In particular, a reported semielasticity, an IRR, and a raw log-link coefficient are different scales. Do not exponentiate an estimate merely because the model uses a log link.
+```python
+zotero_find_in_pdf(item_key=item_key, query="Table 5", start_page=1,
+                   end_page=20, max_matches=3, max_chars=16000)
+```
 
-## Whole-Argument Reading
+Then read the targeted page's extracted text:
 
-For an explicit full-read request or whole-argument evaluation, use `zotero_get_item_fulltext` or staged `zotero_find_in_item(query=None, ...)` windows. For a bounded question, use the relevant result and necessary context instead; “literature review” alone does not require full-paper reads.
+```python
+zotero_read_pdf_pages(item_key=item_key, start_page=verified_pdf_page,
+                     end_page=verified_pdf_page)
+```
+
+Use an available PDF outline or `zotero_find_in_pdf` result to establish `verified_pdf_page`, the actual one-based page index in the file. Printed page labels, sidecar lines, and indexed offsets do not establish that locator. `zotero_find_in_pdf` reports exact total and returned matches and whether the requested text layer is complete; `partial_text_coverage` and `no_usable_text` do not support an absence claim.
+A section heading, printed page label, or sidecar line range alone does not establish that index.
+If the PDF page index is unavailable, the core workflow permits reading a precise sidecar window and reporting its actual source location.
+
+## Check a Table with Damaged Extracted Text
+
+Read the row label, column headers, unit definition, and table notes together.
+A PDF text read can restore stars lost in a sidecar, but it can also lose minus signs or detach columns itself.
+When prose does not resolve the ambiguity, inspect the actual page or table crop:
+
+```python
+zotero_render_pdf_page(item_key=item_key, page=verified_pdf_page,
+                       region=detected_bbox)  # optional normalized bbox
+```
+
+The rendering tool returns one PNG image block plus matching provenance. Use it for column alignment, signs, stars, figures, or other visual ambiguity. Coordinates, extracted page text, and generated descriptions cannot substitute for inspecting the actual image.
+
+For symptom-specific examples, load [extraction diagnostics](../../citation-integrity/references/verification-workflow.md).
+Follow citation-integrity's core skill for statistical interpretation and how to record where the evidence came from.

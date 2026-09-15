@@ -1,103 +1,171 @@
 ---
 name: citation-integrity
-description: Enforces evidence contracts for claims from Samuel's Zotero passage RAG, bibliography index, direct source reads, and citation graph. Use whenever an answer asserts source content, a citation occurrence, graph structure, findings, numbers, mechanisms, or cross-paper comparisons grounded in Zotero.
+description: Governs evidence eligibility, statistical fidelity, and citations for claims grounded in Samuel's Zotero sources. Use when reporting Zotero findings, estimates, mechanisms, cross-paper comparisons, bibliography occurrences, citation graphs, or validated zotero-extract evidence packets.
 ---
 
-# Citation Integrity & Evidence Contracts
+# Citation Integrity
 
-## Request-Routing Playbook
+## Choose the Evidence Needed
 
-```text
-MATERIAL CLAIM
-│
-├─ Classify the claim
-│  ├─ finding / mechanism / definition ──→ positive-Rerank passage or direct source read
-│  ├─ empirical number / table value ────→ exact passage + direct page verification when needed
-│  ├─ source identity / scope ────────────→ resolve_exact_source (identity metadata only)
-│  ├─ bibliography occurrence / count ────→ zotero_search_bibliography_entries (raw entries / distinct citers)
-│  ├─ graph relationship / ranking ───────→ graph tool with explicit scope
-│  └─ plain metadata fact ─────────────────→ verified metadata lookup
-├─ Explicit automated audit requested? ──→ Zotero research skill's opt-in claim-audit workflow
-├─ Is the route permitted for this claim? ─→ Continue only with that route
-├─ Is the claim a comparison? ────────────→ Keep each clause tied to its own source
-├─ Are values or attributes material? ────→ Verify value, unit, sign (+/-), specification, attribution, and time horizon
-├─ Is evidence sufficient? ───────────────→ Attach an internal evidence record and render it as a footnote
-└─ Evidence insufficient? ─────────────────→ Retrieve stronger evidence, mark UNVERIFIED, or omit
-```
+Use every row that applies. A single answer or claim may require several kinds of evidence.
 
-Apply this sequence separately to every material Zotero-grounded claim. It maps claims to evidence types; it does not replace the Zotero research skill's routing or the rules below.
+| If reporting… | Evidence needed | Guidance |
+|---|---|---|
+| A finding, mechanism, or definition | A supporting passage from the source itself | Section 1 |
+| An estimate, uncertainty measure, or table value | The result and notes; verify its scale and uncertainty | Section 2 |
+| A paper's identity, metadata, or collection membership | The exact-source resolver or verified metadata, not as proof of findings | Section 1 |
+| A bibliography mention or count | Raw bibliography entries from the requested set of citing papers | Section 1 |
+| A citation relationship or citation-based ranking | Graph results with an explicit scope and measure | Section 1 |
+| A finding from an audit result or extraction packet | Check what it validates and whether the source supports the claim | Section 5 |
 
-## Scope & Non-Negotiable Rules
+## What This Skill Covers
 
-Follow these rules for every Zotero-grounded claim, including casual chat and literature reviews.
+This skill governs what evidence permits you to say, including in headings, summaries, and casual answers.
+For which papers to check, what to read next, and when to stop, follow [Zotero research](../zotero-research/SKILL.md).
+Do not run a separate verification pass when adequate evidence has already been read.
 
-1. **Ground Every Claim:** Every finding, number, reference count, or graph metric must trace directly to its own retrieved source record. Generated `[Figure Schema]` descriptions are discovery aids, not standalone empirical evidence; verify against source text, captions, tables, or a page image.
-2. **Verify Numbers in the Source Text:** Confirm exact values, units, signs (+/-), samples, specifications, and time horizons directly in the cited text. For decisive estimates and rankings, verify the targeted result and necessary notes once — from a PDF page when the value comes from table text, or from complete unambiguous prose when it does not. Complete positive-Rerank passages can support incidental numbers when they contain both value and context. Use a precise known-item sidecar window with `zotero_find_in_item` when page extraction fails, the locator is unavailable, or a precise window avoids a broad read. Reuse verified evidence rather than retrieving it again for certification. If you cannot verify the exact number, drop it or mark it `UNVERIFIED`.
-3. **Only Use Positive Rerank Scores:** Passages with a `Rerank` score of 0 or lower cannot support a claim about a paper's findings. Treat zero or negative scores as search clues only. Never make up a `Rerank` score. A positive score makes a passage eligible for inspection; it does not establish truth or entailment. Read sufficient context to verify the proposition, attribution, and necessary conditions. Check quotations verbatim. A higher score after re-querying is not independent corroboration. An expanded hit and its adjacent chunks may supply the needed context; cite the chunk actually supporting the claim and never assign the anchor's score to a neighbor. Expansion adds no new score. An ineligible anchor does not become eligible merely by expansion; use a direct-source route to verify it.
-4. **Keep Sources Separate:** Never use one paper's evidence to back up a claim about a different paper. In comparisons between papers, give each claim its own separate footnote. Follow the Zotero ranking workflow: align estimands and resolve plausible challengers before choosing a winner; supported individual numbers alone do not establish a ranking.
-5. **Handle Unclear References Carefully:** If a reference search returns ambiguous or unresolved results, state only that the raw text string appeared. Do not assume the paper identity or build graph links from it.
-6. **Do Not Cite Bibliography Sections as Findings:** Passages marked `REF` or containing reference lists only prove what a paper cited. They never prove the paper's own findings.
-7. **External References (`ext:*`):** External nodes contain basic metadata only and do not link to outgoing citations. Never infer a paper's findings from an external reference. Check your local library before claiming a paper is missing.
-8. **Admit Missing Evidence:** Say "No supporting evidence found in the retrieved passages" or mark the claim "Unverified" instead of guessing from memory. Without exhaustive coverage, limit rankings to the comparable estimates retrieved; do not imply a collection-wide winner. Check headings and connective prose as carefully as quotations: retain important hypotheses, remove overstatements, and label your own deductions as synthesis.
-9. **Keep Source Details Internally:** Retain verified `itemType`, `source_group`, and any canonical `review:*` or `type:*` tags in the internal evidence record. Reuse verified metadata already returned; fetch missing citation identity only for sources actually cited. Do not make calls solely to fill internal classification or tag fields. These labels describe the source—they do not prove the claim. Ordinary footnotes use the concise format below; show diagnostic fields only when requested or material to the answer.
-10. **Use Truthful Retrieval Routes:**
-    - Every substantive finding must come from a valid source route (`zotero_semantic_search`, its bounded expansion `zotero_read_passage`, `zotero_read_pdf_pages`, `zotero_get_item_fulltext`, or `zotero_find_in_item` for sidecar lookups). Identity, metadata, bibliography, and graph claims use their own routes in the router above.
-    - Distinguish extracted PDF-page text, MinerU sidecar text, and visual inspection of a rendered page image. `zotero_read_pdf_pages` returns text; never claim a visual check unless an image was actually inspected. Never label sidecar text as a page read, and do not use the vague label "direct PDF".
-    - Indexed passages may expose the same sidecar text as literal lookups. Agreement across those views is not independent corroboration. All extracted text, including prose and PDF text layers, can contain errors. Resolve broken signs or columns using unambiguous source prose or a page image; never silently repair a table.
-    - Footnotes do not show internal tool names. Show the exact location (e.g., `passage 12/40`, `PDF p. 14`, `lines 45–60`). Distinguish printed page numbers from PDF page indices when known. Do not present an ambiguous page label as a verified PDF page; use the stable passage or section locator instead.
-    - If your evidence comes from a weaker source (like a sidecar rather than the original PDF page), explain that directly in your text.
-    - A value quoted from table text (PDF text layer or sidecar) that is load-bearing for a lead claim or a ranking should be labeled as table-extracted unless the surrounding prose independently states it.
-    - Never print raw curly-brace records (`{...}`) in chat; format them as standard footnotes.
-11. **Use the Resolver Only for Identity:** `zotero_resolve_exact_source` tells you whether a paper exists in a collection. It gives you the `item_key` to search, but it does not prove any findings. If the result is ambiguous or absent, report the conflict. Never use `related_matches` as evidence or silently switch to another paper.
-12. **Automated Audits Are Opt-In:** Ordinary RAG, including numbers, causal claims, and rankings, does not require `zotero_audit_claims`. Verify source evidence while retrieving it. Use the tool only when Samuel explicitly requests automated auditing, following the [Zotero research audit workflow](../zotero-research/SKILL.md) and its bounded repair rules. Never use it inside `zotero-extract`.
-    - A successful audit validates its evidence contract, not semantic entailment, causal identification, comparable estimands, or candidate coverage. Never cite the audit as source evidence.
-    - Keep evidence quotes literal and provenance truthful. Do not repair OCR or alter thresholds to make a quote pass. Qualify or omit unresolved claims rather than retrying indefinitely.
-    - Describe verification coverage accurately. Never say all figures were audited or page-verified unless each material final figure was covered that way.
+- Ground every material claim in its own retrieved evidence. Never supply a paper's estimates, setting, specification, or mechanism from model memory.
+- Never use one paper's evidence as proof of another paper's findings. A paper's description of prior work establishes what it says about that work, not independent verification of the cited result.
+- Metadata abstracts, titles, membership, bibliography entries, and graph relationships do not establish empirical findings.
+- Passages marked `REF` or consisting of reference lists establish citations only.
+- Generated `[Figure Schema]` descriptions are discovery aids, not observed results. Verify findings against source prose, captions, tables, or an actually inspected image.
+- Never invent scores, quotes, provenance, or missing statistics. Mark unresolved claims `UNVERIFIED`, qualify them, or omit them.
 
-## Statistical Reporting
+## 1. Decide Whether the Evidence Supports the Claim
 
-- Preserve the reported scale: coefficient, semielasticity, marginal effect, IRR, or percentage change. Read the table notes; parentheses do not always mean standard errors. Do not exponentiate an already transformed estimate.
-- For every estimate discussed, include the user's requested uncertainty fields or distinguish “not reported in the checked result” from “not retrieved.” Do not claim a statistic is absent from the whole paper after a partial read.
-- Keep reported statistics separate from your calculations. Never invent an exact p-value from significance stars, rounded coefficients, or rounded SEs. Report the stated threshold when only a threshold is available.
-- Calculate uncertainty only when the scale and inferential assumptions justify it. Label calculated CIs or p-values as approximate, state the method and assumptions, and use available degrees of freedom where required. A normal approximation from clustered SEs is not an exact reproduction of the paper's inference.
-- Transform interval endpoints consistently with the estimate and present bounds in ascending order. Do not mix a positive “reduction” scale with signed percentage-change bounds.
-- If a reported p-value and CI appear inconsistent, check the inferential method or disclose the unresolved discrepancy. They may use different procedures; never silently repair either value.
+### Source passages and direct reading
 
-## Human-Facing Evidence Presentation
+Only a displayed **positive `Rerank`** makes a semantic hit eligible for supporting findings.
+Zero, negative, or missing scores make it discovery-only. `Relevance` is not a substitute; never fabricate a score.
+A positive score signals relevance; it does not establish that the text is accurate, supports the claim, or identifies a causal effect. Check whose finding is described and read enough context.
 
-For chat responses, use standard Markdown footnotes rather than raw curly-brace records:
+An eligible hit's expansion and neighbors may supply context. Cite the chunk that actually supports the claim.
+Expansion adds no score; never assign the anchor's score to a neighbor. Expanding an ineligible anchor does not make it eligible.
+A verified direct-source read can establish the finding without a reranker score. Reading and checking the source itself counts as this kind of read.
 
-- Put a `[^cN]` marker immediately after the supported clause. Number markers in order of appearance.
-- Reuse a marker only for the exact same source and page/passage locator. Different passages, pages, or sources receive separate markers.
-- Place one `### Evidence` block at the very end of your response, listing only the cited entries. Omit the block only if no evidence was cited.
-- Format ordinary footnotes with author/year, title when available, item key, and exact passage, page, section, or line locator. Retain scores, route details, hashes, classifications, and tags internally; show them only for a requested evidence audit or when material to the answer. Do not print original/recheck score histories as corroboration.
-- Keep operational capability notes brief and before the final Evidence block. Ordinary answers need no audit-status note.
-- If web evidence is also present, combine the `[^wN]` and `[^cN]` definitions in this same final block while keeping the numbers distinct.
+Tools for finding and reading evidence include `zotero_semantic_search`, `zotero_read_passage`, `zotero_read_pdf_pages`, `zotero_get_item_fulltext`, `zotero_find_in_item`, and `zotero_find_in_pdf`.
+For visual evidence, use `zotero_render_pdf_page` when text or layout remains ambiguous; retain the actual one-based PDF-page/region locator and record that the returned image was inspected. A coordinate, extracted text block, or generated description is not an image inspection.
+A clipped preview or heading alone does not support the missing result.
+
+### Evidence for Paper Identity, Bibliography Mentions, and Citation Relationships
+
+The exact-source resolver establishes identity and scope, not findings. Ambiguous, absent, and related matches do not authorize substitution.
+For an unresolved or ambiguous bibliography entry, state only the verified raw occurrence; do not invent target identity or graph links.
+External `ext:*` nodes contain metadata and incoming relationships, not the external work's findings or outgoing references.
+An external-node label does not prove the work is absent from the library.
+
+Name the measure actually returned: raw occurrences, distinct citing items, inbound edges, or bibliographic coupling.
+Graph-edge counts are not raw citation totals, and inbound ranking is not hub centrality.
+Keep scope, direction, node identity, and resolution limits attached to any graph or count claim.
+
+### What the Evidence Does Not Establish
+
+Failed retrieval does not prove that a paper lacks a result. An irrelevant passage does not rule out a paper that could change the answer.
+An insignificant estimate is not evidence of zero effect. A plausible mechanism is not an established explanation.
+Distinguish your interpretation from what the paper reports, and retain the assumptions and limitations needed to interpret the finding.
+For a bounded comparison, limit the conclusion to the comparable estimates checked; do not imply a collection-wide winner without exhaustive coverage.
+
+## 2. Preserve Statistical Meaning
+
+### Verify the result and its context
+
+For each estimate reported, establish:
+- Outcome, sign, scale, and baseline denominator.
+- Treatment definition and dose; units, buildings, events, and programs are not interchangeable.
+- Sample, geography, specification, and time horizon.
+- Whether it is a main estimate, subgroup/dosage result, dynamic estimate, robustness check, or model prediction.
+- What the uncertainty notation means and how inference was performed.
+
+For a decisive table value, verify the targeted result and notes from its PDF page when available.
+Complete, unambiguous source prose can independently establish a number; incidental numbers may use complete positive-Rerank passages.
+A precise known-item sidecar window is permitted when page extraction fails, no page locator is available, or the window avoids a broad read. Disclose that weaker route.
+Reuse verified evidence; a second view of the same text is not independent corroboration.
+
+Read the table notes before interpreting parentheses or stars. Parentheses can contain SEs, CIs, or test statistics.
+Preserve the reported scale: coefficient, semielasticity, marginal effect, IRR, or percentage change.
+Do not exponentiate an already transformed estimate or assume a log-link coefficient and a reported semielasticity are interchangeable.
+
+### Report uncertainty honestly
+
+For every estimate discussed, include the requested uncertainty fields.
+In comparisons, supply an available SE, CI, or p-value even if the user did not specify a particular one.
+If unavailable, distinguish **not reported in the checked result** from **not retrieved**; do not leave uncertainty silently blank.
+A partial read does not establish that a statistic is absent from the entire paper.
+
+Keep source-reported statistics separate from your calculations.
+Never infer an exact p-value from stars or rounded coefficients and SEs. Report the source's significance threshold when that is all it supplies.
+A coefficient/SE ratio is a test-statistic approximation, not a p-value.
+Calculate CIs or p-values only when the scale and inferential assumptions justify it; label them approximate and state the method.
+Use available degrees of freedom where required. A normal approximation using clustered SEs does not reproduce the paper's exact inference.
+Transform interval endpoints with the estimate, sort bounds in ascending order, and distinguish positive reductions from signed changes.
+If a reported CI and p-value disagree, check whether they use different methods or disclose the unresolved discrepancy; do not silently repair either.
+
+### Keep comparisons on an explicit basis
+
+Supported individual numbers do not by themselves support a ranking.
+Percentages with different outcomes, doses, denominators, horizons, or geographic coverage are not automatically comparable.
+Do not normalize across these differences without justification; label any conversion as your calculation and never assume linear dose scaling.
+Separate **largest point estimate**, **significance against zero**, and **evidence that estimates differ**.
+One significant estimate and one insignificant estimate do not establish a significant difference between them.
+A numerical maximum among unlike results must be labeled that way, not called the strongest overall effect.
+
+## 3. Check Extracted Text and Record Its Source
+
+Distinguish extracted PDF-page text, MinerU sidecar text, indexed passages, and visual inspection.
+`zotero_read_pdf_pages` returns text, not an image inspection. Describe the evidence as extracted PDF-page text, not the vague label “direct PDF.”
+Indexed passages and literal lookups may expose the same sidecar. Agreement does not independently verify its accuracy.
+
+`zotero_find_in_pdf` is a bounded literal lookup over the authoritative PDF text layer. It returns one-based PDF page locators, verbatim extracted windows, exact total/returned match counts, and text-layer coverage. Coverage is `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage cannot establish absence. Its PDF page index is distinct from a printed label, MinerU sidecar line, or indexed offset.
+
+All extracted text can lose signs, digits, stars, or column alignment, including PDF text layers.
+If a value needed to support the answer is ambiguous, use unambiguous source prose or inspect the actual page/table image with an available tool.
+Never silently repair a table, reattach detached stars by guesswork, or choose the coefficient/IRR column that fits expectations.
+If the ambiguity cannot be resolved from text, render the targeted PDF page or normalized region with `zotero_render_pdf_page` and inspect the actual image. If visual inspection is unavailable or still inconclusive, omit the value or mark it unverified.
+For specific symptoms and failure wording, load [extraction diagnostics](references/verification-workflow.md).
+
+Keep the exact returned item key and the supporting page, passage, section, or sidecar window that was actually read.
+Never present sidecar lines, passage numbers, or unmapped page labels as verified PDF page indices.
+Keep evidence IDs and returned hashes internal. Never relabel hash types by assumption; use fields with matching documented semantics.
+Indexed character offsets, sidecar character offsets, and PDF page indices are different source locations.
+Preserve verified `itemType`, `source_group`, and canonical `review:*` or `type:*` tags when available; they describe the source, not evidence quality.
+Reuse metadata. Fetch missing citation identity only for papers actually cited, never solely to fill internal labels.
+
+## 4. Write Claims and Cite Their Sources
+
+- Put a Markdown `[^cN]` footnote immediately after each source-grounded claim, including table entries and paper-inclusion claims. Give each paper in a comparison its own support.
+- Number markers in order of appearance. Reuse a marker only for the same source and location; different locations receive separate markers.
+- End with one `### Evidence` block containing only cited entries. Omit it only when no evidence was cited.
+- Each entry gives author/year, title when available, item key, and exact PDF page, passage, section, or sidecar lines. Distinguish printed pages from PDF indices when known.
+- Footnotes give source locations, not internal tool names or raw curly-brace records. Keep scores, hashes, and classification fields internal unless requested or material; never present score histories as corroboration.
+- Disclose reliance on weaker sidecar evidence in the answer; one brief note can cover several claims. Label table values needed to support the answer **table-extracted** unless source prose independently states them.
+- Never claim visual inspection, page verification, exhaustive coverage, or automated auditing that did not occur.
+- Keep capability notes brief and before the Evidence block. Ordinary answers need no audit-status note.
+- If web sources also appear, combine `[^wN]` and `[^cN]` definitions in that final Evidence block.
 
 ```markdown
-A paper reports the claimed mechanism.[^c1]
+The paper reports the stated result.[^c1]
 
 ### Evidence
-[^c1]: Author — Title (Year); item KEY; passage 12/40, PDF p. 14.
+[^c1]: Author — Title (Year); item KEY; Table 2, PDF p. 6.
 ```
 
-Keep structured JSON and raw canonical evidence records unchanged for machine-facing background tasks; only human-facing chat responses use footnotes.
+Keep structured JSON and canonical evidence records unchanged in machine-facing tasks; use footnotes for human-facing synthesis.
+For record fields or when checking where evidence came from, load [evidence record formats](references/evidence-contracts.md).
 
-## Zotero-Extraction Packet Adjudication
+## 5. Use Audit Results and Extraction Packets Carefully
 
-A validated `zotero-extract` packet contains candidate evidence; it is not an automatic citation and not a new tool route. The main session reviews packets after `zotero-extract submit` accepts them and before writing cross-paper conclusions.
+Automated audits are opt-in, not a requirement for numbers, causal claims, or comparisons.
+Use the [research audit workflow](../zotero-research/SKILL.md) only when Samuel explicitly requests it; never use `zotero_audit_claims` inside `zotero-extract`.
+An audit checks its specified evidence requirements; it does not establish that the source supports the claim, identifies a causal effect, makes estimates comparable, or covers all relevant papers. Never cite an audit as source evidence.
+Keep audit quotes literal and provenance truthful; do not repair OCR or alter thresholds to obtain acceptance.
 
-For packet field meanings, load [extraction packet fields](references/extraction-packet.md).
+A validated extraction packet contains evidence to review, not an automatic citation or a new source of evidence.
+When reviewing extraction results in the main session:
+1. Use only validated packets from accepted `processed` items. Confirm identity, manifest state, source hash, and quotes against the source or sidecar.
+2. Treat worker confidence as a review flag, not verification. Unresolved evidence stays unverified.
+3. Packet routes describe where the evidence came from; they are not reranker scores. Verified direct reading needs no semantic search to certify it.
+4. Synthesize across papers in the main session; extraction workers report only their assigned source.
+5. Treat a completed manifest as coverage evidence, not proof of claims. An empty packet establishes only no matching evidence found under its inclusion rule.
+6. Present the resulting claims with the footnotes above, not raw packet JSON.
 
-Review steps:
-
-1. Use only validated packets for items in the accepted `processed` state. Confirm item identity, manifest state, source hash, and quotes against the source or sidecar. Worker confidence never substitutes for verification; unresolved evidence stays unverified.
-2. Packet extraction routes describe how the worker read the text; they do not provide `Rerank` scores. Verified direct-source evidence needs no reranker score. Use semantic search only for an unresolved retrieval gap, not to certify an adequate direct read.
-3. Compare findings across papers in the main session. Workers extract evidence from single papers; they do not synthesize cross-paper conclusions.
-4. The extraction manifest proves that papers were processed, not that their claims are true. An empty packet proves only that no matching evidence was found under the inclusion rule.
-5. Format final findings as human-readable footnotes; do not dump raw JSON packets in chat.
-
-## Progressive Disclosure
-
-- For machine-readable evidence records or an explicit provenance inspection, load [evidence contracts](references/evidence-contracts.md). Ordinary cited answers do not require loading this schema reference.
-- For unclear extraction, figure schemas, missing reranker evidence, or failure phrasing, load [verification diagnostics](references/verification-workflow.md).
+For the meaning of packet fields, load [extraction packet fields](references/extraction-packet.md).
