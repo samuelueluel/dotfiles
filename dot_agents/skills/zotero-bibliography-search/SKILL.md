@@ -39,7 +39,7 @@ The bibliography collection filter includes direct members only. If Samuel's sco
 
 Use a title fragment, DOI, or author/title combination that matches the raw entry. BM25 score measures text similarity, not identity confidence.
 
-For detailed parameter and scope examples, load [bibliography search details](../zotero-research/references/bibliography-graphs.md).
+For detailed parameter and scope examples, load [bibliography search details](../../references/zotero/bibliography-graphs.md).
 
 ### 3. Interpret resolution status
 

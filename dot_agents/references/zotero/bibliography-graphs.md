@@ -2,7 +2,7 @@
 
 **Load this file when** counting bibliography mentions or citation links, checking whether a reference matches a library item, or choosing which papers a citation-graph query includes.
 
-Use [bibliography search](../../zotero-bibliography-search/SKILL.md) for raw occurrences and [citation analysis](../../zotero-citation-analysis/SKILL.md) for graph relationships. Use citation integrity to decide what their results can support.
+Use [bibliography search](../../skills/zotero-bibliography-search/SKILL.md) for raw occurrences and [citation analysis](../../skills/zotero-citation-analysis/SKILL.md) for graph relationships. Use citation integrity to decide what their results can support.
 
 ## Bibliography Queries
 

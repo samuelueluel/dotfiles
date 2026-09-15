@@ -25,7 +25,7 @@ A page-text extraction and a sidecar reconstruction can fail differently. Neithe
 - A higher score after another query is not another source or independent corroboration.
 - A `[Figure Schema]` block can identify a relevant figure, but its generated numbers and descriptions are not source observations.
 
-For lookup or continuation syntax, load [source-reading details](../../zotero-research/references/deep-dive-reading.md).
+For lookup or continuation syntax, load [source-reading details](../../../references/zotero/deep-dive-reading.md).
 The active task skill—normally `zotero-source-reading` or `zotero-result-comparison`—chooses the next action and bounds retries.
 
 ## Distinguish Missing Evidence from Negative Findings

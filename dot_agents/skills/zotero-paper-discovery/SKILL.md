@@ -52,7 +52,7 @@ If the composite tool is unavailable:
 2. Run the same two to four bounded `zotero_semantic_search` facets within scope.
 3. Deduplicate candidates by exact parent item key.
 
-For exact filter syntax and collection pagination, load [search and retrieval details](../zotero-research/references/search-retrieval.md).
+For exact filter syntax and collection pagination, load [search and retrieval details](../../references/zotero/search-retrieval.md).
 
 ### 4. Adjudicate candidates
 

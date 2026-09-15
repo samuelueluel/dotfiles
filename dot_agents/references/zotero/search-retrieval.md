@@ -2,7 +2,7 @@
 
 **Load this file when** choosing fields to identify an exact paper, checking collection membership, reading another page of collection items, or combining metadata filters.
 
-The active task skill—normally [paper discovery](../../zotero-paper-discovery/SKILL.md) or [source reading](../../zotero-source-reading/SKILL.md)—governs which papers to check and what to do with exact, ambiguous, or missing matches. This reference explains the lookup parameters and results.
+The active task skill—normally [paper discovery](../../skills/zotero-paper-discovery/SKILL.md) or [source reading](../../skills/zotero-source-reading/SKILL.md)—governs which papers to check and what to do with exact, ambiguous, or missing matches. This reference explains the lookup parameters and results.
 
 ## Exact-Source Fields and Fallbacks
 
@@ -75,5 +75,5 @@ By default, paper retrieval excludes `note`, `thesis`, `case`, `bill`, `hearing`
 Source groups are aliases, not tags. Existing canonical review tags are `review:unreviewed`, `review:skimmed`, and `review:checked`.
 `type:textbook` accompanies native `book`; `type:lecture-notes` implies no single native type.
 
-For a diagnosed SQLite/WAL or metadata-freshness failure, load [pipeline service operations](../../zotero-pipeline/references/service-ops.md).
+For a diagnosed SQLite/WAL or metadata-freshness failure, load [pipeline service operations](../../skills/zotero-pipeline/references/service-ops.md).
 Ordinary metadata lookup does not require closing Zotero Desktop.

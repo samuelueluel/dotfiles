@@ -22,7 +22,7 @@ description: Examines citation neighbors, resolved inbound-edge rankings, and bi
 - Ranking by resolved inbound edges: `zotero_rank_works_by_inbound_citations`.
 - True bibliography occurrences: stop and use `zotero-bibliography-search` instead.
 
-For detailed node and scope semantics, load [citation graph details](../zotero-research/references/bibliography-graphs.md).
+For detailed node and scope semantics, load [citation graph details](../../references/zotero/bibliography-graphs.md).
 
 ## Scope Rules
 

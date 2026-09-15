@@ -50,7 +50,7 @@ Coupling: scope=library; seed KEY; related KEY; Jaccard=J; shared_references=N
 ```
 
 Retain the actual returned measure, node kind, direction, and scope.
-For parameters and scope, load [bibliography and graph details](../../zotero-research/references/bibliography-graphs.md).
+For parameters and scope, load [bibliography and graph details](../../../references/zotero/bibliography-graphs.md).
 
 ## Classification Suffixes
 

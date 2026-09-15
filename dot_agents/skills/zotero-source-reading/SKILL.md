@@ -28,7 +28,7 @@ Call `zotero_resolve_exact_source` with Samuel's original identifier and any exp
 
 Related matches are never substitutes. Do not silently combine working-paper and published versions.
 
-If the resolver is unavailable, use exact metadata lookup and verify all supplied identifiers before reading. For identity fields and collection membership details, load [exact-source retrieval syntax](../zotero-research/references/search-retrieval.md).
+If the resolver is unavailable, use exact metadata lookup and verify all supplied identifiers before reading. For identity fields and collection membership details, load [exact-source retrieval syntax](../../references/zotero/search-retrieval.md).
 
 ### 2. Define the missing fact
 
@@ -51,7 +51,7 @@ Use the returned evidence ID with `zotero_read_passage`. Add `neighbors=1` only 
 
 For a known phrase, table label, heading, or statistic, use `zotero_find_in_item`. Prefer a distinctive phrase over a common word. When continuing the sidecar, pass its `source_hash` as `expected_hash`.
 
-Inspect the deployed schema before using an unfamiliar tool. For detailed lookup and continuation examples, load [bounded source-reading syntax](../zotero-research/references/deep-dive-reading.md).
+Inspect the deployed schema before using an unfamiliar tool. For detailed lookup and continuation examples, load [bounded source-reading syntax](../../references/zotero/deep-dive-reading.md).
 
 ### 4. Collect multiple exact routes when useful
 

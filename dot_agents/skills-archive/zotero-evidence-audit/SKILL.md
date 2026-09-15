@@ -42,7 +42,7 @@ Do not supply titles, DOIs, filesystem paths, source bodies, or caller-invented 
 
 Numeric claims require evidence containing the values and units from a PDF-page read, or the supported weaker sidecar fallback after a PDF-page route fails.
 
-For the exact deployed payload and error codes, load [claim-audit schema](../zotero-research/references/claim-audit.md) and inspect the current tool schema before calling.
+For the exact deployed payload and error codes, load [claim-audit schema](references/claim-audit.md) and inspect the current tool schema before calling.
 
 ### 3. Expand evidence before quoting
 

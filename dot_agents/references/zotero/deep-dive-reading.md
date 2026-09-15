@@ -2,7 +2,7 @@
 
 **Load this file when** expanding a retrieved passage, continuing truncated text, locating a table, or checking damaged extracted text.
 
-The active task skill—normally [source reading](../../zotero-source-reading/SKILL.md) or [result comparison](../../zotero-result-comparison/SKILL.md)—decides what to read next. Choose the example that fits the missing evidence; do not run every example for each claim.
+The active task skill—normally [source reading](../../skills/zotero-source-reading/SKILL.md) or [result comparison](../../skills/zotero-result-comparison/SKILL.md)—decides what to read next. Choose the example that fits the missing evidence; do not run every example for each claim.
 
 ## Expand an Existing Hit
 
@@ -85,5 +85,5 @@ zotero_render_pdf_page(item_key=item_key, page=verified_pdf_page,
 
 The rendering tool returns one PNG image block plus matching provenance. Use it for column alignment, signs, stars, figures, or other visual ambiguity. Coordinates, extracted page text, and generated descriptions cannot substitute for inspecting the actual image.
 
-For symptom-specific examples, load [extraction diagnostics](../../citation-integrity/references/verification-workflow.md).
+For symptom-specific examples, load [extraction diagnostics](../../skills/citation-integrity/references/verification-workflow.md).
 Follow citation-integrity's core skill for statistical interpretation and how to record where the evidence came from.

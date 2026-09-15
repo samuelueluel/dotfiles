@@ -72,7 +72,7 @@ If the composite tool is unavailable, use this bounded sequence:
 5. `zotero_read_pdf_pages` for the targeted result and notes.
 6. `zotero_render_pdf_page` only when text leaves a decisive visual ambiguity.
 
-For detailed parameter examples, load [bounded source-reading syntax](../zotero-research/references/deep-dive-reading.md).
+For detailed parameter examples, load [bounded source-reading syntax](../../references/zotero/deep-dive-reading.md).
 
 ### 4. Verify statistical meaning
 
@@ -97,7 +97,7 @@ If a CI and p-value disagree, inspect the methods and table layout. Otherwise st
 
 For a multi-paper numerical ranking, use `zotero_validate_evidence_bundle` after selecting the exact claim evidence. Treat it as a linter only. It can detect missing evidence links, scale or uncertainty fields, comparator items, calculation labels, page provenance, and unresolved ambiguity. Passing does not establish substantive support and is never cited.
 
-Do not run `zotero_audit_claims` unless Samuel explicitly requested an automated evidence audit.
+After substantive verification, apply `citation-integrity`'s automatic final contract-audit rule to audit-ready numerical or comparison claims.
 
 ### 6. Answer and stop
 

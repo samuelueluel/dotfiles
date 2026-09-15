@@ -1,6 +1,6 @@
 ---
 name: citation-integrity
-description: Governs evidence eligibility, statistical fidelity, and citations for claims grounded in Samuel's Zotero sources. Use when reporting Zotero findings, estimates, mechanisms, cross-paper comparisons, bibliography occurrences, citation graphs, or validated zotero-extract evidence packets.
+description: Governs evidence eligibility, statistical fidelity, final mechanical claim auditing, and citations for claims grounded in Samuel's Zotero sources. Use when reporting Zotero findings, estimates, mechanisms, cross-paper comparisons, bibliography occurrences, citation graphs, or validated zotero-extract evidence packets.
 ---
 
 # Citation Integrity
@@ -16,13 +16,14 @@ Use every row that applies. A single answer or claim may require several kinds o
 | A paper's identity, metadata, or collection membership | The exact-source resolver or verified metadata, not as proof of findings | Section 1 |
 | A bibliography mention or count | Raw bibliography entries from the requested set of citing papers | Section 1 |
 | A citation relationship or citation-based ranking | Graph results with an explicit scope and measure | Section 1 |
-| A finding from an audit result or extraction packet | Check what it validates and whether the source supports the claim | Section 5 |
+| A final audit-ready quantitative claim, direct quotation, or cross-paper numerical comparison | Supporting source evidence plus one mechanical contract audit | Section 5 |
+| A finding from an extraction packet | Check what the packet validates and whether the source supports the claim | Section 5 |
 
 ## What This Skill Covers
 
 This skill governs what evidence permits you to say, including in headings, summaries, and casual answers.
 Use the task-specific Zotero skill to decide which papers to check, what to read next, and when to stop: [paper discovery](../zotero-paper-discovery/SKILL.md), [result comparison](../zotero-result-comparison/SKILL.md), [source reading](../zotero-source-reading/SKILL.md), [bibliography search](../zotero-bibliography-search/SKILL.md), or [citation analysis](../zotero-citation-analysis/SKILL.md).
-Do not run a separate verification pass when adequate evidence has already been read.
+Reuse adequate evidence rather than retrieving another representation for reassurance. The final contract audit checks evidence wiring, not substantive support.
 
 - Ground every material claim in its own retrieved evidence. Never supply a paper's estimates, setting, specification, or mechanism from model memory.
 - Never use one paper's evidence as proof of another paper's findings. A paper's description of prior work establishes what it says about that work, not independent verification of the cited result.
@@ -176,12 +177,28 @@ The paper reports the stated result.[^c1]
 Keep structured JSON and canonical evidence records unchanged in machine-facing tasks; use footnotes or compact evidence locators for human-facing synthesis.
 For record fields or when checking where evidence came from, load [evidence record formats](references/evidence-contracts.md).
 
-## 5. Use Audit Results and Extraction Packets Carefully
+## 5. Run Final Contract Audits and Review Extraction Packets
 
-Automated audits are opt-in, not a requirement for numbers, causal claims, or comparisons.
-Use [Zotero evidence audit](../zotero-evidence-audit/SKILL.md) only when Samuel explicitly requests it; never use `zotero_audit_claims` inside `zotero-extract`.
-An audit checks its specified evidence requirements; it does not establish that the source supports the claim, identifies a causal effect, makes estimates comparable, or covers all relevant papers. Never cite an audit as source evidence.
-Keep audit quotes literal and provenance truthful; do not repair OCR or alter thresholds to obtain acceptance.
+### Automatic mechanical audit
+
+After substantive source review and before the final answer, run one `zotero_audit_claims` call with `escalation="none"` when the answer contains audit-ready evidence for any of these:
+
+- Exact empirical estimates or uncertainty measures.
+- Direct quotations.
+- Cross-paper numerical comparisons.
+- Other material quantitative claims where a wrong item, quote, number, or unit would change the answer.
+
+Audit no more than eight atomic claims. Use the exact parent item keys, evidence routes, locators, queries, and literal quotes already collected by the governing task skill. Do not retrieve another representation merely to make the payload audit-ready.
+
+Skip the audit for metadata-only inventories, paper-discovery lists with compact locators, bibliography occurrences, citation-graph results, routine qualitative summaries, and claims without audit-ready evidence. Never call `zotero_audit_claims` inside `zotero-extract`.
+
+The audit rehydrates evidence and checks mechanical contracts such as source identity, quote containment, fresh positive semantic rerank, numbers and units, and comparator-item coverage. It does not establish entailment, causal validity, table interpretation, comparability, or scope completeness. Never cite the audit as source evidence or describe a passing status as proof.
+
+If the audit exposes a genuine wrong key, quote, number, unit, or locator, correct the claim or evidence before answering. Do not alter source text, weaken thresholds, or begin a search cycle solely to obtain a passing status. Treat stale schemas, unavailable checkers, and contradictory diagnostics as tool failures rather than source findings.
+
+For payload fields, route rules, and reason codes, load [claim-audit reference](references/claim-audit.md).
+
+### Extraction packets
 
 A validated extraction packet contains evidence to review, not an automatic citation or a new source of evidence.
 When reviewing extraction results in the main session:

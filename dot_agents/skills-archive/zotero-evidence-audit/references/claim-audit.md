@@ -45,4 +45,4 @@ Quotes must also support any bare dates, sample sizes, and other numbers include
 | Retained preview omits its quote or diagnostics conflict | The tool response does not meet its documented requirements; this is not evidence that the author or agent fabricated a result |
 
 Passing the audit does not establish that the source supports the claim. Apply citation-integrity's evidence rules when writing the answer.
-For a diagnosed service problem requiring maintenance, load [service operations](../../zotero-pipeline/references/service-ops.md).
+For a diagnosed service problem requiring maintenance, load [service operations](../../../skills/zotero-pipeline/references/service-ops.md).

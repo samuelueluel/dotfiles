@@ -11,7 +11,7 @@ Use every row that applies. A request may need more than one workflow; do not dr
 
 | If the user asks to… | Action | Guidance |
 |---|---|---|
-| Read every paper in a collection or explicit list | Use `zotero-extract` | [Extraction skill](../../zotero-extract/SKILL.md) |
+| Read every paper in a collection or explicit list | Use `zotero-extract` | [Extraction skill](../../../skills/zotero-extract/SKILL.md) |
 | Explicitly run an automated evidence audit | Use the bounded `zotero_audit_claims` workflow | Section 6 |
 | Find or read a named paper, DOI, citation key, or item key | Use `zotero_resolve_exact_source`, then read the exact paper | Section 4 |
 | Compare findings or identify the largest, smallest, or strongest effect | Find candidates, choose the comparison basis, and check papers that could change the answer | Sections 1–3 |
@@ -22,10 +22,10 @@ Use every row that applies. A request may need more than one workflow; do not dr
 ## What This Skill Covers
 
 - This skill governs which papers to check, what to read next, and when to stop.
-- Load [citation integrity](../../citation-integrity/SKILL.md) for source-grounded answers. It governs what can support a claim, statistical interpretation, where the evidence came from, and footnotes; apply it while reading, not as an extra audit pass.
-- Use official Zotero MCP tools. Keep ordinary research in the main session; use extraction workers only through explicitly requested [zotero-extract](../../zotero-extract/SKILL.md).
+- Load [citation integrity](../../../skills/citation-integrity/SKILL.md) for source-grounded answers. It governs what can support a claim, statistical interpretation, where the evidence came from, and footnotes; apply it while reading, not as an extra audit pass.
+- Use official Zotero MCP tools. Keep ordinary research in the main session; use extraction workers only through explicitly requested [zotero-extract](../../../skills/zotero-extract/SKILL.md).
 - Preserve the requested library, collection and subcollections, exact items, and metadata filters. Collection membership determines which papers are in scope, not study geography.
-- Read existing sources only. For requested metadata changes, load [library management](../../zotero-library/SKILL.md); for requested parsing, indexing, or recovery, load [pipeline operations](../../zotero-pipeline/SKILL.md).
+- Read existing sources only. For requested metadata changes, load [library management](../../../skills/zotero-library/SKILL.md); for requested parsing, indexing, or recovery, load [pipeline operations](../../../skills/zotero-pipeline/SKILL.md).
 - Never download or embed a paper just because it appears in a bibliography. Do not invent tags or change metadata during research.
 - Read known-item sidecars through `zotero_find_in_item`. Never shell-parse sidecars, MCP internal files, or gateway temporary output.
 - Inspect unfamiliar tool schemas before calling them. Use returned locators and current capabilities, not guessed parameters or assumed tools.
@@ -42,7 +42,7 @@ For a named source, complete section 4 first. For a ranking, use section 2 after
 
 Search limits count distinct items, not passages. Increasing the limit cannot expand a preview.
 If an evidence ID is lost, recover it with one search restricted to that exact item. Do not repeat searches with different wording to recover the same passage.
-For unknown collection keys, load [collection keys](../../zotero-library/references/collections.md).
+For unknown collection keys, load [collection keys](../../../skills/zotero-library/references/collections.md).
 
 ## 2. Compare or Rank Findings
 
@@ -109,7 +109,7 @@ Never infer PDF pages or source locations from passage numbers, sidecar length, 
 If no PDF page index is available, read a precise sidecar window and identify its source location as required by citation integrity.
 For sidecar continuations, pass the returned `source_hash` as `expected_hash` to reject changed text.
 For `zotero_find_in_pdf`, page numbers are one-based PDF indices, not printed labels, sidecar lines, or indexed offsets. It searches only the authoritative PDF text layer and reports `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage is not evidence of absence. Its windows are verbatim extracted page text. Use `zotero_render_pdf_page` only for unresolved visual ambiguity; coordinates, extracted text, and generated descriptions are not image inspection.
-For lookup and continuation examples, load [source-reading details](deep-dive-reading.md).
+For lookup and continuation examples, load [source-reading details](../../../references/zotero/deep-dive-reading.md).
 
 Reuse a result and its notes once they are adequately verified. Read another representation only to resolve a specific remaining uncertainty. Follow citation integrity when extracted table text is ambiguous; do not silently repair it.
 Still retrieve the requested SE, CI, or p-value, even if it cannot change the ranking.
@@ -130,7 +130,7 @@ Never silently combine working-paper and published versions.
 If the resolver is unavailable, a uniquely verified exact metadata lookup may establish identity and scope.
 An empty collection list in metadata, or a missing parent-collection key, does not prove that the paper is absent from the collection and its subcollections.
 Ordinary metadata reads do not require the library-management skill.
-For identifier fields, fallback lookups, or advanced filters, load [identity and scope details](search-retrieval.md).
+For identifier fields, fallback lookups, or advanced filters, load [identity and scope details](../../../references/zotero/search-retrieval.md).
 
 ## 5. Find Bibliography Mentions and Citation Relationships
 
@@ -146,14 +146,14 @@ For network questions, choose the requested measure and pass an explicit graph s
 An external or unresolved reference does not establish absence from the library. Verify metadata identity before labeling it absent.
 Never infer a cited work's findings or outgoing bibliography from an external node.
 If substantive findings are needed, return to source reading for the identified paper.
-For scope tables, resolution fields, and bounded query examples, load [bibliography and graph details](bibliography-graphs.md).
+For scope tables, resolution fields, and bounded query examples, load [bibliography and graph details](../../../references/zotero/bibliography-graphs.md).
 
 ## 6. Run an Automated Evidence Audit Only When Asked
 
 Use `zotero_audit_claims` only when Samuel explicitly requests an automated evidence-contract audit, never inside `zotero-extract`.
 A request to verify estimates or consider significance is ordinary research, not audit authorization.
 
-1. Load [audit payload and errors](claim-audit.md) and inspect the deployed schema.
+1. Load the archived [audit payload and errors](../../zotero-evidence-audit/references/claim-audit.md) and inspect the deployed schema.
 2. Submit up to eight claims, each covering one result or comparison, with literal quotes and an accurate description of where the evidence came from; start with `escalation="none"`.
 3. Expand clipped semantic hits and sidecar windows before copying quotes. Reuse successful queries unchanged.
 4. Allow one request-wide repair pass: at most three targeted retrievals and one audit rerun, including any tool-side bounded escalation.
@@ -174,4 +174,4 @@ Research errors do not authorize rebuilding, reinstalling, starting services, or
 If an embedder or reranker is unavailable, ask Samuel to run `serve-embedder` or `serve-reranker`; never auto-start them.
 If metadata or filters fail, report the error and retry without weakening scope. Use index status only after a readiness/index error.
 Missing sidecars or inaccessible attachments are access limitations, not negative findings.
-For diagnosed infrastructure failures, load [pipeline operations](../../zotero-pipeline/SKILL.md). An irrelevant search result does not mean the retrieval service is broken.
+For diagnosed infrastructure failures, load [pipeline operations](../../../skills/zotero-pipeline/SKILL.md). An irrelevant search result does not mean the retrieval service is broken.
