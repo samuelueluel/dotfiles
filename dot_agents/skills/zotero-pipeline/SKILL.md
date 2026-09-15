@@ -15,7 +15,7 @@ REQUEST
 ├─ Rebuild bibliography or citation graph? ────→ DERIVED INDEX: Desktop/WAL check → dedicated rebuild
 ├─ Inspect a service/index failure? ───────────→ DIAGNOSE: scoped status/probe → report cause
 ├─ Pause jobs or recover corrupted indexes? ──→ RECOVER: inspect plan → explicit approval → reviewed helper
-└─ Read an existing source or answer research? → RESEARCH: load zotero-research
+└─ Read an existing source or answer research? → RESEARCH: load the matching task-specific Zotero skill
 ```
 
 ## Safety Boundaries
@@ -98,7 +98,7 @@ Inspect tool schemas when arguments or capabilities are uncertain.
 
 Distinguish the failing layer: source file, parser, index, embedding endpoint, reranker, Zotero metadata access, or response formatting.
 A relevance miss does not establish corruption. Do not rebuild indexes to repair a clipped preview.
-Missing `Rerank` means semantic output is discovery-only; source verification can still use direct reading through the research skill.
+Missing `Rerank` means semantic output is discovery-only; source verification can still use direct reading through `zotero-source-reading`.
 
 For a wedged service or container, inspect its state and the intended recovery before an authorized restart.
 If repair requires package reinstallation or deployment, obtain authorization and follow the current fork pin rather than an assumed upstream version.
@@ -114,7 +114,7 @@ Use exact-key deletion confirmation for individual interrupted items.
 Report what changed, what verification succeeded, and what remains unresolved.
 Separate source parsing success from index success and successful retrieval.
 Do not claim the pipeline is repaired solely because a process started or a command returned.
-Ordinary source reading and interpretation belong to [Zotero research](../zotero-research/SKILL.md); library metadata changes belong to [library management](../zotero-library/SKILL.md).
+Ordinary source reading belongs to [source reading](../zotero-source-reading/SKILL.md), paper-list creation to [paper discovery](../zotero-paper-discovery/SKILL.md), and result ranking to [result comparison](../zotero-result-comparison/SKILL.md); library metadata changes belong to [library management](../zotero-library/SKILL.md).
 
 ## Reference Routing
 

@@ -110,3 +110,32 @@ test("settled guard schedules one soft reminder without auto-continuing", async 
   assert.match(reminder.content[0].text, /previous agent run settled/);
   assert.equal(await contextHandler({ messages: [{ role: "user", content: "next" }] }, harness.ctx), undefined);
 });
+
+test("plan-note guard fires once after compaction when plan-sourced work is open", async () => {
+  const planTasks = [
+    {
+      id: 1,
+      subject: "U1 task",
+      status: "pending",
+      metadata: { plan_source: "02_Memories/Saved-Plans/Advisor-Workflow.md", plan_step_id: "U1" },
+    },
+  ];
+  const branch = [
+    {
+      type: "message",
+      message: {
+        role: "toolResult",
+        toolName: "todo",
+        details: { action: "create", params: {}, tasks: planTasks, nextId: 2 },
+      },
+    },
+  ];
+  const harness = makeHarness({ threshold: 99, branch });
+  await harness.emit("session_compact");
+  await harness.emit("agent_start");
+
+  const planHandler = harness.handlers.get("context")[0];
+  const injected = await planHandler({ messages: messagesWithToolTail() }, harness.ctx);
+  assert.match(injected.messages.at(-1).content[0].text, /\[Plan Note\]/);
+  assert.equal(await planHandler({ messages: messagesWithToolTail() }, harness.ctx), undefined);
+});

@@ -3,6 +3,7 @@ import { SESSION_RUNTIME_OWNED } from "../lib/session-runtime.js";
 import { documentRootAccess, routeFor } from "../lib/document-analysis-bridge-logic.ts";
 import { DOCUMENT_ANALYSIS_TOOL_NAMES } from "../lib/document-analysis-bridge-policy.ts";
 import { isSafeBashCommand } from "../lib/bash-policy.ts";
+import { registerPlanModeGate } from "../lib/permission-mode-gate.ts";
 import { getPlanIntake } from "../lib/plan-workflow-state.ts";
 
 /**
@@ -153,6 +154,8 @@ const READ_ONLY_MCP_OPERATIONS = new Set([
   "zotero:search_bibliography_entries",
   "zotero:search_references",
   "zotero:read_pdf_pages",
+  "zotero:read_passage",
+  "zotero:find_in_item",
   "zotero:search_items",
   "zotero:resolve_exact_source",
   "zotero:search_by_tag",
@@ -348,6 +351,33 @@ function isReadOnlyMcpCall(toolName: string, input: unknown): boolean {
 }
 
 /**
+ * Plan intake may read the saved plan note — the load prompt points the model at
+ * turbovault_read_note — but nothing else besides todo until the intake turn
+ * settles. Fail closed on routing: only the direct tool, the exact
+ * `mcp__turbovault` proxy, or the generic gateway addressed to TurboVault
+ * without a competing `action`; and only for the exact note being loaded.
+ */
+function isPlanIntakeReadCall(toolName: string, input: unknown, planPath: string): boolean {
+  if (!input || typeof input !== "object") return false;
+  if (typeof planPath !== "string" || !planPath.trim()) return false;
+  const record = input as Record<string, unknown>;
+  const args = record.args && typeof record.args === "object" ? (record.args as Record<string, unknown>) : undefined;
+  const requestedPath = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+  const path = requestedPath(record.path) || (args ? requestedPath(args.path) : "");
+  if (!path || path !== planPath.trim()) return false;
+
+  if (toolName === "turbovault_read_note") return true;
+  if (toolName === "mcp__turbovault") return getMcpToolName(input) === "turbovault_read_note";
+  if (toolName === "mcp") {
+    if (record.action !== undefined) return false;
+    if (getMcpToolName(input) !== "turbovault_read_note") return false;
+    const server = getMcpServerName(toolName, input);
+    return !server || server === "turbovault";
+  }
+  return false;
+}
+
+/**
  * Plan mode is deny-by-default: only tools verified as read-only stay available.
  * Every mutating tool is excluded on purpose, including ones the broad Bash and
  * MCP policy rules would otherwise let through unprompted. Verified exclusions:
@@ -498,6 +528,19 @@ function notify(ctx: ExtensionContext, message: string, level: "error" | "info" 
 export default function permissionModeExtension(pi: ExtensionAPI): void {
   const processState = getProcessModeState();
   let currentMode: Mode = processState.mode ?? "manual";
+
+  // The process wrapper for pi-permission-system installs this gate before the
+  // upstream permission handler. That lets plan mode block stale/forged calls
+  // before an upstream `ask` can open a redundant prompt, while still letting
+  // verified read-only calls reach the normal hard-deny and path checks.
+  registerPlanModeGate((toolName, input) => {
+    if (processState.mode !== "plan") return { mode: "other" };
+    if (!isPlanPermittedCall(toolName, input)) {
+      return { mode: "plan", allowed: false, reason: PLAN_MODE_BLOCK_REASON(toolName) };
+    }
+    return { mode: "plan", allowed: true };
+  });
+
   // Track only whether ask_user was active before entering auto mode. This
   // restores the prior policy-filtered state without re-enabling a tool that
   // was already hidden by another policy.
@@ -738,10 +781,10 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
       activeSessionId = undefined;
     }
     const planIntake = getPlanIntake(activeSessionId);
-    if (planIntake && event.toolName !== "todo") {
+    if (planIntake && event.toolName !== "todo" && !isPlanIntakeReadCall(event.toolName, event.input, planIntake.planPath)) {
       return {
         block: true,
-        reason: `Plan intake is active for '${planIntake.planPath}': only todo calls are permitted until intake completes.`,
+        reason: `Plan intake is active for '${planIntake.planPath}': only the plan note read and todo calls are permitted until intake completes.`,
       };
     }
 

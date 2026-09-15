@@ -1,52 +1,42 @@
-# Evidence Verification Diagnostics
+# Extraction Diagnostics and Failure Wording
 
-**Load this file when** resolving unclear numeric extraction, interpreting figure schemas, or diagnosing missing or ineligible reranker evidence.
+**Load this file when** a table has broken signs or columns, inferential statistics conflict, or it is unclear whether a retrieved passage can support a claim.
 
-The [citation integrity skill](../SKILL.md) governs evidence eligibility and statistical reporting. The [research skill](../../zotero-research/SKILL.md) governs route selection, stopping, and service-failure boundaries. This reference is not another mandatory verification pass.
+The [citation integrity skill](../SKILL.md) owns the governing checks. This reference illustrates failure cases; it is not a second audit workflow.
 
-## Reranker Output
+## Table and Numerical Symptoms
 
-Raw cross-encoder scores are query-dependent relevance signals, not calibrated confidence in a claim. The main skill's positive-score gate applies:
+| Symptom | What to inspect | What to say if unresolved |
+|---|---|---|
+| Coefficient sign disagrees with the IRR's position relative to 1 | Outcome row, transformation note, source prose, or actual table image | “The extracted columns disagree; the estimate remains unverified.” |
+| Stars appear below the table, detached from cells | Actual cell alignment and star legend | “The estimate and SE are available; the significance marker could not be assigned reliably.” |
+| Minus signs disappear in PDF text | Prose describing direction or actual page image | “The extracted sign is unclear.” |
+| CI excludes the null but p-value is nonsignificant | Methods for both interval and test; clustering, resampling, or alternative procedures | “The reported CI and p-value disagree; I could not establish whether the interval and test used different methods.” |
+| Large percentage is normalized from counts | Baseline denominator, treatment dose, and whether it is a cumulative program effect | “The dose or denominator is unverified, so this cannot support a per-building comparison.” |
+| Number is visible but uncertainty is outside the read window | Table continuation and notes | “The estimate was retrieved, but its uncertainty was not.” |
 
-| Displayed result | Interpretation |
+Use these statements only after the appropriate bounded follow-up, or when source access prevents resolving the problem.
+A page-text extraction and a sidecar reconstruction can fail differently. Neither is equivalent to inspecting the table image.
+
+## Retrieval and Score Symptoms
+
+- A positive rerank score on a heading can locate a result without revealing its estimate.
+- A negative or missing score means the search result cannot support the finding under the score rule; it is not proof that the source lacks the result.
+- A higher score after another query is not another source or independent corroboration.
+- A `[Figure Schema]` block can identify a relevant figure, but its generated numbers and descriptions are not source observations.
+
+For lookup or continuation syntax, load [source-reading details](../../zotero-research/references/deep-dive-reading.md).
+The active task skill—normally `zotero-source-reading` or `zotero-result-comparison`—chooses the next action and bounds retries.
+
+## Distinguish Missing Evidence from Negative Findings
+
+| Evidence actually checked | Appropriate wording |
 |---|---|
-| `Rerank > 0` | Eligible for inspection; attribution and context still determine what it supports |
-| `Rerank <= 0` | Discovery clue only; a direct-source read may independently verify the finding |
-| `Rerank` missing | Semantic result is discovery-only; use available bounded direct reading or report the limitation |
-| `Relevance` present without `Rerank` | Dense similarity is not a replacement for the missing score |
+| Search returned no usable passage | “No supporting evidence found in the retrieved passages.” |
+| Checked table supplies stars and their legend, but no exact p-value | “The checked table reports a significance threshold, not an exact p-value.” |
+| Uncertainty field has not been located | “Not retrieved.” |
+| Checked result omits the requested uncertainty field | “Not reported in the checked result.” |
+| Bibliography entry remains ambiguous | “The raw occurrence is verified; the target identity is unresolved.” |
+| Tool reports resolved inbound edges | “These are graph-edge counts, not raw bibliography occurrence counts.” |
 
-A positive score on a contents heading or clipped sentence does not supply its missing content. A higher score after re-querying does not independently corroborate the source.
-
-For a missing-score case, bounded direct routes include `zotero_read_pdf_pages` and `zotero_find_in_item`. Service diagnosis is separate from answering the research question; the research skill prohibits automatic service startup or repair.
-
-## Extraction Problems
-
-| Symptom | Useful next step |
-|---|---|
-| Search preview ends before the estimate or note | Expand the existing `evidence_id` with `zotero_read_passage` |
-| Expanded passage or sidecar window is still truncated | Continue from the returned locator rather than repeating the lookup |
-| Decisive table's PDF page is known | Read that page directly |
-| No PDF locator, but exact item and result phrase are known | Use a bounded `zotero_find_in_item` window and disclose the sidecar route |
-| Signs or columns are missing from extracted table text | Look for unambiguous source prose or inspect a page image if available |
-| Estimate and uncertainty appear on different scales | Check table notes and the main skill's statistical-reporting rules |
-| Reported CI and p-value appear inconsistent | Check whether they use the same inferential procedure; otherwise disclose the discrepancy |
-| Sentence crosses a page boundary | Read the continuation needed for meaning |
-
-For tool parameters and continuation examples, load [targeted reading](../../zotero-research/references/deep-dive-reading.md). Complete, unambiguous prose may suffice without another page read, but both prose and PDF text layers can contain errors.
-
-For an explicitly requested automated audit only, separate exact fragments can resolve quote-containment failures across page boundaries; see [audit API details](../../zotero-research/references/claim-audit.md). Ordinary reading does not require audit payloads.
-
-## Generated Figure Schemas
-
-A `[Figure Schema]` block describes a figure for discovery. Useful source evidence may be in its caption, surrounding prose, a table, or the page image itself. A reranker score for the chunk does not turn a generated schema into observed numerical data.
-
-## Failure Phrasing Examples
-
-Use only the statement warranted by the retrieved evidence:
-
-- “No supporting evidence found in the retrieved passages.”
-- “The estimate is available, but its SE was not retrieved.”
-- “The checked table reports p < 0.05, not an exact p-value.”
-- “The extracted table's sign is unclear; this estimate remains unverified.”
-- “The bibliography occurrence is unresolved, so the target identity is not established.”
-- “These are graph-edge counts, not raw bibliography occurrence counts.”
+Exact wording depends on what was read. A partial source read does not establish that the paper lacks the result entirely.

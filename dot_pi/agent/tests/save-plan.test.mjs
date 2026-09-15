@@ -69,10 +69,12 @@ function context(entries, notifications = [], options = {}) {
       getSessionName: () => options.sessionName,
       getSessionId: () => options.sessionId ?? "abc12345-session",
     },
+    model: options.model,
+    thinkingLevel: options.thinkingLevel,
   };
 }
 
-function lintedEntry(markdown = structuredPlan, title = "Advisor Workflow") {
+function lintedEntry(markdown = structuredPlan, title = "Advisor Workflow", qualification = "") {
   return {
     type: "custom",
     customType: logic.LINTED_PLAN_ENTRY_TYPE,
@@ -82,6 +84,7 @@ function lintedEntry(markdown = structuredPlan, title = "Advisor Workflow") {
       markdown,
       lintedAt: "2026-01-02T03:04:05.000Z",
       sourceSession: "source-session",
+      ...(qualification ? { qualification } : {}),
     },
   };
 }
@@ -94,12 +97,10 @@ test("extension registers /lint-plan, /save-plan, and /load-plan", () => {
     registerCommand: (name, options) => registrations.set(name, options),
     appendEntry: () => {},
     sendUserMessage: () => {},
-    getModel: () => undefined,
-    getThinkingLevel: () => "high",
   });
 
   assert.deepEqual([...registrations.keys()], ["lint-plan", "save-plan", "load-plan"]);
-  assert.match(registrations.get("lint-plan").description, /Plan Format v1/);
+  assert.match(registrations.get("lint-plan").description, /strict structured plan/);
   assert.match(registrations.get("save-plan").description, /successful \/lint-plan/);
   assert.match(registrations.get("load-plan").description, /structured saved plan/);
   assert.ok(handlers.has("message_end"));
@@ -156,11 +157,13 @@ test("preparePlanSave uses a stable title filename and generated frontmatter", (
 });
 
 test("findLatestLintedPlan reads the latest branch marker and respects a later reset", () => {
-  const latest = { ...lintedEntry(structuredPlan, "Latest"), timestamp: "2026-01-02T03:04:05.000Z" };
+  const qualification = "the latest plan after the final design decision";
+  const latest = { ...lintedEntry(structuredPlan, "Latest", qualification), timestamp: "2026-01-02T03:04:05.000Z" };
   const result = logic.findLatestLintedPlan([lintedEntry(structuredPlan, "Old"), latest]);
 
   assert.equal(result.title, "Latest");
   assert.equal(result.markdown, structuredPlan);
+  assert.equal(result.qualification, qualification);
 
   const reset = { type: "custom", customType: logic.LINTED_PLAN_RESET_ENTRY_TYPE, data: { format: 1 } };
   assert.equal(logic.findLatestLintedPlan([latest, reset]), undefined);
@@ -176,22 +179,24 @@ function extensionHarness() {
     registerCommand: (name, options) => registrations.set(name, options),
     sendUserMessage: (prompt) => sent.push(prompt),
     appendEntry: (customType, data) => appended.push({ customType, data }),
-    getModel: () => ({ provider: "openai-codex", id: "gpt-5.6-sol" }),
-    getThinkingLevel: () => "xhigh",
   };
   commandModule.default(pi);
   return { registrations, handlers, sent, appended };
 }
 
-test("/lint-plan captures a strict response and records it as the canonical plan", async () => {
+test("/lint-plan captures a qualified response and records it as the canonical plan", async () => {
   state.clearAllPlanIntakes();
   const harness = extensionHarness();
   const notifications = [];
   const ctx = context([], notifications);
+  const qualification = "the revised implementation plan after we rejected the old data source";
 
-  await harness.registrations.get("lint-plan").handler("Advisor Workflow", ctx);
+  await harness.registrations.get("lint-plan").handler(qualification, ctx);
   assert.equal(harness.sent.length, 1);
-  assert.match(harness.sent[0], /entire active planning branch/);
+  assert.match(harness.sent[0], /full active planning branch/);
+  assert.match(harness.sent[0], /Use this description to find the plan version or portion to lint/);
+  assert.match(harness.sent[0], /Description:.*revised implementation plan after we rejected the old data source/);
+  assert.doesNotMatch(harness.sent[0], /Use this title exactly/);
 
   await harness.handlers.get("message_end")({
     message: { role: "assistant", content: [{ type: "text", text: structuredPlan }] },
@@ -200,9 +205,37 @@ test("/lint-plan captures a strict response and records it as the canonical plan
 
   assert.equal(harness.appended.length, 2);
   assert.equal(harness.appended[0].customType, logic.LINTED_PLAN_RESET_ENTRY_TYPE);
+  assert.equal(harness.appended[0].data.qualification, qualification);
   assert.equal(harness.appended[1].customType, logic.LINTED_PLAN_ENTRY_TYPE);
   assert.equal(harness.appended[1].data.markdown, structuredPlan.trim());
+  assert.equal(harness.appended[1].data.qualification, qualification);
   assert.match(notifications.at(-1).message, /Plan linted: Advisor Workflow/);
+});
+
+test("/lint-plan preserves the qualification when requesting a format correction", async () => {
+  state.clearAllPlanIntakes();
+  const harness = extensionHarness();
+  const notifications = [];
+  const ctx = context([], notifications);
+  const qualification = "the plan edition before the implementation pivot";
+
+  await harness.registrations.get("lint-plan").handler(qualification, ctx);
+  await harness.handlers.get("message_end")({
+    message: { role: "assistant", content: [{ type: "text", text: "not a structured plan" }] },
+  });
+  await harness.handlers.get("agent_settled")({}, ctx);
+
+  assert.equal(harness.sent.length, 2);
+  assert.match(harness.sent[1], /same source selection/);
+  assert.match(harness.sent[1], /Description:.*plan edition before the implementation pivot/);
+
+  await harness.handlers.get("message_end")({
+    message: { role: "assistant", content: [{ type: "text", text: structuredPlan }] },
+  });
+  await harness.handlers.get("agent_settled")({}, ctx);
+
+  assert.equal(harness.appended.length, 2);
+  assert.equal(harness.appended[1].data.qualification, qualification);
 });
 
 test("savePlan writes the canonical plan directly and does not dispatch a model turn", async () => {
@@ -210,7 +243,8 @@ test("savePlan writes the canonical plan directly and does not dispatch a model 
   try {
     const notifications = [];
     const dispatched = [];
-    const ctx = context([lintedEntry()], notifications);
+    const qualification = "the selected implementation edition after the schema decision";
+    const ctx = context([lintedEntry(structuredPlan, "Advisor Workflow", qualification)], notifications);
     const result = await commandModule.savePlan("Advisor Workflow", ctx, {
       vaultRoot: root,
       now: new Date(2026, 0, 2, 3, 4, 5),
@@ -224,9 +258,34 @@ test("savePlan writes the canonical plan directly and does not dispatch a model 
     const saved = await readFile(join(root, result.path), "utf8");
     assert.equal(saved, result.content);
     assert.match(saved, /status: canonical/);
+    assert.match(saved, /lint_qualification: "the selected implementation edition after the schema decision"/);
     assert.match(saved, /### U1 — Inspect the workflow/);
     assert.deepEqual(notifications, [{ message: "Saved plan: 02_Memories/Saved-Plans/Advisor-Workflow.md", level: "info" }]);
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("save-plan command reads model metadata from the command context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pi-save-plan-"));
+  const previousVaultRoot = process.env.OBSIDIAN_VAULT_PATH;
+  try {
+    process.env.OBSIDIAN_VAULT_PATH = root;
+    const harness = extensionHarness();
+    const notifications = [];
+    const ctx = context([lintedEntry()], notifications, {
+      model: { provider: "openai-codex", id: "gpt-5.6-sol" },
+      thinkingLevel: "xhigh",
+    });
+
+    await harness.registrations.get("save-plan").handler("", ctx);
+
+    const saved = await readFile(join(root, "02_Memories/Saved-Plans/Advisor-Workflow.md"), "utf8");
+    assert.ok(saved.includes('source_model: "openai-codex/gpt-5.6-sol"'));
+    assert.match(saved, /source_effort: "xhigh"/);
+  } finally {
+    if (previousVaultRoot === undefined) delete process.env.OBSIDIAN_VAULT_PATH;
+    else process.env.OBSIDIAN_VAULT_PATH = previousVaultRoot;
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -272,15 +331,34 @@ test("savePlan requires a successful lint result", async () => {
   }]);
 });
 
-test("buildLintPlanPrompt explicitly handles scattered context and bounded units", () => {
-  const prompt = logic.buildLintPlanPrompt("Advisor Workflow");
+test("buildLintPlanPrompt treats the argument as the requested plan scope", () => {
+  const qualification = "the earlier plan edition before we switched databases";
+  const prompt = logic.buildLintPlanPrompt(qualification);
 
-  assert.match(prompt, /entire active planning branch/);
+  assert.match(prompt, /full active planning branch/);
+  assert.match(prompt, /Use this description to find the plan version or portion to lint/);
+  assert.match(prompt, /Source selection:/);
+  assert.match(prompt, /earlier plan edition before we switched databases/);
+  assert.match(prompt, /abandoned alternatives and later revisions/);
+  assert.match(prompt, /include only that subsection and the prerequisites/);
   assert.match(prompt, /no preamble, no postscript, no commentary/);
-  assert.match(prompt, /Use this title exactly/);
+  assert.doesNotMatch(prompt, /Use this title exactly/);
+  assert.match(prompt, /Choose a concise descriptive title for the requested plan or portion/);
   assert.match(prompt, /Target 8 or fewer execution units/);
   assert.match(prompt, /never produce more than 12/);
   assert.match(prompt, /do not make each command or minor check a separate execution unit/i);
+  assert.doesNotMatch(prompt, /Plan Format v1/);
+
+  const currentPrompt = logic.buildLintPlanPrompt();
+  assert.match(currentPrompt, /No description was supplied/);
+  assert.match(currentPrompt, /latest coherent version of the plan/);
+  assert.match(currentPrompt, /Do not combine it with abandoned alternatives/);
+
+  const correction = logic.buildLintCorrectionPrompt(["missing required section"], [], qualification);
+  assert.match(correction, /same source selection/);
+  assert.match(correction, /Description:.*earlier plan edition before we switched databases/);
+  assert.doesNotMatch(correction, /Use this title exactly/);
+  assert.doesNotMatch(correction, /Plan Format v1/);
 });
 
 test("listSavedPlans sorts by updated frontmatter and rankPlanCandidates fuzzy-matches titles", async () => {
@@ -301,19 +379,29 @@ test("listSavedPlans sorts by updated frontmatter and rankPlanCandidates fuzzy-m
   }
 });
 
-test("buildLoadPlanPrompt requests one todo per bounded execution unit and no execution", () => {
+test("buildLoadPlanPrompt points at the note and describes todo intake", () => {
   const plan = logic.parseSavedPlanDocument(
     logic.buildPlanNote(structuredPlan, "Advisor Workflow", new Date(2026, 0, 2, 3, 4, 5)),
     "02_Memories/Saved-Plans/Advisor-Workflow.md",
   );
   const prompt = logic.buildLoadPlanPrompt(plan);
 
-  assert.match(prompt, /INTAKE ONLY/);
-  assert.match(prompt, /exactly one pending todo item for each supplied execution unit/);
-  assert.match(prompt, /not one item per substep/);
-  assert.match(prompt, /plan_step_id/);
-  assert.match(prompt, /U1/);
-  assert.match(prompt, /do not execute/i);
+  assert.match(prompt, /Load the saved plan 02_Memories\/Saved-Plans\/Advisor-Workflow\.md \("Advisor Workflow"\)/);
+  assert.match(prompt, /Read the note with turbovault_read_note/);
+  assert.match(prompt, /Call todo list first/);
+  assert.match(prompt, /one pending item per execution unit in the note's "## Execution units" section/);
+  assert.match(prompt, /heading id \(U1, U2, …\) as plan_step_id/);
+  assert.match(prompt, /02_Memories\/Saved-Plans\/Advisor-Workflow\.md as plan_source/);
+  assert.match(prompt, /set blockedBy from each unit's "Depends on" line/);
+  assert.match(prompt, /this turn only creates the todo list/);
+  assert.match(prompt, /re-read it after compaction/);
+  assert.match(prompt, /update it to match/);
+  assert.match(prompt, /re-read the note with turbovault_read_note immediately before editing/);
+  assert.match(prompt, /append new unit ids rather than renumbering/);
+  assert.match(prompt, /Objective, Decisions, or Stop conditions, stop and ask first/);
+  assert.doesNotMatch(prompt, /<structured-plan>/);
+  assert.doesNotMatch(prompt, /PLAN_INTAKE_COMPLETE/);
+  assert.doesNotMatch(prompt, /INTAKE ONLY/);
 });
 
 test("loadPlan uses the picker and starts a todo-only intake", async () => {
@@ -338,7 +426,8 @@ test("loadPlan uses the picker and starts a todo-only intake", async () => {
     assert.equal(result.title, "Advisor Workflow");
     assert.equal(choices.length, 1);
     assert.equal(prompts.length, 1);
-    assert.match(prompts[0], /INTAKE ONLY/);
+    assert.match(prompts[0], /this turn only creates the todo list/);
+    assert.match(prompts[0], /turbovault_read_note/);
     assert.equal(state.getPlanIntake("abc12345-session").planPath, "02_Memories/Saved-Plans/Advisor-Workflow.md");
     assert.match(notifications[0].message, /Loading .* into todo/);
   } finally {

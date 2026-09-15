@@ -163,7 +163,7 @@ export async function savePlan(
     return undefined;
   }
   if (command.value && slugifyPlanTitle(command.value) !== slugifyPlanTitle(linted.title)) {
-    notify(ctx, "The save title differs from the linted plan title. Run /lint-plan with the desired title first.", "error");
+    notify(ctx, "The save title differs from the linted plan title. Use the linted title or lint the desired plan scope first.", "error");
     return undefined;
   }
 
@@ -174,6 +174,7 @@ export async function savePlan(
     sessionId: linted.sourceSession || sessionId(ctx),
     sourceModel: options.sourceModel,
     sourceEffort: options.sourceEffort,
+    qualification: linted.qualification,
     now: options.now,
   });
   if (!prepared) {
@@ -222,6 +223,7 @@ export async function savePlan(
           sessionId: linted.sourceSession || sessionId(ctx),
           sourceModel: options.sourceModel,
           sourceEffort: options.sourceEffort,
+          qualification: linted.qualification,
           createdAt,
           now: options.now,
         });
@@ -386,7 +388,7 @@ export async function loadPlan(
   const plan = selected.plan;
   if (!plan.ok) {
     const details = plan.issues.slice(0, 6).join(" ");
-    notify(ctx, `Cannot load ${plan.path}: it is not a valid Plan Format v${PLAN_FORMAT_VERSION}. ${details}`, "error");
+    notify(ctx, `Cannot load ${plan.path}: it is not a valid structured saved plan. ${details}`, "error");
     return undefined;
   }
   if (plan.units.length > PLAN_HARD_MAX_EXECUTION_UNITS) {
@@ -435,7 +437,7 @@ export async function loadPlan(
 export default function savePlanExtension(pi: ExtensionAPI): void {
   let pendingLint: {
     sourceSession?: string;
-    titleHint: string;
+    qualification: string;
     candidate?: string;
     retryCount: number;
   } | undefined;
@@ -459,7 +461,7 @@ export default function savePlanExtension(pi: ExtensionAPI): void {
         if (!parsed.ok && current.retryCount < 1) {
           pendingLint = { ...current, candidate: undefined, retryCount: current.retryCount + 1 };
           try {
-            pi.sendUserMessage(buildLintCorrectionPrompt(parsed.issues, parsed.warnings, current.titleHint), { deliverAs: "followUp" });
+            pi.sendUserMessage(buildLintCorrectionPrompt(parsed.issues, parsed.warnings, current.qualification), { deliverAs: "followUp" });
             notify(ctx, "The planner response failed the plan format check; requesting one correction.", "warning");
           } catch (error) {
             pendingLint = undefined;
@@ -476,6 +478,7 @@ export default function savePlanExtension(pi: ExtensionAPI): void {
             markdown: candidate,
             lintedAt: new Date().toISOString(),
             sourceSession: current.sourceSession,
+            qualification: current.qualification || undefined,
             warnings: parsed.warnings.length > 0 ? parsed.warnings : undefined,
           };
           pendingLint = undefined;
@@ -527,7 +530,7 @@ export default function savePlanExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("lint-plan", {
-    description: "Consolidate the active planning branch into a strict Plan Format v1 document",
+    description: "Lint a selected plan edition or conversation scope into a strict structured plan document (usage: /lint-plan [qualification])",
     handler: async (args, ctx) => {
       if (getPlanIntake(sessionId(ctx))) {
         notify(ctx, "Cannot lint while plan intake is active.", "error");
@@ -541,6 +544,7 @@ export default function savePlanExtension(pi: ExtensionAPI): void {
         pi.appendEntry(LINTED_PLAN_RESET_ENTRY_TYPE, {
           format: PLAN_FORMAT_VERSION,
           sourceSession: sessionId(ctx),
+          qualification: args.trim() || undefined,
           requestedAt: new Date().toISOString(),
         });
       } catch (error) {
@@ -550,12 +554,12 @@ export default function savePlanExtension(pi: ExtensionAPI): void {
       }
       pendingLint = {
         sourceSession: sessionId(ctx),
-        titleHint: args.trim(),
+        qualification: args.trim(),
         retryCount: 0,
       };
       try {
         pi.sendUserMessage(buildLintPlanPrompt(args), { deliverAs: "followUp" });
-        notify(ctx, "Requested a canonical plan; waiting for the planner response.", "info");
+        notify(ctx, "Requested a scoped canonical plan; waiting for the planner response.", "info");
       } catch (error) {
         pendingLint = undefined;
         const detail = error instanceof Error ? error.message : String(error);
@@ -568,8 +572,8 @@ export default function savePlanExtension(pi: ExtensionAPI): void {
     description: "Save the last successful /lint-plan result to Obsidian (usage: /save-plan [--overwrite]; title comes from /lint-plan)",
     handler: async (args, ctx) => {
       const prepared = await savePlan(args, ctx, {
-        sourceModel: modelKey(pi.getModel()),
-        sourceEffort: String(pi.getThinkingLevel?.() ?? ""),
+        sourceModel: modelKey(ctx.model),
+        sourceEffort: String(ctx.thinkingLevel ?? ""),
       });
       if (!prepared) return;
       try {

@@ -6,11 +6,15 @@ export const MAX_NUDGES_PER_CYCLE = 10;
 export type TodoStatus = "pending" | "in_progress" | "completed" | "deleted";
 export type ReminderReason = "drift" | "settled";
 
+/** Task metadata key written by /load-plan intake; marks todo work backed by a saved plan note. */
+export const PLAN_SOURCE_METADATA_KEY = "plan_source";
+
 export interface TodoTaskRecord {
 	readonly [key: string]: unknown;
 	readonly id?: unknown;
 	readonly status?: unknown;
 	readonly blockedBy?: unknown;
+	readonly metadata?: unknown;
 }
 
 export interface TodoSnapshot {
@@ -26,6 +30,7 @@ export interface TodoReminderConfig {
 export interface ReminderPayload {
 	readonly reason: ReminderReason;
 	readonly actionCount: number;
+	readonly planSourced?: boolean;
 }
 
 export interface TodoReminderDiagnostics {
@@ -82,6 +87,18 @@ export function extractLatestTodoSnapshot(branch: Iterable<unknown>): TodoSnapsh
 
 export function hasOpenTodoWork(snapshot: TodoSnapshot | undefined): boolean {
 	return snapshot?.tasks.some((task) => OPEN_STATUSES.has(task.status as TodoStatus)) ?? false;
+}
+
+/** True when any open task carries plan_source metadata, i.e. work loaded from a saved plan note. */
+export function hasPlanSourcedOpenWork(snapshot: TodoSnapshot | undefined): boolean {
+	return (
+		snapshot?.tasks.some((task) => {
+			if (!OPEN_STATUSES.has(task.status as TodoStatus)) return false;
+			const metadata = asRecord(task.metadata);
+			const source = metadata?.[PLAN_SOURCE_METADATA_KEY];
+			return typeof source === "string" && source.trim() !== "";
+		}) ?? false
+	);
 }
 
 /**
@@ -203,6 +220,7 @@ export class TodoReminderTracker {
 	private nudgesThisCycle = 0;
 	private settledReminderUsed = false;
 	private dueReason: ReminderReason | undefined;
+	private planReminderDue = false;
 
 	public constructor(config: TodoReminderConfig) {
 		this.config = config;
@@ -213,6 +231,10 @@ export class TodoReminderTracker {
 		this.actionsSinceMutation = 0;
 		this.actionsSinceReminder = 0;
 		this.dueReason = undefined;
+		// Restore runs after session_start and session_compact. Compaction is the
+		// main event that can destroy the /load-plan intake instructions, so
+		// re-arm the plan-note reminder whenever plan-sourced work survives.
+		this.planReminderDue = hasPlanSourcedOpenWork(snapshot);
 		if (options.resetCycle !== false) {
 			this.nudgesThisCycle = 0;
 			this.settledReminderUsed = false;
@@ -279,12 +301,23 @@ export class TodoReminderTracker {
 		const payload: ReminderPayload = {
 			reason: this.dueReason,
 			actionCount: this.actionsSinceMutation,
+			// When the one-shot plan reminder is still armed it will carry the plan
+			// guidance in the same context event; suppress the suffix here so the
+			// paragraph is never delivered twice.
+			planSourced: hasPlanSourcedOpenWork(this.snapshot) && !this.planReminderDue,
 		};
 		this.dueReason = undefined;
 		this.nudgesThisCycle += 1;
 		this.actionsSinceReminder = 0;
 		if (payload.reason === "settled") this.settledReminderUsed = true;
 		return payload;
+	}
+
+	/** One-shot plan-note reminder, armed on restore (session start, compaction, tree changes). */
+	public consumePlanReminder(): string | undefined {
+		const due = this.planReminderDue && hasPlanSourcedOpenWork(this.snapshot);
+		this.planReminderDue = false;
+		return due ? PLAN_WORKFLOW_REMINDER : undefined;
 	}
 
 	public getDiagnostics(): TodoReminderDiagnostics {
@@ -298,18 +331,28 @@ export class TodoReminderTracker {
 	}
 }
 
+export const PLAN_WORKFLOW_REMINDER =
+	"[Plan Note] Open tasks carry plan_source metadata: they come from a saved plan note. " +
+	"That Obsidian note is the authoritative plan — re-read it for a unit's full details or after compaction. " +
+	"If the work shows the plan as written needs correction, update the note to match (TurboVault edit_note with a " +
+	"commit message saying why), sync the todo list, and append new unit ids rather than renumbering. " +
+	"If a correction would change the plan's Objective, Decisions, or Stop conditions, stop and ask first.";
+
 export function renderTodoReminder(payload: ReminderPayload): string {
+	const planSuffix = payload.planSourced ? ` ${PLAN_WORKFLOW_REMINDER}` : "";
 	if (payload.reason === "settled") {
 		return (
 			"[Todo Completion Check] The previous agent run settled while open todo work remains. " +
 			"Before treating the request as complete, check the todo list; continue the active task " +
-			"or update the plan if the scope has changed."
+			"or update the plan if the scope has changed." +
+			planSuffix
 		);
 	}
 
 	return (
 		`[Todo Alignment Check] You have completed ${payload.actionCount} successful tool actions since the last ` +
 		"todo mutation. Verify that your current actions directly advance the active task and that you are not " +
-		"caught in an unnecessary rabbit hole. Continue with your current step, or update your todo plan if the scope changed."
+		"caught in an unnecessary rabbit hole. Continue with your current step, or update your todo plan if the scope changed." +
+		planSuffix
 	);
 }

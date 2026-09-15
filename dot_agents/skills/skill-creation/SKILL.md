@@ -55,6 +55,8 @@ skill-name/
 
 When a skill handles **3 or more distinct sub-intents, sub-modes, or caller domains** (e.g. read vs. write vs. search vs. prune, or `pi` vs. `beta`), open `SKILL.md` directly under the title with a fenced ASCII decision tree under `## Request-Routing Playbook`.
 
+A routing table is an acceptable alternative when it fits the situation better—for example, when the routes are independent conditions rather than sequential decisions, or when a single request can match several routes at once. Keep the same requirements: each row states the trigger or condition, the action, and where the detailed guidance continues.
+
 ### Decision Tree Rules:
 - **Fenced Monospaced Block:** Always wrap in a fenced `text` code block to preserve structural whitespace.
 - **Strict Top-Down Hierarchy:** Use box characters (`├─`, `└─`, `│`, `──→`). Never use diagonal lines, cycles, or backwards loops.
@@ -158,7 +160,7 @@ When asked to review, audit, or make a skill comply with these guidelines:
 - [ ] Rules separate thinking guidelines from physical tool limits
 - [ ] Physical tool limits checked against `Pi-Hooks.md` / `workflow-invariants.ts`; Samuel asked if a new hook is needed
 - [ ] All safety boundaries, rules, and output formatting stay in `SKILL.md` (never hidden in `references/`)
-- [ ] Multi-intent skills (3+ tasks) include an ASCII decision tree
+- [ ] Multi-intent skills (3+ tasks) include an ASCII decision tree, or a routing table when that fits the routes better
 - [ ] Decision tree appears immediately under the title, is top-down and straightforward, and is wrapped in a fenced `text` code block
 - [ ] Decision tree uses box characters, maps each trigger to a mode and primary action/tool, and remains the single canonical router
 - [ ] Each rule lives in one place without repeating the same flowchart

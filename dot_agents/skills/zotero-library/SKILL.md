@@ -16,7 +16,7 @@ REQUEST
 ├─ Export citations or bibliography? ──────→ EXPORT: explicit keys/scope → export_bibliography
 ├─ Read or write annotations/notes? ────────→ ANNOTATE: resolve source → inspect → requested change
 ├─ Delete a record or collection? ─────────→ DELETE: show exact target and consequences → confirm
-└─ Ask about findings in papers? ──────────→ RESEARCH: load zotero-research
+└─ Ask about findings in papers? ──────────→ RESEARCH: load zotero-source-reading or zotero-result-comparison
 ```
 
 ## Safety and Scope
@@ -28,7 +28,7 @@ REQUEST
 - Never upload PDF bytes to Zotero Cloud, call `zotero_attach_file`, or pass a file to `zotero_add_item`.
 - Attach local PDFs through `zotero-link`; never replace linked files with cloud uploads.
 - Never download, parse, or embed papers merely because they appear in a bibliography.
-- Do not treat titles, abstracts in metadata, or collection membership as verified empirical findings. For content questions, load [Zotero research](../zotero-research/SKILL.md).
+- Do not treat titles, metadata abstracts, or collection membership as verified empirical findings. For content questions, load [source reading](../zotero-source-reading/SKILL.md) or [result comparison](../zotero-result-comparison/SKILL.md).
 - Do not run OCR, embedding, or index recovery during routine record management. Explicit processing belongs to [pipeline operations](../zotero-pipeline/SKILL.md).
 
 ## 1. Lookup and Identity
@@ -101,7 +101,7 @@ For annotations and notes, resolve the parent and inspect existing content first
 Use `zotero_compile_annotation_digest` for a requested bounded digest; it gathers annotations rather than evaluating findings.
 External PDF-viewer highlights may live only inside the linked file, not Zotero's annotation database.
 Use the documented annotation tools for requested edits; never replace unrelated notes or highlights.
-If the task requires interpreting the underlying source, load [Zotero research](../zotero-research/SKILL.md).
+If the task requires interpreting the underlying source, load [source reading](../zotero-source-reading/SKILL.md) or [result comparison](../zotero-result-comparison/SKILL.md).
 
 ## 6. Verification and Failure
 
@@ -115,7 +115,7 @@ Never treat an immutable SQLite read as current while WAL is active.
 Metadata-only edits do not require re-embedding. Changed source text or parsing may require an exact-item refresh through the pipeline skill.
 
 Keep confirmations compact: identify the changed records and any unresolved issue.
-For source-grounded conclusions, use the research skill's evidence workflow rather than treating metadata as evidence.
+For source-grounded conclusions, use the applicable task-specific research skill rather than treating metadata as evidence.
 
 ## Reference Routing
 

@@ -125,6 +125,31 @@ const autoaskQuestion = await emit(
   context("parent"),
 );
 const promptsAfterAutoask = promptCount;
+
+await parent.commands.get("plan").handler("", context("parent-plan"));
+const planExplore = await emit(
+  parent,
+  {
+    type: "tool_call",
+    toolName: "Agent",
+    toolCallId: "parent-plan-explore",
+    input: { subagent_type: "Explore", prompt: "find it" },
+  },
+  context("parent-plan"),
+);
+const planOther = await emit(
+  parent,
+  {
+    type: "tool_call",
+    toolName: "custom_extension_tool",
+    toolCallId: "parent-plan-custom",
+    input: {},
+  },
+  context("parent-plan"),
+);
+const planPrompts = promptCount - promptsAfterAutoask;
+const planYoloAfterCalls = globalThis.__piPermissionSystem?.getYoloMode?.();
+await parent.commands.get("autoask").handler("", context("parent-after-plan"));
 const globalRuntimeBeforeChild = globalThis.__piPermissionSystem;
 
 const childInstall = order === "local-first"
@@ -194,6 +219,10 @@ console.log("RESULT " + JSON.stringify({
   autoaskOtherGenericBlocked: autoaskOtherGeneric?.block === true,
   autoaskQuestionBlocked: autoaskQuestion?.block === true,
   autoaskPrompts: promptsAfterAutoask,
+  planExploreBlocked: planExplore?.block === true,
+  planOtherBlocked: planOther?.block === true,
+  planPrompts,
+  planYoloAfterCalls,
   autoaskAfterChildBlocked: autoaskAfterChild?.block === true,
   autoaskOtherAfterChildBlocked: autoaskOtherAfterChild?.block === true,
   manualGenericBlocked: manualGeneric?.block === true,
@@ -279,6 +308,10 @@ for (const order of ["package-first", "local-first"]) {
     assert.equal(result.autoaskOtherGenericBlocked, false);
     assert.equal(result.autoaskQuestionBlocked, false);
     assert.equal(result.autoaskPrompts, 0);
+    assert.equal(result.planExploreBlocked, false);
+    assert.equal(result.planOtherBlocked, true);
+    assert.equal(result.planPrompts, 0);
+    assert.equal(result.planYoloAfterCalls, false);
     assert.equal(result.autoaskAfterChildBlocked, false);
     assert.equal(result.autoaskOtherAfterChildBlocked, false);
     assert.equal(result.manualGenericBlocked, false);

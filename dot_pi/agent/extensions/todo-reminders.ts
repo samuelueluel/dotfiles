@@ -9,6 +9,7 @@ import {
 } from "../lib/todo-reminder-logic.js";
 
 export const TODO_REMINDER_ID = "todo-drift-guard";
+export const PLAN_REMINDER_ID = "plan-note-guard";
 
 function detailsFromToolResult(result: unknown): unknown {
 	if (!result || typeof result !== "object") return undefined;
@@ -84,5 +85,17 @@ export default function todoRemindersExtension(pi: ExtensionAPI): void {
 			const payload = tracker.consumeReminder();
 			return payload ? renderTodoReminder(payload) : null;
 		},
+	});
+
+	// Conditional on the planning workflow: fires once when open plan-sourced
+	// tasks survive a restore — session start, compaction, or tree changes —
+	// which is when the /load-plan intake instructions are most likely lost.
+	registerReminder(pi, {
+		id: PLAN_REMINDER_ID,
+		label: "plan-note-guard",
+		lifetime: "transient",
+		on: "call:every",
+		priority: 64,
+		content: () => tracker.consumePlanReminder() ?? null,
 	});
 }

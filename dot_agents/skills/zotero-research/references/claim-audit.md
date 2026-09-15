@@ -1,38 +1,48 @@
-# Explicit Claim Audit: API and Error Reference
+# Prepare an Explicitly Requested Audit and Handle Errors
 
-**Load this file when** Samuel explicitly requests `zotero_audit_claims` or an automated evidence-contract audit; not for ordinary RAG.
+**Load this file when** preparing arguments for a user-requested `zotero_audit_claims` call or diagnosing its validation errors.
 
-The [research skill](../../zotero-research/SKILL.md) governs opt-in use, literal evidence, interpretation, and the request-wide repair budget. Inspect the deployed tool schema before constructing a payload.
+Follow [Zotero evidence audit](../../zotero-evidence-audit/SKILL.md) for when audits are allowed, how to prepare quotes, and how many repair attempts are permitted for the request.
+Check the installed tool's schema for accepted fields. Its validation requirements are stricter than ordinary source reading.
 
-## Payload Fields
+## Prepare the Tool Arguments
 
-Each claim has `claim_id`, `text`, `risk_tags`, and 1–4 `evidence` references. A claim should contain one attributed result, estimand, null finding, or comparison, rather than bundling sample details and multiple findings.
+A claim has `claim_id`, `text`, `risk_tags`, and 1–4 evidence references.
+Each claim represents one attributed result, null finding, or comparison, rather than several unrelated findings.
 
-| Route | Locator fields | Additional fields |
+| Evidence route | Required fields | Optional source-location and hash fields |
 |---|---|---|
-| `semantic` | Exact parent `item_key`, original successful `query`, literal `quote` | Returned `chunk_id`, `content_hash`, `index_generation` when available |
-| `pdf_page` | Exact parent `item_key`, `page`, optional `end_page`, literal `quote` | Returned `attachment_key` and `content_hash` when available |
-| `mineru_sidecar` | Exact parent `item_key`, `locator` or line range, literal `quote` | Returned `content_hash` and `index_generation` when available |
+| `semantic` | Exact parent `item_key`, original `query`, literal `quote` | `chunk_id`, `content_hash`, `index_generation` |
+| `pdf_page` | Exact parent `item_key`, `page`, literal `quote` | `end_page`, `attachment_key`, `content_hash` |
+| `mineru_sidecar` | Exact parent `item_key`, literal `quote` | `locator`, `start_line`, `end_line`, `content_hash`, `index_generation` |
 
-The audit does not accept caller-supplied source bodies, filesystem paths, or reranker scores. Numeric claims require direct-page evidence or the supported weaker sidecar fallback, with values and units inside the accepted quotes.
+Item keys are eight-character parent keys, not titles, DOIs, paths, or collections.
+The tool does not accept caller-supplied source bodies or reranker scores.
+Numeric claims require evidence from a PDF-page read, or the supported weaker sidecar fallback after the PDF-page read fails. Accepted quotes must contain the values and units.
 
-Copy quotes from complete text, not previews: expand a semantic hit with `zotero_read_passage` before submitting `semantic` evidence. For `mineru_sidecar`, copy the quote and line locators from `zotero_find_in_item`.
+`risk_tags=["comparison"]` requires evidence from at least two distinct items.
+`risk_tags=["within_item_comparison"]` applies to one item. These tags are mutually exclusive.
+`escalation="none"` disables tool-side follow-ups. `"bounded"` permits up to three targeted follow-ups, which count toward the core skill's repair limit.
 
-The lookup's `source_hash` is passed back as `expected_hash` for lookup continuations. The deployed audit evidence schema instead accepts optional `content_hash`; it has no `source_hash` field. Do not rename hashes by assumption. Omit optional hash fields unless their compatibility with the audit route is established.
+## Preserve Exact Quotes, Source Locations, and Hashes
 
-- `risk_tags=["comparison"]` requires evidence from at least two distinct items.
-- `risk_tags=["within_item_comparison"]` applies within one item. These tags are mutually exclusive.
-- `escalation="none"` is the initial setting. `"bounded"` is available for a specific unresolved gap within the main skill's repair budget.
-- Parenthetical citation years are stripped from claim text by a pre-tool hook. Bare dates remain numeric obligations; include them only when material and evidenced.
-- For a sentence crossing a page boundary, separate exact fragment references may avoid a containment failure without reconstructing the source text.
+Passage expansion supplies complete chunk text and `content_hash`.
+Sidecar lookup supplies source lines and `source_hash`; its continuations accept that value as `expected_hash`.
+The audit evidence schema has `content_hash`, not `source_hash`. These fields are not aliases: omit an optional hash unless its compatibility with the audit route is established.
 
-## Error Diagnostics
+A sentence spanning pages may use separate exact fragment references when supported, rather than reconstructed cross-page text.
+The Pi argument hook removes parenthetical citation years from claim text while preserving quotes and bare years.
+Quotes must also support any bare dates, sample sizes, and other numbers included in the claim.
 
-| Result | Meaning and next step |
+## Validation Errors
+
+| Result | Diagnostic check |
 |---|---|
-| `QUOTE_NOT_FOUND` | Compare the quote with the returned text for OCR repairs, omitted layout text, or changed hyphenation. A shorter exact quote, or re-reading the passage with `zotero_read_passage` or `zotero_find_in_item`, may resolve it. It does not establish source absence. |
-| `NUMBER_MISMATCH` / `UNIT_MISMATCH` | Check signs, ranges, thresholds, and whether the submitted quote contains the stated value and unit. Correct or omit the claim. |
-| `check_mode`, `CHECKER_UNAVAILABLE`, or `CHECKER_SKIPPED` | Legacy deployment. Stop the audit; do not consume the rerun trying different wording. |
-| Retained evidence preview omits its quote, or score diagnostics conflict | Response-contract problem. Do not infer fabrication or a source-level contradiction. |
+| `QUOTE_NOT_FOUND` | Compare the literal quote with source text, including layout breaks; an exact shorter excerpt may locate the problem |
+| `NUMBER_MISMATCH` / `UNIT_MISMATCH` | Inspect signs, ranges, thresholds, and whether the chosen excerpt contains the stated value and unit |
+| `CHUNK_NOT_FOUND` | Check the returned chunk identifier and whether the underlying evidence changed |
+| `check_mode`, `CHECKER_UNAVAILABLE`, `CHECKER_SKIPPED` | An outdated schema or tool capability, not a finding about the source; stop the audit as required by the core workflow |
+| Retained preview omits its quote or diagnostics conflict | The tool response does not meet its documented requirements; this is not evidence that the author or agent fabricated a result |
 
-If service diagnosis is needed, load [service operations](../../zotero-pipeline/references/service-ops.md). Reinstallation is a separate maintenance task, not an automatic part of answering a research question.
+Passing the audit does not establish that the source supports the claim. Apply citation-integrity's evidence rules when writing the answer.
+For a diagnosed service problem requiring maintenance, load [service operations](../../zotero-pipeline/references/service-ops.md).

@@ -21,7 +21,7 @@ Use every row that applies. A single answer or claim may require several kinds o
 ## What This Skill Covers
 
 This skill governs what evidence permits you to say, including in headings, summaries, and casual answers.
-For which papers to check, what to read next, and when to stop, follow [Zotero research](../zotero-research/SKILL.md).
+Use the task-specific Zotero skill to decide which papers to check, what to read next, and when to stop: [paper discovery](../zotero-paper-discovery/SKILL.md), [result comparison](../zotero-result-comparison/SKILL.md), [source reading](../zotero-source-reading/SKILL.md), [bibliography search](../zotero-bibliography-search/SKILL.md), or [citation analysis](../zotero-citation-analysis/SKILL.md).
 Do not run a separate verification pass when adequate evidence has already been read.
 
 - Ground every material claim in its own retrieved evidence. Never supply a paper's estimates, setting, specification, or mechanism from model memory.
@@ -132,9 +132,33 @@ Reuse metadata. Fetch missing citation identity only for papers actually cited, 
 
 ## 4. Write Claims and Cite Their Sources
 
-- Put a Markdown `[^cN]` footnote immediately after each source-grounded claim, including table entries and paper-inclusion claims. Give each paper in a comparison its own support.
-- Number markers in order of appearance. Reuse a marker only for the same source and location; different locations receive separate markers.
-- End with one `### Evidence` block containing only cited entries. Omit it only when no evidence was cited.
+### Cite material claims, not every inventory entry
+
+Use a Markdown `[^cN]` footnote immediately after:
+- Exact estimates, uncertainty measures, table values, and calculated transformations.
+- Findings, mechanisms, definitions, or interpretations attributed to a source.
+- Comparison and ranking claims. Give each paper whose result establishes the comparison its own support.
+- Consequential or genuinely contestable inclusion or exclusion decisions.
+
+Plain metadata may be listed without an evidence footnote when the claim goes no further than verified author, title, year, item key, item type, or scoped collection membership. Retain the item key or another compact identity locator in the list. Do not enumerate and cite every screened-out paper unless the user requests exclusions or an exclusion materially limits the answer. A failed search is not a source finding; report a material unresolved exclusion using the bounded wording in [extraction diagnostics](references/verification-workflow.md).
+
+### Use compact evidence locators for paper lists
+
+For candidate, eligibility, or inventory lists, prefer a compact evidence column over one footnote per row:
+
+```markdown
+| Paper | Why included | Evidence locator |
+|---|---|---|
+| Author (Year), Title | Estimates treatment effects on outcome | item KEY; Results, Table 2 |
+```
+
+The locator must identify the exact parent item and the supporting section, table, PDF page, passage, or sidecar window actually read. This compact format replaces row-level footnotes for the inclusion rationale. If the list contains metadata only, the item key is sufficient and the rationale column may be omitted.
+
+### Keep narrative citations precise and bounded
+
+- Number footnote markers in order of appearance.
+- One marker may support several claims drawn from the same table, passage, or tightly bounded result context in one paragraph or table row. Use a new marker when the source location, evidence route, or result context materially changes.
+- End with one `### Evidence` block containing only cited entries. Omit it when the answer contains no material source-grounded claims requiring footnotes or uses only compact list locators.
 - Each entry gives author/year, title when available, item key, and exact PDF page, passage, section, or sidecar lines. Distinguish printed pages from PDF indices when known.
 - Footnotes give source locations, not internal tool names or raw curly-brace records. Keep scores, hashes, and classification fields internal unless requested or material; never present score histories as corroboration.
 - Disclose reliance on weaker sidecar evidence in the answer; one brief note can cover several claims. Label table values needed to support the answer **table-extracted** unless source prose independently states them.
@@ -149,13 +173,13 @@ The paper reports the stated result.[^c1]
 [^c1]: Author — Title (Year); item KEY; Table 2, PDF p. 6.
 ```
 
-Keep structured JSON and canonical evidence records unchanged in machine-facing tasks; use footnotes for human-facing synthesis.
+Keep structured JSON and canonical evidence records unchanged in machine-facing tasks; use footnotes or compact evidence locators for human-facing synthesis.
 For record fields or when checking where evidence came from, load [evidence record formats](references/evidence-contracts.md).
 
 ## 5. Use Audit Results and Extraction Packets Carefully
 
 Automated audits are opt-in, not a requirement for numbers, causal claims, or comparisons.
-Use the [research audit workflow](../zotero-research/SKILL.md) only when Samuel explicitly requests it; never use `zotero_audit_claims` inside `zotero-extract`.
+Use [Zotero evidence audit](../zotero-evidence-audit/SKILL.md) only when Samuel explicitly requests it; never use `zotero_audit_claims` inside `zotero-extract`.
 An audit checks its specified evidence requirements; it does not establish that the source supports the claim, identifies a causal effect, makes estimates comparable, or covers all relevant papers. Never cite an audit as source evidence.
 Keep audit quotes literal and provenance truthful; do not repair OCR or alter thresholds to obtain acceptance.
 

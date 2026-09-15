@@ -1,75 +1,59 @@
 # Evidence Record Formats
 
-**Load this file when** preparing machine-readable evidence records or performing an explicit provenance inspection, not for every ordinary cited answer.
+**Load this file when** preparing machine-readable evidence records or checking where evidence came from.
 
-The [citation integrity skill](../SKILL.md) governs evidence eligibility, statistical reporting, and human-facing footnotes. The formats below describe internal records, not citation stamps to paste into chat. Retain only returned or otherwise verified fields; optional metadata does not justify another retrieval call.
+The [citation integrity skill](../SKILL.md) governs what can support a claim and how to cite it for readers.
+These are working-record examples, not a tool payload schema or extra bookkeeping required for every answer.
 
-## 1. Semantic-Passage Evidence
+## Source Evidence Fields
 
-Canonical record:
+| Field | Meaning |
+|---|---|
+| Item key and verified citation identity | Source to which the evidence belongs |
+| Supporting excerpt and result context | The actual claim support, including necessary notes |
+| Reading method | Indexed passage, extracted PDF text, full-source text, sidecar text, or inspected image |
+| Source location | Actual passage, section, PDF page index, printed page, or sidecar window |
+| Evidence ID | Returned `evidence_id`; neighbors have separate IDs |
+| Hash/version fields | Returned content/source identifiers, retained with their original names and route |
+| Source classification | Verified native `itemType`, `source_group`, and canonical tags when already available |
 
-```text
-{Author Year, item KEY, passage N/M, p. X if mapped, Rerank +S; itemType/source_group; canonical tags if present}
-```
-
-Retain returned `chunk_id`, `content_hash`, and `index_generation` alongside the record when available. Page labels require an established mapping to printed pages or PDF indices; otherwise the passage/section locator is sufficient.
-
-Current semantic results contain bounded previews and an `evidence_id`, not necessarily a complete matched passage. `zotero_read_passage` expands that token and returns the anchor and any requested neighbors with their own chunk identifiers. For a claim supported by a neighbor, retain that neighbor's locator; expansion adds no score and the anchor's score does not become the neighbor's score. Eligibility is governed by the main skill.
-
-## 2. Direct-Source Evidence
-
-Canonical records:
-
-```text
-{Author Year, item KEY, PDF p. X; itemType/source_group; canonical tags if present}
-{Author Year, item KEY, § heading; itemType/source_group; canonical tags if present}
-{Author Year, item KEY, lines X–Y; itemType/source_group; canonical tags if present}
-```
-
-Internally retain which route supplied the text: extracted PDF-page text, full-source text, or MinerU sidecar. Record visual inspection separately only if a page image was actually viewed. For sidecars, retain the returned `source_hash` and line/character window. Indexed offsets, source-file character offsets, sidecar lines, and PDF indices are different locators.
-
-## 3. Exact-Source Identity Evidence
-
-Canonical records:
+## Source Location Examples
 
 ```text
-{resolve_exact_source → exact, item KEY, collection scope verified}
-{resolve_exact_source → absent, requested identity, collection scope}
-{resolve_exact_source → ambiguous, competing item KEYs or metadata conflict}
+Author Year; item KEY; passage N/M; evidence_id=<returned token>; Rerank=<returned score>
+Author Year; item KEY; PDF p. X; Table Y; extracted page text
+Author Year; item KEY; PDF p. X; Table Y; inspected page image
+Author Year; item KEY; sidecar lines X–Y; source_hash=<returned hash>
 ```
 
-Resolver output includes identity status and membership context. These records describe identity only. A substantive answer instead cites its passage or direct-source evidence; it need not display a separate resolver record unless identity is material.
+Record a PDF page index only when its correspondence to the supporting text is established. Otherwise cite the passage, section, or sidecar lines actually read.
+`read_passage` character offsets belong to the stored chunk; `find_in_item` character offsets belong to the sidecar source.
+An expanded neighbor's source location identifies its text without acquiring the anchor's score.
 
-## 4. Bibliography-Reference Evidence
-
-Canonical record:
+## Identity and Bibliography Records
 
 ```text
-{zotero_search_bibliography_entries → citing KEY, entry N, status/method, resolution confidence C, parse P}
+Identity: exact / ambiguous / absent; original identifier; item keys; requested scope
+Bibliography: citing item KEY; entry identifier; raw entry; resolution status and method
 ```
 
-Retain the raw entry and its resolution status. BM25 scores measure text match, not identity confidence. `unresolved` or `ambiguous` entries remain raw occurrences rather than verified target identities.
+Resolver membership fields describe where an identity was established.
+Bibliography resolution confidence and BM25 match scores measure different things; do not use one in place of the other.
+Raw entries remain useful evidence that a mention occurred when the cited work's identity is unresolved.
 
-## 5. Citation-Graph Evidence
-
-Canonical records:
+## Graph Records
 
 ```text
-{zotero_rank_works_by_inbound_citations → scope collection KEY, item ABCDEFGH, rank #1, 14 inward citations}
-{zotero_get_citation_neighbors → scope collection-expanded KEY, seed ABCDEFGH, result ext:doi:..., incoming}
-{zotero_find_bibliographically_coupled_papers → scope library, seed ABCDEFGH, result HGFEDCBA, Jaccard 0.50, 1 shared citation}
+Inbound rank: scope=collection KEY; target KEY; rank=R; inward_citations=N
+Neighbors: scope=collection-expanded KEY; seed KEY; direction=incoming; target=ext:doi:...
+Coupling: scope=library; seed KEY; related KEY; Jaccard=J; shared_references=N
 ```
 
-Retain the explicit scope, direction, node kind, and returned measure. An inbound-edge count is not a raw bibliography occurrence count. Bibliography retrieval is useful when the question asks for raw occurrences or a specific unresolved identity needs checking; it is not a mandatory second pass for every graph result.
+Retain the actual returned measure, node kind, direction, and scope.
+For parameters and scope, load [bibliography and graph details](../../zotero-research/references/bibliography-graphs.md).
 
-For graph parameters and external-node scope details, load [search and retrieval](../../zotero-research/references/search-retrieval.md).
+## Classification Suffixes
 
-## 6. Source Classification Fields
-
-When already available, retain:
-
-- Native `itemType`, such as `journalArticle`, `preprint`, or `report`.
-- Returned or mapped `source_group`, such as `article`, `unpublished`, or `institutional`.
-- Canonical `review:*` or `type:*` tags, such as `review:checked` or `type:textbook`.
-
-Example suffix: `; journalArticle/article; review:checked`. These fields describe the source; they do not strengthen its evidence. Omit missing labels rather than making calls solely to fill them.
+Example: `journalArticle/article; review:checked`.
+Native types, query-time source groups, and tags are separate fields, not interchangeable credibility labels.
+If optional classification fields are missing, leave them absent; the core skill does not require retrieval solely to fill them in.

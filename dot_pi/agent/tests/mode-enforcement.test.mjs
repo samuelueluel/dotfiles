@@ -203,6 +203,22 @@ test("manual restores ask_user and disables YOLO", async () => {
   }
 });
 
+test("manual allows read-only Zotero passage and item searches", async () => {
+  const harness = createHarness(["mcp__zotero"]);
+  try {
+    for (const operation of ["zotero_read_passage", "zotero_find_in_item"]) {
+      const result = await harness.handlers.get("tool_call")(
+        { toolName: "mcp__zotero", toolCallId: `manual-${operation}`, input: { tool: operation, args: {} } },
+        harness.context,
+      );
+      assert.notEqual(result?.block, true, `${operation} should be allowed in manual mode`);
+    }
+  } finally {
+    await harness.settle();
+    harness.cleanup();
+  }
+});
+
 test("mode command accepts autoask and switches the tool surface", async () => {
   const harness = createHarness();
   try {
@@ -254,9 +270,9 @@ test("plan disables YOLO, keeps ask_user, and drops mutating tools from the surf
   }
 });
 
-test("plan intake permits only todo calls until the intake turn settles", async () => {
+test("plan intake permits the plan note read and todo calls only", async () => {
   intakeState.clearAllPlanIntakes();
-  const harness = createHarness(["read", "bash", "todo", "mcp"]);
+  const harness = createHarness(["read", "bash", "todo", "mcp", "mcp__zotero"]);
   try {
     intakeState.beginPlanIntake({
       sessionId: "mode-enforcement-test",
@@ -271,12 +287,50 @@ test("plan intake permits only todo calls until the intake turn settles", async 
     );
     assert.notEqual(todo?.block, true);
 
+    const planPath = "02_Memories/Saved-Plans/Test.md";
+    const directNoteRead = await harness.handlers.get("tool_call")(
+      { toolName: "turbovault_read_note", toolCallId: "note-read", input: { path: planPath } },
+      harness.context,
+    );
+    assert.notEqual(directNoteRead?.block, true);
+
+    const gatewayNoteRead = await harness.handlers.get("tool_call")(
+      { toolName: "mcp", toolCallId: "gateway-read", input: { tool: "turbovault_read_note", args: { path: planPath } } },
+      harness.context,
+    );
+    assert.notEqual(gatewayNoteRead?.block, true);
+
+    const proxyNoteRead = await harness.handlers.get("tool_call")(
+      { toolName: "mcp__turbovault", toolCallId: "proxy-read", input: { tool: "turbovault_read_note", args: { path: planPath } } },
+      harness.context,
+    );
+    assert.notEqual(proxyNoteRead?.block, true);
+
+    const gatewayWithAction = await harness.handlers.get("tool_call")(
+      { toolName: "mcp", toolCallId: "gateway-action", input: { action: "status", tool: "turbovault_read_note", args: { path: planPath } } },
+      harness.context,
+    );
+    assert.equal(gatewayWithAction.block, true);
+
+    const spoofedProxy = await harness.handlers.get("tool_call")(
+      { toolName: "mcp__zotero", toolCallId: "spoofed-proxy", input: { tool: "turbovault_read_note", args: { path: planPath } } },
+      harness.context,
+    );
+    assert.equal(spoofedProxy.block, true);
+
+    const otherNoteRead = await harness.handlers.get("tool_call")(
+      { toolName: "turbovault_read_note", toolCallId: "other-note", input: { path: "02_Memories/Unrelated.md" } },
+      harness.context,
+    );
+    assert.equal(otherNoteRead.block, true);
+    assert.match(otherNoteRead.reason, /only the plan note read and todo calls are permitted/);
+
     const blocked = await harness.handlers.get("tool_call")(
       { toolName: "bash", toolCallId: "execution-call", input: { command: "stata-mp -b do analysis.do" } },
       harness.context,
     );
     assert.equal(blocked.block, true);
-    assert.match(blocked.reason, /only todo calls are permitted/);
+    assert.match(blocked.reason, /only the plan note read and todo calls are permitted/);
   } finally {
     intakeState.clearAllPlanIntakes();
     harness.cleanup();

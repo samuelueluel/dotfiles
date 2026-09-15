@@ -2,14 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  PLAN_WORKFLOW_REMINDER,
   TodoReminderTracker,
   allOpenTodoWorkBlocked,
   assistantAppearsToAwaitUserInput,
   extractLatestTodoSnapshot,
   hasOpenTodoWork,
+  hasPlanSourcedOpenWork,
   isRealTodoMutation,
   parseTodoSnapshot,
   readTodoReminderConfig,
+  renderTodoReminder,
 } from "../lib/todo-reminder-logic.ts";
 
 const task = (id, status, extra = {}) => ({ id, subject: `task ${id}`, status, ...extra });
@@ -159,4 +162,78 @@ test("mutation detection uses details.error and snapshot comparison", () => {
   assert.equal(isRealTodoMutation(before, after, details("update", after.tasks)), true);
   assert.equal(isRealTodoMutation(before, before, details("update", before.tasks)), false);
   assert.equal(isRealTodoMutation(before, after, details("update", after.tasks, 2, { error: "rejected" })), false);
+});
+
+const planTask = (id, status, extra = {}) => ({
+  id,
+  subject: `unit ${id}`,
+  status,
+  metadata: { plan_source: "02_Memories/Saved-Plans/Advisor-Workflow.md", plan_step_id: "U1" },
+  ...extra,
+});
+
+test("detects open plan-sourced work from task metadata", () => {
+  assert.equal(hasPlanSourcedOpenWork({ tasks: [planTask(1, "pending")], nextId: 2 }), true);
+  assert.equal(hasPlanSourcedOpenWork({ tasks: [planTask(1, "in_progress")], nextId: 2 }), true);
+  assert.equal(hasPlanSourcedOpenWork({ tasks: [planTask(1, "completed")], nextId: 2 }), false);
+  assert.equal(hasPlanSourcedOpenWork({ tasks: [task(1, "pending")], nextId: 2 }), false);
+  assert.equal(hasPlanSourcedOpenWork({ tasks: [planTask(1, "pending", { metadata: {} })], nextId: 2 }), false);
+  assert.equal(hasPlanSourcedOpenWork(undefined), false);
+});
+
+test("plan-sourced state rides drift and settled reminders and survives restore", () => {
+  const tracker = new TodoReminderTracker({ threshold: 1, maxNudgesPerCycle: 2 });
+  tracker.observeTodoResult(details("create", [planTask(1, "pending")]));
+  tracker.observeSuccessfulAction();
+
+  const payload = tracker.consumeReminder();
+  assert.equal(payload.planSourced, true);
+  const rendered = renderTodoReminder(payload);
+  assert.match(rendered, /Todo Alignment Check/);
+  assert.match(rendered, /\[Plan Note\]/);
+  assert.match(rendered, /re-read it for a unit's full details or after compaction/);
+  assert.match(rendered, /Objective, Decisions, or Stop conditions, stop and ask first/);
+
+  const plain = new TodoReminderTracker({ threshold: 1, maxNudgesPerCycle: 2 });
+  plain.observeTodoResult(details("create", openSnapshot));
+  plain.observeSuccessfulAction();
+  assert.equal(renderTodoReminder(plain.consumeReminder()).includes("[Plan Note]"), false);
+});
+
+test("one-shot plan reminder arms on restore and consumes once", () => {
+  const snapshot = { tasks: [planTask(1, "pending")], nextId: 2 };
+  const tracker = new TodoReminderTracker({ threshold: 1, maxNudgesPerCycle: 2 });
+  tracker.restore(snapshot);
+  assert.equal(tracker.consumePlanReminder(), PLAN_WORKFLOW_REMINDER);
+  assert.equal(tracker.consumePlanReminder(), undefined);
+
+  const withoutPlanWork = new TodoReminderTracker({ threshold: 1, maxNudgesPerCycle: 2 });
+  withoutPlanWork.restore({ tasks: openSnapshot, nextId: 2 });
+  assert.equal(withoutPlanWork.consumePlanReminder(), undefined);
+
+  // Once all plan tasks complete, a restore must not re-arm the reminder.
+  const settled = new TodoReminderTracker({ threshold: 1, maxNudgesPerCycle: 2 });
+  settled.restore({ tasks: [planTask(1, "completed")], nextId: 2 });
+  assert.equal(settled.consumePlanReminder(), undefined);
+
+  // Completion between restore and consumption suppresses the one-shot.
+  const completedAfterRestore = new TodoReminderTracker({ threshold: 1, maxNudgesPerCycle: 2 });
+  completedAfterRestore.restore({ tasks: [planTask(1, "pending")], nextId: 2 });
+  completedAfterRestore.observeTodoResult(details("update", [planTask(1, "completed")]));
+  assert.equal(completedAfterRestore.consumePlanReminder(), undefined);
+});
+
+test("armed one-shot suppresses the plan suffix on a simultaneous drift reminder", () => {
+  const tracker = new TodoReminderTracker({ threshold: 1, maxNudgesPerCycle: 2 });
+  tracker.restore({ tasks: [planTask(1, "pending")], nextId: 2 });
+  tracker.observeSuccessfulAction();
+
+  const drift = tracker.consumeReminder();
+  assert.equal(drift.planSourced, false);
+  assert.equal(renderTodoReminder(drift).includes("[Plan Note]"), false);
+  assert.match(tracker.consumePlanReminder(), /\[Plan Note\]/);
+
+  // With no one-shot pending, drift carries the plan guidance again.
+  tracker.observeSuccessfulAction();
+  assert.equal(tracker.consumeReminder().planSourced, true);
 });

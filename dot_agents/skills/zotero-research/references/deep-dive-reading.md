@@ -2,7 +2,7 @@
 
 **Load this file when** expanding a retrieved passage, continuing truncated text, locating a table, or checking damaged extracted text.
 
-[Zotero research](../SKILL.md), section 3, explains what to read next. Choose the example that fits the missing evidence; do not run every example for each claim.
+The active task skill—normally [source reading](../../zotero-source-reading/SKILL.md) or [result comparison](../../zotero-result-comparison/SKILL.md)—decides what to read next. Choose the example that fits the missing evidence; do not run every example for each claim.
 
 ## Expand an Existing Hit
 
