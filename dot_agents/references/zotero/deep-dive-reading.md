@@ -58,7 +58,7 @@ First use the literal PDF route when an exact phrase, heading, or table label mu
 
 ```python
 zotero_find_in_pdf(item_key=item_key, query="Table 5", start_page=1,
-                   end_page=20, max_matches=3, max_chars=16000)
+                   end_page=20, max_matches=3, offset=0, max_chars=16000)
 ```
 
 Then read the targeted page's extracted text:
@@ -68,7 +68,7 @@ zotero_read_pdf_pages(item_key=item_key, start_page=verified_pdf_page,
                      end_page=verified_pdf_page)
 ```
 
-Use an available PDF outline or `zotero_find_in_pdf` result to establish `verified_pdf_page`, the actual one-based page index in the file. Printed page labels, sidecar lines, and indexed offsets do not establish that locator. `zotero_find_in_pdf` reports exact total and returned matches and whether the requested text layer is complete; `partial_text_coverage` and `no_usable_text` do not support an absence claim.
+Use an available PDF outline or `zotero_find_in_pdf` result to establish `verified_pdf_page`, the actual one-based page index in the file. Printed page labels, sidecar lines, and indexed offsets do not establish that locator. `zotero_find_in_pdf` reports exact total and returned matches, complete `match_pages`, `omitted_match_pages`, and whether the requested text layer is complete. When `has_more_matches` is true, continue with `next_offset` or narrow the page range to omitted late pages. `partial_text_coverage` and `no_usable_text` do not support an absence claim.
 A section heading, printed page label, or sidecar line range alone does not establish that index.
 If the PDF page index is unavailable, the core workflow permits reading a precise sidecar window and reporting its actual source location.
 

@@ -12,7 +12,10 @@ description: Compares or ranks empirical findings across an explicit Zotero item
 - State the comparison basis before detailed extraction. Distinguish overall outcomes, subtypes, counts, rates, percentages, treatment doses, populations, areas, and horizons.
 - Do not normalize unlike estimates without justification. Never assume linear dose scaling.
 - Separate the largest point estimate, significance against zero, and evidence that estimates differ.
-- Read only papers that can plausibly lead or change the ranking. Once the leader and up to two relevant alternatives are supported, stop.
+- Classify estimates as main, subgroup, dosage, dynamic, supplemental, robustness, or model-based. Dynamic and subgroup estimates remain eligible unless the user's rule or declared policy excludes them.
+- For largest-effect requests, record both the paper's primary result and its maximum substantive significant result. Do not let an auxiliary placebo or mechanical robustness cell become a paper's representative maximum.
+- Exhaustively inventory eligible results for every item in the frozen set before ranking. Selective deep verification applies after result-level coverage, not before it.
+- Do not declare a collection-wide winner while any frozen item lacks a terminal result card.
 - Never repair signs, digits, stars, columns, confidence intervals, or p-values by intuition.
 - Discuss only the leader and the alternatives needed to explain the result. Name, but do not summarize, the remaining papers when the user requests only identification.
 
@@ -30,34 +33,42 @@ If no bounded item set exists and plausible definitions would materially change 
 
 ### 1. Choose the ranking rule
 
-Write one precise internal rule before extracting numbers. Examples:
+Write one precise internal rule and one eligibility policy before extracting numbers. Supported policies are:
 
 ```text
-Maximum percentage reduction for any crime subtype in each paper's primary local specification; exclude robustness and dynamic maxima.
+primary_only: rank each paper's preferred or headline result.
+substantive_all: rank the largest statistically significant substantive result across main, subgroup, dosage, and dynamic estimates; exclude placebos and mechanical robustness checks.
+custom: follow the user's explicit eligibility rule.
 ```
 
-```text
-Largest main intention-to-treat effect on the overall outcome at the paper's stated follow-up horizon.
-```
+Use `substantive_all` when Samuel asks for the largest effect “however measured,” broadly authorizes judgment, or otherwise requests the maximum without limiting the specification. Use `primary_only` for main, preferred, headline, or intention-to-treat findings. Do not silently exclude dynamic estimates; identify their period and duration and decide whether a short-lived maximum is substantively impressive under the ranking rule.
 
 When Samuel authorizes judgment, choose and state the rule. If one unresolved definition would select a different winner and judgment was not authorized, ask one focused question.
 
-### 2. Triage the frozen papers
+### 2. Build a complete result inventory
 
-Maintain these states:
+Comparison requires exhaustive relevant-result coverage across the frozen set. This means reading enough of each paper's relevant results, tables, captions, notes, and source prose to identify every estimate eligible under the ranking rule; it does not require reading every page of every paper.
 
-- `comparable`: source evidence establishes an estimate on the chosen basis.
-- `different_estimand`: relevant finding, but not on the selected basis.
-- `outside_comparison`: the frozen paper cannot win under the rule.
-- `unresolved`: a missing fact could still change the ranking.
+Maintain one terminal result card for every frozen parent item:
 
-Use discovery passages and existing working context first. Do not reread evidence already adequate in the current session.
+```text
+item_key
+status: eligible | no_eligible_result | unresolved
+eligible_results:
+  outcome, point estimate, scale, uncertainty
+  treatment, dose, denominator, population, geography, horizon
+  result_class: main | subgroup | dosage | dynamic | supplemental | robustness | model_based
+  specification status and evidence locator
+primary_result_id: paper's preferred or headline result
+maximum_substantive_result_id: largest significant substantive result
+selected_result_id: result selected by the declared eligibility policy
+inventory_locators: exact tables, PDF pages, or bounded passages read
+reason: required for no_eligible_result; explain unresolved fields when unresolved
+```
 
-Prioritize:
+`eligible` requires at least one result, all three result-role IDs, and exact inventory locators. `no_eligible_result` requires an explicit reason and no result records. `unresolved` may contain partial results but cannot supply a selected maximum for a complete-scope comparison. Record whether primary-only and substantive-all policies would produce different top sets.
 
-1. The apparent leader.
-2. The paper most likely to exceed it.
-3. A third paper only when it remains a credible challenger or clarifies the comparison.
+Use discovery passages and existing working context first. Do not reread evidence already adequate in the current session. Do not rank, deep-verify only the apparent leader, or silently omit a frozen paper before every card is terminal.
 
 ### 3. Collect decisive evidence
 
@@ -68,7 +79,7 @@ If the composite tool is unavailable, use this bounded sequence:
 1. `zotero_read_passage` for an existing evidence ID.
 2. `zotero_find_in_item` with a distinctive table label or source phrase.
 3. Continue a sidecar read with the returned `source_hash` as `expected_hash`.
-4. `zotero_find_in_pdf` to establish the actual one-based PDF page.
+4. `zotero_find_in_pdf` to establish the actual one-based PDF page. When `has_more_matches` is true, inspect `match_pages` and `omitted_match_pages`, then continue with `offset` or a narrower late-page range.
 5. `zotero_read_pdf_pages` for the targeted result and notes.
 6. `zotero_render_pdf_page` only when text leaves a decisive visual ambiguity.
 
@@ -87,29 +98,35 @@ For every estimate that will appear in the answer, establish:
 - Whether parentheses are SEs, CIs, or another statistic.
 - Exact reported p-value, CI, SE, or significance threshold when available.
 
-A decisive table read must include row and column labels plus notes. PDF text can lose signs and alignment just as sidecars can.
+A decisive table read must include row and column labels plus notes. Source prose that names a table does not complete a paper-level maximum until the referenced table is read; treat `REFERENCED_TABLE_NOT_READ` as required follow-up. PDF text can lose signs and alignment just as sidecars can.
 
 Use unambiguous source prose only when it directly describes the same result. If text routes disagree or remain ambiguous, inspect the actual rendered page image. If image inspection is unavailable or inconclusive, omit the value or mark it unverified.
 
 If a CI and p-value disagree, inspect the methods and table layout. Otherwise state that the extracted or reported values disagree; never say “as printed” without verified page evidence.
 
-### 5. Validate the draft evidence structure
+### 5. Validate coverage and evidence structure
 
-For a multi-paper numerical ranking, use `zotero_validate_evidence_bundle` after selecting the exact claim evidence. Treat it as a linter only. It can detect missing evidence links, scale or uncertainty fields, comparator items, calculation labels, page provenance, and unresolved ambiguity. Passing does not establish substantive support and is never cited.
+Before ranking, submit the completed manifest to `zotero_validate_comparison_manifest`. Include the frozen item keys, one terminal result card per item, the ranking rule, eligibility policy, primary and maximum-substantive result IDs, inventory locators, selected item keys, numerical and substantive winner status, whether an alternative policy changes the top set, and the maximum number of items permitted in the final analysis. The tool checks coverage, result-policy consistency, unresolved-item policy, selected maxima, and declared output scope; it does not read sources or judge estimates.
 
-After substantive verification, apply `citation-integrity`'s automatic final contract-audit rule to audit-ready numerical or comparison claims.
+A clear numerical winner is merely the largest value under the rule. A clear substantive winner remains persuasive after accounting for dose, denominator, population, area, and horizon. Use `top_k` when the numerical winner is clear but the substantive winner is not.
 
-### 6. Answer and stop
+For a multi-paper numerical ranking, draft the final quantitative and comparison claims in structured form and call `zotero_validate_evidence_bundle` with `allowed_item_keys` set to the selected top-one or top-three keys. Treat it as a linter only. It can detect evidence from unselected papers, missing evidence links, scale or uncertainty fields, comparator items, calculation labels, page provenance, and unresolved ambiguity. Passing does not establish substantive support and is never cited.
+
+After substantive verification, apply `citation-integrity`'s one-pass final contract-audit rule to the audit-ready claims that will actually appear in the answer.
+
+### 6. Deep-verify, answer, and stop
+
+After every item has a terminal result card, deep-verify the winner and only the close alternatives needed to explain the ranking. Do not retrieve detailed statistics for papers that will only be named.
 
 Lead with the winner and the qualification needed to interpret it. Normally give:
 
 - One explicit comparison basis.
 - The winning paper and decisive estimate with inference.
-- One or two alternatives only when needed to show why the winner leads.
+- Alternatives only when the ranking is genuinely close or the user requests a top-three set.
 - Material differences in dose, denominator, population, area, or horizon.
-- One bounded uncertainty statement if an unresolved paper could change the result.
+- One bounded uncertainty statement if the conclusion is limited to verified estimates.
 
-Do not summarize the rest of the frozen list. Follow `citation-integrity` for claim-level footnotes; one tightly bounded table or passage may use one marker for several values.
+Respect the requested output boundary. If both the numerical and substantive winner are clear, analyze one paper. When estimands differ materially and Samuel permits alternatives, report the top three even if one paper is the numerical leader, and say so directly. Analyze no unselected paper; name the remaining papers without statistics or summary. Follow `citation-integrity` for claim-level footnotes; one tightly bounded table or passage may use one marker for several values.
 
 ## Evidence Invariants
 
@@ -123,4 +140,4 @@ Do not summarize the rest of the frozen list. Follow `citation-integrity` for cl
 
 ## Stop Condition
 
-Stop when the comparison rule, leader, requested inference, and only the necessary alternatives are supported. Do not retrieve extra statistics for papers that will only be named.
+Stop only after every frozen item has a terminal result card, the comparison manifest validates, and the comparison rule, leader, requested inference, and only the necessary alternatives are supported. Do not retrieve extra statistics for papers that will only be named.

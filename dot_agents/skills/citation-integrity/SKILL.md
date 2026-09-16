@@ -181,20 +181,20 @@ For record fields or when checking where evidence came from, load [evidence reco
 
 ### Automatic mechanical audit
 
-After substantive source review and before the final answer, run one `zotero_audit_claims` call with `escalation="none"` when the answer contains audit-ready evidence for any of these:
+After substantive source review and before the final answer, run one `zotero_audit_claims` audit cycle with `escalation="none"` when the answer contains audit-ready evidence for any of these:
 
 - Exact empirical estimates or uncertainty measures.
 - Direct quotations.
 - Cross-paper numerical comparisons.
 - Other material quantitative claims where a wrong item, quote, number, or unit would change the answer.
 
-Audit no more than eight atomic claims. Use the exact parent item keys, evidence routes, locators, queries, and literal quotes already collected by the governing task skill. Do not retrieve another representation merely to make the payload audit-ready.
+Audit no more than eight atomic claims, and audit only claims that will actually appear in the final answer. For a comparison, pass `allowed_item_keys` from the validated top-one or top-three selection. Prioritize the decisive estimates and ranking claim; do not audit intermediate working claims. Use `expected_values` for empirical estimates, SEs, CI endpoints, p-values, thresholds, and sample sizes so table, figure, model, page, and year numbers in prose are not audited as findings. Use the exact parent item keys, evidence routes, locators, queries, and literal quotes already collected by the governing task skill. Do not retrieve another representation merely to make the payload audit-ready.
 
 Skip the audit for metadata-only inventories, paper-discovery lists with compact locators, bibliography occurrences, citation-graph results, routine qualitative summaries, and claims without audit-ready evidence. Never call `zotero_audit_claims` inside `zotero-extract`.
 
 The audit rehydrates evidence and checks mechanical contracts such as source identity, quote containment, fresh positive semantic rerank, numbers and units, and comparator-item coverage. It does not establish entailment, causal validity, table interpretation, comparability, or scope completeness. Never cite the audit as source evidence or describe a passing status as proof.
 
-If the audit exposes a genuine wrong key, quote, number, unit, or locator, correct the claim or evidence before answering. Do not alter source text, weaken thresholds, or begin a search cycle solely to obtain a passing status. Treat stale schemas, unavailable checkers, and contradictory diagnostics as tool failures rather than source findings.
+One audit cycle permits one initial call and at most one corrected resubmission. Resubmit only when the first result exposes a genuine caller-payload error such as a wrong locator, truncated quote, omitted expected value, or incorrect item key. Do not resubmit when the returned excerpt visibly contains the claimed values and the diagnostic indicates a parser defect. Correct genuine errors before answering, but do not alter source text, weaken thresholds, or begin a search cycle solely to obtain a passing status. Treat stale schemas and unavailable checkers as tool failures rather than source findings. Never include audit status or diagnostics in the final answer unless the capability failure materially limits the answer.
 
 For payload fields, route rules, and reason codes, load [claim-audit reference](references/claim-audit.md).
 

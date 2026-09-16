@@ -6,7 +6,7 @@ Follow [citation integrity](../SKILL.md) for the automatic audit boundary, evide
 
 ## Prepare the Tool Arguments
 
-Submit no more than eight atomic claims in one call with `escalation="none"`. Each claim has `claim_id`, `text`, `risk_tags`, and one to four evidence references. One claim represents one attributed result, quotation, estimate, null finding, or comparison rather than several unrelated findings.
+Submit no more than eight atomic claims in one call with `escalation="none"`. For a validated comparison, pass the selected top-one or top-three parent keys as `allowed_item_keys`. Each claim has `claim_id`, `text`, `risk_tags`, optional structured `expected_values`, and one to four evidence references. One claim represents one attributed result, quotation, estimate, null finding, or comparison rather than several unrelated findings.
 
 | Evidence route | Required fields | Optional source-location and hash fields |
 |---|---|---|
@@ -16,7 +16,19 @@ Submit no more than eight atomic claims in one call with `escalation="none"`. Ea
 
 Item keys are eight-character parent keys, not titles, DOIs, paths, or collections. The tool rejects caller-supplied source bodies and reranker scores.
 
-Numeric claims require evidence from a PDF-page read, or the supported weaker MinerU-sidecar fallback after a PDF-page route fails. Accepted quotes must contain the values and units. Use `risk_tags=["comparison"]` for a cross-paper comparison with evidence from at least two distinct items. Use `risk_tags=["within_item_comparison"]` for a comparison inside one item. The tags are mutually exclusive.
+Numeric claims require evidence from a PDF-page read, or the supported weaker MinerU-sidecar fallback after a PDF-page route fails. Accepted quotes must contain the values and units. Supply `expected_values` for the empirical values to audit so structural numbers such as `Table 6`, `Figure 2`, publication years, and PDF pages are not treated as findings.
+
+```json
+{
+  "expected_values": [
+    {"role": "estimate", "value": "-0.164"},
+    {"role": "se", "value": "0.052"},
+    {"role": "p_threshold", "operator": "<", "value": "0.01"}
+  ]
+}
+```
+
+Supported roles include `estimate`, `se`, `ci_lower`, `ci_upper`, `p_value`, `p_threshold`, `sample_size`, and `other`. A `p_threshold` requires `<`, `<=`, `=`, `>=`, or `>`. Use `risk_tags=["comparison"]` for a cross-paper comparison with evidence from at least two distinct items. Use `risk_tags=["within_item_comparison"]` for a comparison inside one item. The tags are mutually exclusive.
 
 ## Preserve Exact Evidence
 
@@ -50,6 +62,6 @@ None of these statuses decides whether the source substantively entails the clai
 | `check_mode`, `CHECKER_UNAVAILABLE`, `CHECKER_SKIPPED` | Treat as an outdated schema or unavailable capability, not a finding about the source. |
 | Retained preview omits its quote or diagnostics conflict | Treat as a response-contract failure, not evidence that the author or agent fabricated a result. |
 
-Correct genuine claim-to-evidence errors before answering. Do not weaken checks, repair OCR, alter quotes, or start repeated retrieval cycles to force acceptance. If the tool itself is stale or unavailable, report the capability limitation only when material and continue under the substantive evidence rules in `citation-integrity`.
+Correct genuine claim-to-evidence errors before answering. One audit cycle permits one corrected resubmission only for a genuine caller-payload error. Do not resubmit for a parser defect when the accepted excerpt visibly contains the values. Do not weaken checks, repair OCR, alter quotes, or start repeated retrieval cycles to force acceptance. If the tool itself is stale or unavailable, report the capability limitation only when material and continue under the substantive evidence rules in `citation-integrity`.
 
 For a diagnosed service problem requiring maintenance, load [service operations](../../zotero-pipeline/references/service-ops.md).
