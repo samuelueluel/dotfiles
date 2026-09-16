@@ -16,7 +16,7 @@ Submit no more than eight atomic claims in one call with `escalation="none"`. Fo
 
 Item keys are eight-character parent keys, not titles, DOIs, paths, or collections. The tool rejects caller-supplied source bodies and reranker scores.
 
-Numeric claims require evidence from a PDF-page read, or the supported weaker MinerU-sidecar fallback after a PDF-page route fails. Accepted quotes must contain the values and units. Supply `expected_values` for the empirical values to audit so structural numbers such as `Table 6`, `Figure 2`, publication years, and PDF pages are not treated as findings.
+Numeric claims require evidence from a PDF-page read, or the supported weaker MinerU-sidecar fallback after a PDF-page route fails. Accepted quotes must contain the values and any explicitly asserted units; a unit-less expected value matches any source unit for that number, so an SE printed as `(10.66%)` satisfies a unit-less `se` entry. Supply `expected_values` for the empirical values to audit so structural numbers such as `Table 6`, `Figure 2`, publication years, and PDF pages are not treated as findings.
 
 ```json
 {
@@ -50,6 +50,8 @@ The Pi argument hook may remove parenthetical citation years from claim text whi
 - `unsupported`: A deterministic contradiction such as a quote, number, unit, or comparator mismatch was found.
 - `insufficient`: The supplied evidence did not establish the required contract.
 
+Each result carries `gate_failures` entries (code, message, blocking) whose messages list the missing and quoted tokens behind `NUMBER_MISMATCH` and `UNIT_MISMATCH`; read them before deciding whether a failure is a caller-payload error.
+
 None of these statuses decides whether the source substantively entails the claim, whether causal wording is justified, whether a table was interpreted correctly, or whether estimates are comparable. The final answer cites the source evidence, never the audit result.
 
 ## Handle Validation Errors
@@ -57,7 +59,7 @@ None of these statuses decides whether the source substantively entails the clai
 | Result | Diagnostic check |
 |---|---|
 | `QUOTE_NOT_FOUND` | Compare the literal quote with the source, including layout breaks; correct a genuine transcription or locator error rather than rewriting source text. |
-| `NUMBER_MISMATCH` / `UNIT_MISMATCH` | Inspect signs, ranges, thresholds, and whether the accepted excerpt contains the stated value and unit. |
+| `NUMBER_MISMATCH` / `UNIT_MISMATCH` | Read the `gate_failures` message first — it lists the missing and quoted tokens — then inspect signs, ranges, thresholds, and whether the accepted excerpt contains the stated value and unit. |
 | `CHUNK_NOT_FOUND` | Check the returned chunk identifier and whether the indexed evidence changed. |
 | `check_mode`, `CHECKER_UNAVAILABLE`, `CHECKER_SKIPPED` | Treat as an outdated schema or unavailable capability, not a finding about the source. |
 | Retained preview omits its quote or diagnostics conflict | Treat as a response-contract failure, not evidence that the author or agent fabricated a result. |

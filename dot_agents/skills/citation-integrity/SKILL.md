@@ -116,7 +116,7 @@ Distinguish extracted PDF-page text, MinerU sidecar text, indexed passages, and 
 `zotero_read_pdf_pages` returns text, not an image inspection. Describe the evidence as extracted PDF-page text, not the vague label “direct PDF.”
 Indexed passages and literal lookups may expose the same sidecar. Agreement does not independently verify its accuracy.
 
-`zotero_find_in_pdf` is a bounded literal lookup over the authoritative PDF text layer. It returns one-based PDF page locators, verbatim extracted windows, exact total/returned match counts, and text-layer coverage. Coverage is `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage cannot establish absence. Its PDF page index is distinct from a printed label, MinerU sidecar line, or indexed offset.
+`zotero_find_in_pdf` is a bounded literal lookup over the authoritative PDF text layer. It returns one-based PDF page locators, verbatim extracted windows, exact total/returned match counts, and text-layer coverage. Coverage is `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage cannot establish absence. Its PDF page index is distinct from a printed label, MinerU sidecar line, or indexed offset. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key in the locator.
 
 All extracted text can lose signs, digits, stars, or column alignment, including PDF text layers.
 If a value needed to support the answer is ambiguous, use unambiguous source prose or inspect the actual page/table image with an available tool.
@@ -150,10 +150,10 @@ For candidate, eligibility, or inventory lists, prefer a compact evidence column
 ```markdown
 | Paper | Why included | Evidence locator |
 |---|---|---|
-| Author (Year), Title | Estimates treatment effects on outcome | item KEY; Results, Table 2 |
+| [Author (Year), Title](zotero://select/library/items/KEY) | Estimates treatment effects on outcome | [PDF p. 6](zotero://open-pdf/library/items/ATT_KEY?page=6); Results, Table 2 |
 ```
 
-The locator must identify the exact parent item and the supporting section, table, PDF page, passage, or sidecar window actually read. This compact format replaces row-level footnotes for the inclusion rationale. If the list contains metadata only, the item key is sufficient and the rationale column may be omitted.
+Wrap the paper title in a `zotero://select/library/items/<PARENT_KEY>` link. When PDF tools return a ready-made `[PDF p. X](zotero://open-pdf/library/items/<ATT_KEY>?page=X)` locator, paste it into the locator column. If reading from a sidecar or semantic passage without a resolved PDF page, retain the plain locator (`passage abc123` or `sidecar lines 45-60`). If the list contains metadata only, the linked item key or title is sufficient and the rationale column may be omitted.
 
 ### Keep narrative citations precise and bounded
 
@@ -171,8 +171,10 @@ The locator must identify the exact parent item and the supporting section, tabl
 The paper reports the stated result.[^c1]
 
 ### Evidence
-[^c1]: Author — Title (Year); item KEY; Table 2, PDF p. 6.
+[^c1]: [Author — Title (Year)](zotero://select/library/items/KEY); Table 2, [PDF p. 6](zotero://open-pdf/library/items/ATT_KEY?page=6).
 ```
+
+Wrap cited titles with their `zotero://select/library/items/<PARENT_KEY>` link. When citing a verified PDF page, paste the tool-returned `[PDF p. X](zotero://open-pdf/library/items/<ATT_KEY>?page=X)` token. Do not hand-craft attachment URLs if an attachment key was not returned; use the plain text locator.
 
 Keep structured JSON and canonical evidence records unchanged in machine-facing tasks; use footnotes or compact evidence locators for human-facing synthesis.
 For record fields or when checking where evidence came from, load [evidence record formats](references/evidence-contracts.md).

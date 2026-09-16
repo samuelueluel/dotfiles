@@ -44,7 +44,7 @@ Inspect the deployed schema, then prefer `zotero_build_candidate_scope`.
 
 Supply two to four distinct semantic facets. Each facet should cover a different way a qualifying paper could describe the treatment or outcome. For example, a crime request may need separate facets for neighborhood offenses, violence or homicide, and individual arrests or incarceration.
 
-Normally use `limit_per_facet=5–8`. Raise it only when the collection is large or the inclusion rule is unusually broad. The tool inventories the verified collection, deduplicates parent items, preserves evidence IDs, and rejects out-of-scope hits. It does not decide inclusion.
+Normally use `limit_per_facet=5–8`. Raise it only when the collection is large or the inclusion rule is unusually broad. The tool inventories the verified collection, deduplicates parent items, preserves evidence IDs, and rejects out-of-scope hits. It does not decide inclusion. The full inventory array ships only when `include_inventory=true`; scope coverage fields are always present — request it when candidate screening needs row-level identity metadata.
 
 If the composite tool is unavailable:
 
@@ -64,7 +64,7 @@ Maintain a short internal ledger:
 
 A positive rerank passage can support inclusion only after its text is read in context. Expand the retained evidence ID with `zotero_read_passage`; do not rerun semantic search to see the same hit again.
 
-For a plausible title missed by semantic retrieval, use one exact-item semantic search or a distinctive `zotero_find_in_item` phrase. Do not use a single no-match for `crime`, `health`, or another broad term as proof of absence.
+For a plausible title missed by semantic retrieval, use one exact-item semantic search or a distinctive `zotero_find_in_item` phrase. Do not use a single no-match for `crime`, `health`, or another broad term as proof of absence. Searches that pin exact item keys report the keys that returned no passage; treat a reported no-hit exactly like any other missing hit.
 
 After two uninformative attempts on the same missing inclusion fact, change the reading method once or leave the item unresolved. Do not cycle through synonyms.
 

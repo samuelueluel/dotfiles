@@ -80,7 +80,7 @@ For every estimate reported, establish:
 
 For a decisive table value:
 
-1. Locate its actual PDF page with `zotero_find_in_pdf` or a verified outline.
+1. Locate its actual PDF page with `zotero_find_in_pdf` or a verified outline. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key with the locator.
 2. Read the result and notes with `zotero_read_pdf_pages`.
 3. Compare with unambiguous source prose when available.
 4. If signs, digits, stars, or columns remain unclear, call `zotero_render_pdf_page` and inspect the image.

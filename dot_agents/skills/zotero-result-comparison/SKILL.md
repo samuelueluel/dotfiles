@@ -58,7 +58,8 @@ eligible_results:
   outcome, point estimate, scale, uncertainty
   treatment, dose, denominator, population, geography, horizon
   result_class: main | subgroup | dosage | dynamic | supplemental | robustness | model_based
-  specification status and evidence locator
+  specification status and evidence IDs (retained `zr1:...` IDs or
+  route-prefixed locators: `pdf:KEY:p12:label`, `mineru:KEY:line7`)
 primary_result_id: paper's preferred or headline result
 maximum_substantive_result_id: largest significant substantive result
 selected_result_id: result selected by the declared eligibility policy
@@ -79,7 +80,7 @@ If the composite tool is unavailable, use this bounded sequence:
 1. `zotero_read_passage` for an existing evidence ID.
 2. `zotero_find_in_item` with a distinctive table label or source phrase.
 3. Continue a sidecar read with the returned `source_hash` as `expected_hash`.
-4. `zotero_find_in_pdf` to establish the actual one-based PDF page. When `has_more_matches` is true, inspect `match_pages` and `omitted_match_pages`, then continue with `offset` or a narrower late-page range.
+4. `zotero_find_in_pdf` to establish the actual one-based PDF page. When `has_more_matches` is true, inspect `match_pages` and `omitted_match_pages`, then continue with `offset` or a narrower late-page range. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key with the locator.
 5. `zotero_read_pdf_pages` for the targeted result and notes.
 6. `zotero_render_pdf_page` only when text leaves a decisive visual ambiguity.
 
@@ -106,7 +107,7 @@ If a CI and p-value disagree, inspect the methods and table layout. Otherwise st
 
 ### 5. Validate coverage and evidence structure
 
-Before ranking, submit the completed manifest to `zotero_validate_comparison_manifest`. Include the frozen item keys, one terminal result card per item, the ranking rule, eligibility policy, primary and maximum-substantive result IDs, inventory locators, selected item keys, numerical and substantive winner status, whether an alternative policy changes the top set, and the maximum number of items permitted in the final analysis. The tool checks coverage, result-policy consistency, unresolved-item policy, selected maxima, and declared output scope; it does not read sources or judge estimates.
+Before ranking, submit the completed manifest to `zotero_validate_comparison_manifest`. Include the frozen item keys, one terminal result card per item, the ranking rule, eligibility policy, primary and maximum-substantive result IDs, inventory locators, selected item keys, numerical and substantive winner status, whether an alternative policy changes the top set, and the maximum number of items permitted in the final analysis. Every result `evidence_ids` entry must be a route-prefixed retained-evidence ID or locator; bare item keys, titles, and free prose are rejected. The tool checks coverage, result-policy consistency, unresolved-item policy, selected maxima, and declared output scope; it does not read sources or judge estimates.
 
 A clear numerical winner is merely the largest value under the rule. A clear substantive winner remains persuasive after accounting for dose, denominator, population, area, and horizon. Use `top_k` when the numerical winner is clear but the substantive winner is not.
 
