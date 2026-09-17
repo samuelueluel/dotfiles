@@ -506,6 +506,126 @@ export function stripAuditClaimCitationYears(claims: unknown): {
 }
 
 /**
+ * Pre-dispatch shape check for `zotero_audit_claims` payloads.
+ * Client-side schema errors echo the entire claims array plus the full tool
+ * schema (tens of KB), so catching mechanical defects here replaces a giant
+ * failure with a one-line fix. Only enforces rules that caused real retries:
+ * entry counts, string length caps, enum membership, item-key shape, and the
+ * p_threshold operator requirement. Anything unrecognized passes through
+ * (`{ok:true}`) so normal server validation owns genuinely novel shapes.
+ */
+const AUDIT_ROLES = new Set([
+  "estimate",
+  "se",
+  "ci_lower",
+  "ci_upper",
+  "p_value",
+  "p_threshold",
+  "sample_size",
+  "other",
+]);
+const AUDIT_OPERATORS = new Set(["<", "<=", "=", ">=", ">"]);
+const AUDIT_RISK_TAGS = new Set([
+  "numeric",
+  "quotation",
+  "causal",
+  "comparison",
+  "within_item_comparison",
+  "attribution",
+  "other",
+]);
+const AUDIT_ROUTES = new Set(["semantic", "pdf_page", "mineru_sidecar"]);
+const AUDIT_ITEM_KEY_RE = /^[A-Za-z0-9]{8}$/;
+
+export function checkAuditClaimsPayload(
+  claims: unknown
+): { ok: true } | { ok: false; reason: string } {
+  const fail = (reason: string): { ok: false; reason: string } => ({ ok: false, reason });
+  let list: unknown = claims;
+  if (typeof list === "string") {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      return { ok: true };
+    }
+  }
+  if (!Array.isArray(list)) return { ok: true };
+  if (list.length < 1 || list.length > 8) {
+    return fail(`claims must contain 1-8 entries (got ${list.length})`);
+  }
+  for (let i = 0; i < list.length; i++) {
+    const tag = `claims[${i}]`;
+    const claim = list[i];
+    if (!isRecord(claim)) return fail(`${tag} must be an object`);
+    if (
+      typeof claim.claim_id !== "string" ||
+      !claim.claim_id ||
+      claim.claim_id.length > 80
+    ) {
+      return fail(`${tag}.claim_id must be a non-empty string of max 80 chars`);
+    }
+    if (typeof claim.text !== "string" || !claim.text || claim.text.length > 1000) {
+      return fail(`${tag}.text must be a non-empty string of max 1000 chars`);
+    }
+    if (claim.risk_tags !== undefined) {
+      if (!Array.isArray(claim.risk_tags) || claim.risk_tags.length > 6) {
+        return fail(`${tag}.risk_tags must be an array of max 6 tags`);
+      }
+      for (const t of claim.risk_tags) {
+        if (typeof t !== "string" || !AUDIT_RISK_TAGS.has(t)) {
+          return fail(`${tag}.risk_tags holds unknown tag ${JSON.stringify(t)}`);
+        }
+      }
+    }
+    if (claim.expected_values !== undefined) {
+      if (!Array.isArray(claim.expected_values) || claim.expected_values.length > 16) {
+        return fail(`${tag}.expected_values must be an array of max 16 entries`);
+      }
+      for (let j = 0; j < claim.expected_values.length; j++) {
+        const ev = claim.expected_values[j];
+        const etag = `${tag}.expected_values[${j}]`;
+        if (!isRecord(ev)) return fail(`${etag} must be an object`);
+        if (typeof ev.role !== "string" || !AUDIT_ROLES.has(ev.role)) {
+          return fail(`${etag}.role must be one of ${[...AUDIT_ROLES].join(", ")}`);
+        }
+        if (typeof ev.value !== "string" || !ev.value || ev.value.length > 64) {
+          return fail(`${etag}.value must be a non-empty string of max 64 chars`);
+        }
+        if (ev.operator !== undefined && ev.operator !== null) {
+          if (typeof ev.operator !== "string" || !AUDIT_OPERATORS.has(ev.operator)) {
+            return fail(`${etag}.operator must be one of <, <=, =, >=, >`);
+          }
+        } else if (ev.role === "p_threshold") {
+          return fail(`${etag}: p_threshold requires operator "<" (e.g. value "0.001")`);
+        }
+      }
+    }
+    if (
+      !Array.isArray(claim.evidence) ||
+      claim.evidence.length < 1 ||
+      claim.evidence.length > 4
+    ) {
+      return fail(`${tag}.evidence must contain 1-4 entries`);
+    }
+    for (let k = 0; k < claim.evidence.length; k++) {
+      const ref = claim.evidence[k];
+      const rtag = `${tag}.evidence[${k}]`;
+      if (!isRecord(ref)) return fail(`${rtag} must be an object`);
+      if (typeof ref.route !== "string" || !AUDIT_ROUTES.has(ref.route)) {
+        return fail(`${rtag}.route must be semantic, pdf_page, or mineru_sidecar`);
+      }
+      if (typeof ref.item_key !== "string" || !AUDIT_ITEM_KEY_RE.test(ref.item_key)) {
+        return fail(`${rtag}.item_key must be an 8-character key`);
+      }
+      if (typeof ref.quote !== "string" || !ref.quote || ref.quote.length > 1600) {
+        return fail(`${rtag}.quote must be a non-empty string of max 1600 chars`);
+      }
+    }
+  }
+  return { ok: true };
+}
+
+/**
  * Repairs common Zotero MCP argument-shape mistakes before dispatch.
  * Silent self-healing: only rewrites when the canonical argument is absent
  * and the alias value parses cleanly; otherwise returns the input untouched
@@ -518,6 +638,9 @@ export function stripAuditClaimCitationYears(claims: unknown): {
  *   read_pdf_pages.
  * - Parenthetical citation years in `zotero_audit_claims` claim text
  *   (see `stripAuditClaimCitationYears`).
+ * - String-serialized `args`/`arguments` objects parsed in place: the MCP
+ *   proxy requires an object and rejects a JSON string before dispatch.
+ *   Malformed strings pass through to normal validation untouched.
  */
 export function healZoteroMcpArgs(
   toolName: unknown,
@@ -531,8 +654,24 @@ export function healZoteroMcpArgs(
   const noHeal = { healedInput: record, wasHealed: false };
   const { server, operation, args } = parseMcpCall(toolName, record);
   if (server !== "zotero") return noHeal;
-  const healed = { ...args };
+  // String-serialized args slots: the MCP proxy requires an object and
+  // rejects a JSON string before dispatch. Parse cleanly-serialized objects
+  // in place; malformed strings pass through to normal validation untouched.
   let wasHealed = false;
+  for (const slot of ["args", "arguments"] as const) {
+    const raw = record[slot];
+    if (typeof raw !== "string") continue;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        record[slot] = parsed;
+        wasHealed = true;
+      }
+    } catch {
+      // Leave malformed strings for normal tool validation.
+    }
+  }
+  const healed = { ...args };
 
   if (
     (operation === "list_collection_items" || operation === "search_bibliography_entries") &&

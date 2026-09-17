@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   autoHealSedCommand,
+  checkAuditClaimsPayload,
   checkDestructiveCommand,
   checkExploreMutatingCommand,
   checkExplorePrompt,
@@ -21,12 +22,22 @@ import {
   isSecretFilePath,
   isSessionSummaryStorePath,
   isVaultNotePath,
+  parseMcpCall,
   validateFileSyntax,
   DOTFILES_ROOT,
   VAULT_ROOT,
 } from "../lib/workflow-invariants-logic.js";
 
+// Count of zotero_audit_claims executions that passed pre-dispatch checks in
+// the current session. Reset on session_start. Caps the audit cycle at one
+// initial call plus one corrected resubmission; mcpScript-wrapped audits are
+// invisible here and are governed by skill guidance instead.
+let auditClaimDispatches = 0;
+
 export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
+  pi.on("session_start", () => {
+    auditClaimDispatches = 0;
+  });
   // Pre-tool checks: boundaries, privilege, destructive commands, auto-healing
   pi.on("tool_call", async (event, ctx) => {
     const isExplore = ctx?.getSystemPrompt?.()?.includes("STRICT READ-ONLY SEARCH SPECIALIST") ?? false;
@@ -86,6 +97,29 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
       const { healedInput, wasHealed } = healZoteroMcpArgs(event.toolName, event.input);
       if (wasHealed) {
         event.input = healedInput;
+      }
+      // Audit-claim guard: validate payload shape before dispatch, because
+      // client-side schema errors echo the whole payload plus the full tool
+      // schema. Rejected payloads do not consume the audit budget.
+      const parsed = parseMcpCall(event.toolName, event.input);
+      if (parsed.server === "zotero" && parsed.operation === "audit_claims") {
+        const check = checkAuditClaimsPayload(
+          (parsed.args as Record<string, unknown>).claims
+        );
+        if (!check.ok) {
+          return {
+            block: true,
+            reason: `Blocked by policy: zotero_audit_claims payload rejected pre-dispatch: ${check.reason}. Fix the payload and retry; rejected payloads do not consume the audit budget.`,
+          };
+        }
+        auditClaimDispatches += 1;
+        if (auditClaimDispatches > 2) {
+          return {
+            block: true,
+            reason:
+              "Blocked by policy: audit budget exhausted (two zotero_audit_claims executions per question: one initial call plus one corrected resubmission). Report the best-supported claims and disclose remaining limits instead of retrying.",
+          };
+        }
       }
     }
 

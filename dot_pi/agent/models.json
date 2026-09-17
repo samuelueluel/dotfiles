@@ -166,7 +166,7 @@
             "medium": "medium",
             "high": "high",
             "xhigh": "xhigh",
-            "max": "max"
+            "max": "xhigh"
           }
         }
       ]
@@ -393,7 +393,7 @@
             "medium": "medium",
             "high": "high",
             "xhigh": "xhigh",
-            "max": "max"
+            "max": "xhigh"
           }
         }
       ]

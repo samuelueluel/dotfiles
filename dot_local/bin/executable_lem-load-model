@@ -16,7 +16,11 @@ QWEN_SAMPLING="--temp 0.6 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0
 QWEN38_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 --presence-penalty 0"
 QWEN38_FLASH_SAMPLING="--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 --presence-penalty 0.0 --repeat-penalty 1.0"
 QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-DFlash2-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
-QWEN38_FLASH_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf"
+# The merged qwen4exp ROCm engine can borrow the target's embeddings/LM head
+# from the shared sidecar, saving about 1.3 GiB versus the full sidecar. Keep
+# the full file for the pre-merge Vulkan/canonical paths.
+QWEN38_FLASH_MTP_FULL="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf"
+QWEN38_FLASH_MTP_SHARED="/root/.cache/huggingface/qwen3.8-flash-next/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf"
 QWEN38_FLASH_FP4_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf"
 QWEN38_FLASH_FP4_MTP_URL="https://huggingface.co/agentionai/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST-GGUF/resolve/main/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf?download=true"
 QWEN38_FLASH_FP4_MTP_SIZE=2444519296
@@ -200,15 +204,25 @@ case "$id" in
     if [[ "$halo_backend" == "halo-vulkan" ]]; then
       args+=" --force-halo-vulkan --load-mode mmap --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
     elif [[ "$halo_backend" == "halo-rocm" ]]; then
-      args+=" --force-halo-rocm --load-mode mmap --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
+      # The halo-rocm HIP loader wedges on this model with --load-mode mmap
+      # (thread spin, no readiness); default load-mode auto uses a working
+      # read path. --no-host/--no-repack are canonical-Vulkan flags and break
+      # halo-rocm buffer setup, so the fork's defaults apply here.
+      args+=" --force-halo-rocm --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
     else
       args+=" --force-vulkan --load-mode mmap --tensor-read-lazy auto --no-host --no-repack --fit off -b 2048 -ub 2048 -ngl 99 --n-cpu-moe 0 -fa on --reasoning on"
     fi
+    # Qwen4Exp has 512 experts but activates only 10 in normal inference;
+    # the default empty warmup builds the all-512-expert graph and can exceed
+    # Lemonade's 600-second readiness window on this 104 GB model.
+    args+=" --no-warmup"
 
     spec=$(menu_spec_mtp) || exit 1
     case "${spec%%[ ]*}" in
       on)
-        args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_MTP --spec-draft-n-max 3 --spec-draft-p-min 0.75"
+        mtp_model="$QWEN38_FLASH_MTP_FULL"
+        [[ "$halo_backend" == "halo-rocm" ]] && mtp_model="$QWEN38_FLASH_MTP_SHARED"
+        args+=" --spec-type draft-mtp --spec-draft-model $mtp_model --spec-draft-n-max 3 --spec-draft-p-min 0.75"
         ;;
       off)
         args+=" --spec-type none"
@@ -458,6 +472,33 @@ if ! curl -sS -m 10 "$LEM_API/models" 2>/dev/null | grep -q "\"id\"[[:space:]]*:
 fi
 
 load_json=$(python3 -c 'import json, sys; print(json.dumps({"model_name": sys.argv[1], "llamacpp_args": sys.argv[2]}))' "$id" "$args")
+
+# Loading over a recently-killed instance races the amdgpu GTT teardown and
+# wedges the halo-rocm HIP loader (Lemonade's reload path kills and respawns
+# immediately, and 76 GiB of GTT takes minutes to drain). Unload, wait for
+# Lemonade to report idle, then wait for the host-side GTT to actually drain.
+if [[ -n "$halo_backend" ]]; then
+  curl -sS -m 10 -X POST "$LEM_API/unload" >/dev/null 2>&1 || true
+  for _ in {1..15}; do
+    curl -sS -m 5 "$LEM_API/health" 2>/dev/null | grep -qE '"model_loaded": ?null' && break
+    sleep 2
+  done
+  gtt_idle=0
+  for _ in {1..90}; do
+    gtt_idle=1
+    for f in /sys/class/drm/card*/device/mem_info_gtt_used; do
+      [[ -r "$f" ]] || continue
+      if (( $(cat "$f") > 4000000000 )); then
+        gtt_idle=0
+        break
+      fi
+    done
+    (( gtt_idle )) && break
+    sleep 2
+  done
+  sleep 2
+fi
+
 resp=$(gum spin --show-output --title "$note" -- \
   curl -sS -m 3600 -X POST "$LEM_API/load" \
   -H 'Content-Type: application/json' -d "$load_json")

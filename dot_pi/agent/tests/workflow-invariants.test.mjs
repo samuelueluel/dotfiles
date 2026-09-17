@@ -17,6 +17,7 @@ import {
   shouldRunPostToolChecks,
   autoHealSedCommand,
   validateFileSyntax,
+  checkAuditClaimsPayload,
   checkExplorePrompt,
   checkZoteroCloudUpload,
   checkZoteroSemanticResult,
@@ -509,13 +510,14 @@ test("healZoteroMcpArgs handles alternate call shapes and ignores other servers"
   assert.equal(bare.wasHealed, true);
   assert.deepEqual(bare.healedInput, { item_key: "AZM6IY9A", start_page: 4, end_page: 6 });
 
-  // JSON-string args are re-serialized, not dropped.
+  // JSON-string args are parsed to objects in place: the MCP proxy requires
+  // an object and rejects a JSON string before dispatch.
   const stringy = healZoteroMcpArgs("mcp__zotero", {
     tool: "zotero_list_collection_items",
     args: JSON.stringify({ collection: "TRGBCDX5" }),
   });
   assert.equal(stringy.wasHealed, true);
-  assert.deepEqual(JSON.parse(stringy.healedInput.args), { collection_key: "TRGBCDX5" });
+  assert.deepEqual(stringy.healedInput.args, { collection_key: "TRGBCDX5" });
 
   // Other servers and tools pass through untouched.
   const vault = healZoteroMcpArgs("mcp__turbovault", {
@@ -622,5 +624,67 @@ test("healZoteroMcpArgs strips parenthetical citation years from audit claim tex
   for (const claims of [undefined, null, "not-json{", { text: "x (2020)" }]) {
     const untouched = healZoteroMcpArgs("mcp__zotero", { tool: "zotero_audit_claims", args: { claims } });
     assert.equal(untouched.wasHealed, false);
+  }
+});
+test("healZoteroMcpArgs parses string-serialized args objects in place", () => {
+  const input = {
+    tool: "zotero_read_pdf_pages",
+    args: JSON.stringify({ item_key: "AZM6IY9A", start_page: 4, end_page: 6 }),
+  };
+  const { healedInput, wasHealed } = healZoteroMcpArgs("mcp__zotero", input);
+  assert.equal(wasHealed, true);
+  assert.deepEqual(healedInput.args, { item_key: "AZM6IY9A", start_page: 4, end_page: 6 });
+  // Caller object is not mutated.
+  assert.equal(typeof input.args, "string");
+
+  // Malformed strings pass through untouched for normal validation.
+  const bad = healZoteroMcpArgs("mcp__zotero", {
+    tool: "zotero_read_pdf_pages",
+    args: "{not json",
+  });
+  assert.equal(bad.wasHealed, false);
+  assert.equal(bad.healedInput.args, "{not json");
+
+  // Non-zotero servers are never touched.
+  const tv = healZoteroMcpArgs("mcp__turbovault", {
+    tool: "turbovault_read_note",
+    args: JSON.stringify({ path: "a.md" }),
+  });
+  assert.equal(tv.wasHealed, false);
+});
+test("checkAuditClaimsPayload accepts minimal valid payloads and JSON strings", () => {
+  const good = [{
+    claim_id: "c1",
+    text: "Effect is 14%.",
+    risk_tags: ["numeric"],
+    expected_values: [{ role: "estimate", value: "14", unit: "percent" }],
+    evidence: [{ route: "pdf_page", item_key: "AZM6IY9A", page: 6, quote: "a 14% reduction" }],
+  }];
+  assert.deepEqual(checkAuditClaimsPayload(good), { ok: true });
+  assert.deepEqual(checkAuditClaimsPayload(JSON.stringify(good)), { ok: true });
+});
+test("checkAuditClaimsPayload rejects retry-class defects with short reasons", () => {
+  const base = {
+    claim_id: "c1",
+    text: "x",
+    evidence: [{ route: "pdf_page", item_key: "AZM6IY9A", page: 1, quote: "q" }],
+  };
+  // p_threshold without operator: the observed live failure.
+  let r = checkAuditClaimsPayload([{ ...base, expected_values: [{ role: "p_threshold", value: "0.001" }] }]);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /p_threshold requires operator/);
+  // Unknown role, malformed key, unknown route, oversized batch.
+  r = checkAuditClaimsPayload([{ ...base, expected_values: [{ role: "p_magic", value: "1" }] }]);
+  assert.equal(r.ok, false);
+  r = checkAuditClaimsPayload([{ ...base, evidence: [{ route: "pdf_page", item_key: " Vader ", quote: "q" }] }]);
+  assert.equal(r.ok, false);
+  r = checkAuditClaimsPayload([{ ...base, evidence: [{ route: "smoke_signal", item_key: "AZM6IY9A", quote: "q" }] }]);
+  assert.equal(r.ok, false);
+  r = checkAuditClaimsPayload(new Array(9).fill(base));
+  assert.equal(r.ok, false);
+});
+test("checkAuditClaimsPayload passes through unrecognized shapes", () => {
+  for (const claims of [undefined, null, 42, "not-json{", { claims: [] }]) {
+    assert.deepEqual(checkAuditClaimsPayload(claims), { ok: true });
   }
 });

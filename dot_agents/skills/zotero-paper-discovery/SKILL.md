@@ -42,7 +42,7 @@ If one consequential boundary is unresolved, ask one focused question. Otherwise
 
 Inspect the deployed schema, then prefer `zotero_build_candidate_scope`.
 
-Supply two to four distinct semantic facets. Each facet should cover a different way a qualifying paper could describe the treatment or outcome. For example, a crime request may need separate facets for neighborhood offenses, violence or homicide, and individual arrests or incarceration.
+Supply two to four distinct semantic facets and no more — each extra facet costs a full retrieval pass. Each facet should cover a different way a qualifying paper could describe the treatment or outcome. For example, a crime request may need separate facets for neighborhood offenses, violence or homicide, and individual arrests or incarceration.
 
 Normally use `limit_per_facet=5–8`. Raise it only when the collection is large or the inclusion rule is unusually broad. The tool inventories the verified collection, deduplicates parent items, preserves evidence IDs, and rejects out-of-scope hits. It does not decide inclusion. The full inventory array ships only when `include_inventory=true`; scope coverage fields are always present — request it when candidate screening needs row-level identity metadata.
 

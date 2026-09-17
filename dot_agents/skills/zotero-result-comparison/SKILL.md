@@ -67,7 +67,7 @@ inventory_locators: exact tables, PDF pages, or bounded passages read
 reason: required for no_eligible_result; explain unresolved fields when unresolved
 ```
 
-`eligible` requires at least one result, all three result-role IDs, and exact inventory locators. `no_eligible_result` requires an explicit reason and no result records. `unresolved` may contain partial results but cannot supply a selected maximum for a complete-scope comparison. Record whether primary-only and substantive-all policies would produce different top sets.
+`eligible` requires at least one result, all three result-role IDs, and exact inventory locators. Keep cards to the primary and maximum-substantive results plus any alternative the ranking discussion needs; extra rows cost reads without changing top-k. `no_eligible_result` requires an explicit reason and no result records. `unresolved` may contain partial results but cannot supply a selected maximum for a complete-scope comparison. Record whether primary-only and substantive-all policies would produce different top sets.
 
 Use discovery passages and existing working context first. Do not reread evidence already adequate in the current session. Do not rank, deep-verify only the apparent leader, or silently omit a frozen paper before every card is terminal.
 
@@ -99,7 +99,7 @@ For every estimate that will appear in the answer, establish:
 - Whether parentheses are SEs, CIs, or another statistic.
 - Exact reported p-value, CI, SE, or significance threshold when available.
 
-A decisive table read must include row and column labels plus notes. Source prose that names a table does not complete a paper-level maximum until the referenced table is read; treat `REFERENCED_TABLE_NOT_READ` as required follow-up. PDF text can lose signs and alignment just as sidecars can.
+A decisive table read must include row and column labels plus notes. When complete source prose already reports the estimate with its uncertainty and significance, that prose establishes the paper-level maximum without a redundant table read; read the table only when prose lacks a decision-relevant field or the ranking margin is close. Treat `REFERENCED_TABLE_NOT_READ` as required follow-up only in those cases. PDF text can lose signs and alignment just as sidecars can.
 
 Use unambiguous source prose only when it directly describes the same result. If text routes disagree or remain ambiguous, inspect the actual rendered page image. If image inspection is unavailable or inconclusive, omit the value or mark it unverified.
 
