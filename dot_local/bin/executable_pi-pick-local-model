@@ -28,9 +28,12 @@ is_valid_model() {
     Qwen3.8-27B-Q6@halo-vulkan|Qwen3.8-27B-Q6@halo-rocm|\
     Signal-3.8-27B-AP-Q4_K_XL|\
     UD-Q4_K_XL|UD-Q4_K_XL@halo-vulkan|UD-Q4_K_XL@halo-rocm|\
+    strix/strix-qwen3.8-flash-next|\
     UD-IQ4_XS|UD-IQ4_XS@halo-vulkan|UD-IQ4_XS@halo-rocm|\
     Qwen3.8-Flash-Next-ROCmFP4|\
     halogen/halogen-qwen3.8-flash-next|\
+    halogen/halogen-qwen3.8-flash-next-w4b|\
+    halogen/halogen-qwen3.8-flash-next-iq4|\
     Qwen3.6-MoE-35B-Q8|Tiel-Coder-35B-A3B-MTP-Q8)
       return 0
       ;;
@@ -70,35 +73,35 @@ export GUM_CHOOSE_HEADER_FOREGROUND="#DA9E8A"
 # --canonical-only benchmark set (current-path backends only).
 _keys=(dense38-q4 dense38-q4-hv dense38-q4-hr dense38-q6 dense38-q6-hv dense38-q6-hr \
        dense38-fp4 signal38-q4xl \
-       flash38-next flash38-next-hv flash38-next-hr flash38-iq4 flash38-iq4-hv flash38-iq4-hr \
-       flash38-fp4 halogen-flash \
+       flash38-next flash38-next-hv flash38-next-hr flash38-strix flash38-iq4 flash38-iq4-hv flash38-iq4-hr \
+       flash38-fp4 halogen-w4b halogen-iq4 \
        moe-q8 tiel-q8)
 _models=("Qwen3.8 Dense 27B" "Qwen3.8 Dense 27B" "Qwen3.8 Dense 27B" \
          "Qwen3.8 Dense 27B" "Qwen3.8 Dense 27B" "Qwen3.8 Dense 27B" \
          "Qwen3.8 Dense 27B" "Signal 3.8 27B" \
+         "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" \
          "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" \
-         "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" "Qwen3.8 Flash-Next" \
-         "Qwen3.8 Flash-Next" "Halogen Flash-Next" \
+         "Qwen3.8 Flash-Next" "Halogen Flash-Next" "Halogen Flash-Next" \
          "Qwen3.6 MoE 35B" "Tiel Coder 35B")
 _quants=(UD-Q4_K_XL UD-Q4_K_XL UD-Q4_K_XL UD-Q6_K_XL UD-Q6_K_XL UD-Q6_K_XL \
          ROCmFP4 AP-Q4_K_XL \
-         UD-Q4_K_XL UD-Q4_K_XL UD-Q4_K_XL UD-IQ4_XS UD-IQ4_XS UD-IQ4_XS \
-         ROCmFP4 W4B \
+         UD-Q4_K_XL UD-Q4_K_XL UD-Q4_K_XL UD-Q4_K_XL UD-IQ4_XS UD-IQ4_XS UD-IQ4_XS \
+         ROCmFP4 W4B UD-IQ4_XS \
          UD-Q8_K_XL UD-Q8_K_XL)
 _backends=(nathan-vulkan halo-vulkan halo-rocm nathan-vulkan halo-vulkan halo-rocm \
            laurent-fp4 halo-vulkan \
-           nathan-vulkan halo-vulkan halo-rocm nathan-vulkan halo-vulkan halo-rocm \
-           laurent-fp4 halogen \
+           nathan-vulkan halo-vulkan halo-rocm strix-llama nathan-vulkan halo-vulkan halo-rocm \
+           laurent-fp4 halogen halogen \
            nathan-vulkan nathan-vulkan)
 _ids=(Qwen3.8-27B-Q4 "Qwen3.8-27B-Q4@halo-vulkan" "Qwen3.8-27B-Q4@halo-rocm" \
       Qwen3.8-27B-Q6 "Qwen3.8-27B-Q6@halo-vulkan" "Qwen3.8-27B-Q6@halo-rocm" \
       Qwen3.8-27B-ROCmFP4 Signal-3.8-27B-AP-Q4_K_XL \
-      UD-Q4_K_XL "UD-Q4_K_XL@halo-vulkan" "UD-Q4_K_XL@halo-rocm" \
+      UD-Q4_K_XL "UD-Q4_K_XL@halo-vulkan" "UD-Q4_K_XL@halo-rocm" "strix/strix-qwen3.8-flash-next" \
       UD-IQ4_XS "UD-IQ4_XS@halo-vulkan" "UD-IQ4_XS@halo-rocm" \
-      Qwen3.8-Flash-Next-ROCmFP4 halogen/halogen-qwen3.8-flash-next \
+      Qwen3.8-Flash-Next-ROCmFP4 halogen/halogen-qwen3.8-flash-next-w4b halogen/halogen-qwen3.8-flash-next-iq4 \
       Qwen3.6-MoE-35B-Q8 Tiel-Coder-35B-A3B-MTP-Q8)
 _canonical=(1 0 0 1 0 0 1 1 \
-            1 0 0 1 0 0 1 0 \
+            1 0 0 0 1 0 0 1 0 0 \
             1 1)
 
 W_KEY=15 W_MODEL=18 W_QUANT=10

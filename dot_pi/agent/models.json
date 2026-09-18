@@ -544,10 +544,90 @@
       },
       "models": [
         {
+          "id": "halogen-qwen3.8-flash-next-w4b",
+          "name": "Halogen | Qwen3.8 Flash Next (W4B Native)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 262144,
+          "maxTokens": 65536,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0,
+            "presence_penalty": 0.0
+          },
+          "thinkingLevelMap": {
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          }
+        },
+        {
+          "id": "halogen-qwen3.8-flash-next-iq4",
+          "name": "Halogen | Qwen3.8 Flash Next (UD-IQ4_XS)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 262144,
+          "maxTokens": 65536,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0,
+            "presence_penalty": 0.0
+          },
+          "thinkingLevelMap": {
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          }
+        },
+        {
           "id": "halogen-qwen3.8-flash-next",
           "name": "Halogen | Qwen3.8 Flash Next",
           "reasoning": true,
           "input": ["text"],
+          "contextWindow": 262144,
+          "maxTokens": 65536,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0,
+            "presence_penalty": 0.0
+          },
+          "thinkingLevelMap": {
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          }
+        }
+      ]
+    },
+    "strix": {
+      "baseUrl": "http://127.0.0.1:8732/v1",
+      "api": "openai-completions",
+      "apiKey": "dummy",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": true
+      },
+      "models": [
+        {
+          "id": "strix-qwen3.8-flash-next",
+          "name": "Strix Llama | Qwen3.8 Flash Next UD-Q4_K_XL (Retained PM4)",
+          "reasoning": true,
+          "input": ["text", "image"],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {

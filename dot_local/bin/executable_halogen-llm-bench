@@ -262,7 +262,7 @@ def make_body(
         "messages": [{"role": "system", "content": system}, *messages],
         "max_tokens": max_tokens,
         "enable_thinking": False,
-        "reasoning_effort": args.effort,
+        "reasoning_effort": "none" if args.effort in ("off", "none") else args.effort,
         "drafter": drafter,
         "temperature": args.temperature,
         "top_p": args.top_p,

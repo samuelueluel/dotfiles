@@ -688,3 +688,332 @@ test("checkAuditClaimsPayload passes through unrecognized shapes", () => {
     assert.deepEqual(checkAuditClaimsPayload(claims), { ok: true });
   }
 });
+
+/* ------- Zotero research-workflow preflight and retrieval policy ------- */
+
+import {
+  checkComparisonManifestPayload,
+  checkEvidenceBundlePayload,
+  checkResultEvidenceBudget,
+  duplicateRetrievalNote,
+  estimateResultEvidenceChars,
+  resultEvidenceConflictNote,
+  retrievalSignature,
+  DEFAULT_EVIDENCE_BUDGET_CHARS,
+} from "../lib/workflow-invariants-logic.ts";
+
+function bundleEvidenceRecord(extra = {}) {
+  return {
+    evidence_id: "e1",
+    item_key: "AZM6IY9A",
+    route: "pdf_extraction",
+    locator: "Table 5, PDF p. 6",
+    page: 6,
+    quote: "reduced crime by 11% (95% CI 7-15%)",
+    ...extra,
+  };
+}
+
+function bundleClaim(extra = {}) {
+  return {
+    claim_id: "c1",
+    text: "The treatment reduced crime by 11%.",
+    evidence_ids: ["e1"],
+    risk_tags: ["numeric"],
+    ...extra,
+  };
+}
+
+test("checkEvidenceBundlePayload accepts a valid bundle", () => {
+  assert.deepEqual(
+    checkEvidenceBundlePayload([bundleClaim()], [bundleEvidenceRecord()], ["AZM6IY9A"]),
+    { ok: true }
+  );
+  assert.deepEqual(
+    checkEvidenceBundlePayload(JSON.stringify([bundleClaim()]), JSON.stringify([bundleEvidenceRecord()]), null),
+    { ok: true }
+  );
+});
+
+test("checkEvidenceBundlePayload rejects retry-class defects with short reasons", () => {
+  let r = checkEvidenceBundlePayload(new Array(21).fill(bundleClaim()), [bundleEvidenceRecord()], null);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /claims must contain 1-20/);
+
+  r = checkEvidenceBundlePayload([bundleClaim()], [bundleEvidenceRecord({ item_key: "BADKEY" })], null);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /item_key must be an 8-character key/);
+
+  r = checkEvidenceBundlePayload([bundleClaim()], [bundleEvidenceRecord({ route: "smoke_signal" })], null);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /route must be one of/);
+
+  r = checkEvidenceBundlePayload(
+    [bundleClaim()],
+    [bundleEvidenceRecord(), bundleEvidenceRecord()],
+    null
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /evidence_id values must be distinct/);
+
+  r = checkEvidenceBundlePayload(
+    [bundleClaim({ expected_values: [{ role: "p_threshold", value: "0.001" }] })],
+    [bundleEvidenceRecord()],
+    null
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /p_threshold requires operator/);
+
+  r = checkEvidenceBundlePayload([bundleClaim({ evidence_ids: ["e1", "e1"] })], [bundleEvidenceRecord()], null);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /evidence_ids must be distinct/);
+
+  r = checkEvidenceBundlePayload([bundleClaim()], [bundleEvidenceRecord({ page: 0 })], null);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /one-based integer/);
+});
+
+test("checkComparisonManifestPayload accepts a valid manifest", () => {
+  const manifest = {
+    frozen_item_keys: ["AZM6IY9A", "BB22CC33"],
+    cards: [
+      {
+        item_key: "AZM6IY9A",
+        status: "eligible",
+        results: [
+          {
+            result_id: "r1",
+            result_class: "main",
+            outcome: "burglary",
+            point_estimate: "-0.072",
+            scale: "log points",
+            uncertainty: "SE 0.020",
+            treatment: "demolition",
+            dose: "one unit",
+            denominator: "blocks",
+            population: "city",
+            geography: "Detroit",
+            time_horizon: "1 year",
+            specification: "TWFE",
+            evidence_ids: ["pdf:AZM6IY9A:p12:t2"],
+          },
+        ],
+        primary_result_id: "r1",
+        maximum_substantive_result_id: "r1",
+        selected_result_id: "r1",
+        inventory_locators: ["Table 2, PDF p. 12"],
+      },
+      { item_key: "BB22CC33", status: "no_eligible_result", reason: "no relevant outcomes" },
+    ],
+    ranking_rule: "largest significant percentage reduction in property crime",
+    eligible_result_policy: "substantive_all",
+    numerical_winner_status: "clear",
+    substantive_winner_status: "clear",
+    alternative_policy_changes_top_k: false,
+    max_reported_items: 1,
+    selected_item_keys: ["AZM6IY9A"],
+  };
+  assert.deepEqual(checkComparisonManifestPayload(manifest), { ok: true });
+  assert.deepEqual(checkComparisonManifestPayload(JSON.stringify(manifest)), { ok: true });
+});
+
+test("checkComparisonManifestPayload rejects retry-class defects with short reasons", () => {
+  const base = {
+    frozen_item_keys: ["AZM6IY9A"],
+    cards: [
+      {
+        item_key: "AZM6IY9A",
+        status: "eligible",
+        results: [
+          {
+            result_id: "r1",
+            result_class: "main",
+            outcome: "burglary",
+            point_estimate: "-0.072",
+            scale: "log points",
+            uncertainty: "SE 0.020",
+            treatment: "demolition",
+            dose: "one unit",
+            denominator: "blocks",
+            population: "city",
+            geography: "Detroit",
+            time_horizon: "1 year",
+            specification: "TWFE",
+            evidence_ids: ["zr1:0:AZM6IY9A#25:" + "a".repeat(64)],
+          },
+        ],
+        primary_result_id: "r1",
+        maximum_substantive_result_id: "r1",
+        selected_result_id: "r1",
+        inventory_locators: ["Table 2, PDF p. 12"],
+      },
+    ],
+    ranking_rule: "largest reduction",
+    eligible_result_policy: "substantive_all",
+    numerical_winner_status: "clear",
+    substantive_winner_status: "clear",
+    alternative_policy_changes_top_k: false,
+    selected_item_keys: ["AZM6IY9A"],
+  };
+  // Bare item key instead of a route-prefixed locator: the live failure mode.
+  let m = JSON.parse(JSON.stringify(base));
+  m.cards[0].results[0].evidence_ids = ["AZM6IY9A"];
+  let r = checkComparisonManifestPayload(m);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /route-prefixed retained-evidence IDs/);
+
+  m = JSON.parse(JSON.stringify(base));
+  m.cards[0].status = "not-a-status";
+  r = checkComparisonManifestPayload(m);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /status must be one of/);
+
+  m = JSON.parse(JSON.stringify(base));
+  m.numerical_winner_status = "unclear";
+  r = checkComparisonManifestPayload(m);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /numerical_winner_status/);
+
+  m = JSON.parse(JSON.stringify(base));
+  m.alternative_policy_changes_top_k = "no";
+  r = checkComparisonManifestPayload(m);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /alternative_policy_changes_top_k must be a boolean/);
+
+  m = JSON.parse(JSON.stringify(base));
+  m.cards = JSON.parse(JSON.stringify(base.cards)).concat(JSON.parse(JSON.stringify(base.cards)));
+  r = checkComparisonManifestPayload(m);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /one entry per item_key/);
+
+  m = JSON.parse(JSON.stringify(base));
+  delete m.selected_item_keys;
+  r = checkComparisonManifestPayload(m);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /selected_item_keys/);
+
+  // Unparseable JSON strings pass through to normal validation; non-object
+  // manifests fail fast with a one-line reason.
+  assert.deepEqual(checkComparisonManifestPayload("not-json{"), { ok: true });
+  r = checkComparisonManifestPayload(42);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /manifest must be an object/);
+});
+
+test("estimateResultEvidenceChars bounds the worst-case composite response", () => {
+  const oneOfEach = {
+    requests: [
+      {
+        item_key: "AZM6IY9A",
+        evidence_id: "zr1:0:AZM6IY9A#1:" + "a".repeat(64),
+        sidecar_queries: ["Table 5"],
+        pdf_queries: ["Table 5"],
+      },
+    ],
+  };
+  // One passage read + 2 sidecar reads (primary + continuation) + 1 pdf read
+  // = 4 route reads x 8000 x 1.3 overhead.
+  assert.equal(estimateResultEvidenceChars(oneOfEach), Math.ceil(4 * 8000 * 1.3));
+  // Compact caps route reads at 1200.
+  const compact = { requests: oneOfEach.requests, compact: true };
+  assert.equal(estimateResultEvidenceChars(compact), Math.ceil(4 * 1200 * 1.3));
+  // Lower max_chars_per_route scales the estimate.
+  const narrow = { requests: oneOfEach.requests, max_chars_per_route: 2000 };
+  assert.equal(estimateResultEvidenceChars(narrow), Math.ceil(4 * 2000 * 1.3));
+});
+
+test("checkResultEvidenceBudget blocks oversized batches and passes bounded ones", () => {
+  const oneFull = { item_key: "AZM6IY9A", evidence_id: "zr1:0:AZM6IY9A#1:" + "a".repeat(64), sidecar_queries: ["Table 5"], pdf_queries: ["Table 5"] };
+  const heavy = {
+    requests: [
+      oneFull,
+      { ...oneFull, item_key: "BB22CC33", evidence_id: "zr1:0:BB22CC33#1:" + "a".repeat(64) },
+      { ...oneFull, item_key: "CC33DD44", evidence_id: "zr1:0:CC33DD44#1:" + "a".repeat(64) },
+      { ...oneFull, item_key: "DD44EE55", evidence_id: "zr1:0:DD44EE55#1:" + "a".repeat(64) },
+    ],
+  };
+  // A two-item full stack estimates ~83k and stays under the default budget.
+  assert.equal(checkResultEvidenceBudget({ requests: [oneFull, { ...oneFull, item_key: "BB22CC33" }] }).blocked, false);
+  let r = checkResultEvidenceBudget(heavy, DEFAULT_EVIDENCE_BUDGET_CHARS);
+  assert.equal(r.blocked, true);
+  assert.match(r.reason, /Split the batch/);
+  assert.match(r.reason, /max_total_chars/);
+
+  // Server-side budget is the escape hatch: the hook stands down.
+  r = checkResultEvidenceBudget({ ...heavy, max_total_chars: 40000 }, DEFAULT_EVIDENCE_BUDGET_CHARS);
+  assert.equal(r.blocked, false);
+
+  // Compact halves the route read size and passes the same batch.
+  r = checkResultEvidenceBudget({ ...heavy, compact: true }, DEFAULT_EVIDENCE_BUDGET_CHARS);
+  assert.equal(r.blocked, false);
+
+  // A small single-item call passes.
+  r = checkResultEvidenceBudget({ requests: [{ item_key: "AZM6IY9A", pdf_queries: ["Table 5"] }] });
+  assert.equal(r.blocked, false);
+});
+
+test("retrievalSignature normalizes identity across call shapes", () => {
+  const flat = retrievalSignature("zotero_find_in_item", { item_key: "AZM6IY9A", query: "Table 5" });
+  const proxy = retrievalSignature("mcp__zotero", { tool: "zotero_find_in_item", args: { item_key: "AZM6IY9A", query: "Table 5" } });
+  const gateway = retrievalSignature("mcp", { tool: "zotero_find_in_item", args: { item_key: "AZM6IY9A", query: "Table 5" } });
+  assert.equal(flat, proxy);
+  assert.equal(proxy, gateway);
+
+  // Case and whitespace differences do not change identity.
+  assert.equal(flat, retrievalSignature("zotero_find_in_item", { item_key: "azm6iy9a", query: "  table  5 " }));
+  // Continuation coordinates and expected hashes do.
+  assert.notEqual(flat, retrievalSignature("zotero_find_in_item", { item_key: "AZM6IY9A", query: "Table 5", start_char: 500 }));
+  assert.notEqual(flat, retrievalSignature("zotero_find_in_item", { item_key: "AZM6IY9A", query: "Table 5", expected_hash: "a".repeat(64) }));
+
+  // semantic_search identity is insensitive to item_keys order.
+  const a = retrievalSignature("zotero_semantic_search", { query: "crime", item_keys: ["AZM6IY9A", "BB22CC33"] });
+  const b = retrievalSignature("zotero_semantic_search", { query: "crime", item_keys: ["BB22CC33", "AZM6IY9A"] });
+  assert.equal(a, b);
+
+  // Resumed evidence calls carry their own identity.
+  const token = "evc1.abc";
+  assert.equal(
+    retrievalSignature("zotero_collect_result_evidence", { continuation_token: token }),
+    `collect_result_evidence|token:${token}`
+  );
+
+  // Non-retrieval calls have no signature.
+  assert.equal(retrievalSignature("zotero_resolve_exact_source", { title: "x" }), null);
+  assert.equal(retrievalSignature("bash", { command: "ls" }), null);
+});
+
+test("duplicateRetrievalNote warns on 2nd and 3rd identical read then falls silent", () => {
+  const seen = new Map();
+  const sig = retrievalSignature("zotero_find_in_item", { item_key: "AZM6IY9A", query: "Table 5" });
+  assert.equal(duplicateRetrievalNote(sig, seen), null); // 1st: silent, recorded
+  assert.match(duplicateRetrievalNote(sig, seen), /Duplicate Retrieval/); // 2nd
+  assert.match(duplicateRetrievalNote(sig, seen), /Duplicate Retrieval/); // 3rd
+  assert.equal(duplicateRetrievalNote(sig, seen), null); // 4th: bounded backoff
+  assert.equal(duplicateRetrievalNote(null, seen), null);
+});
+
+test("resultEvidenceConflictNote surfaces conflict flags as one compact line", () => {
+  const collectInput = { tool: "zotero_collect_result_evidence", args: { requests: [] } };
+  const conflicted = JSON.stringify({
+    items: [
+      {
+        item_key: "AZM6IY9A",
+        conflict_flags: [{ code: "NUMERIC_SIGNATURE_MISMATCH" }],
+        requires_visual_review: true,
+        requires_follow_up: false,
+      },
+    ],
+  });
+  const note = resultEvidenceConflictNote("mcp__zotero", collectInput, false, [{ type: "text", text: conflicted }]);
+  assert.match(note, /\[Evidence Conflicts\]/);
+  assert.match(note, /AZM6IY9A/);
+  assert.match(note, /NUMERIC_SIGNATURE_MISMATCH/);
+  assert.match(note, /before any ranking/);
+  // One line only.
+  assert.equal(note.split("\n").length, 1);
+
+  const clean = JSON.stringify({ items: [{ item_key: "AZM6IY9A", conflict_flags: [], requires_follow_up: false }] });
+  assert.equal(resultEvidenceConflictNote("mcp__zotero", collectInput, false, [{ type: "text", text: clean }]), null);
+  assert.equal(resultEvidenceConflictNote("mcp__zotero", collectInput, true, [{ type: "text", text: conflicted }]), null);
+  assert.equal(resultEvidenceConflictNote("zotero_semantic_search", { query: "x" }, false, [{ type: "text", text: conflicted }]), null);
+});

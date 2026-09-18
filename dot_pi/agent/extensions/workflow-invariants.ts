@@ -4,20 +4,28 @@ import * as path from "node:path";
 import {
   autoHealSedCommand,
   checkAuditClaimsPayload,
+  checkComparisonManifestPayload,
   checkDestructiveCommand,
+  checkEvidenceBundlePayload,
   checkExploreMutatingCommand,
   checkExplorePrompt,
   checkPrivilegedOrHostMutation,
+  checkResultEvidenceBudget,
   checkSecretShellAccess,
   checkSessionSummaryStoreShellAccess,
   checkVaultShellAccess,
   checkZoteroCloudUpload,
   checkZoteroIndexMutation,
   checkZoteroSemanticResult,
+  DEFAULT_EVIDENCE_BUDGET_CHARS,
+  duplicateRetrievalNote,
+  EVIDENCE_BUDGET_ENV_VAR,
   healZoteroMcpArgs,
   healZoteroWorkerInput,
   isChezmoiManaged,
   isDotfilesStaticPath,
+  resultEvidenceConflictNote,
+  retrievalSignature,
   shouldRunPostToolChecks,
   isSecretFilePath,
   isSessionSummaryStorePath,
@@ -34,9 +42,15 @@ import {
 // invisible here and are governed by skill guidance instead.
 let auditClaimDispatches = 0;
 
+// Signatures of completed Zotero retrieval calls in the current session, used
+// by the post-tool duplicate-retrieval nudge. Bounded and reset on
+// session_start; mcpScript-internal calls do not surface as tool results.
+const retrievalSignatures = new Map<string, number>();
+
 export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
   pi.on("session_start", () => {
     auditClaimDispatches = 0;
+    retrievalSignatures.clear();
   });
   // Pre-tool checks: boundaries, privilege, destructive commands, auto-healing
   pi.on("tool_call", async (event, ctx) => {
@@ -102,23 +116,62 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
       // client-side schema errors echo the whole payload plus the full tool
       // schema. Rejected payloads do not consume the audit budget.
       const parsed = parseMcpCall(event.toolName, event.input);
-      if (parsed.server === "zotero" && parsed.operation === "audit_claims") {
-        const check = checkAuditClaimsPayload(
-          (parsed.args as Record<string, unknown>).claims
-        );
-        if (!check.ok) {
-          return {
-            block: true,
-            reason: `Blocked by policy: zotero_audit_claims payload rejected pre-dispatch: ${check.reason}. Fix the payload and retry; rejected payloads do not consume the audit budget.`,
-          };
+      if (parsed.server === "zotero") {
+        if (parsed.operation === "audit_claims") {
+          const check = checkAuditClaimsPayload(
+            (parsed.args as Record<string, unknown>).claims
+          );
+          if (!check.ok) {
+            return {
+              block: true,
+              reason: `Blocked by policy: zotero_audit_claims payload rejected pre-dispatch: ${check.reason}. Fix the payload and retry; rejected payloads do not consume the audit budget.`,
+            };
+          }
+          auditClaimDispatches += 1;
+          if (auditClaimDispatches > 2) {
+            return {
+              block: true,
+              reason:
+                "Blocked by policy: audit budget exhausted (two zotero_audit_claims executions per question: one initial call plus one corrected resubmission). Report the best-supported claims and disclose remaining limits instead of retrying.",
+            };
+          }
         }
-        auditClaimDispatches += 1;
-        if (auditClaimDispatches > 2) {
-          return {
-            block: true,
-            reason:
-              "Blocked by policy: audit budget exhausted (two zotero_audit_claims executions per question: one initial call plus one corrected resubmission). Report the best-supported claims and disclose remaining limits instead of retrying.",
-          };
+        // Validator-payload preflight: the manifest and evidence-bundle
+        // schemas echo oversized failure context, so mechanical defects are
+        // rejected here with a one-line reason instead.
+        if (parsed.operation === "validate_evidence_bundle") {
+          const args = parsed.args as Record<string, unknown>;
+          const check = checkEvidenceBundlePayload(args.claims, args.evidence, args.allowed_item_keys);
+          if (!check.ok) {
+            return {
+              block: true,
+              reason: `Blocked by policy: zotero_validate_evidence_bundle payload rejected pre-dispatch: ${check.reason}. Fix the payload and retry.`,
+            };
+          }
+        }
+        if (parsed.operation === "validate_comparison_manifest") {
+          const check = checkComparisonManifestPayload(
+            (parsed.args as Record<string, unknown>).manifest
+          );
+          if (!check.ok) {
+            return {
+              block: true,
+              reason: `Blocked by policy: zotero_validate_comparison_manifest payload rejected pre-dispatch: ${check.reason}. Fix the payload and retry.`,
+            };
+          }
+        }
+        // Retrieval-budget guard for composite evidence collection. Calls
+        // that already set max_total_chars are bounded server-side and pass.
+        if (parsed.operation === "collect_result_evidence") {
+          const budget =
+            Number(process.env[EVIDENCE_BUDGET_ENV_VAR]) || DEFAULT_EVIDENCE_BUDGET_CHARS;
+          const check = checkResultEvidenceBudget(parsed.args as Record<string, unknown>, budget);
+          if (check.blocked) {
+            return {
+              block: true,
+              reason: `Blocked by policy: ${check.reason}`,
+            };
+          }
         }
       }
     }
@@ -261,7 +314,8 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
     }
   });
 
-  // Post-tool checks: Chezmoi staging reminder and syntax verification
+  // Post-tool checks: duplicate-retrieval nudge, evidence-conflict note,
+  // Chezmoi staging reminder, and syntax verification
   pi.on("tool_result", async (event) => {
     // Zotero RAG footgun annotator: all-non-positive reranks read as no evidence.
     // Silent on success, mixed/positive scores, errors, and non-search calls.
@@ -273,6 +327,25 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
     );
     if (rerankNote) {
       event.content.push({ type: "text", text: rerankNote });
+    }
+
+    // Duplicate-retrieval nudge and evidence-conflict note for Zotero reads.
+    // Both are one-line, non-blocking, and silent on errors.
+    if (event.isError !== true) {
+      const signature = retrievalSignature(event.toolName, event.input);
+      const dupNote = duplicateRetrievalNote(signature, retrievalSignatures);
+      if (dupNote) {
+        event.content.push({ type: "text", text: `\n\n${dupNote}` });
+      }
+      const conflictNote = resultEvidenceConflictNote(
+        event.toolName,
+        event.input,
+        event.isError,
+        (event as { content?: unknown }).content
+      );
+      if (conflictNote) {
+        event.content.push({ type: "text", text: `\n\n${conflictNote}` });
+      }
     }
 
     // Failed writes/edits did not establish a new file state. Do not validate

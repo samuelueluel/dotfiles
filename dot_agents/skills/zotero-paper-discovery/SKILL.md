@@ -40,7 +40,7 @@ If one consequential boundary is unresolved, ask one focused question. Otherwise
 
 ### 3. Build one bounded candidate scope
 
-Inspect the deployed schema, then prefer `zotero_build_candidate_scope`.
+Inspect the deployed schema, then call `zotero_build_candidate_scope` directly. When the collection key is already known from step 2, do not call `zotero_list_collection_items` first and do not paginate it: the composite tool already inventories and validates the scope, so a separate listing pass only spends calls. Reserve that listing route for the fallback case below.
 
 Supply two to four distinct semantic facets and no more — each extra facet costs a full retrieval pass. Each facet should cover a different way a qualifying paper could describe the treatment or outcome. For example, a crime request may need separate facets for neighborhood offenses, violence or homicide, and individual arrests or incarceration.
 
@@ -64,7 +64,9 @@ Maintain a short internal ledger:
 
 A positive rerank passage can support inclusion only after its text is read in context. Expand the retained evidence ID with `zotero_read_passage`; do not rerun semantic search to see the same hit again.
 
-For a plausible title missed by semantic retrieval, use one exact-item semantic search or a distinctive `zotero_find_in_item` phrase. Do not use a single no-match for `crime`, `health`, or another broad term as proof of absence. Searches that pin exact item keys report the keys that returned no passage; treat a reported no-hit exactly like any other missing hit.
+Expand positive candidate evidence in batch before making inclusion decisions. After the scope build, collect every retained evidence ID across the whole candidate ledger, expand them in one consecutive batch, and only then classify each candidate. Interleaving search, expansion, and decisions per candidate costs one extra retrieval round per item and invites repeated generic searches.
+
+Use exact-item semantic searches only for title-plausible misses the facets did not surface, and give each one a distinctive phrase. Never re-screen with a generic single word (`crime`, `demolition`, `health`); if no distinctive phrase can be named, leave the item unresolved instead of running another broad query. Do not use a single no-match for a broad term as proof of absence. Searches that pin exact item keys report the keys that returned no passage; treat a reported no-hit exactly like any other missing hit.
 
 After two uninformative attempts on the same missing inclusion fact, change the reading method once or leave the item unresolved. Do not cycle through synonyms.
 

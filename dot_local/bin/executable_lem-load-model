@@ -464,6 +464,9 @@ else
   par=$(menu_parallel_slots) || exit 1
   args+=" --parallel $par"
 fi
+if [[ " $args " != *" --cache-ram "* ]]; then
+  args+=" --cache-ram 0"
+fi
 args=${args# }
 
 note="loading $selection  [override: $args]"

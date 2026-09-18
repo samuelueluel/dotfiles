@@ -1,48 +1,57 @@
 #!/usr/bin/env bash
 # Manage the Halogen Qwen3.8-Flash-Next server beside Lemonade.
-#
-# Halogen's .hgn checkpoint is not a Lemonade/llama.cpp model. This helper
-# keeps its OpenAI-compatible API on loopback and never downloads an image or
-# model implicitly.
+# Supports both native W4B (.hgn) and Unsloth UD-IQ4_XS (GGUF) weights.
+# Keeps its OpenAI-compatible API on loopback and never downloads weights implicitly.
 set -euo pipefail
 
 HALOGEN_CONTAINER=${HALOGEN_CONTAINER:-halogen}
-HALOGEN_IMAGE=${HALOGEN_IMAGE:-ghcr.io/peonist-ai/halogen-flash-server:0.6.3}
-HALOGEN_MODELS=${HALOGEN_MODELS:-$HOME/halogen-models}
+HALOGEN_IMAGE=${HALOGEN_IMAGE:-ghcr.io/peonist-ai/halogen-flash-server:0.11.4}
 HALOGEN_API_PORT=${HALOGEN_API_PORT:-8731}
 HALOGEN_API=${HALOGEN_API:-http://127.0.0.1:${HALOGEN_API_PORT}}
 HALOGEN_MODEL_ID=${HALOGEN_MODEL_ID:-halogen-qwen3.8-flash-next}
-HALOGEN_CHECKPOINT_FILE=${HALOGEN_CHECKPOINT_FILE:-qwen38-flash-next-w4b.hgn}
+
+# Weight locations
+HALOGEN_W4B_MODELS=${HALOGEN_W4B_MODELS:-$HOME/halogen-models}
+HALOGEN_W4B_CHECKPOINT_FILE=${HALOGEN_W4B_CHECKPOINT_FILE:-qwen38-flash-next-w4b.hgn}
+
+HALOGEN_IQ4_MODELS=${HALOGEN_IQ4_MODELS:-$HOME/.local/share/containers/storage/volumes/lemonade26-v108-cache/_data/qwen3.8-flash-next}
+HALOGEN_IQ4_CHECKPOINT_FILE=${HALOGEN_IQ4_CHECKPOINT_FILE:-/models/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf}
+HALOGEN_IQ4_MTP_HEAD=${HALOGEN_IQ4_MTP_HEAD:-/models/qwen38-flash-next-mtp.hgn}
+HALOGEN_IQ4_TOKENIZER=${HALOGEN_IQ4_TOKENIZER:-/models/tokenizer}
+
 HALOGEN_FLASH_PIN_TRUNK=${HALOGEN_FLASH_PIN_TRUNK:-1}
 HALOGEN_MAX_TOK=${HALOGEN_MAX_TOK:-16384}
 HALOGEN_PREFILL_CHUNK=${HALOGEN_PREFILL_CHUNK:-16384}
 HALOGEN_KV_POOL_POSITIONS=${HALOGEN_KV_POOL_POSITIONS:-262144}
 HALOGEN_MAX_TOKENS_DEFAULT=${HALOGEN_MAX_TOKENS_DEFAULT:-8192}
 HALOGEN_MAX_TOKENS_CAP=${HALOGEN_MAX_TOKENS_CAP:-65536}
+
 # Halogen and Lemonade both use most of this host's memory. Evict only
 # Lemonade's resident chat model before starting Halogen; keep its container up.
 HALOGEN_EVICT_LEMONADE=${HALOGEN_EVICT_LEMONADE:-1}
 HALOGEN_LEMONADE_CONTAINER=${HALOGEN_LEMONADE_CONTAINER:-lemonade}
 HALOGEN_LEMONADE_API=${HALOGEN_LEMONADE_API:-${LEM_API:-http://127.0.0.1:13305/api/v1}}
 HALOGEN_EVICT_TIMEOUT_S=${HALOGEN_EVICT_TIMEOUT_S:-120}
-# The model is large and cold starts are slow, but an accidental infinite wait
-# is worse than an explicit opt-in. Set 0 when an unbounded wait is intended.
 HALOGEN_WAIT_TIMEOUT_S=${HALOGEN_WAIT_TIMEOUT_S:-120}
 
 usage() {
   cat <<'EOF'
 Usage:
-  halogen start    Start the existing image and mounted model, without waiting
-  halogen ensure   Start it if needed and wait for /health to report ready
-  halogen status   Print the server health document, or the container state
-  halogen stop     Stop the container without removing it
-  halogen logs     Show container logs (extra arguments go to podman logs)
+  halogen start [w4b|iq4]   Start existing image and model (prompts gum menu if interactive)
+  halogen ensure [w4b|iq4]  Start it if needed and wait for /health to report ready
+  halogen status            Print the server health document, variant, or container state
+  halogen stop              Stop the container without removing it
+  halogen logs              Show container logs (extra arguments go to podman logs)
+
+Variants:
+  w4b, native   Peonist Native W4B weights (~118 GiB .hgn, 8-bit o_proj, faster decode)
+  iq4, gguf     Unsloth UD-IQ4_XS GGUF weights (~94 GB, 8-bit trunk, +2% PPL)
 
 Environment:
-  HALOGEN_MODELS       Host directory containing the .hgn checkpoint (default: ~/halogen-models)
-  HALOGEN_IMAGE        Image reference (default: ghcr.io/peonist-ai/halogen-flash-server:0.6.3)
+  HALOGEN_VARIANT      Default weight variant (w4b or iq4)
+  HALOGEN_IMAGE        Image reference (default: ghcr.io/peonist-ai/halogen-flash-server:0.11.4)
   HALOGEN_API_PORT     Loopback API port (default: 8731)
-  HALOGEN_FLASH_PIN_TRUNK  Lock weights in RAM; 0 costs several times decode speed (default: 1)
+  HALOGEN_FLASH_PIN_TRUNK  Lock weights in RAM (default: 1)
   HALOGEN_MAX_TOK      Prefill arena size (default: 16384)
   HALOGEN_PREFILL_CHUNK  Prefill call width; must equal MAX_TOK (default: 16384)
   HALOGEN_KV_POOL_POSITIONS  Shared KV pool positions (default: 262144)
@@ -50,8 +59,6 @@ Environment:
   HALOGEN_MAX_TOKENS_CAP  Maximum request budget (default: 65536)
   HALOGEN_API          Health URL (default: http://127.0.0.1:<port>)
   HALOGEN_EVICT_LEMONADE  Evict Lemonade's resident LLM before start (default: 1; 0 opts out)
-  HALOGEN_LEMONADE_API   Lemonade API base URL (default: LEM_API or http://127.0.0.1:13305/api/v1)
-  HALOGEN_EVICT_TIMEOUT_S  Lemonade eviction timeout (default: 120 seconds)
   HALOGEN_WAIT_TIMEOUT_S  Readiness timeout in seconds (default: 120; 0 waits without a deadline)
 EOF
 }
@@ -84,24 +91,6 @@ lemonade_state() {
 health_document() {
   local api=${HALOGEN_API%/}
   curl -fsS --max-time 3 "$api/health"
-}
-
-model_dir() {
-  [[ -d "$HALOGEN_MODELS" ]] || die "model directory does not exist: $HALOGEN_MODELS"
-  realpath "$HALOGEN_MODELS"
-}
-
-require_model() {
-  local dir checkpoint overlay
-  dir=$(model_dir) || return $?
-  [[ "$HALOGEN_CHECKPOINT_FILE" != /* ]] || die "HALOGEN_CHECKPOINT_FILE must be relative to HALOGEN_MODELS"
-  checkpoint="$dir/$HALOGEN_CHECKPOINT_FILE"
-  [[ -f "$checkpoint" ]] || die "checkpoint missing: $checkpoint (download it explicitly with hf download)"
-  overlay="${checkpoint%.hgn}.overlay.hgn"
-  if [[ ! -f "$overlay" ]]; then
-    printf 'halogen: warning: quality sidecar missing: %s\n' "$overlay" >&2
-  fi
-  printf '%s\n' "$dir"
 }
 
 validate_eviction_settings() {
@@ -145,6 +134,10 @@ lemonade_health() {
 
 evict_lemonade_models() {
   validate_eviction_settings
+  if podman container exists strix-llama-server >/dev/null 2>&1; then
+    podman stop strix-llama-server >/dev/null 2>&1 || true
+  fi
+
   if [[ "$HALOGEN_EVICT_LEMONADE" == 0 ]]; then
     printf 'halogen: Lemonade eviction disabled (HALOGEN_EVICT_LEMONADE=0)\n' >&2
     return 0
@@ -210,24 +203,76 @@ if value.get("status") == "error" and "not found" not in json.dumps(value).lower
   done
 }
 
+menu_variant() {
+  gum choose --header "halogen · select weights" --height 2 --selected "w4b    Native W4B (.hgn, faster decode)" \
+    "w4b    Native W4B (.hgn, faster decode)" \
+    "iq4    Unsloth UD-IQ4_XS (GGUF, +2% PPL)"
+}
+
+resolve_variant() {
+  local v="${1:-${HALOGEN_VARIANT:-}}"
+  if [[ -z "$v" ]]; then
+    if [[ -t 0 ]] && command -v gum >/dev/null 2>&1; then
+      local choice
+      choice=$(menu_variant) || exit 1
+      v="${choice%%[ ]*}"
+    else
+      v="w4b"
+    fi
+  fi
+  case "$v" in
+    w4b|native|hgn|default) echo "w4b" ;;
+    iq4|ud-iq4-xs|gguf) echo "iq4" ;;
+    *) die "unrecognized weight variant: $v (expected 'w4b' or 'iq4')" ;;
+  esac
+}
+
+current_container_variant() {
+  local variant
+  variant=$(podman inspect --format '{{index .Config.Labels "halogen.variant"}}' "$HALOGEN_CONTAINER" 2>/dev/null || true)
+  if [[ -n "$variant" ]]; then
+    printf '%s\n' "$variant"
+    return 0
+  fi
+  local ckpt
+  ckpt=$(podman inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$HALOGEN_CONTAINER" 2>/dev/null | grep '^HALOGEN_CHECKPOINT=' || true)
+  if [[ "$ckpt" == *UD-IQ4_XS* ]]; then
+    printf 'iq4\n'
+  elif [[ -n "$ckpt" ]]; then
+    printf 'w4b\n'
+  else
+    printf ''
+  fi
+}
+
 start_container() {
   require_podman
-  local state dir
-  state=$(container_state)
-  case "$state" in
-    running)
-      printf 'halogen: container %s is already running\n' "$HALOGEN_CONTAINER"
-      return 0
-      ;;
-  esac
+  local desired_var
+  desired_var=$(resolve_variant "${1:-}") || return $?
 
-  dir=$(require_model) || return $?
+  local state cur_var
+  state=$(container_state)
+  cur_var=$(current_container_variant)
+
   podman image exists "$HALOGEN_IMAGE" 2>/dev/null || die "image is not present: $HALOGEN_IMAGE (pull it explicitly first)"
 
+  if [[ -n "$state" && -n "$cur_var" && "$cur_var" != "$desired_var" ]]; then
+    printf 'halogen: switching model weights from %s to %s\n' "$cur_var" "$desired_var" >&2
+    if [[ "$state" == running ]]; then
+      podman stop --time 30 "$HALOGEN_CONTAINER" >/dev/null 2>&1 || true
+    fi
+    podman rm "$HALOGEN_CONTAINER" >/dev/null 2>&1 || true
+    state=""
+  fi
+
   case "$state" in
+    running)
+      printf 'halogen: container %s (%s) is already running\n' "$HALOGEN_CONTAINER" "$desired_var"
+      return 0
+      ;;
     created|configured|exited|stopped|paused)
       evict_lemonade_models
-      printf 'halogen: starting existing container %s\n' "$HALOGEN_CONTAINER"
+      printf 'halogen: starting existing container %s (%s)\n' "$HALOGEN_CONTAINER" "$desired_var"
       podman start "$HALOGEN_CONTAINER" >/dev/null
       return 0
       ;;
@@ -244,7 +289,7 @@ start_container() {
         --security-opt seccomp=unconfined
         --ipc=host
         --ulimit memlock=-1:-1
-        --volume "${dir}:/models:ro"
+        --label "halogen.variant=${desired_var}"
         --env "HALOGEN_API_PORT=${HALOGEN_API_PORT}"
         --env "HALOGEN_MODEL_ID=${HALOGEN_MODEL_ID}"
         --env "HALOGEN_FLASH_PIN_TRUNK=${HALOGEN_FLASH_PIN_TRUNK}"
@@ -253,9 +298,50 @@ start_container() {
         --env "HALOGEN_KV_POOL_POSITIONS=${HALOGEN_KV_POOL_POSITIONS}"
         --env "HALOGEN_MAX_TOKENS_DEFAULT=${HALOGEN_MAX_TOKENS_DEFAULT}"
         --env "HALOGEN_MAX_TOKENS_CAP=${HALOGEN_MAX_TOKENS_CAP}"
-        "$HALOGEN_IMAGE"
+        --env "HALOGEN_TEMPERATURE=${HALOGEN_TEMPERATURE:-1.0}"
+        --env "HALOGEN_TOP_P=${HALOGEN_TOP_P:-0.95}"
+        --env "HALOGEN_TOP_K=${HALOGEN_TOP_K:-20}"
+        --env "HALOGEN_MIN_P=${HALOGEN_MIN_P:-0.0}"
+        --env "HALOGEN_PRESENCE_PENALTY=${HALOGEN_PRESENCE_PENALTY:-0.0}"
+        --env "HALOGEN_ENABLE_THINKING=${HALOGEN_ENABLE_THINKING:-1}"
+        --env "HALOGEN_REASONING_EFFORT=${HALOGEN_REASONING_EFFORT:-xhigh}"
+        --env "HALOGEN_DRAFTER_DEFAULT=${HALOGEN_DRAFTER_DEFAULT:-1}"
       )
-      podman "${args[@]}"
+
+      if [[ "$desired_var" == "w4b" ]]; then
+        local dir="$HALOGEN_W4B_MODELS"
+        [[ -d "$dir" ]] || die "models directory does not exist: $dir"
+        local checkpoint="$dir/$HALOGEN_W4B_CHECKPOINT_FILE"
+        [[ -f "$checkpoint" ]] || die "checkpoint missing: $checkpoint"
+        local overlay="${checkpoint%.hgn}.overlay.hgn"
+        if [[ ! -f "$overlay" ]]; then
+          printf 'halogen: warning: quality sidecar missing: %s\n' "$overlay" >&2
+        fi
+        args+=(
+          --volume "${dir}:/models:ro"
+          --env "HALOGEN_CHECKPOINT=/models/${HALOGEN_W4B_CHECKPOINT_FILE}"
+        )
+      else
+        local dir="$HALOGEN_IQ4_MODELS"
+        [[ -d "$dir" ]] || die "models directory does not exist: $dir"
+        local ckpt_host="$dir/${HALOGEN_IQ4_CHECKPOINT_FILE#/models/}"
+        [[ -f "$ckpt_host" ]] || die "GGUF checkpoint missing: $ckpt_host"
+        local mtp_host="$dir/${HALOGEN_IQ4_MTP_HEAD#/models/}"
+        [[ -f "$mtp_host" ]] || die "MTP head missing: $mtp_host"
+        args+=(
+          --volume "${dir}:/models:ro"
+          --env "HALOGEN_CHECKPOINT=${HALOGEN_IQ4_CHECKPOINT_FILE}"
+          --env "HALOGEN_MTP_HEAD=${HALOGEN_IQ4_MTP_HEAD}"
+          --env "HALOGEN_TOKENIZER=${HALOGEN_IQ4_TOKENIZER}"
+        )
+      fi
+
+      args+=(
+        "$HALOGEN_IMAGE"
+        all
+      )
+      printf 'halogen: creating and starting container %s (%s)\n' "$HALOGEN_CONTAINER" "$desired_var"
+      podman "${args[@]}" >/dev/null
       ;;
     *)
       die "container $HALOGEN_CONTAINER is in unsupported state: $state"
@@ -288,26 +374,27 @@ wait_for_health() {
 }
 
 start() {
-  start_container
+  start_container "${1:-}"
 }
 
 ensure() {
   validate_wait_timeout
-  start_container
+  start_container "${1:-}"
   wait_for_health
 }
 
 status() {
   require_podman
   require_curl
-  local health state
+  local health state var
+  state=$(container_state)
+  var=$(current_container_variant)
   if health=$(health_document 2>/dev/null); then
-    printf '%s\n' "$health"
+    printf 'halogen: running (%s)\n%s\n' "${var:-unknown}" "$health"
     return 0
   fi
-  state=$(container_state)
   if [[ -n "$state" ]]; then
-    printf 'halogen: container %s is %s; /health is not ready\n' "$HALOGEN_CONTAINER" "$state" >&2
+    printf 'halogen: container %s is %s (%s); /health is not ready\n' "$HALOGEN_CONTAINER" "$state" "${var:-unknown}" >&2
   else
     printf 'halogen: container %s does not exist; /health is not reachable\n' "$HALOGEN_CONTAINER" >&2
   fi
@@ -340,13 +427,11 @@ logs() {
 case "${1:-}" in
   start)
     shift
-    (($# == 0)) || { usage >&2; exit 2; }
-    start
+    start "${1:-}"
     ;;
   ensure)
     shift
-    (($# == 0)) || { usage >&2; exit 2; }
-    ensure
+    ensure "${1:-}"
     ;;
   status)
     shift

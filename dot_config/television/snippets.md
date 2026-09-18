@@ -73,6 +73,11 @@
 - AI: Halogen start | halogen start
 - AI: Halogen ensure (wait for health) | halogen ensure
 - AI: Halogen stop | halogen stop
+- AI: Strix-Llama status | strix-llama status
+- AI: Strix-Llama start (menu: MTP/vision/KV) | strix-llama start
+- AI: Strix-Llama ensure (wait for health) | strix-llama ensure
+- AI: Strix-Llama logs | strix-llama logs
+- AI: Strix-Llama stop | strix-llama stop
 
 - AI: Serve autocomplete model (background) | serve-autocomplete
 - AI: Stop autocomplete model | stop-autocomplete

@@ -1,0 +1,929 @@
+#!/usr/bin/env python3
+"""
+strix-llm-bench — reproducible Strix-Llama speed benchmark following LLM-Bench protocol.
+
+Measures server-side throughput directly against the running strix-llama container:
+* Target prompt prefill: ~2048 new tokens (PP2048)
+* Target generation: exactly 182 tokens (TG182; EOS is ignored)
+* Context depths: d0, d30000, d60000, d150000
+* Workloads: Stata code (or prose)
+* Reasoning: disabled via chat_template_kwargs={"enable_thinking": False}
+* Speculation: MTP timings recorded from server response
+* Cache control: unique nonce per cell; deep target cache hits strictly required
+* Power sampling: amdgpu PPT average at 1.0s interval
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import math
+import os
+import re
+import socket
+import statistics
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+from typing import Any, Callable
+
+SCRIPT_NAME = "strix-llm-bench"
+SCRIPT_VERSION = "1.0"
+DEFAULT_BASE_URL = "http://127.0.0.1:8732"
+DEFAULT_OUTDIR = Path.home() / ".local/share/ramalama/benchmarks"
+PP_TARGET = 2048
+TG_TARGET = 182
+DEFAULT_DEPTHS = [0, 30000, 60000, 150000]
+DEFAULT_RUNS = 2
+PROMPT_VERSION = "builtin-2"
+
+TASK_LABELS = {
+    "prose": "prose synthesis",
+    "stata": "Stata code",
+}
+TASK_ORDER = ("prose", "stata")
+
+TASK_INSTRUCTIONS = {
+    "prose": (
+        "Read the source passage below and write exactly two concise, polished "
+        "paragraphs for an applied economist. Synthesize its central mechanism, "
+        "evidence, limitations, and policy implications. Use only the passage. "
+        "Do not use hidden reasoning or a preamble."
+    ),
+    "stata": (
+        "Write complete Stata 19 code for the specification below. Return only a "
+        "single do-file in a fenced code block; make it executable, explicit about "
+        "variable construction, and robust to missing values. Do not use hidden "
+        "reasoning or explanatory prose outside the code."
+    ),
+}
+
+TASK_SEEDS = {
+    "prose": """
+The following passage concerns applied empirical economics. Urban economic activity
+is shaped by access to jobs, housing costs, transportation networks, environmental
+amenities, and local public finance. A change in a transport network can alter the
+spatial distribution of employment and households, but the observed correlation
+between access and outcomes is not automatically causal. Researchers therefore make
+the estimand explicit, define the treatment and comparison populations, and state
+which potential outcomes are being compared. A credible design explains why the
+counterfactual trend is plausible, how treatment timing is determined, and whether
+anticipation, displacement, and changes in composition threaten interpretation.
+
+Difference-in-differences compares changes in treated and comparison units, often
+using unit and period fixed effects. Its central identifying restriction is a form
+of parallel trends, which must be assessed using pre-treatment outcomes and
+institutional knowledge rather than a mechanical significance test alone. Event
+studies can display dynamic effects, but leads and lags may be contaminated by
+staggered adoption, treatment effect heterogeneity, and noisy estimates. Modern
+implementations distinguish the treatment cohort from the calendar period and
+aggregate cohort-specific effects transparently. Standard errors should reflect
+the level at which treatment varies and the dependence induced by repeated
+observations.
+
+Environmental policy creates related measurement problems. Pollution monitors are
+not randomly located, exposure may be spatially correlated, and weather affects
+both emissions and measured concentrations. Satellite measures can broaden spatial
+coverage but introduce retrieval error and missingness. A useful analysis reports
+the measurement process, checks sensitivity to alternative samples and bandwidths,
+and separates short-run behavioral responses from long-run investment responses.
+Distributional effects matter because exposure and adaptation capacity can differ
+by income, age, race, tenure, and neighborhood. A policy that improves an average
+outcome may still impose costs on a subgroup or shift pollution to an unmeasured
+location.
+
+The strongest empirical writing connects institutional detail to the statistical
+model. It distinguishes descriptive patterns from causal claims, reports the units
+and scale of the estimates, and explains which assumptions are testable and which
+are maintained. Robustness checks are informative when they probe a concrete threat
+rather than merely producing a longer list of specifications. External validity
+requires identifying the population, time period, and policy margin to which the
+result is intended to apply. These principles are useful when reading a paper,
+report, or long technical memo and deciding whether its mechanism and evidence
+support the conclusion.
+""".strip(),
+    "stata": """
+Write a Stata 19 do-file for a panel-data difference-in-differences analysis of a
+local transit expansion. The input data contain county_id, year, treated, first_treat,
+employment, population, pm25, median_rent, and distance_to_station. Some counties
+are never treated, first_treat is missing for them, and the panel can be unbalanced.
+The code must set a reproducible project root through a global or local macro,
+create a log, validate identifiers and years, and preserve the raw data by using
+a tempfile or a preserved frame for intermediate work.
+
+Construct log employment and log population carefully, retaining missing values
+rather than converting them to zero. Create treatment timing and event-time
+variables, cap a displayed event window at -5 and 8, and make the omitted period
+-1 explicit. Estimate a two-way-fixed-effects event study with county and year
+fixed effects and standard errors clustered by county. Also estimate a compact
+post-treatment specification for employment and PM2.5. Use modern Stata syntax
+where appropriate, label variables, and export a readable results table. Include
+checks for duplicate county-year observations, treatment timing inconsistencies,
+small or nonpositive outcomes before logging, and a summary of the estimation
+sample. The do-file should run even when optional user-written commands are not
+installed; if a community-contributed export command is unavailable, leave a
+clearly marked fallback using built-in Stata commands.
+""".strip(),
+}
+
+FILLER_SEEDS = {
+    "prose": (
+        "A research memo records an institutional fact, a measurement choice, and "
+        "a possible threat to inference. The reader should track the population, "
+        "time horizon, comparison group, and mechanism while separating evidence "
+        "from interpretation. Spatial exposure, treatment timing, selection, "
+        "spillovers, and serial correlation can all change the meaning of an "
+        "estimate. A transparent memo reports these choices and the sensitivity "
+        "of the conclusion to plausible alternatives."
+    ),
+    "stata": (
+        "A reproducible Stata project separates raw data from derived data, validates "
+        "keys before merging, records the sample used by each model, and makes all "
+        "transformations visible. Panel estimators require explicit unit and time "
+        "variables, a clear treatment date, and standard errors that reflect the "
+        "assignment process. Missing, zero, and negative values must be handled "
+        "deliberately rather than silently recoded."
+    ),
+}
+
+BENCH_SYSTEM = (
+    "You are a local throughput benchmark target. Follow the task request directly. "
+    "Do not emit chain-of-thought or hidden reasoning; provide only the requested "
+    "answer content. The benchmark records server timings, not answer quality."
+)
+
+
+class BenchmarkError(RuntimeError):
+    pass
+
+
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def safe_float(v: Any) -> float | None:
+    try:
+        if v is None or v == "":
+            return None
+        f = float(v)
+        return f if math.isfinite(f) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def safe_int(v: Any) -> int | None:
+    try:
+        if v is None or v == "":
+            return None
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def json_request(url: str, payload: dict[str, Any] | None = None, timeout: float = 60.0) -> dict[str, Any]:
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {"Content-Type": "application/json"} if payload is not None else {}
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST" if payload is not None else "GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            return json.loads(raw) if raw.strip() else {}
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        raise BenchmarkError(f"HTTP {exc.code} from {url}: {raw[:500]}") from exc
+    except Exception as exc:
+        raise BenchmarkError(f"Request failed for {url}: {exc}") from exc
+
+
+class PowerSampler:
+    def __init__(self, interval: float = 1.0) -> None:
+        self.interval = interval
+        self.sensor_path, self.sensor_name = self.find_sensor()
+        self.samples: list[tuple[float, float]] = []
+        self.started: float | None = None
+        self.stop_event = threading.Event()
+        self.thread: threading.Thread | None = None
+
+    @staticmethod
+    def find_sensor() -> tuple[Path | None, str]:
+        base = Path("/sys/class/drm")
+        averages = sorted(base.glob("card*/device/hwmon/hwmon*/power1_average"))
+        inputs = sorted(base.glob("card*/device/hwmon/hwmon*/power1_input"))
+        for p in [*averages, *inputs]:
+            try:
+                float(p.read_text(encoding="utf-8").strip())
+                return p, p.name
+            except (OSError, ValueError):
+                continue
+        return None, "unavailable"
+
+    def read_watts(self) -> float | None:
+        if self.sensor_path is None:
+            return None
+        try:
+            val = float(self.sensor_path.read_text(encoding="utf-8").strip()) / 1_000_000.0
+            return val if math.isfinite(val) and val >= 0 else None
+        except (OSError, ValueError):
+            return None
+
+    def record(self) -> None:
+        if self.started is None:
+            return
+        w = self.read_watts()
+        if w is not None:
+            self.samples.append((time.monotonic() - self.started, w))
+
+    def run(self) -> None:
+        while not self.stop_event.wait(self.interval):
+            self.record()
+
+    def start(self) -> None:
+        self.started = time.monotonic()
+        if self.sensor_path is None:
+            return
+        self.record()
+        self.thread = threading.Thread(target=self.run, name="strix-power", daemon=True)
+        self.thread.start()
+
+    def stop(self) -> dict[str, Any]:
+        if self.started is None:
+            return {"available": False, "sensor": self.sensor_name, "samples": []}
+        self.stop_event.set()
+        if self.thread is not None:
+            self.thread.join(timeout=max(1.0, self.interval + 0.5))
+        self.record()
+        return {
+            "available": self.sensor_path is not None and bool(self.samples),
+            "sensor": str(self.sensor_path) if self.sensor_path else self.sensor_name,
+            "sensor_kind": self.sensor_name,
+            "sample_interval_s": self.interval,
+            "samples": list(self.samples),
+        }
+
+
+def power_phase_summary(trace: dict[str, Any] | None, timing: dict[str, Any]) -> dict[str, Any]:
+    trace = trace or {}
+    samples = trace.get("samples") or []
+    prompt_ms = safe_float(timing.get("prompt_ms"))
+    predicted_ms = safe_float(timing.get("predicted_ms"))
+    wall_ms = safe_float(timing.get("wall_ms"))
+    if prompt_ms is None or predicted_ms is None:
+        usable = [float(w) for _, w in samples]
+        return {
+            "available": bool(usable),
+            "sample_count": len(usable),
+            "request_mean_w": statistics.mean(usable) if usable else None,
+            "prefill_mean_w": None,
+            "decode_mean_w": None,
+        }
+
+    prompt_end = prompt_ms / 1000.0
+    request_end = (prompt_ms + predicted_ms) / 1000.0
+    if wall_ms is not None:
+        request_end = min(request_end, max(0.0, wall_ms / 1000.0))
+    prefill = [float(w) for elapsed, w in samples if 0.0 <= elapsed < prompt_end]
+    decode = [float(w) for elapsed, w in samples if prompt_end <= elapsed <= request_end]
+    request = prefill + decode
+    return {
+        "available": bool(request),
+        "sample_count": len(request),
+        "request_mean_w": statistics.mean(request) if request else None,
+        "prefill_mean_w": statistics.mean(prefill) if prefill else None,
+        "prefill_samples": len(prefill),
+        "decode_mean_w": statistics.mean(decode) if decode else None,
+        "decode_samples": len(decode),
+    }
+
+
+class StrixClient:
+    def __init__(self, base_url: str, request_timeout: float = 1800.0, power_interval: float = 1.0, power_enabled: bool = True):
+        self.base = base_url.rstrip("/")
+        self.request_timeout = request_timeout
+        self.power_interval = power_interval
+        self.power_enabled = power_enabled
+        self.last_power_trace: dict[str, Any] | None = None
+
+    def health(self) -> dict[str, Any]:
+        return json_request(f"{self.base}/health", timeout=10.0)
+
+    def tokenize(self, content: str) -> int:
+        data = json_request(f"{self.base}/tokenize", {"content": content}, timeout=300.0)
+        tokens = data.get("tokens")
+        if isinstance(tokens, list):
+            return len(tokens)
+        count = safe_int(data.get("count"))
+        if count is not None:
+            return count
+        raise BenchmarkError(f"tokenize returned no token list: {data}")
+
+    def chat(self, messages: list[dict[str, str]], max_tokens: int, cache_prompt: bool, ignore_eos: bool = True, measure_power: bool = False) -> tuple[dict[str, Any], float]:
+        body = {
+            "model": "strix-qwen3.8-flash-next",
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "ignore_eos": ignore_eos,
+            "cache_prompt": cache_prompt,
+            "chat_template_kwargs": {"enable_thinking": False},
+            "stream": False,
+        }
+        sampler = PowerSampler(self.power_interval) if measure_power and self.power_enabled else None
+        if sampler is not None:
+            sampler.start()
+        started = time.perf_counter()
+        try:
+            response = json_request(f"{self.base}/v1/chat/completions", body, timeout=self.request_timeout)
+        finally:
+            wall_ms = (time.perf_counter() - started) * 1000
+            self.last_power_trace = sampler.stop() if sampler is not None else None
+        return response, wall_ms
+
+
+def system_for(nonce: str) -> str:
+    return f"{BENCH_SYSTEM}\nCell nonce: {nonce}"
+
+
+def fit_text_to_tokens(text: str, target: int, tokenize: Callable[[str], int], tolerance: int = 8) -> tuple[str, int]:
+    target = max(1, target)
+    if not text:
+        text = "benchmark"
+    if tokenize(text) < target:
+        source = text
+        repeats = max(2, math.ceil(target * 4 / max(1, len(source))))
+        text = (source + "\n\n") * repeats
+    candidate = text
+    measured = tokenize(candidate)
+    for _ in range(6):
+        if abs(measured - target) <= tolerance:
+            return candidate, measured
+        if measured <= 0:
+            break
+        new_len = max(1, min(len(text), round(len(candidate) * target / measured)))
+        if new_len == len(candidate):
+            break
+        candidate = text[:new_len]
+        measured = tokenize(candidate)
+
+    low, high = 0, len(candidate)
+    best = ""
+    best_n = 0
+    while low <= high and high - low > 2:
+        mid = (low + high) // 2
+        val = candidate[:mid]
+        cnt = tokenize(val)
+        if cnt <= target:
+            best, best_n = val, cnt
+            low = mid + 1
+        else:
+            high = mid - 1
+    if best:
+        return best, best_n
+    return candidate, measured
+
+
+def repeated_task_text(task: str, prefix: str, target: int, tokenize: Callable[[str], int]) -> tuple[str, int]:
+    seed = TASK_SEEDS[task]
+    text = prefix + "\n\n" + seed
+    while tokenize(text) < target:
+        text += "\n\n" + seed
+    return fit_text_to_tokens(text, target, tokenize)
+
+
+def build_target_prompt(task: str, target_tokens: int, tokenize: Callable[[str], int]) -> tuple[str, int]:
+    prefix = TASK_INSTRUCTIONS[task] + "\n\n"
+    return repeated_task_text(task, prefix, target_tokens, tokenize)
+
+
+def build_filler(task: str, target_tokens: int, nonce: str, tokenize: Callable[[str], int]) -> tuple[str, int]:
+    marker = (
+        f"This is an isolated benchmark context cell. The nonce is {nonce}. "
+        "It is intentionally unique so no earlier benchmark cell can supply a "
+        "matching prefix from the server cache.\n\n"
+    )
+    seed = FILLER_SEEDS[task]
+    repeats = max(2, math.ceil(target_tokens * 4.4 / len(seed)))
+    text = marker + "\n\n".join(f"Context segment {i + 1}: {seed}" for i in range(repeats))
+    return fit_text_to_tokens(text, target_tokens, tokenize, tolerance=16)
+
+
+def sha256_text(val: str) -> str:
+    return hashlib.sha256(val.encode("utf-8")).hexdigest()[:16]
+
+
+def extract_timing(response: dict[str, Any], wall_ms: float) -> dict[str, Any]:
+    timings = response.get("timings") if isinstance(response.get("timings"), dict) else {}
+    usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+    details = usage.get("prompt_tokens_details") if isinstance(usage.get("prompt_tokens_details"), dict) else {}
+    prompt_n = safe_int(timings.get("prompt_n"))
+    cache_n = safe_int(timings.get("cache_n"))
+    predicted_n = safe_int(timings.get("predicted_n"))
+    if prompt_n is None:
+        tot = safe_int(usage.get("prompt_tokens"))
+        cached = safe_int(details.get("cached_tokens"))
+        prompt_n = tot - (cached or 0) if tot is not None else None
+    if cache_n is None:
+        cache_n = safe_int(details.get("cached_tokens"))
+    if predicted_n is None:
+        predicted_n = safe_int(usage.get("completion_tokens"))
+
+    draft_n = safe_int(timings.get("draft_n"))
+    draft_acc = safe_int(timings.get("draft_n_accepted"))
+    acc_pct = (draft_acc / draft_n * 100.0) if draft_n and draft_n > 0 else None
+
+    return {
+        "prompt_n": prompt_n,
+        "cache_n": cache_n,
+        "total_prompt_n": safe_int(usage.get("prompt_tokens")),
+        "predicted_n": predicted_n,
+        "prompt_ms": safe_float(timings.get("prompt_ms")),
+        "predicted_ms": safe_float(timings.get("predicted_ms")),
+        "prompt_tps": safe_float(timings.get("prompt_per_second")),
+        "predicted_tps": safe_float(timings.get("predicted_per_second")),
+        "wall_ms": wall_ms,
+        "finish_reason": (response.get("choices") or [{}])[0].get("finish_reason"),
+        "draft_n": draft_n,
+        "draft_n_accepted": draft_acc,
+        "spec_acceptance_pct": acc_pct,
+    }
+
+
+class PromptSizer:
+    def __init__(self, client: StrixClient):
+        self.client = client
+        self.tokenize = client.tokenize
+        cal_nonce = "calibration-00000000000000000000000000000000"
+        self.system = system_for(cal_nonce)
+        try:
+            resp, _ = client.chat(
+                [{"role": "system", "content": self.system}, {"role": "user", "content": "x"}],
+                max_tokens=1,
+                cache_prompt=False,
+            )
+            timings = resp.get("timings", {})
+            prompt_n = safe_int(timings.get("prompt_n"))
+            if prompt_n is None:
+                prompt_n = safe_int(resp.get("usage", {}).get("prompt_tokens"))
+            sys_n = self.tokenize(self.system)
+            user_n = self.tokenize("x")
+            self.chat_overhead = max(0, (prompt_n or 24) - sys_n - user_n)
+        except Exception as e:
+            log(f"  calibration failed ({e}), using default overhead 24")
+            self.chat_overhead = 24
+        log(f"  chat-template overhead estimate: {self.chat_overhead} tokens")
+
+    def content_goal(self, total_prompt_tokens: int, system: str) -> int:
+        sys_n = self.tokenize(system)
+        return max(1, total_prompt_tokens - sys_n - self.chat_overhead)
+
+
+def aggregate(values: list[float | int | None]) -> dict[str, Any]:
+    clean = [float(v) for v in values if v is not None and math.isfinite(float(v))]
+    if not clean:
+        return {"n": 0, "mean": None, "sd": None, "median": None, "min": None, "max": None}
+    return {
+        "n": len(clean),
+        "mean": statistics.mean(clean),
+        "sd": statistics.stdev(clean) if len(clean) > 1 else 0.0,
+        "median": statistics.median(clean),
+        "min": min(clean),
+        "max": max(clean),
+    }
+
+
+def fmt_num(value: Any, decimals: int = 1, dash: str = "—") -> str:
+    n = safe_float(value)
+    if n is None:
+        return dash
+    return f"{n:.{decimals}f}"
+
+
+def fmt_stat(stat: dict[str, Any] | None, decimals: int = 1) -> str:
+    if not stat or stat.get("mean") is None:
+        return "—"
+    return f"{fmt_num(stat['mean'], decimals)} ± {fmt_num(stat.get('sd'), decimals)}"
+
+
+def collect_host_environment() -> dict[str, Any]:
+    cpu = "AMD RYZEN AI MAX+ PRO 395 w/ Radeon 8060S"
+    product = "HP ZBook Ultra G1a 14 inch Mobile Workstation PC"
+    device = f"{cpu} / {product}"
+    memory = "128 GB LPDDR5X-8000"
+    uma = "0.5 GB (512 MB)"
+
+    def read_sys(path: str) -> str:
+        try:
+            return Path(path).read_text(encoding="utf-8").strip()
+        except OSError:
+            return "not detected"
+
+    cmdline = read_sys("/proc/cmdline")
+    params = [token for token in cmdline.split() if token.startswith(("gttsize=", "ttm.pages_limit=", "amdgpu.gttsize=", "amd_iommu="))]
+    kernel = f"{os.uname().release}, amdgpu params: {', '.join(params) if params else 'none'}"
+
+    try:
+        tuned = subprocess.check_output(["tuned-adm", "active"], text=True, timeout=3).strip()
+        m = re.search(r"Current active profile:\s*(\S+)", tuned)
+        tuned_profile = m.group(1) if m else "not detected"
+    except Exception:
+        tuned_profile = "not detected"
+
+    platform_profile = read_sys("/sys/firmware/acpi/platform_profile")
+    governor = read_sys("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")
+    power = f"sustained TDP: not recorded; tuned profile: {tuned_profile}; platform profile: {platform_profile}; CPU governor: {governor}"
+
+    # Container details
+    container_info = {}
+    try:
+        raw = subprocess.check_output(["podman", "inspect", "strix-llama-server"], text=True, timeout=5)
+        cdata = json.loads(raw)[0]
+        container_info = {
+            "labels": cdata["Config"].get("Labels", {}),
+            "cmd": cdata["Config"].get("Cmd", []),
+            "image": cdata.get("ImageName", "localhost/llama-rocm-10.0-strix-llama:latest"),
+        }
+    except Exception as e:
+        container_info = {"error": str(e)}
+
+    return {
+        "device": device,
+        "memory": memory,
+        "uma_split": uma,
+        "kernel": kernel,
+        "power": power,
+        "container": container_info,
+    }
+
+
+def run_benchmark(
+    client: StrixClient,
+    tasks: list[str],
+    depths: list[int],
+    runs: int,
+    tag: str,
+    allow_cache_miss: bool = False,
+    cooldown: float = 0.0,
+) -> dict[str, Any]:
+    started_iso = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    env = collect_host_environment()
+    log(f"\nStarting benchmark: tag={tag}, tasks={tasks}, depths={depths}, runs={runs}")
+    log(f"Host: {env['device']} · RAM: {env['memory']}")
+
+    # Warmup
+    log("  warmup request (discarded)...")
+    warmup_nonce = uuid.uuid4().hex
+    client.chat(
+        [{"role": "system", "content": system_for(warmup_nonce)}, {"role": "user", "content": "Warm up inference; reply OK."}],
+        max_tokens=8,
+        cache_prompt=False,
+    )
+
+    sizer = PromptSizer(client)
+    cells: list[dict[str, Any]] = []
+
+    for task in tasks:
+        for depth in depths:
+            for rep in range(1, runs + 1):
+                nonce = uuid.uuid4().hex
+                system = system_for(nonce)
+                filler_info: dict[str, Any] | None = None
+                prior_messages: list[dict[str, str]] = []
+
+                if depth > 0:
+                    filler_goal = sizer.content_goal(depth, system)
+                    log(f"    [{tag}] {task} d{depth} r{rep}/{runs}: generating {filler_goal} filler tokens...")
+                    filler_text, filler_n = build_filler(task, filler_goal, nonce, client.tokenize)
+                    log(f"    [{tag}] {task} d{depth} r{rep}/{runs}: ingesting {filler_n} filler tokens into KV cache...")
+                    fill_resp, fill_wall_ms = client.chat(
+                        [{"role": "system", "content": system}, {"role": "user", "content": filler_text}],
+                        max_tokens=1,
+                        cache_prompt=True,
+                        measure_power=True,
+                    )
+                    fill_timing = extract_timing(fill_resp, fill_wall_ms)
+                    fill_power = power_phase_summary(client.last_power_trace, fill_timing)
+                    fill_msg = (fill_resp.get("choices") or [{}])[0].get("message", {})
+                    fill_content = str(fill_msg.get("content") or "OK")
+                    prior_messages = [
+                        {"role": "user", "content": filler_text},
+                        {"role": "assistant", "content": fill_content},
+                    ]
+                    filler_tot = fill_timing.get("total_prompt_n") or fill_timing.get("prompt_n")
+                    filler_info = {
+                        "requested_depth": depth,
+                        "content_tokens": filler_n,
+                        "timing": fill_timing,
+                        "power": fill_power,
+                        "actual_context_tokens": filler_tot,
+                    }
+                    fill_pp = fill_timing.get("prompt_tps")
+                    fill_pp_s = f"{fill_pp:.1f}" if fill_pp else "—"
+                    log(f"    [{tag}] {task} d{depth} r{rep}/{runs} fill done: {filler_tot} tokens at {fill_pp_s} t/s ({fill_wall_ms/1000:.1f}s)")
+
+                # Target prompt
+                if depth == 0:
+                    target_goal = sizer.content_goal(PP_TARGET, system)
+                else:
+                    target_goal = max(1, PP_TARGET - sizer.chat_overhead)
+                target_prompt, target_n = build_target_prompt(task, target_goal, client.tokenize)
+
+                target_messages = [
+                    {"role": "system", "content": system},
+                    *prior_messages,
+                    {"role": "user", "content": target_prompt},
+                ]
+
+                log(f"    [{tag}] {task} d{depth} r{rep}/{runs}: running target request (~{PP_TARGET} new tok, TG={TG_TARGET})...")
+                resp, wall_ms = client.chat(
+                    target_messages,
+                    max_tokens=TG_TARGET,
+                    cache_prompt=True,
+                    ignore_eos=True,
+                    measure_power=True,
+                )
+                timing = extract_timing(resp, wall_ms)
+                power = power_phase_summary(client.last_power_trace, timing)
+                timing["power"] = power
+
+                actual_cache = timing.get("cache_n")
+                actual_prompt = timing.get("prompt_n")
+                cache_ok: bool
+                if depth == 0:
+                    cache_ok = actual_cache is None or actual_cache <= 32
+                else:
+                    expected = filler_info.get("actual_context_tokens") if filler_info else depth
+                    cache_ok = bool(actual_cache and actual_cache >= max(1, int(expected * 0.90)))
+
+                if not cache_ok and not allow_cache_miss:
+                    raise BenchmarkError(
+                        f"cache miss at d{depth}: saw cache_n={actual_cache}, expected roughly {depth}; aborting"
+                    )
+
+                pp = timing.get("prompt_tps")
+                tg = timing.get("predicted_tps")
+                acc = timing.get("spec_acceptance_pct")
+                pp_s = f"{pp:.1f}" if pp else "—"
+                tg_s = f"{tg:.1f}" if tg else "—"
+                acc_s = f"{acc:.1f}%" if acc is not None else "—"
+                cache_s = str(actual_cache) if actual_cache is not None else "?"
+
+                log(
+                    f"    => {task} d{depth} rep {rep}: PP {pp_s} t/s ({actual_prompt} new, cache {cache_s}) · "
+                    f"TG {tg_s} t/s ({timing.get('predicted_n')} tok) · Spec acc {acc_s}"
+                )
+
+                cells.append({
+                    "task": task,
+                    "task_label": TASK_LABELS.get(task, task),
+                    "depth": depth,
+                    "depth_label": f"d{depth}",
+                    "rep": rep,
+                    "nonce": nonce,
+                    "target_tokens": target_n,
+                    "timing": timing,
+                    "cache_ok": cache_ok,
+                    "filler": filler_info,
+                })
+
+                if cooldown > 0:
+                    time.sleep(cooldown)
+
+    # Summarize cells
+    summaries: list[dict[str, Any]] = []
+    for task in tasks:
+        for depth in depths:
+            cgroup = [c for c in cells if c["task"] == task and c["depth"] == depth]
+            if not cgroup:
+                continue
+            fill_pp_list = [c["filler"]["timing"]["prompt_tps"] for c in cgroup if c.get("filler")]
+            target_pp_list = [c["timing"]["prompt_tps"] for c in cgroup]
+            tg_list = [c["timing"]["predicted_tps"] for c in cgroup]
+            draft_tot = sum(c["timing"]["draft_n"] or 0 for c in cgroup)
+            draft_acc = sum(c["timing"]["draft_n_accepted"] or 0 for c in cgroup)
+            fill_pwr = [c["filler"]["power"]["prefill_mean_w"] for c in cgroup if c.get("filler") and c["filler"]["power"]["prefill_mean_w"]]
+            target_prefill_pwr = [c["timing"]["power"]["prefill_mean_w"] for c in cgroup if c["timing"]["power"]["prefill_mean_w"]]
+            target_decode_pwr = [c["timing"]["power"]["decode_mean_w"] for c in cgroup if c["timing"]["power"]["decode_mean_w"]]
+
+            summaries.append({
+                "task": task,
+                "task_label": TASK_LABELS.get(task, task),
+                "depth": depth,
+                "depth_label": f"d{depth}",
+                "runs_ok": len([c for c in cgroup if c["cache_ok"]]),
+                "runs_total": len(cgroup),
+                "fill_prompt_tps": aggregate(fill_pp_list),
+                "target_prompt_tps": aggregate(target_pp_list),
+                "predicted_tps": aggregate(tg_list),
+                "spec_draft_tokens": draft_tot,
+                "spec_accepted_tokens": draft_acc,
+                "spec_acceptance_pct": (draft_acc / draft_tot * 100.0) if draft_tot > 0 else None,
+                "fill_power_w": aggregate(fill_pwr),
+                "target_prefill_power_w": aggregate(target_prefill_pwr),
+                "target_decode_power_w": aggregate(target_decode_pwr),
+            })
+
+    finished_iso = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    return {
+        "script": SCRIPT_NAME,
+        "version": SCRIPT_VERSION,
+        "started": started_iso,
+        "finished": finished_iso,
+        "tag": tag,
+        "endpoint": client.base,
+        "host": socket.gethostname(),
+        "environment": env,
+        "protocol": {
+            "pp_target": PP_TARGET,
+            "tg_target": TG_TARGET,
+            "reasoning": "off",
+            "tasks": tasks,
+            "depths": depths,
+            "runs": runs,
+        },
+        "summaries": summaries,
+        "cells": cells,
+    }
+
+
+def render_markdown(report: dict[str, Any]) -> str:
+    env = report["environment"]
+    proto = report["protocol"]
+    cinfo = env.get("container", {})
+    labels = cinfo.get("labels", {})
+    cmd = cinfo.get("cmd", [])
+
+    lines = [
+        "## Local LLM benchmark: Strix-Llama (Retained-PM4 PR #133)",
+        "",
+        "### Run",
+        "",
+        f"- Date: `{report['started']}` · Strix-Llama at `{report['endpoint']}` · host `{report['host']}`",
+        f"- Configuration tag: `{report['tag']}` (batch `{labels.get('strix-batch')}`, ubatch `{labels.get('strix-ubatch')}`, ctx `{labels.get('strix-ctx')}`, KV `{labels.get('strix-kv')}`, MTP `{labels.get('strix-mtp')}`)",
+        f"- Protocol: `PP≈{proto['pp_target']}` new · `TG={proto['tg_target']}` · reasoning `off` · tasks `{', '.join(proto['tasks'])}` · depths `{', '.join('d'+str(d) for d in proto['depths'])}` · runs/cell `{proto['runs']}`",
+        "- Cache: unique nonce per cell; deep target cache hits required (≥90% fill-prefix reuse).",
+        f"- Hardware: `{env.get('device')}` · memory `{env.get('memory')}` · UMA `{env.get('uma_split')}`",
+        f"- Kernel: `{env.get('kernel')}` · power `{env.get('power')}`",
+        f"- Container git commit: `{labels.get('git-commit', 'not recorded')}`",
+        f"- Full command: `{' '.join(cmd)}`",
+        "",
+        "### Results",
+        "",
+        "| Task | Depth | Fill PP t/s | Target PP t/s | TG t/s | Spec. acceptance | Prefill W | Decode W | Runs |",
+        "| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+
+    for s in report["summaries"]:
+        acc = s.get("spec_acceptance_pct")
+        acc_s = f"{acc:.1f}%" if acc is not None else "—"
+        row = [
+            s["task_label"],
+            f"`{s['depth_label']}`",
+            fmt_stat(s["fill_prompt_tps"]),
+            fmt_stat(s["target_prompt_tps"]),
+            fmt_stat(s["predicted_tps"]),
+            acc_s,
+            fmt_stat(s["target_prefill_power_w"]),
+            fmt_stat(s["target_decode_power_w"]),
+            f"{s['runs_ok']}/{proto['runs']}",
+        ]
+        lines.append("| " + " | ".join(row) + " |")
+
+    lines.extend([
+        "",
+        "### Per-run details",
+        "",
+        "| Task | Depth | Rep | Fill tokens | Fill t/s | Fill s | Target PP new | Target PP t/s | Cache tok | TG tok | TG t/s | Draft acc | Target s |",
+        "| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ])
+
+    for c in report["cells"]:
+        t = c["timing"]
+        f = c.get("filler")
+        ft = f["timing"] if f else {}
+        fill_tok = str(f["actual_context_tokens"]) if f else "—"
+        fill_tps = fmt_num(ft.get("prompt_tps")) if f else "—"
+        fill_s = f"{ft.get('wall_ms', 0)/1000:.1f}" if f else "—"
+        acc = t.get("spec_acceptance_pct")
+        acc_s = f"{acc:.1f}%" if acc is not None else "—"
+
+        row = [
+            c["task_label"],
+            f"`{c['depth_label']}`",
+            str(c["rep"]),
+            fill_tok,
+            fill_tps,
+            fill_s,
+            str(t.get("prompt_n", "—")),
+            fmt_num(t.get("prompt_tps")),
+            str(t.get("cache_n", "—")),
+            str(t.get("predicted_n", "—")),
+            fmt_num(t.get("predicted_tps")),
+            acc_s,
+            f"{t.get('wall_ms', 0)/1000:.1f}",
+        ]
+        lines.append("| " + " | ".join(row) + " |")
+
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def parse_depths(val: str) -> list[int]:
+    out = []
+    for p in val.split(","):
+        p = p.strip().lower()
+        if not p:
+            continue
+        if p.startswith("d"):
+            p = p[1:]
+        mult = 1
+        if p.endswith("k"):
+            mult = 1000
+            p = p[:-1]
+        elif p.endswith("m"):
+            mult = 1_000_000
+            p = p[:-1]
+        out.append(int(float(p) * mult))
+    return out
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Strix-Llama speed benchmark")
+    parser.add_argument("--api", default=DEFAULT_BASE_URL, help="Strix-Llama API base URL")
+    parser.add_argument("--tasks", default="stata", help="Comma-separated tasks: stata, prose, all")
+    parser.add_argument("--depths", type=parse_depths, default=DEFAULT_DEPTHS, help="Depths: 0,30k,60k,150k")
+    parser.add_argument("--runs", type=int, default=DEFAULT_RUNS, help="Repetitions per cell")
+    parser.add_argument("--tag", default="6k/6k", help="Configuration label (e.g. 6k/6k or 4k/4k)")
+    parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR, help="Output directory")
+    parser.add_argument("--no-save", action="store_true", help="Do not save reports to disk")
+    parser.add_argument("--no-power", action="store_true", help="Disable AMD GPU power sampling")
+    parser.add_argument("--power-interval", type=float, default=1.0, help="Power sampling interval (s)")
+    parser.add_argument("--request-timeout", type=float, default=1800.0, help="Request timeout (s)")
+    parser.add_argument("--cooldown", type=float, default=2.0, help="Cooldown between cells (s)")
+    parser.add_argument("--allow-cache-miss", action="store_true", help="Do not abort on cache miss")
+    args = parser.parse_args()
+
+    selected_tasks = []
+    for t in args.tasks.split(","):
+        t = t.strip().lower()
+        if t in ("code", "stata"):
+            if "stata" not in selected_tasks:
+                selected_tasks.append("stata")
+        elif t in ("prose", "reading", "writing"):
+            if "prose" not in selected_tasks:
+                selected_tasks.append("prose")
+        elif t == "all":
+            selected_tasks = list(TASK_ORDER)
+    if not selected_tasks:
+        selected_tasks = ["stata"]
+
+    client = StrixClient(
+        args.api,
+        request_timeout=args.request_timeout,
+        power_interval=args.power_interval,
+        power_enabled=not args.no_power,
+    )
+
+    try:
+        health = client.health()
+        if health.get("status") not in ("ok", "ready"):
+            raise BenchmarkError(f"Strix-llama health is not ok: {health}")
+    except Exception as e:
+        log(f"Error connecting to Strix-Llama at {args.api}: {e}")
+        return 1
+
+    report = run_benchmark(
+        client,
+        tasks=selected_tasks,
+        depths=args.depths,
+        runs=args.runs,
+        tag=args.tag,
+        allow_cache_miss=args.allow_cache_miss,
+        cooldown=args.cooldown,
+    )
+
+    md_text = render_markdown(report)
+    print("\n" + md_text)
+
+    if not args.no_save:
+        args.outdir.mkdir(parents=True, exist_ok=True)
+        stamp = dt.datetime.now().astimezone().strftime("%Y-%m-%dT%H-%M-%S%z")
+        tag_slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", args.tag.lower())
+        base_name = f"{stamp}_strix-llama_{tag_slug}"
+        json_path = args.outdir / f"{base_name}.json"
+        md_path = args.outdir / f"{base_name}.md"
+
+        json_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        md_path.write_text(md_text, encoding="utf-8")
+        log(f"Saved report to:\n  {md_path}\n  {json_path}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

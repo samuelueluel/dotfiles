@@ -13,6 +13,8 @@ description: Compares or ranks empirical findings across an explicit Zotero item
 - Do not normalize unlike estimates without justification. Never assume linear dose scaling.
 - Separate the largest point estimate, significance against zero, and evidence that estimates differ.
 - Classify estimates as main, subgroup, dosage, dynamic, supplemental, robustness, or model-based. Dynamic and subgroup estimates remain eligible unless the user's rule or declared policy excludes them.
+- Do not let an agent-calculated conversion silently determine a ranking. Store source inputs, formula, calculated result, and source-reported status for any value you computed.
+- Report a tie or “top-k plus tie” when the top-k boundary is tied or an inference conflict on a close alternative remains unresolved. Never declare a clear winner in either situation.
 - For largest-effect requests, record both the paper's primary result and its maximum substantive significant result. Do not let an auxiliary placebo or mechanical robustness cell become a paper's representative maximum.
 - Exhaustively inventory eligible results for every item in the frozen set before ranking. Selective deep verification applies after result-level coverage, not before it.
 - Do not declare a collection-wide winner while any frozen item lacks a terminal result card.
@@ -30,6 +32,8 @@ Use one of these exact scopes:
 If no bounded item set exists and plausible definitions would materially change the set, run the separate discovery task first. Do not make collection-wide maximum claims from an unbounded semantic search.
 
 ## Workflow
+
+Comparison runs in two passes. Pass 1 (steps 2–4) builds a complete result inventory for every frozen paper at inventory depth: eligible results, primary and maximum-substantive roles, uncertainty status, and named unresolved fields. Pass 2 (step 6) deep-verifies only the leader and the close alternatives needed to explain the ranking, with full tables, notes, and conflict resolution. Do not deep-verify a paper during pass 1, and do not rank before every card is terminal.
 
 ### 1. Choose the ranking rule
 
@@ -54,18 +58,27 @@ Maintain one terminal result card for every frozen parent item:
 ```text
 item_key
 status: eligible | no_eligible_result | unresolved
+inventory_status: complete | partial — whether every eligible result class was searched in this paper
+unresolved_fields: fields that could not be verified, with the attempted route (empty when none)
 eligible_results:
   outcome, point estimate, scale, uncertainty
   treatment, dose, denominator, population, geography, horizon
   result_class: main | subgroup | dosage | dynamic | supplemental | robustness | model_based
   specification status and evidence IDs (retained `zr1:...` IDs or
   route-prefixed locators: `pdf:KEY:p12:label`, `mineru:KEY:line7`)
+  source_reported: whether the value is source-reported or agent-calculated
+  calculation_method: for agent-calculated values — source inputs, formula,
+  calculated result, and unit/scale
 primary_result_id: paper's preferred or headline result
 maximum_substantive_result_id: largest significant substantive result
 selected_result_id: result selected by the declared eligibility policy
 inventory_locators: exact tables, PDF pages, or bounded passages read
+close_alternative: item key and margin for the nearest competing estimate, or none
+tie_group: result IDs or item keys tied at the top-k boundary, if any
 reason: required for no_eligible_result; explain unresolved fields when unresolved
 ```
+
+These ledger fields are internal working state. The `zotero_validate_comparison_manifest` submission still uses the deployed schema; do not add unsupported fields to it.
 
 `eligible` requires at least one result, all three result-role IDs, and exact inventory locators. Keep cards to the primary and maximum-substantive results plus any alternative the ranking discussion needs; extra rows cost reads without changing top-k. `no_eligible_result` requires an explicit reason and no result records. `unresolved` may contain partial results but cannot supply a selected maximum for a complete-scope comparison. Record whether primary-only and substantive-all policies would produce different top sets.
 
@@ -103,6 +116,8 @@ A decisive table read must include row and column labels plus notes. When comple
 
 Use unambiguous source prose only when it directly describes the same result. If text routes disagree or remain ambiguous, inspect the actual rendered page image. If image inspection is unavailable or inconclusive, omit the value or mark it unverified.
 
+When a ranking depends on an agent-calculated value — a unit conversion, per-capita rescaling, or subgroup combination — record the source inputs, the formula, the calculated result, and the unit/scale on the result card, and mark the estimate `source_reported: false`. A winner determined only by such a calculation is not a clear numerical winner; report it with the same caution as any other approximate comparison.
+
 If a CI and p-value disagree, inspect the methods and table layout. Otherwise state that the extracted or reported values disagree; never say “as printed” without verified page evidence.
 
 ### 5. Validate coverage and evidence structure
@@ -110,6 +125,8 @@ If a CI and p-value disagree, inspect the methods and table layout. Otherwise st
 Before ranking, submit the completed manifest to `zotero_validate_comparison_manifest`. Include the frozen item keys, one terminal result card per item, the ranking rule, eligibility policy, primary and maximum-substantive result IDs, inventory locators, selected item keys, numerical and substantive winner status, whether an alternative policy changes the top set, and the maximum number of items permitted in the final analysis. Every result `evidence_ids` entry must be a route-prefixed retained-evidence ID or locator; bare item keys, titles, and free prose are rejected. The tool checks coverage, result-policy consistency, unresolved-item policy, selected maxima, and declared output scope; it does not read sources or judge estimates.
 
 A clear numerical winner is merely the largest value under the rule. A clear substantive winner remains persuasive after accounting for dose, denominator, population, area, and horizon. Use `top_k` when the numerical winner is clear but the substantive winner is not.
+
+If the top-k boundary is tied — two estimates indistinguishable under the ranking rule — or an inference conflict on a close alternative remains unresolved after the available checks, do not declare a clear winner. Set `numerical_winner_status` or `substantive_winner_status` to `not_clear`, use `winner_type: top_k`, and report the outcome as a tie or “top-k plus tie”, naming the tied group. An unresolved p-value/CI or table-alignment conflict on the nearest competitor blocks a clear-winner declaration even when the leader's own evidence is unambiguous.
 
 For a multi-paper numerical ranking, draft the final quantitative and comparison claims in structured form and call `zotero_validate_evidence_bundle` with `allowed_item_keys` set to the selected top-one or top-three keys. Treat it as a linter only. It can detect evidence from unselected papers, missing evidence links, scale or uncertainty fields, comparator items, calculation labels, page provenance, and unresolved ambiguity. Passing does not establish substantive support and is never cited.
 

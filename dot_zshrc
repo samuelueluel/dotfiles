@@ -833,6 +833,7 @@ lem-unload() {
   # a host-wide pkill nukes them (2026-08-15: lem-unload killed all three; the
   # embedder/reranker containers self-removed via --rm).
   podman exec lemonade pkill -9 llama-server 2>/dev/null || true
+  command strix-llama stop 2>/dev/null || true
   echo "RAM cleared & orphan engine processes terminated."
 }
 
@@ -849,10 +850,20 @@ _halogen_healthy() {
   curl -fsS --max-time 2 "$api/health" >/dev/null 2>&1
 }
 
+_strix_llama_healthy() {
+  command -v curl >/dev/null 2>&1 || return 1
+  local api="${STRIX_LLAMA_API:-http://127.0.0.1:8732}"
+  api="${api%/}"
+  curl -fsS --max-time 2 "$api/health" >/dev/null 2>&1
+}
+
 _pi_cloud_model_scope() {
   local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-5.6*:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
   if _halogen_healthy; then
-    scope+=',halogen/halogen-qwen3.8-flash-next'
+    scope+=',halogen/halogen-qwen3.8-flash-next-w4b,halogen/halogen-qwen3.8-flash-next-iq4,halogen/halogen-qwen3.8-flash-next'
+  fi
+  if _strix_llama_healthy; then
+    scope+=',strix/strix-qwen3.8-flash-next'
   fi
   print -r -- "$scope"
 }
@@ -904,13 +915,24 @@ pi() {
   model_id=$(_pi_pick_local_model) || return 1
   case "$model_id" in
     halogen/*)
-      command halogen ensure || return 1
+      local hal_variant="w4b"
+      [[ "$model_id" == *iq4* ]] && hal_variant="iq4"
+      command halogen ensure "$hal_variant" || return 1
+      command strix-llama stop 2>/dev/null || true
+      pi_model_id="$model_id"
+      typeset -g PI_LOCAL_THINKING_LEVEL=unknown
+      model_flag="$pi_model_id"
+      ;;
+    strix/*)
+      command halogen stop 2>/dev/null || true
+      command strix-llama ensure || return 1
       pi_model_id="$model_id"
       typeset -g PI_LOCAL_THINKING_LEVEL=unknown
       model_flag="$pi_model_id"
       ;;
     *)
-      command halogen stop || return 1
+      command halogen stop 2>/dev/null || true
+      command strix-llama stop 2>/dev/null || true
       _lem_preload "$model_id" || return 1
       case "$model_id" in
         *@halo-vulkan|*@halo-rocm) pi_model_id="${model_id%@*}" ;;
@@ -1026,13 +1048,24 @@ beta() {
   model_id=$(_pi_pick_local_model) || return 1
   case "$model_id" in
     halogen/*)
-      command halogen ensure || return 1
+      local hal_variant="w4b"
+      [[ "$model_id" == *iq4* ]] && hal_variant="iq4"
+      command halogen ensure "$hal_variant" || return 1
+      command strix-llama stop 2>/dev/null || true
+      pi_model_id="$model_id"
+      typeset -g PI_LOCAL_THINKING_LEVEL=unknown
+      model_flag="$pi_model_id"
+      ;;
+    strix/*)
+      command halogen stop 2>/dev/null || true
+      command strix-llama ensure || return 1
       pi_model_id="$model_id"
       typeset -g PI_LOCAL_THINKING_LEVEL=unknown
       model_flag="$pi_model_id"
       ;;
     *)
-      command halogen stop || return 1
+      command halogen stop 2>/dev/null || true
+      command strix-llama stop 2>/dev/null || true
       _lem_preload "$model_id" || return 1
       case "$model_id" in
         *@halo-vulkan|*@halo-rocm) pi_model_id="${model_id%@*}" ;;

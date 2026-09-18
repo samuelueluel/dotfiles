@@ -1,0 +1,476 @@
+#!/usr/bin/env bash
+# Manage the strix-llama Qwen3.8-Flash-Next server container on ROCm 10 + retained-PM4.
+#
+# Runs the unmerged PR #133 image (localhost/llama-rocm-10.0-strix-llama) with the
+# exact measured flags for Qwen3.8-Flash-Next UD-Q4_K_XL and shared MTP head:
+# 1207 t/s pp2048 at depth 0, 1055 t/s at depth 32k, 43.9 t/s decode on Radeon 8060S.
+# Serves an OpenAI-compatible API on loopback port 8732.
+set -euo pipefail
+
+STRIX_LLAMA_CONTAINER=${STRIX_LLAMA_CONTAINER:-strix-llama-server}
+STRIX_LLAMA_IMAGE=${STRIX_LLAMA_IMAGE:-localhost/llama-rocm-10.0-strix-llama}
+STRIX_LLAMA_API_PORT=${STRIX_LLAMA_API_PORT:-8732}
+STRIX_LLAMA_API=${STRIX_LLAMA_API:-http://127.0.0.1:${STRIX_LLAMA_API_PORT}}
+STRIX_LLAMA_MODEL_ID=${STRIX_LLAMA_MODEL_ID:-strix-qwen3.8-flash-next}
+STRIX_LLAMA_MODELS=${STRIX_LLAMA_MODELS:-$HOME/models}
+
+# Model file locations on host
+MODEL_SHARD_1="$STRIX_LLAMA_MODELS/unsloth/Qwen3.8-Flash-Next-GGUF/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf"
+MMPROJ_FILE="$STRIX_LLAMA_MODELS/unsloth/Qwen3.8-Flash-Next-GGUF/mmproj-F16.gguf"
+MTP_FILE="$STRIX_LLAMA_MODELS/unsloth/Qwen3.8-Flash-Next-GGUF/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf"
+
+# Memory eviction timeouts and safety
+STRIX_LLAMA_EVICT_TIMEOUT_S=${STRIX_LLAMA_EVICT_TIMEOUT_S:-120}
+STRIX_LLAMA_WAIT_TIMEOUT_S=${STRIX_LLAMA_WAIT_TIMEOUT_S:-300}
+
+# Standard sampling parameters for Qwen 3.8 Flash Next
+STRIX_TEMP=${STRIX_TEMP:-1.0}
+STRIX_TOP_P=${STRIX_TOP_P:-0.95}
+STRIX_TOP_K=${STRIX_TOP_K:-20}
+STRIX_MIN_P=${STRIX_MIN_P:-0.0}
+STRIX_PRESENCE_PENALTY=${STRIX_PRESENCE_PENALTY:-0.0}
+STRIX_REPEAT_PENALTY=${STRIX_REPEAT_PENALTY:-1.0}
+STRIX_CTX=${STRIX_CTX:-262144}
+STRIX_BATCH=${STRIX_BATCH:-6144}
+STRIX_UBATCH=${STRIX_UBATCH:-6144}
+STRIX_SPEC_DRAFT_P_MIN=${STRIX_SPEC_DRAFT_P_MIN:-off}
+STRIX_SPEC_TYPE=${STRIX_SPEC_TYPE:-draft-mtp}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  strix-llama start    Start the container and server (prompts with gum if interactive)
+  strix-llama ensure   Start if needed and wait for /health to report ready
+  strix-llama status   Print server health status or container state
+  strix-llama stop     Stop the server container
+  strix-llama logs     Show container logs (extra arguments pass to podman logs)
+
+Options can be pre-selected via environment variables:
+  STRIX_MTP=on|off          (default: interactive menu / "on")
+  STRIX_VISION=on|off       (default: interactive menu / "on")
+  STRIX_KV=q8|f16           (menu preselect: f16; env/non-interactive default: "q8")
+  STRIX_BATCH=6144|4096     (default: interactive menu / "4096")
+  STRIX_UBATCH=6144|4096    (default: interactive menu / "4096")
+  STRIX_SPEC_TYPE=TYPE      (default: "draft-mtp"; e.g. "draft-mtp,ngram-mod")
+  STRIX_INTERACTIVE=0       (bypass gum menus and use defaults/env)
+EOF
+}
+
+die() {
+  printf 'strix-llama: %s\n' "$*" >&2
+  exit 1
+}
+
+require_podman() {
+  command -v podman >/dev/null 2>&1 || die "podman is required"
+}
+
+require_curl() {
+  command -v curl >/dev/null 2>&1 || die "curl is required"
+}
+
+container_state() {
+  podman inspect --format '{{.State.Status}}' "$STRIX_LLAMA_CONTAINER" 2>/dev/null || true
+}
+
+container_label() {
+  local label="$1"
+  podman inspect --format "{{index .Config.Labels \"$label\"}}" "$STRIX_LLAMA_CONTAINER" 2>/dev/null || true
+}
+
+health_document() {
+  local api=${STRIX_LLAMA_API%/}
+  curl -fsS --max-time 3 "$api/health"
+}
+
+require_model_files() {
+  [[ -d "$STRIX_LLAMA_MODELS" ]] || die "models directory does not exist: $STRIX_LLAMA_MODELS"
+  [[ -f "$MODEL_SHARD_1" ]] || die "primary model shard missing: $MODEL_SHARD_1"
+  [[ -f "$MMPROJ_FILE" ]] || die "mmproj file missing: $MMPROJ_FILE"
+  [[ -f "$MTP_FILE" ]] || die "MTP sidecar file missing: $MTP_FILE"
+}
+
+# --- gum interactive menus ---
+menu_spec_mtp() {
+  gum choose --header "speculative decoding" --height 2 --selected "on       MTP" \
+    "on       MTP" \
+    "off      Base"
+}
+
+menu_vision() {
+  gum choose --header "vision projector" --height 2 --selected "off      Text-only" \
+    "off      Text-only" \
+    "on       Vision (mmproj-F16)"
+}
+
+menu_kv_cache() {
+  gum choose --header "kv cache quantization" --height 2 --selected "f16      F16" \
+    "f16      F16" \
+    "q8       Q8_0"
+}
+
+menu_batch() {
+  local sel="4k       4k/4k"
+  if [[ "${STRIX_BATCH:-}" == "6144" ]]; then
+    sel="6k       6k/6k"
+  fi
+  gum choose --header "batch / micro-batch (-b / -ub)" --height 2 --selected "$sel" \
+    "4k       4k/4k" \
+    "6k       6k/6k"
+}
+
+resolve_options() {
+  local is_interactive=0
+  if [[ -t 0 && "${STRIX_INTERACTIVE:-1}" != "0" ]] && command -v gum >/dev/null 2>&1; then
+    is_interactive=1
+  fi
+
+  # 1. MTP Option
+  if [[ -n "${STRIX_MTP:-}" ]]; then
+    OPT_MTP="$STRIX_MTP"
+  elif (( is_interactive )); then
+    local spec
+    spec=$(menu_spec_mtp) || exit 1
+    case "${spec%%[ ]*}" in
+      on)  OPT_MTP="on" ;;
+      off) OPT_MTP="off" ;;
+      *)   OPT_MTP="on" ;;
+    esac
+  else
+    OPT_MTP="on"
+  fi
+
+  # 2. Vision Option
+  if [[ -n "${STRIX_VISION:-}" ]]; then
+    OPT_VISION="$STRIX_VISION"
+  elif (( is_interactive )); then
+    local vis
+    vis=$(menu_vision) || exit 1
+    case "${vis%%[ ]*}" in
+      on)  OPT_VISION="on" ;;
+      off) OPT_VISION="off" ;;
+      *)   OPT_VISION="off" ;;
+    esac
+  else
+    OPT_VISION="off"
+  fi
+
+  # 3. KV Cache Option
+  if [[ -n "${STRIX_KV:-}" ]]; then
+    OPT_KV="$STRIX_KV"
+  elif (( is_interactive )); then
+    local kv
+    kv=$(menu_kv_cache) || exit 1
+    case "${kv%%[ ]*}" in
+      q8)  OPT_KV="q8_0" ;;
+      f16) OPT_KV="f16" ;;
+      *)   OPT_KV="q8_0" ;;
+    esac
+  else
+    OPT_KV="q8_0"
+  fi
+
+  # 4. Batch / Micro-batch Option
+  if [[ -n "${STRIX_BATCH:-}" && -n "${STRIX_UBATCH:-}" && "${STRIX_INTERACTIVE:-1}" == "0" ]]; then
+    OPT_BATCH="$STRIX_BATCH"
+    OPT_UBATCH="$STRIX_UBATCH"
+  elif (( is_interactive )); then
+    local b_choice
+    b_choice=$(menu_batch) || exit 1
+    case "${b_choice%%[ ]*}" in
+      4k)
+        OPT_BATCH=4096
+        OPT_UBATCH=4096
+        ;;
+      6k)
+        OPT_BATCH=6144
+        OPT_UBATCH=6144
+        ;;
+      *)
+        OPT_BATCH=6144
+        OPT_UBATCH=6144
+        ;;
+    esac
+  else
+    OPT_BATCH="${STRIX_BATCH:-4096}"
+    OPT_UBATCH="${STRIX_UBATCH:-4096}"
+  fi
+}
+
+evict_conflicting_services() {
+  # Halogen, Lemonade resident model, and Strix-Llama all share 125 GiB unified memory.
+  if podman container exists halogen >/dev/null 2>&1; then
+    local hal_state
+    hal_state=$(podman inspect --format '{{.State.Status}}' halogen 2>/dev/null || true)
+    if [[ "$hal_state" == "running" ]]; then
+      printf 'strix-llama: stopping running Halogen container...\n' >&2
+      podman stop halogen >/dev/null 2>&1 || true
+    fi
+  fi
+
+  if podman container exists lemonade >/dev/null 2>&1; then
+    local lem_state
+    lem_state=$(podman inspect --format '{{.State.Status}}' lemonade 2>/dev/null || true)
+    if [[ "$lem_state" == "running" ]]; then
+      local health
+      if health=$(curl -fsS --max-time 3 "http://127.0.0.1:13305/api/v1/health" 2>/dev/null); then
+        if python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if (d.get("model_loaded") or d.get("all_models_loaded")) else 1)' <<<"$health" 2>/dev/null; then
+          printf 'strix-llama: unloading resident Lemonade model to preserve unified memory...\n' >&2
+          curl -fsS -X POST "http://127.0.0.1:13305/api/v1/unload" -H 'Content-Type: application/json' -d '{}' >/dev/null 2>&1 || true
+          sleep 2
+        fi
+      fi
+    fi
+  fi
+}
+
+start_container() {
+  require_podman
+  resolve_options
+
+  OPT_SPEC_TYPE="${STRIX_SPEC_TYPE:-draft-mtp}"
+
+  local state current_mtp current_vision current_kv current_ctx current_batch current_ubatch current_pmin current_spec
+  state=$(container_state)
+  current_mtp=$(container_label "strix-mtp")
+  current_vision=$(container_label "strix-vision")
+  current_kv=$(container_label "strix-kv")
+  current_ctx=$(container_label "strix-ctx")
+  current_batch=$(container_label "strix-batch")
+  current_ubatch=$(container_label "strix-ubatch")
+  current_pmin=$(container_label "strix-pmin")
+  current_spec=$(container_label "strix-spec")
+
+  local config_match=0
+  if [[ "$current_mtp" == "$OPT_MTP" && "$current_vision" == "$OPT_VISION" && "$current_kv" == "$OPT_KV" \
+     && "$current_ctx" == "$STRIX_CTX" && "$current_batch" == "$OPT_BATCH" && "$current_ubatch" == "$OPT_UBATCH" \
+     && "$current_pmin" == "$STRIX_SPEC_DRAFT_P_MIN" && "$current_spec" == "$OPT_SPEC_TYPE" ]]; then
+    config_match=1
+  fi
+
+  if [[ "$state" == "running" ]]; then
+    if (( config_match )); then
+      printf 'strix-llama: container %s is already running with requested config (MTP=%s, Vision=%s, KV=%s, CTX=%s, B=%s, UB=%s, Pmin=%s)\n' \
+        "$STRIX_LLAMA_CONTAINER" "$OPT_MTP" "$OPT_VISION" "$OPT_KV" "$STRIX_CTX" "$OPT_BATCH" "$OPT_UBATCH" "$STRIX_SPEC_DRAFT_P_MIN"
+      return 0
+    fi
+    printf 'strix-llama: config changed (running: CTX=%s, B=%s, UB=%s, Pmin=%s -> requested: CTX=%s, B=%s, UB=%s, Pmin=%s); recreating...\n' \
+      "${current_ctx:-unknown}" "${current_batch:-unknown}" "${current_ubatch:-unknown}" "${current_pmin:-unknown}" \
+      "$STRIX_CTX" "$OPT_BATCH" "$OPT_UBATCH" "$STRIX_SPEC_DRAFT_P_MIN"
+    podman rm -f "$STRIX_LLAMA_CONTAINER" >/dev/null 2>&1 || true
+    state=""
+  elif [[ -n "$state" ]]; then
+    # Container exists but stopped. Recreate if config differs.
+    if (( ! config_match )); then
+      podman rm -f "$STRIX_LLAMA_CONTAINER" >/dev/null 2>&1 || true
+      state=""
+    fi
+  fi
+
+  require_model_files
+  podman image exists "$STRIX_LLAMA_IMAGE" 2>/dev/null || die "image not present: $STRIX_LLAMA_IMAGE (build it with sjust llm-engine or sjust strix-llama)"
+
+  evict_conflicting_services
+
+  if [[ "$state" == "created" || "$state" == "exited" || "$state" == "stopped" ]]; then
+    printf 'strix-llama: starting existing container %s (MTP=%s, Vision=%s, KV=%s)\n' \
+      "$STRIX_LLAMA_CONTAINER" "$OPT_MTP" "$OPT_VISION" "$OPT_KV"
+    podman start "$STRIX_LLAMA_CONTAINER" >/dev/null
+    return 0
+  fi
+
+  printf 'strix-llama: launching container %s (MTP=%s, Vision=%s, KV=%s)\n' \
+    "$STRIX_LLAMA_CONTAINER" "$OPT_MTP" "$OPT_VISION" "$OPT_KV"
+
+  local -a server_args=(
+    llama-server
+    -m "/models/unsloth/Qwen3.8-Flash-Next-GGUF/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf"
+    -dev ROCm0
+    -ngl all
+    -fa on
+    -fit off
+    --load-mode mlock
+    --lazy-mode on-direct
+    -ctk "$OPT_KV"
+    -ctv "$OPT_KV"
+    -c "$STRIX_CTX"
+    -b "$OPT_BATCH"
+    -ub "$OPT_UBATCH"
+    --cache-ram 0
+    --parallel 1
+    --jinja
+    --temp "$STRIX_TEMP"
+    --top-p "$STRIX_TOP_P"
+    --top-k "$STRIX_TOP_K"
+    --min-p "$STRIX_MIN_P"
+    --presence-penalty "$STRIX_PRESENCE_PENALTY"
+    --repeat-penalty "$STRIX_REPEAT_PENALTY"
+    --host 0.0.0.0
+    --port "${STRIX_LLAMA_API_PORT}"
+    -a "${STRIX_LLAMA_MODEL_ID}"
+  )
+
+  if [[ "$OPT_VISION" == "on" ]]; then
+    server_args+=(
+      --mmproj "/models/unsloth/Qwen3.8-Flash-Next-GGUF/mmproj-F16.gguf"
+      --mmproj-device ROCm0
+      --image-min-tokens 1024
+    )
+  fi
+
+  if [[ "$OPT_MTP" == "on" ]]; then
+    server_args+=(
+      --spec-type "$OPT_SPEC_TYPE"
+      --spec-draft-n-max 3
+    )
+    if [[ -n "$STRIX_SPEC_DRAFT_P_MIN" && "$STRIX_SPEC_DRAFT_P_MIN" != "0" && "$STRIX_SPEC_DRAFT_P_MIN" != "0.0" && "$STRIX_SPEC_DRAFT_P_MIN" != "none" && "$STRIX_SPEC_DRAFT_P_MIN" != "off" ]]; then
+      server_args+=(
+        --spec-draft-p-min "$STRIX_SPEC_DRAFT_P_MIN"
+      )
+    fi
+    server_args+=(
+      --spec-draft-model "/models/unsloth/Qwen3.8-Flash-Next-GGUF/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf"
+      --spec-draft-device ROCm0
+      --spec-draft-ngl all
+    )
+  fi
+
+  local -a podman_args=(
+    run --detach
+    --replace
+    --name "$STRIX_LLAMA_CONTAINER"
+    --restart unless-stopped
+    --memory 118g
+    --memory-swap 118g
+    --label "strix-mtp=$OPT_MTP"
+    --label "strix-vision=$OPT_VISION"
+    --label "strix-kv=$OPT_KV"
+    --label "strix-ctx=$STRIX_CTX"
+    --label "strix-batch=$OPT_BATCH"
+    --label "strix-ubatch=$OPT_UBATCH"
+    --label "strix-pmin=$STRIX_SPEC_DRAFT_P_MIN"
+    --label "strix-spec=$OPT_SPEC_TYPE"
+    --publish "127.0.0.1:${STRIX_LLAMA_API_PORT}:${STRIX_LLAMA_API_PORT}"
+    --device /dev/kfd
+    --device /dev/dri
+    --group-add keep-groups
+    --security-opt seccomp=unconfined
+    --ipc=host
+    --ulimit memlock=-1:-1
+    --volume "${STRIX_LLAMA_MODELS}:/models:ro"
+    "$STRIX_LLAMA_IMAGE"
+    "${server_args[@]}"
+  )
+
+  podman "${podman_args[@]}" >/dev/null
+}
+
+wait_for_health() {
+  require_curl
+  local elapsed=0 state health
+  while :; do
+    state=$(container_state)
+    [[ "$state" == running ]] || die "container stopped before strix-llama became ready (state: ${state:-missing})"
+    if health=$(health_document 2>/dev/null); then
+      if python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("status") in ("ok","ready") else 1)' <<<"$health" 2>/dev/null; then
+        break
+      fi
+    fi
+    if (( elapsed >= STRIX_LLAMA_WAIT_TIMEOUT_S )); then
+      die "strix-llama did not become ready within ${STRIX_LLAMA_WAIT_TIMEOUT_S}s; inspect with 'strix-llama logs'"
+    fi
+    if (( elapsed == 0 || elapsed % 30 == 0 )); then
+      printf 'strix-llama: waiting for /health (%ss elapsed; 104GB model loading on-direct)...\n' "$elapsed" >&2
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  printf 'strix-llama: ready at %s/health\n' "${STRIX_LLAMA_API%/}"
+}
+
+start() {
+  start_container
+}
+
+ensure() {
+  start_container
+  wait_for_health
+}
+
+status() {
+  require_podman
+  require_curl
+  local health state mtp vision kv batch ubatch
+  state=$(container_state)
+  mtp=$(container_label "strix-mtp")
+  vision=$(container_label "strix-vision")
+  kv=$(container_label "strix-kv")
+  batch=$(container_label "strix-batch")
+  ubatch=$(container_label "strix-ubatch")
+  if health=$(health_document 2>/dev/null); then
+    printf 'strix-llama: active (MTP=%s, Vision=%s, KV=%s, Batch=%s/%s)\n%s\n' \
+      "${mtp:-unknown}" "${vision:-unknown}" "${kv:-unknown}" "${batch:-unknown}" "${ubatch:-unknown}" "$health"
+    return 0
+  fi
+  if [[ -n "$state" ]]; then
+    printf 'strix-llama: container %s is %s (MTP=%s, Vision=%s, KV=%s, Batch=%s/%s); /health is not ready\n' \
+      "$STRIX_LLAMA_CONTAINER" "$state" "${mtp:-unknown}" "${vision:-unknown}" "${kv:-unknown}" "${batch:-unknown}" "${ubatch:-unknown}" >&2
+  else
+    printf 'strix-llama: container %s does not exist; /health is not reachable\n' "$STRIX_LLAMA_CONTAINER" >&2
+  fi
+  return 1
+}
+
+stop() {
+  require_podman
+  local state
+  state=$(container_state)
+  if [[ -z "$state" ]]; then
+    printf 'strix-llama: container %s does not exist\n' "$STRIX_LLAMA_CONTAINER"
+    return 0
+  fi
+  if [[ "$state" != running && "$state" != paused ]]; then
+    printf 'strix-llama: container %s is already %s\n' "$STRIX_LLAMA_CONTAINER" "$state"
+    return 0
+  fi
+  podman stop --time 5 "$STRIX_LLAMA_CONTAINER"
+}
+
+logs() {
+  require_podman
+  if (($# == 0)); then
+    set -- --tail 100
+  fi
+  podman logs "$@" "$STRIX_LLAMA_CONTAINER"
+}
+
+case "${1:-}" in
+  start)
+    shift
+    (($# == 0)) || { usage >&2; exit 2; }
+    start
+    ;;
+  ensure)
+    shift
+    (($# == 0)) || { usage >&2; exit 2; }
+    ensure
+    ;;
+  status)
+    shift
+    (($# == 0)) || { usage >&2; exit 2; }
+    status
+    ;;
+  stop)
+    shift
+    (($# == 0)) || { usage >&2; exit 2; }
+    stop
+    ;;
+  logs)
+    shift
+    logs "$@"
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
