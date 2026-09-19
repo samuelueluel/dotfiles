@@ -118,6 +118,7 @@ First remove repeated explanations so each rule lives in one clear place. Then m
 ### What Stays in `SKILL.md` vs. What Moves to `references/`:
 - **Rules Always Stay in `SKILL.md`:** All safety boundaries, "never do X" rules, and output formatting requirements must stay in `SKILL.md`. Agents only load `SKILL.md` by default; any rule tucked away in `references/` will be ignored during normal work.
 - **Reference Material Goes to `references/`:** Large tables, lists of codes, full scripts, and rare troubleshooting steps belong in `references/`. Reference files provide background details and manuals, not basic rules.
+- **Prevention Content Stays in `SKILL.md`:** References load reliably when they fix a failure — the error itself triggers the load. They do not load reliably when they would *prevent* one (parameter bounds, sequences needed before the first successful call), because nothing has failed yet to trigger them. If the agent needs it before acting, keep it inline; relegate to `references/` only material complete enough to serve post-error use.
 
 ### Reference File Standards:
 1. **Header Trigger on Line 3:** Every reference file must open with a main title on line 1, followed on line 3 by a clear note explaining when to load it:

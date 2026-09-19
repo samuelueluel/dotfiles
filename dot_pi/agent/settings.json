@@ -39,7 +39,7 @@
     "npm:pi-tool-display",
     "npm:pi-ask-user",
     "local-packages/pi-permission-system",
-    "npm:@tintinweb/pi-subagents",
+    "local-packages/pi-subagents",
     "local-packages/pi-agent-beautify",
     "npm:@juicesharp/rpiv-todo@2.8.0",
     {
@@ -48,7 +48,9 @@
     },
     "local-packages/rpiv-advisor-lean",
     "local-packages/pi-smart-compact",
-    "local-packages/pi-compact-transcript"
+    "local-packages/pi-compact-transcript",
+    "local-packages/pi-math",
+    "npm:pi-vim"
   ],
   "extensions": [
     "extensions/agent-title.ts",
@@ -90,5 +92,15 @@
     "contextGraphEnabled": false,
     "showStatus": false
   },
-  "outputPad": 0
+  "outputPad": 0,
+  "retry": {
+    "enabled": true,
+    "maxRetries": 6,
+    "baseDelayMs": 2000,
+    "provider": {
+      "timeoutMs": 3600000,
+      "maxRetries": 0,
+      "maxRetryDelayMs": 60000
+    }
+  }
 }

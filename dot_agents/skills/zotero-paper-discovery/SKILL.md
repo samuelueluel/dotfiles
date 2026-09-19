@@ -37,6 +37,7 @@ If one consequential boundary is unresolved, ask one focused question. Otherwise
 - Include subcollections only when requested or when the named project scope convention includes them.
 - For explicit items, preserve the exact parent keys.
 - For a named source, use `zotero_resolve_exact_source`; related matches are not substitutes.
+- If resuming a prior task, check `~/.agents/scratch/<YYYY-MM-DD>-<task-slug>-discovery.md` for a frozen list before rebuilding scope; rebuild the scope if it changed rather than trusting a stale file.
 
 ### 3. Build one bounded candidate scope
 
@@ -52,7 +53,7 @@ If the composite tool is unavailable:
 2. Run the same two to four bounded `zotero_semantic_search` facets within scope.
 3. Deduplicate candidates by exact parent item key.
 
-For exact filter syntax and collection pagination, load [search and retrieval details](../../references/zotero/search-retrieval.md).
+For exact filter syntax and collection pagination, load [search and retrieval details](../../references/zotero/search-retrieval.md). Check these parameter bounds before the first retrieval call — the deployed schema is authoritative and the full list lives in [tool parameters](../../references/zotero/tool-params.md). `find_in_item` has no `limit` (use `max_matches` 1–10; `max_chars` 256–16000 total; `context_lines` 0–20). `read_pdf_pages` requires `start_page` (no `page` param). `read_passage` and collect `neighbors` max out at 2; collect takes at most 4 items and 2 phrases per route. `find_in_pdf` rejects page ranges over 50.
 
 ### 4. Adjudicate candidates
 
@@ -66,7 +67,7 @@ A positive rerank passage can support inclusion only after its text is read in c
 
 Expand positive candidate evidence in batch before making inclusion decisions. After the scope build, collect every retained evidence ID across the whole candidate ledger, expand them in one consecutive batch, and only then classify each candidate. Interleaving search, expansion, and decisions per candidate costs one extra retrieval round per item and invites repeated generic searches.
 
-Use exact-item semantic searches only for title-plausible misses the facets did not surface, and give each one a distinctive phrase. Never re-screen with a generic single word (`crime`, `demolition`, `health`); if no distinctive phrase can be named, leave the item unresolved instead of running another broad query. Do not use a single no-match for a broad term as proof of absence. Searches that pin exact item keys report the keys that returned no passage; treat a reported no-hit exactly like any other missing hit.
+Use exact-item semantic searches only for title-plausible misses the facets did not surface, and give each one a distinctive phrase. Exception: if an expanded anchor cannot decide inclusion (e.g., a budget-capped window showing only background prose), run one exact-item findings-query per ambiguous candidate instead of another expansion round. Never re-screen with a generic single word (`crime`, `demolition`, `health`); if no distinctive phrase can be named, leave the item unresolved instead of running another broad query. Do not use a single no-match for a broad term as proof of absence. Searches that pin exact item keys report the keys that returned no passage; treat a reported no-hit exactly like any other missing hit.
 
 After two uninformative attempts on the same missing inclusion fact, change the reading method once or leave the item unresolved. Do not cycle through synonyms.
 
@@ -79,6 +80,8 @@ Return an explicit parent-item list that a later task can reuse without rediscov
 - The exact supporting section, table, PDF page, passage, or sidecar locator actually read.
 - Any plausible unresolved item that could alter downstream work.
 - A bounded coverage statement such as “I found eight qualifying papers in the scoped search,” not an unsupported exhaustive claim.
+
+Persist the frozen list to `~/.agents/scratch/<YYYY-MM-DD>-<task-slug>-discovery.md` — keys, rationale, and locators only, no prose — so a compacted or later session resumes without re-reads. Rebuild the file if the scope changes; never trust a stale one.
 
 Use the compact evidence-locator table in `citation-integrity`; metadata-only rows need no footnote. Do not enumerate screened-out papers unless Samuel requests exclusions or one materially limits the result.
 

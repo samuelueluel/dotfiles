@@ -37,18 +37,23 @@ HALOGEN_WAIT_TIMEOUT_S=${HALOGEN_WAIT_TIMEOUT_S:-120}
 usage() {
   cat <<'EOF'
 Usage:
-  halogen start [w4b|iq4]   Start existing image and model (prompts gum menu if interactive)
-  halogen ensure [w4b|iq4]  Start it if needed and wait for /health to report ready
-  halogen status            Print the server health document, variant, or container state
-  halogen stop              Stop the container without removing it
-  halogen logs              Show container logs (extra arguments go to podman logs)
+  halogen start [w4b|iq4] [on|off]   Start existing image and model (prompts gum menu if interactive)
+  halogen ensure [w4b|iq4] [on|off]  Start it if needed and wait for /health to report ready
+  halogen status                     Print the server health document, variant, or container state
+  halogen stop                       Stop the container without removing it
+  halogen logs                       Show container logs (extra arguments go to podman logs)
 
 Variants:
   w4b, native   Peonist Native W4B weights (~118 GiB .hgn, 8-bit o_proj, faster decode)
   iq4, gguf     Unsloth UD-IQ4_XS GGUF weights (~94 GB, 8-bit trunk, +2% PPL)
 
+Vision:
+  off           Text-only (default)
+  on            Vision sidecar (0.84 GiB /models/qwen38-flash-next-vision.hgn)
+
 Environment:
   HALOGEN_VARIANT      Default weight variant (w4b or iq4)
+  HALOGEN_VISION       Default vision tower state: off (default) or on
   HALOGEN_IMAGE        Image reference (default: ghcr.io/peonist-ai/halogen-flash-server:0.11.4)
   HALOGEN_API_PORT     Loopback API port (default: 8731)
   HALOGEN_FLASH_PIN_TRUNK  Lock weights in RAM (default: 1)
@@ -227,6 +232,30 @@ resolve_variant() {
   esac
 }
 
+menu_vision() {
+  gum choose --header "halogen · vision tower" --height 2 --selected "off    Text-only" \
+    "off    Text-only" \
+    "on     Vision sidecar (0.84 GiB)"
+}
+
+resolve_vision() {
+  local vis="${1:-${HALOGEN_VISION:-}}"
+  if [[ -z "$vis" ]]; then
+    if [[ -t 0 ]] && command -v gum >/dev/null 2>&1; then
+      local choice
+      choice=$(menu_vision) || exit 1
+      vis="${choice%%[ ]*}"
+    else
+      vis="off"
+    fi
+  fi
+  case "$vis" in
+    on|vision|true|1|yes) echo "on" ;;
+    off|text|false|0|no|"") echo "off" ;;
+    *) die "unrecognized vision option: $vis (expected 'off' or 'on')" ;;
+  esac
+}
+
 current_container_variant() {
   local variant
   variant=$(podman inspect --format '{{index .Config.Labels "halogen.variant"}}' "$HALOGEN_CONTAINER" 2>/dev/null || true)
@@ -245,19 +274,38 @@ current_container_variant() {
   fi
 }
 
+current_container_vision() {
+  local vis
+  vis=$(podman inspect --format '{{index .Config.Labels "halogen.vision"}}' "$HALOGEN_CONTAINER" 2>/dev/null || true)
+  if [[ -n "$vis" ]]; then
+    printf '%s\n' "$vis"
+    return 0
+  fi
+  local tower
+  tower=$(podman inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$HALOGEN_CONTAINER" 2>/dev/null | grep '^HALOGEN_VISION_TOWER=' || true)
+  if [[ -n "$tower" ]]; then
+    printf 'on\n'
+  else
+    printf 'off\n'
+  fi
+}
+
 start_container() {
   require_podman
-  local desired_var
+  local desired_var desired_vis
   desired_var=$(resolve_variant "${1:-}") || return $?
+  desired_vis=$(resolve_vision "${2:-}") || return $?
 
-  local state cur_var
+  local state cur_var cur_vis
   state=$(container_state)
   cur_var=$(current_container_variant)
+  cur_vis=$(current_container_vision)
 
   podman image exists "$HALOGEN_IMAGE" 2>/dev/null || die "image is not present: $HALOGEN_IMAGE (pull it explicitly first)"
 
-  if [[ -n "$state" && -n "$cur_var" && "$cur_var" != "$desired_var" ]]; then
-    printf 'halogen: switching model weights from %s to %s\n' "$cur_var" "$desired_var" >&2
+  if [[ -n "$state" && ( ( -n "$cur_var" && "$cur_var" != "$desired_var" ) || ( -n "$cur_vis" && "$cur_vis" != "$desired_vis" ) ) ]]; then
+    printf 'halogen: config changed (variant: %s -> %s, vision: %s -> %s); recreating container\n' \
+      "${cur_var:-unknown}" "$desired_var" "${cur_vis:-unknown}" "$desired_vis" >&2
     if [[ "$state" == running ]]; then
       podman stop --time 30 "$HALOGEN_CONTAINER" >/dev/null 2>&1 || true
     fi
@@ -267,12 +315,12 @@ start_container() {
 
   case "$state" in
     running)
-      printf 'halogen: container %s (%s) is already running\n' "$HALOGEN_CONTAINER" "$desired_var"
+      printf 'halogen: container %s (%s, vision=%s) is already running\n' "$HALOGEN_CONTAINER" "$desired_var" "$desired_vis"
       return 0
       ;;
     created|configured|exited|stopped|paused)
       evict_lemonade_models
-      printf 'halogen: starting existing container %s (%s)\n' "$HALOGEN_CONTAINER" "$desired_var"
+      printf 'halogen: starting existing container %s (%s, vision=%s)\n' "$HALOGEN_CONTAINER" "$desired_var" "$desired_vis"
       podman start "$HALOGEN_CONTAINER" >/dev/null
       return 0
       ;;
@@ -290,6 +338,7 @@ start_container() {
         --ipc=host
         --ulimit memlock=-1:-1
         --label "halogen.variant=${desired_var}"
+        --label "halogen.vision=${desired_vis}"
         --env "HALOGEN_API_PORT=${HALOGEN_API_PORT}"
         --env "HALOGEN_MODEL_ID=${HALOGEN_MODEL_ID}"
         --env "HALOGEN_FLASH_PIN_TRUNK=${HALOGEN_FLASH_PIN_TRUNK}"
@@ -308,8 +357,9 @@ start_container() {
         --env "HALOGEN_DRAFTER_DEFAULT=${HALOGEN_DRAFTER_DEFAULT:-1}"
       )
 
+      local dir
       if [[ "$desired_var" == "w4b" ]]; then
-        local dir="$HALOGEN_W4B_MODELS"
+        dir="$HALOGEN_W4B_MODELS"
         [[ -d "$dir" ]] || die "models directory does not exist: $dir"
         local checkpoint="$dir/$HALOGEN_W4B_CHECKPOINT_FILE"
         [[ -f "$checkpoint" ]] || die "checkpoint missing: $checkpoint"
@@ -322,7 +372,7 @@ start_container() {
           --env "HALOGEN_CHECKPOINT=/models/${HALOGEN_W4B_CHECKPOINT_FILE}"
         )
       else
-        local dir="$HALOGEN_IQ4_MODELS"
+        dir="$HALOGEN_IQ4_MODELS"
         [[ -d "$dir" ]] || die "models directory does not exist: $dir"
         local ckpt_host="$dir/${HALOGEN_IQ4_CHECKPOINT_FILE#/models/}"
         [[ -f "$ckpt_host" ]] || die "GGUF checkpoint missing: $ckpt_host"
@@ -336,11 +386,19 @@ start_container() {
         )
       fi
 
+      if [[ "$desired_vis" == "on" ]]; then
+        local vision_file="$dir/qwen38-flash-next-vision.hgn"
+        [[ -f "$vision_file" ]] || die "vision sidecar missing: $vision_file"
+        args+=(
+          --env "HALOGEN_VISION_TOWER=/models/qwen38-flash-next-vision.hgn"
+        )
+      fi
+
       args+=(
         "$HALOGEN_IMAGE"
         all
       )
-      printf 'halogen: creating and starting container %s (%s)\n' "$HALOGEN_CONTAINER" "$desired_var"
+      printf 'halogen: creating and starting container %s (%s, vision=%s)\n' "$HALOGEN_CONTAINER" "$desired_var" "$desired_vis"
       podman "${args[@]}" >/dev/null
       ;;
     *)
@@ -374,27 +432,28 @@ wait_for_health() {
 }
 
 start() {
-  start_container "${1:-}"
+  start_container "${1:-}" "${2:-}"
 }
 
 ensure() {
   validate_wait_timeout
-  start_container "${1:-}"
+  start_container "${1:-}" "${2:-}"
   wait_for_health
 }
 
 status() {
   require_podman
   require_curl
-  local health state var
+  local health state var vis
   state=$(container_state)
   var=$(current_container_variant)
+  vis=$(current_container_vision)
   if health=$(health_document 2>/dev/null); then
-    printf 'halogen: running (%s)\n%s\n' "${var:-unknown}" "$health"
+    printf 'halogen: running (%s, vision=%s)\n%s\n' "${var:-unknown}" "${vis:-off}" "$health"
     return 0
   fi
   if [[ -n "$state" ]]; then
-    printf 'halogen: container %s is %s (%s); /health is not ready\n' "$HALOGEN_CONTAINER" "$state" "${var:-unknown}" >&2
+    printf 'halogen: container %s is %s (%s, vision=%s); /health is not ready\n' "$HALOGEN_CONTAINER" "$state" "${var:-unknown}" "${vis:-off}" >&2
   else
     printf 'halogen: container %s does not exist; /health is not reachable\n' "$HALOGEN_CONTAINER" >&2
   fi
@@ -427,11 +486,11 @@ logs() {
 case "${1:-}" in
   start)
     shift
-    start "${1:-}"
+    start "$@"
     ;;
   ensure)
     shift
-    ensure "${1:-}"
+    ensure "$@"
     ;;
   status)
     shift

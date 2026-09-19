@@ -51,14 +51,14 @@ When Samuel authorizes judgment, choose and state the rule. If one unresolved de
 
 ### 2. Build a complete result inventory
 
-Comparison requires exhaustive relevant-result coverage across the frozen set. This means reading enough of each paper's relevant results, tables, captions, notes, and source prose to identify every estimate eligible under the ranking rule; it does not require reading every page of every paper.
+Comparison requires checking every location where an eligible estimate could appear, for every frozen paper: the abstract, the results section or sections, every numbered table with its notes, and figure captions (figures presenting estimates count as tables). Check appendices and supplements only when the main text points to an eligible estimate there or the ranking margin is close; otherwise record them as unchecked. This does not require reading every page of every paper.
 
 Maintain one terminal result card for every frozen parent item:
 
 ```text
 item_key
 status: eligible | no_eligible_result | unresolved
-inventory_status: complete | partial — whether every eligible result class was searched in this paper
+inventory_status: complete | partial — complete means all four locations above were checked; partial names the unchecked locations. Either value describes locations checked, not certainty that nothing was missed
 unresolved_fields: fields that could not be verified, with the attempted route (empty when none)
 eligible_results:
   outcome, point estimate, scale, uncertainty
@@ -97,7 +97,7 @@ If the composite tool is unavailable, use this bounded sequence:
 5. `zotero_read_pdf_pages` for the targeted result and notes.
 6. `zotero_render_pdf_page` only when text leaves a decisive visual ambiguity.
 
-For detailed parameter examples, load [bounded source-reading syntax](../../references/zotero/deep-dive-reading.md).
+For detailed parameter examples, load [bounded source-reading syntax](../../references/zotero/deep-dive-reading.md). Check these parameter bounds before the first retrieval call — the deployed schema is authoritative and the full list lives in [tool parameters](../../references/zotero/tool-params.md). `find_in_item` has no `limit` (use `max_matches` 1–10; `max_chars` 256–16000 total). `read_pdf_pages` requires `start_page` (no `page` param). Collect takes at most 4 items and 2 phrases per route, with `neighbors` max 2. Manifest `max_reported_items` is 1–3; audits take max 8 claims with `escalation: "none"`.
 
 ### 4. Verify statistical meaning
 
@@ -126,11 +126,11 @@ Before ranking, submit the completed manifest to `zotero_validate_comparison_man
 
 A clear numerical winner is merely the largest value under the rule. A clear substantive winner remains persuasive after accounting for dose, denominator, population, area, and horizon. Use `top_k` when the numerical winner is clear but the substantive winner is not.
 
-If the top-k boundary is tied — two estimates indistinguishable under the ranking rule — or an inference conflict on a close alternative remains unresolved after the available checks, do not declare a clear winner. Set `numerical_winner_status` or `substantive_winner_status` to `not_clear`, use `winner_type: top_k`, and report the outcome as a tie or “top-k plus tie”, naming the tied group. An unresolved p-value/CI or table-alignment conflict on the nearest competitor blocks a clear-winner declaration even when the leader's own evidence is unambiguous.
+If the top-k boundary is tied — two estimates indistinguishable under the ranking rule — or an inference conflict on a close alternative remains unresolved after the available checks, do not declare a clear winner. Set `numerical_winner_status` or `substantive_winner_status` to `not_clear`, use `winner_type: top_k`, and report the outcome as a tie or “top-k plus tie”, naming the tied group. Tie-group estimates need verified source locators like any reported result, but they are not audit-bundle members; the audit covers the selected maxima and the ranking claim only. An unresolved p-value/CI or table-alignment conflict on the nearest competitor blocks a clear-winner declaration even when the leader's own evidence is unambiguous.
 
 For a multi-paper numerical ranking, draft the final quantitative and comparison claims in structured form and call `zotero_validate_evidence_bundle` with `allowed_item_keys` set to the selected top-one or top-three keys. Treat it as a linter only. It can detect evidence from unselected papers, missing evidence links, scale or uncertainty fields, comparator items, calculation labels, page provenance, and unresolved ambiguity. Passing does not establish substantive support and is never cited.
 
-After substantive verification, apply `citation-integrity`'s one-pass final contract-audit rule to the audit-ready claims that will actually appear in the answer.
+After substantive verification, apply `citation-integrity`’s one-pass final contract-audit rule to the audit-ready claims that will actually appear in the answer. Persist the terminal cards to `~/.agents/scratch/<YYYY-MM-DD>-<task-slug>-cards.md` (cards only, no prose) once the manifest validates, so a compacted or later session resumes without re-reads. Rebuild the file if the scope changes; never trust a stale one.
 
 ### 6. Deep-verify, answer, and stop
 

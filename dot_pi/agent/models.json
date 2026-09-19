@@ -547,7 +547,7 @@
           "id": "halogen-qwen3.8-flash-next-w4b",
           "name": "Halogen | Qwen3.8 Flash Next (W4B Native)",
           "reasoning": true,
-          "input": ["text"],
+          "input": ["text", "image"],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {
@@ -570,7 +570,7 @@
           "id": "halogen-qwen3.8-flash-next-iq4",
           "name": "Halogen | Qwen3.8 Flash Next (UD-IQ4_XS)",
           "reasoning": true,
-          "input": ["text"],
+          "input": ["text", "image"],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {
@@ -593,7 +593,7 @@
           "id": "halogen-qwen3.8-flash-next",
           "name": "Halogen | Qwen3.8 Flash Next",
           "reasoning": true,
-          "input": ["text"],
+          "input": ["text", "image"],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {
