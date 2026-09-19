@@ -294,7 +294,6 @@ model-check() {
       _m=$(grep    '^model=' "$_f" | cut -d= -f2)
       _t=$(grep    '^thinking=' "$_f" | cut -d= -f2)
       case "${_m:l}" in
-        *qwen3.8-flash-next-rocmfp4*) _short="flash38fp4" ;;
         *claude-opus-4*)     _short="opus"    ;;
         *claude-opus-5*)     _short="opus5"   ;;
         *claude-sonnet-5*)   _short="sonnet5" ;;

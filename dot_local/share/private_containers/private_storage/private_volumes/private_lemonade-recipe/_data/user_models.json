@@ -1,4 +1,40 @@
 {
+  "DeepSeek-V4-Flash-Q2": {
+    "checkpoints": {
+      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-IQ2_XXS"
+    },
+    "labels": [
+      "custom",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 84.6,
+    "suggested": true
+  },
+  "DeepSeek-V4-Flash-Q2K": {
+    "checkpoints": {
+      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-Q2_K_XL"
+    },
+    "labels": [
+      "custom",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 90.2,
+    "suggested": true
+  },
+  "DeepSeek-V4-Flash-Q3": {
+    "checkpoints": {
+      "main": "unsloth/DeepSeek-V4-Flash-0731-GGUF:UD-IQ3_XXS"
+    },
+    "labels": [
+      "custom",
+      "tool-calling"
+    ],
+    "recipe": "llamacpp",
+    "size": 97.1,
+    "suggested": true
+  },
   "Qwen3.6-MoE-35B-Q8": {
     "checkpoints": {
       "main": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL",
@@ -44,37 +80,6 @@
     "size": 24.1,
     "suggested": true
   },
-  "Qwen3.8-27B-ROCmFP4": {
-    "checkpoints": {
-      "main": "kingjones777/Qwen3.8-27B-ROCmFP4-STRIX-MTP-GGUF:Qwen3.8-27B-Q4_0_ROCMFP4_FAST.gguf"
-    },
-    "labels": [
-      "custom",
-      "fp4",
-      "dflash2",
-      "tool-calling"
-    ],
-    "recipe": "llamacpp",
-    "size": 14.3,
-    "suggested": true
-  },
-  "Qwen3.8-Flash-Next-ROCmFP4": {
-    "checkpoints": {
-      "main": "agentionai/Qwen3.8-Flash-Next-ROCmFP4-FAST-imatrix-GGUF:Qwen3.8-Flash-Next-ROCmFP4-FAST-v2-ple16.gguf",
-      "mmproj": "agentionai/Qwen3.8-Flash-Next-ROCmFP4-FAST-imatrix-GGUF:mmproj/mmproj-Qwen3.8-Flash-Next-f16.gguf"
-    },
-    "labels": [
-      "custom",
-      "fp4",
-      "imatrix",
-      "mtp",
-      "tool-calling",
-      "vision"
-    ],
-    "recipe": "llamacpp",
-    "size": 87.9,
-    "suggested": true
-  },
   "Tiel-Coder-35B-A3B-MTP-Q8": {
     "checkpoints": {
       "main": "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:Tiel-Coder-35B-A3B-MTP-UD-Q8_K_XL.gguf",
@@ -90,20 +95,6 @@
     ],
     "recipe": "llamacpp",
     "size": 39.4,
-    "suggested": true
-  },
-  "Signal-3.8-27B-AP-Q4_K_XL": {
-    "checkpoints": {
-      "main": "agentionai/Signal-3.8-27B-GGUF:AP-Q4_K_XL"
-    },
-    "labels": [
-      "custom",
-      "mtp",
-      "reasoning",
-      "tool-calling"
-    ],
-    "recipe": "llamacpp",
-    "size": 16.35,
     "suggested": true
   }
 }

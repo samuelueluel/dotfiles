@@ -51,7 +51,7 @@ The tree is the sole intent router. Execution location follows the general deleg
    ```
    Read the resolved path directly. If metadata does not find it, use a narrow content search rather than guessing.
 3. **Choose the retrieval route:** Use `turbovault_search` or `turbovault_advanced_search` for exact terms, identifiers, filenames, equations, citations, or filters. Use `turbovault_hybrid_search` for conceptual questions and paraphrases. Use `turbovault_embedding_search` only when dense-only retrieval is requested or useful for diagnosis. Use the existing `semantic_search` when whole-note TF-IDF similarity is specifically wanted.
-4. **Check dense readiness:** Before dense or hybrid retrieval, call `turbovault_embedding_index_status`. If `exists` is false or `stale` is true, do not present dense results as available. If the endpoint is configured and the user wants semantic retrieval, offer `turbovault_reindex_embeddings`; otherwise answer with lexical search and state the limitation.
+4. **Check dense readiness:** Before dense or hybrid retrieval, call `turbovault_embedding_index_status`. If `exists` is false or `stale` is true, do not present dense results as available. If the endpoint is configured and the user wants semantic retrieval, offer `turbovault_reindex_embeddings`; otherwise answer with lexical search and state the limitation. Treat a reindex request that exceeds the client timeout as still running until the status check says otherwise (see Dense Index Lifecycle).
 5. **Read sources after discovery:** Dense and hybrid results identify candidate chunks. Read the returned note paths with `turbovault_read_note` before making claims that require full-note context.
 6. **Searching and graph lookups:** Keep small, focused searches in the main session. Use an `Explore` subagent only for a genuinely broad search that would clutter the chat context. In CPTR/headless mode, never use subagents; keep permitted discovery inline with narrow queries and bounded results.
 
@@ -60,6 +60,7 @@ The tree is the sole intent router. Execution location follows the general deleg
 - **Initial setup:** Configure the embedding endpoint in the TurboVault server environment, call `turbovault_embedding_index_status`, then call `turbovault_reindex_embeddings` once.
 - **Normal use:** Call `turbovault_hybrid_search` for conceptual retrieval. Do not reindex on every query.
 - **After changes:** Vault mutations mark the derived index stale. Batch note changes, then reindex when semantic retrieval is needed. Reindex after changing the endpoint, model, vector dimension, chunking settings, or after a large external vault update.
+- **Long rebuilds and timeouts:** A full reindex can outrun the MCP client timeout while the server keeps building, and the mid-build state is indistinguishable from an aborted job in the status payload. Verify before reissuing, and never start a second build over a live one. Load [TurboVault substrate guidance](references/turbovault-guide.md) to confirm a running build.
 - **Failure behavior:** If the endpoint is unavailable or the index is stale, use lexical search. Dense tools fail closed; they do not silently downgrade and should not be described as having returned dense evidence.
 - **Source boundary:** The index lives outside the vault. Read source notes after retrieval, and never place generated vectors or API keys in vault notes.
 
@@ -81,4 +82,4 @@ When Samuel says "remember this" or "save this", run a quick metadata query to c
 - If writing note content, headings, colors, lists, wikilinks, callouts, frontmatter, descriptions, or tags, load [formatting and syntax](references/formatting-and-syntax.md).
 - If drafting or editing note text, choosing words, avoiding LLM buzzwords, or balancing information density, load [prose style guide](references/prose-style-guide.md).
 - If filing, organizing, naming, archiving, or picking a folder, load [Hybrid PARA structure](references/hybrid-para-structure.md).
-- If a vault mutation reports git-substrate divergence, or a discovery task may be broad enough to need an Explore agent, load [TurboVault substrate guidance](references/turbovault-guide.md).
+- If a vault mutation reports git-substrate divergence, an embedding reindex times out, or a discovery task may be broad enough to need an Explore agent, load [TurboVault substrate guidance](references/turbovault-guide.md).

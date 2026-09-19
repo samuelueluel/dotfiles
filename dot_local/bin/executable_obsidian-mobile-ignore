@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# obsidian-mobile-ignore — keep a declared set of Obsidian community plugins
+# from loading on mobile, while leaving them enabled on desktop.
+#
+# Obsidian has no per-device plugin enable list: the enabled set lives in the
+# synced .obsidian/community-plugins.json, so toggling a plugin off on the phone
+# disables it everywhere. The lever that does work per-platform is the
+# "isDesktopOnly" flag in each plugin's manifest.json — the mobile app refuses to
+# load a plugin that declares it, the desktop app ignores it.
+#
+# Plugin updates re-download manifest.json and reset the flag to whatever upstream
+# declares, so re-run this script after updating plugins from the desktop.
+#
+# Usage:
+#   obsidian-mobile-ignore              apply the ignore list (idempotent)
+#   obsidian-mobile-ignore --check      report drift only, exit 1 if drift found
+#   obsidian-mobile-ignore --unset     set the listed plugins back to loadable on mobile
+#   obsidian-mobile-ignore --status    show every installed plugin and its flag
+#   obsidian-mobile-ignore -c FILE     use a different ignore list
+#   obsidian-mobile-ignore -v PATH     use a different vault root
+#
+# Config file: one plugin id per line, '#' comments and blank lines ignored.
+set -euo pipefail
+
+VAULT="${OBSIDIAN_VAULT:-$HOME/Dropbox/Sam-Obsidian-Vault}"
+LIST="${OBSIDIAN_MOBILE_IGNORE_LIST:-$HOME/.config/obsidian-mobile-ignore.txt}"
+MODE="apply"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --check)  MODE="check" ;;
+    --unset)  MODE="unset" ;;
+    --status) MODE="status" ;;
+    -c|--list) LIST="${2:-}"; shift ;;
+    -v|--vault) VAULT="${2:-}"; shift ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+PLUGINS="$VAULT/.obsidian/plugins"
+command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
+[[ -d $PLUGINS ]] || { echo "no plugins dir at $PLUGINS" >&2; exit 1; }
+
+if [[ $MODE == "status" ]]; then
+  for manifest in "$PLUGINS"/*/manifest.json; do
+    id=$(jq -r '.id // "?"' "$manifest")
+    only=$(jq -r '.isDesktopOnly // false' "$manifest")
+    printf '%-34s desktop-only=%s\n' "$id" "$only"
+  done
+  exit 0
+fi
+
+[[ -f $LIST ]] || { echo "no ignore list at $LIST (see --help)" >&2; exit 1; }
+
+WANT=true
+[[ $MODE == "unset" ]] && WANT=false
+
+drift=0
+changed=0
+missing=0
+
+while IFS= read -r raw || [[ -n $raw ]]; do
+  id="${raw%%#*}"
+  id="${id//[[:space:]]/}"
+  [[ -z $id ]] && continue
+
+  manifest="$PLUGINS/$id/manifest.json"
+  if [[ ! -f $manifest ]]; then
+    echo "MISSING  $id (no $manifest)"
+    missing=$((missing + 1))
+    continue
+  fi
+
+  declared=$(jq -r '.id // ""' "$manifest")
+  if [[ -n $declared && $declared != "$id" ]]; then
+    echo "MISMATCH $id: manifest declares id \"$declared\"; skipping" >&2
+    drift=$((drift + 1))
+    continue
+  fi
+
+  current=$(jq -r '.isDesktopOnly // false' "$manifest")
+  if [[ "$current" == "$WANT" ]]; then
+    echo "ok       $id isDesktopOnly=$WANT"
+    continue
+  fi
+
+  drift=$((drift + 1))
+  if [[ $MODE == "check" ]]; then
+    echo "DRIFT    $id isDesktopOnly=$current (want $WANT)"
+    continue
+  fi
+
+  tmp=$(mktemp "$PLUGINS/.manifest.XXXXXX")
+  jq --argjson want "$WANT" '.isDesktopOnly = $want' "$manifest" > "$tmp"
+  mv "$tmp" "$manifest"
+  changed=$((changed + 1))
+  echo "SET      $id -> isDesktopOnly=$WANT"
+done < "$LIST"
+
+echo
+echo "vault: $VAULT"
+echo "list:  $LIST"
+if [[ $MODE == "check" ]]; then
+  ((drift == 0)) && echo "in sync" || echo "drift: $drift plugin(s) out of sync"
+else
+  echo "updated: $changed plugin(s); missing: $missing"
+  if [[ $changed -gt 0 ]]; then
+    echo "restart Obsidian on the phone (fully quit, not just backgrounded) to pick this up."
+  fi
+fi
+
+if [[ $MODE == "check" && $drift -gt 0 ]]; then
+  exit 1
+fi
+exit 0

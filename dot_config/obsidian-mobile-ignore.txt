@@ -1,0 +1,22 @@
+# Plugins that must not load on Obsidian mobile.
+# Applied by obsidian-mobile-ignore (sets isDesktopOnly in each manifest.json).
+# Comment a line with '#' to stop forcing that plugin; re-run the script after
+# updating plugins on the desktop, since updates restore the upstream flag.
+
+# Heavy / desktop-only machinery
+obsidian-git                    # git on mobile: slow startup, conflict footgun alongside Dropbox
+smart-second-brain              # embeddings + graph + model clients; needs local Ollama/cloud
+custom-sort                     # desktop explorer ordering workflow
+number-headings-obsidian        # rewrites headings on open; risky under touch editing
+explorer-focus                  # desktop pane workflow
+
+# Physical-keyboard workflows
+obsidian-vimrc-support
+obsidian-latex-suite            # snippet/text-expansion needs a real keyboard
+
+# Left loading on mobile on purpose:
+#   obsidian-style-settings, obsidian-minimal-settings  -> apply theme/snippet CSS vars
+#   obsidian-icon-folder                               -> icons in the mobile file list
+#   fast-text-color                                    -> cheap, works on touch
+#   cmdr                                               -> mobile toolbar lives here
+#   frontmatter-date-manager                           -> dates still update from the phone

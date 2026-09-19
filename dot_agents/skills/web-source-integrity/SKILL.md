@@ -9,7 +9,7 @@ description: Enforces source selection, claim-level verification, bottom-of-resp
 
 ```text
 REQUEST
-├─ Routine lookup, syntax check, or local pi/beta ─────────→ INLINE: Mode 1/2/3/4 directly
+├─ Routine lookup, syntax check, or local pi/beta ─────────→ INLINE: Mode 1/2/3/4 directly; light citation path
 ├─ Deep multi-source audit reading 4+ full texts (pihat) ──→ SUBAGENT: Explore (up to 4-fanout)
 │
 ├─ Broad, uncertain, or multi-angle question ──────────────→ MODE 1: web_search discovery
@@ -70,6 +70,20 @@ Do not automatically run every route. Choose the shortest route that reaches ade
 
 ## Evidence and Citation Contract
 
+The evidence bar never moves: a claim is citable only after you have retrieved and read a page that supports it. Stakes change the citation form, not whether you read the source. A light citation is never permission to answer from a snippet.
+
+### Light path: routine, low-stakes lookups
+
+Use for an uncontested fact the user will not act on or audit — a version number, a CLI flag, a syntax detail, a definition, an obvious official-documentation answer. Fetch the page as usual, then link it inline where the fact appears:
+
+```markdown
+The CLI reads config from `~/.config/app/settings.json` ([Configuration](https://example.com/docs/configuration)).
+```
+
+Skip claim decomposition, the `### Evidence` block, and the independence analysis. Move to the full contract as soon as a claim is quantitative, disputed, attributed to a named party, date-sensitive in a way that could change a decision, load-bearing for Samuel's research or writing, or part of a comparison. When the path is unclear, use the full contract.
+
+### Full contract: material claims
+
 1. Decompose the answer into material claims.
 2. Classify each claim's domain, freshness requirement, stakes, and source type using [source hierarchies](references/source-hierarchies.md) when the request spans multiple domains or source classes.
 3. Search and select candidate sources; prefer primary or official sources appropriate to the claim.
@@ -77,16 +91,31 @@ Do not automatically run every route. Choose the shortest route that reaches ade
 5. Check exact support, independence, date, scope, and contradictions.
 6. Put a footnote marker immediately after the supported claim. Number web markers by first appearance using `[^w1]`, `[^w2]`, and so on. Reuse a marker only for the same URL and evidence locator; use separate markers for distinct sections, pages, or passages. If several sources support one claim, attach several markers.
 
-   Collect the definitions in one `### Evidence` block at the absolute end of the response:
+   Collect the definitions in one `### Evidence` block at the absolute end of the response, with the source rendered as a clickable Markdown link the way [citation-integrity](../citation-integrity/SKILL.md) links Zotero items:
 
    ```markdown
    ### Evidence
-   [^w1]: Page title (if available) — publisher/site (if available); §Relevant heading or concise excerpt/locator; published YYYY-MM-DD when stated; accessed YYYY-MM-DD; https://example.com/page
+   [^w1]: [Page title (if available) — publisher/site](https://example.com/page); §Relevant heading or concise excerpt/locator; published YYYY-MM-DD when stated; accessed YYYY-MM-DD.
    ```
+
+   Link the title/site text to the page you actually retrieved; do not leave a bare trailing URL, and never point a link at a page you only saw as a snippet. Do not build a URL fragment from heading text. An invented `#current-rates` fails silently or lands on the wrong section, which is worse than no link at all. Use an anchored URL only when a tool returned that exact URL or the page itself links the section by it; otherwise link the title and keep the locator as plain text. Unlike a Zotero `?page=X` locator, a web fragment has no resolver behind it, so there is nothing to catch a wrong one.
 
    Include only entries referenced in the response. Omit the shared block only when neither web nor Zotero evidence is cited. The URL, a supporting locator or concise excerpt, and the ISO `accessed` date are required; page title, publisher/site, and `published` date are optional. Include `published` only when the page states a relevant publication date; never infer missing dates, confuse an update date with a publication date, or emit raw `{URL, date}` stamps in human-facing prose. If web and Zotero evidence both appear, combine their `[^wN]` and `[^cN]` definitions in this same final block while keeping the namespaces separate.
 
 If a claim rests only on a synthesized search answer, say `UNVERIFIED: summary-only` rather than presenting it as page-supported evidence. If a page is inaccessible or support is partial, state the limitation, qualify the claim, or omit it.
+
+### Use clickable locators for source lists
+
+For candidate-source, corroboration, or comparison lists, prefer a compact evidence column over one footnote per row:
+
+```markdown
+| Source | What it supports | Evidence locator |
+|---|---|---|
+| [Publisher — Page title](https://example.com/report) | States the current rate and its effective date | §Current rates; accessed 2026-09-15 |
+| [Publisher — Page title](https://example.org/notice) | Confirms the deadline in the same jurisdiction | Notice dated 2026-08-01; accessed 2026-09-15 |
+```
+
+Wrap the source name in the retrieved URL and keep the locator as plain text under the same no-invented-fragments rule. When a row carries plain metadata only — domain, publisher, or page title with no load-bearing claim — the linked name is sufficient and the locator column may be omitted. Do not link a row for a page that was never retrieved; name it as an unexamined lead instead.
 
 ## Security and Failure Handling
 

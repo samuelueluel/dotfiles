@@ -21,9 +21,6 @@ QWEN38_DFLASH2_DRAFT="/root/.cache/huggingface/hub/models--incoai--Qwen3.8-27B-D
 # the full file for the pre-merge Vulkan/canonical paths.
 QWEN38_FLASH_MTP_FULL="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-Q8_0.gguf"
 QWEN38_FLASH_MTP_SHARED="/root/.cache/huggingface/qwen3.8-flash-next/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf"
-QWEN38_FLASH_FP4_MTP="/root/.cache/huggingface/qwen3.8-flash-next/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf"
-QWEN38_FLASH_FP4_MTP_URL="https://huggingface.co/agentionai/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST-GGUF/resolve/main/Qwen3.8-Flash-Next-MTP-ROCmFP4-FAST.gguf?download=true"
-QWEN38_FLASH_FP4_MTP_SIZE=2444519296
 
 usage() {
   cat <<'EOF'
@@ -95,35 +92,6 @@ append_kv_flags() {
   esac
 }
 
-ensure_qwen38_flash_fp4_mtp() {
-  local cache_root target part size
-  # Primary cache volume is lemonade26-v108-cache; lemonade-cache is kept as a
-  # legacy fallback for older installs.
-  cache_root=$(podman volume inspect --format '{{.Mountpoint}}' lemonade26-v108-cache 2>/dev/null || true)
-  [[ -n "$cache_root" ]] || cache_root=$(podman volume inspect --format '{{.Mountpoint}}' lemonade-cache 2>/dev/null || true)
-  [[ -n "$cache_root" ]] || cache_root="$HOME/.local/share/containers/storage/volumes/lemonade26-v108-cache/_data"
-  target="$cache_root/qwen3.8-flash-next/$(basename "$QWEN38_FLASH_FP4_MTP")"
-  part="$target.part"
-
-  size=$(stat -c '%s' "$target" 2>/dev/null || echo 0)
-  [[ "$size" == "$QWEN38_FLASH_FP4_MTP_SIZE" ]] && return 0
-
-  mkdir -p "$(dirname "$target")"
-  if [[ -f "$target" && ! -f "$part" ]]; then
-    mv -f "$target" "$part"
-  fi
-
-  gum spin --show-output --title "downloading ROCmFP4 MTP sidecar (2.28 GiB)" -- \
-    curl -fL --retry 5 --retry-delay 3 --retry-connrefused --continue-at - \
-      -o "$part" "$QWEN38_FLASH_FP4_MTP_URL" \
-    || die "ROCmFP4 MTP sidecar download failed"
-
-  size=$(stat -c '%s' "$part" 2>/dev/null || echo 0)
-  [[ "$size" == "$QWEN38_FLASH_FP4_MTP_SIZE" ]] \
-    || die "ROCmFP4 MTP sidecar has size $size; expected $QWEN38_FLASH_FP4_MTP_SIZE"
-  mv -f "$part" "$target"
-}
-
 [[ -n "${1:-}" ]] || { usage >&2; exit 2; }
 selection=$1
 [[ "$selection" != *$'\n'* && "$selection" != *$'\r'* && "$selection" != *' '* ]] || die "model contains whitespace"
@@ -154,47 +122,6 @@ fixed_parallel=0
 halo_backend="${fixed_halo_backend:-${LEM_HALO_BACKEND:-}}"
 
 case "$id" in
-  Qwen3.8-Flash-Next-ROCmFP4*)
-    # Agention's per-head ROCmFP4-FAST imatrix GGUF. This is not the
-    # Nathan Q4_K_XL file: Laurent's qwen4exp-rocmfpx Vulkan engine is required.
-    fixed_parallel=1
-    pi_thinking_level="max"
-    args+=" --force-laurent --fit off -b 2048 -ub 512 -ngl 99 -fa on --reasoning on"
-
-    spec=$(menu_spec_mtp) || exit 1
-    case "${spec%%[ ]*}" in
-      on)
-        ensure_qwen38_flash_fp4_mtp
-        args+=" --spec-type draft-mtp --spec-draft-model $QWEN38_FLASH_FP4_MTP --spec-draft-adaptive --spec-draft-n-min 2 --spec-draft-n-max 4 --n-gpu-layers-draft 99 -ctkd q8_0 -ctvd q8_0"
-        ;;
-      off)
-        args+=" --spec-type none"
-        ;;
-    esac
-
-    args+=" $QWEN38_FLASH_SAMPLING"
-    effort=$(menu_thinking_effort) || exit 1
-    case "${effort%%[ ]*}" in
-      xhigh)
-        pi_thinking_level="max"
-        args+=" --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22.jinja"
-        ;;
-      medium)
-        pi_thinking_level="medium"
-        args+=" --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-medium.jinja"
-        ;;
-      low)
-        pi_thinking_level="low"
-        args+=" --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-low.jinja"
-        ;;
-      off)
-        pi_thinking_level="off"
-        args+=" --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0 --presence-penalty 1.5 --chat-template-file /root/.cache/lemonade/qwen3.8-froggeric-v22-off.jinja"
-        ;;
-    esac
-
-    append_kv_flags || exit 1
-    ;;
   UD-Q4_K_XL|UD-IQ4_XS|Qwen3.8-Flash-Next-*)
     # Qwen3.8-Flash-Next is a qwen4exp model with a very large PLE tensor.
     # The extra-model registry attaches mmproj-F16.gguf; preserve mmap-backed
@@ -323,17 +250,11 @@ case "$id" in
     spec=$(menu_spec_dense38) || exit 1
     case "${spec%%[ ]*}" in
       dflash2)
-        if [[ "$id" == *"ROCmFP4"* ]]; then
-          args+=" --force-laurent --spec-type draft-dflash --spec-draft-model /root/.cache/huggingface/hub/models--agentionai--Qwen3.8-27B-DFlash2-ROCmFP4-FAST-GGUF/snapshots/main/Qwen3.8-27B-DFlash2-Q4_0_ROCMFP4_FAST.gguf --spec-draft-adaptive --spec-draft-n-min 2 --spec-draft-n-max 6 -ctkd q8_0 -ctvd q8_0"
-        else
-          args+=" --spec-type draft-dflash --spec-draft-model $QWEN38_DFLASH2_DRAFT --spec-draft-n-max 4 -ctkd q8_0 -ctvd q8_0"
-        fi
+        args+=" --spec-type draft-dflash --spec-draft-model $QWEN38_DFLASH2_DRAFT --spec-draft-n-max 4 -ctkd q8_0 -ctvd q8_0"
         ;;
       on)
-        [[ "$id" == *"ROCmFP4"* ]] && args+=" --force-laurent"
         ;;
       off)
-        [[ "$id" == *"ROCmFP4"* ]] && args+=" --force-laurent"
         args+=" --spec-type none"
         ;;
     esac
@@ -385,16 +306,13 @@ case "$id" in
 esac
 
 # Backend resolution: the pi/beta picker pins the backend in the selection
-# suffix; scripted callers may still use LEM_HALO_BACKEND. ROCmFP4 models stay
-# pinned to Laurent, and halo backends are rejected for models that cannot
-# use them.
+# suffix; scripted callers may still use LEM_HALO_BACKEND.
 if [[ -n "$fixed_halo_backend" && -n "${LEM_HALO_BACKEND:-}" && "${LEM_HALO_BACKEND}" != "$fixed_halo_backend" ]]; then
   die "$selection conflicts with LEM_HALO_BACKEND=${LEM_HALO_BACKEND}"
 fi
 if [[ -n "$halo_backend" ]]; then
   case "$id" in
     Qwen3.8-27B-Q4|Qwen3.8-27B-Q6|UD-Q4_K_XL|UD-IQ4_XS|Qwen3.8-Flash-Next-*)
-      [[ "$id" != *ROCmFP4* ]] || die "$selection: ROCmFP4 models are pinned to the Laurent engine"
       ;;
     *)
       die "$selection: halo backends are not supported for $id"
@@ -403,9 +321,8 @@ if [[ -n "$halo_backend" ]]; then
 fi
 
 # The standard Qwen3.8 Q4/Q6 models can be compared across the current
-# engines and the halo-box builds. ROCmFP4 remains pinned to Laurent because
-# its quantization/layout is not assumed to work in the new fork.
-if [[ "$id" == Qwen3.8-* || "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS ]] && [[ "$id" != *ROCmFP4* ]]; then
+# engines and the halo-box builds.
+if [[ "$id" == Qwen3.8-* || "$id" == UD-Q4_K_XL || "$id" == UD-IQ4_XS ]]; then
   case "$halo_backend" in
     ""|current|default) ;;
     halo-vulkan)

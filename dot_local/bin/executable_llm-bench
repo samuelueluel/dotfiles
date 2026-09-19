@@ -622,8 +622,6 @@ def infer_engine(tokens: list[str], backend: str) -> str:
         return "Halo ROCm/HIP"
     if has_flag(tokens, "--force-rocm"):
         return "Gaetan ROCm/HIP"
-    if has_flag(tokens, "--force-laurent"):
-        return "Laurent Vulkan"
     if has_flag(tokens, "--force-vulkan"):
         return "Nathan Vulkan"
     if (backend or "").lower() == "vulkan":
@@ -1483,8 +1481,6 @@ def engine_binary_path(engine: str) -> str:
         return "/opt/lemonade/llama/halo-vulkan/bin/llama-server-real"
     if "halo" in low and "rocm" in low:
         return "/opt/lemonade/llama/halo-rocm/llama-server"
-    if "laurent" in low:
-        return "/opt/lemonade/llama/vulkan-laurent/bin/llama-server"
     if "rocm" in low:
         return "/opt/lemonade/llama/rocm/llama-server"
     return "/opt/lemonade/llama/vulkan/bin/llama-server-real"
@@ -1499,8 +1495,6 @@ def expected_runtime_paths(engine: str) -> tuple[str, ...]:
             "/opt/lemonade/llama/halo-rocm/llama-server",
             "/opt/lemonade/llama/halo-rocm/ld-linux-x86-64.so.2",
         )
-    if "laurent" in low:
-        return ("/opt/lemonade/llama/vulkan-laurent/bin/llama-server",)
     if "rocm" in low:
         return ("/opt/lemonade/llama/rocm/llama-server",)
     return ("/opt/lemonade/llama/vulkan/bin/llama-server-real",)
@@ -1512,8 +1506,6 @@ def expected_runtime_marker(engine: str) -> str:
         return "halo-vulkan"
     if "halo" in low and "rocm" in low:
         return "halo-rocm"
-    if "laurent" in low:
-        return "laurent"
     if "rocm" in low:
         return "gaetan"
     return "nathan"
@@ -1523,7 +1515,7 @@ def detect_runtime_identity() -> dict[str, str]:
     script = (
         "for p in $(ps -eo pid=); do "
         "marker=$(tr '\\0' '\\n' < /proc/$p/environ 2>/dev/null | sed -n 's/^TURQUOISE_LLM_ENGINE=//p'); "
-        "case \"$marker\" in nathan|laurent|gaetan|halo-vulkan|halo-rocm) "
+        "case \"$marker\" in nathan|gaetan|halo-vulkan|halo-rocm) "
         "exe=$(readlink -f /proc/$p/exe 2>/dev/null || true); "
         "sha=$(sha256sum \"$exe\" 2>/dev/null | awk '{print $1}'); "
         "printf '%s\\t%s\\t%s\\t%s\\n' \"$p\" \"$exe\" \"$sha\" \"$marker\";; esac; "
@@ -1575,8 +1567,6 @@ def build_description(engine: str) -> str:
         return "halo-box/strix-llama.cpp; CMake: -DGGML_HIP=ON -DGGML_NATIVE=ON -DAMDGPU_TARGETS=gfx1151 -DGGML_HIP_GRAPHS=ON -DGGML_HIP_MMQ_MFMA=ON -DGGML_HIP_NO_VMM=ON -DGGML_HIP_RCCL=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release"
     if "nathan" in low:
         return "Nathanw1014/llama.cpp branch strix-halo-vulkan; CMake: -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release; targets llama-server llama-cli llama-bench"
-    if "laurent" in low:
-        return "LaurentZuijdwijk/llama.cpp; CMake: -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release; targets llama-server llama-cli llama-bench"
     if "rocm" in low:
         return "gaetan-puleo/llama-cpp-strix-halo; CMake: -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1151 -DGGML_HIP_ROCWMMA_FATTN=ON -DCMAKE_BUILD_TYPE=Release"
     return "not recorded"
@@ -1769,7 +1759,7 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  llm-bench --models Qwen3.8-27B-Q4,Qwen3.8-27B-ROCmFP4 --suite prose --depths 0,30k,60k --runs 3
+  llm-bench --models Qwen3.8-27B-Q4,Qwen3.8-27B-Q6 --suite prose --depths 0,30k,60k --runs 3
   llm-bench --models Qwen3.6-MoE-35B-Q8 --suite code --spec off --depths d0,d60000
   llm-bench --models Qwen3.8-27B-Q4 --spec canonical --spec-n-max 6 --runs 2
   llm-bench --list-models

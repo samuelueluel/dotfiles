@@ -505,13 +505,6 @@
           "maxTokens": 131072
         },
         {
-          "id": "Qwen3.8-27B-ROCmFP4",
-          "name": "Qwen3.8 Dense 27B | ROCmFP4",
-          "reasoning": true,
-          "contextWindow": 131072,
-          "maxTokens": 131072
-        },
-        {
           "id": "UD-Q4_K_XL",
           "name": "Qwen3.8 Flash Next | Q4",
           "reasoning": true,
@@ -521,13 +514,6 @@
         {
           "id": "UD-IQ4_XS",
           "name": "Qwen3.8 Flash Next | IQ4_XS",
-          "reasoning": true,
-          "contextWindow": 262144,
-          "maxTokens": 131072
-        },
-        {
-          "id": "Qwen3.8-Flash-Next-ROCmFP4",
-          "name": "Qwen3.8 Flash Next | ROCmFP4",
           "reasoning": true,
           "contextWindow": 262144,
           "maxTokens": 131072
