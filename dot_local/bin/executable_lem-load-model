@@ -142,7 +142,7 @@ case "$id" in
     # Qwen4Exp has 512 experts but activates only 10 in normal inference;
     # the default empty warmup builds the all-512-expert graph and can exceed
     # Lemonade's 600-second readiness window on this 104 GB model.
-    args+=" --no-warmup"
+    args+=" --no-warmup --cache-ram 4096 --ctx-checkpoints 1 --checkpoint-min-step 2048"
 
     spec=$(menu_spec_mtp) || exit 1
     case "${spec%%[ ]*}" in
@@ -182,7 +182,7 @@ case "$id" in
     # Tiel's trained MTP head is packaged in the MTP main GGUF; no separate
     # --spec-draft-model path is needed. Keep it on Nathan's Vulkan backend.
     fixed_parallel=1
-    args+=" --force-vulkan --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on"
+    args+=" --force-vulkan --cache-ram 16384 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 1024 -b 2048 -t 16 --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0 -fa on"
 
     mode=$(menu_thinking_onoff) || exit 1
     case "${mode%%[ ]*}" in
@@ -212,7 +212,7 @@ case "$id" in
     # Signal's GGUF contains the Qwen3.8 MTP draft head. The adaptive flag
     # requires the halo-box Strix Vulkan engine, not Nathan's older Vulkan build.
     fixed_parallel=1
-    args+=" --force-halo-vulkan -ngl 999 -fa on --cache-ram 0 --cache-reuse 512 --ctx-checkpoints 16 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 256 -b 2048 -t 16 --temp 0.7 --top-p 0.95 --top-k 20 --min-p 0"
+    args+=" --force-halo-vulkan -ngl 999 -fa on --cache-ram 16384 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048 --context-shift --slot-prompt-similarity 0.8 --kv-unified --no-mmap --direct-io -ub 256 -b 2048 -t 16 --temp 0.7 --top-p 0.95 --top-k 20 --min-p 0"
 
     spec=$(menu_spec_mtp) || exit 1
     case "${spec%%[ ]*}" in
@@ -382,7 +382,7 @@ else
   args+=" --parallel $par"
 fi
 if [[ " $args " != *" --cache-ram "* ]]; then
-  args+=" --cache-ram 0"
+  args+=" --cache-ram 16384 --cache-reuse 512 --ctx-checkpoints 8 --checkpoint-min-step 2048"
 fi
 args=${args# }
 

@@ -1,0 +1,13 @@
+{
+  "vaultPath": "~/Dropbox/Sam-Obsidian-Vault",
+  "readyPrompt": "Read the following Obsidian notes with TurboVault, reply only with \"Ready.\", and wait for follow-up discussion.",
+  "includeDescription": false,
+  "readDescriptions": true,
+  "maxVisibleRows": 12,
+  "borderColor": "borderAccent",
+  "descLines": 2,
+  "padList": true,
+  "maxTotalBytes": 160000,
+  "cacheTtlMs": 120000,
+  "skipDirs": ["node_modules", "attachments", ".trash", ".obsidian", ".git"]
+}

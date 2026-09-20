@@ -296,7 +296,9 @@ start_container() {
     -c "$STRIX_CTX"
     -b "$OPT_BATCH"
     -ub "$OPT_UBATCH"
-    --cache-ram 0
+    --cache-ram 4096
+    --ctx-checkpoints 1
+    --checkpoint-min-step 2048
     --parallel 1
     --jinja
     --temp "$STRIX_TEMP"
