@@ -20,6 +20,7 @@ import {
   DEFAULT_EVIDENCE_BUDGET_CHARS,
   duplicateRetrievalNote,
   EVIDENCE_BUDGET_ENV_VAR,
+  healTurbovaultMcpArgs,
   healZoteroMcpArgs,
   healZoteroWorkerInput,
   isChezmoiManaged,
@@ -105,12 +106,20 @@ export default function workflowInvariantsExtension(pi: ExtensionAPI): void {
     if (
       typeof event.toolName === "string" &&
       (event.toolName === "mcp" ||
-        event.toolName === "mcp__zotero" ||
-        event.toolName.startsWith("zotero_"))
+        event.toolName.startsWith("mcp__") ||
+        event.toolName.startsWith("zotero_") ||
+        event.toolName.startsWith("turbovault_"))
     ) {
       const { healedInput, wasHealed } = healZoteroMcpArgs(event.toolName, event.input);
       if (wasHealed) {
         event.input = healedInput;
+      }
+      // TurboVault query repair: natural-language apostrophes (`dad's`) are
+      // rejected by Tantivy's query grammar server-side. Mirrors the server
+      // sanitizer so older pinned builds behave the same. Never blocks.
+      const tvHealed = healTurbovaultMcpArgs(event.toolName, event.input);
+      if (tvHealed.wasHealed) {
+        event.input = tvHealed.healedInput;
       }
       // Audit-claim guard: validate payload shape before dispatch, because
       // client-side schema errors echo the whole payload plus the full tool

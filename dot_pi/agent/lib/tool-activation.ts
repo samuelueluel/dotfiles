@@ -329,7 +329,8 @@ export function assertToolActivationReady(pi: ToolHost): void {
   const allowed = state.permissionAllowedTools!;
   const leaked = pi.getActiveTools().filter((name) => {
     const groupId = state.ownerByTool.get(name);
-    return !allowed.has(name) || (groupId !== undefined && state.groups.get(groupId)?.active !== true);
+    if (groupId === undefined) return false;
+    return !allowed.has(name) || state.groups.get(groupId)?.active !== true;
   });
   if (leaked.length > 0) {
     throw new Error(`Tool activation unavailable: active tools were not reconciled (${leaked.join(", ")}).`);
@@ -367,7 +368,8 @@ export function activateToolActivationGroup(pi: ToolHost, id: string): string[] 
     const missing = expected.filter((name) => !after.includes(name));
     const leaked = after.filter((name) => {
       const groupId = state.ownerByTool.get(name);
-      return !allowed.has(name) || (groupId !== undefined && state.groups.get(groupId)?.active !== true);
+      if (groupId === undefined) return false;
+      return !allowed.has(name) || state.groups.get(groupId)?.active !== true;
     });
     if (missing.length > 0) throw new Error(`reconciler did not activate ${missing.join(", ")}`);
     if (leaked.length > 0) throw new Error(`reconciler left unauthorized tools active (${leaked.join(", ")})`);

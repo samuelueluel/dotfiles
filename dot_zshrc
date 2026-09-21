@@ -859,7 +859,7 @@ _strix_llama_healthy() {
 _pi_cloud_model_scope() {
   local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-5.6*:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
   if _halogen_healthy; then
-    scope+=',halogen/halogen-qwen3.8-flash-next-w4b,halogen/halogen-qwen3.8-flash-next-iq4,halogen/halogen-qwen3.8-flash-next'
+    scope+=',halogen/halogen-qwen3.8-flash-next-w4b,halogen/halogen-qwen3.8-flash-next-iq4,halogen/halogen-qwen3.8-flash-next-q4xl,halogen/halogen-qwen3.8-flash-next'
   fi
   if _strix_llama_healthy; then
     scope+=',strix/strix-qwen3.8-flash-next'
@@ -916,6 +916,7 @@ pi() {
     halogen/*)
       local hal_variant="w4b"
       [[ "$model_id" == *iq4* ]] && hal_variant="iq4"
+      [[ "$model_id" == *q4xl* ]] && hal_variant="q4xl"
       command halogen ensure "$hal_variant" || return 1
       command strix-llama stop 2>/dev/null || true
       pi_model_id="$model_id"
@@ -1049,6 +1050,7 @@ beta() {
     halogen/*)
       local hal_variant="w4b"
       [[ "$model_id" == *iq4* ]] && hal_variant="iq4"
+      [[ "$model_id" == *q4xl* ]] && hal_variant="q4xl"
       command halogen ensure "$hal_variant" || return 1
       command strix-llama stop 2>/dev/null || true
       pi_model_id="$model_id"

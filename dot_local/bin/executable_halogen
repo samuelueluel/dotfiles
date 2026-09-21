@@ -19,9 +19,14 @@ HALOGEN_IQ4_CHECKPOINT_FILE=${HALOGEN_IQ4_CHECKPOINT_FILE:-/models/UD-IQ4_XS/Qwe
 HALOGEN_IQ4_MTP_HEAD=${HALOGEN_IQ4_MTP_HEAD:-/models/qwen38-flash-next-mtp.hgn}
 HALOGEN_IQ4_TOKENIZER=${HALOGEN_IQ4_TOKENIZER:-/models/tokenizer}
 
+HALOGEN_Q4XL_MODELS=${HALOGEN_Q4XL_MODELS:-$HALOGEN_IQ4_MODELS}
+HALOGEN_Q4XL_CHECKPOINT_FILE=${HALOGEN_Q4XL_CHECKPOINT_FILE:-/models/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf}
+HALOGEN_Q4XL_MTP_HEAD=${HALOGEN_Q4XL_MTP_HEAD:-/models/qwen38-flash-next-mtp.hgn}
+HALOGEN_Q4XL_TOKENIZER=${HALOGEN_Q4XL_TOKENIZER:-/models/tokenizer}
+
 HALOGEN_FLASH_PIN_TRUNK=${HALOGEN_FLASH_PIN_TRUNK:-1}
-HALOGEN_MAX_TOK=${HALOGEN_MAX_TOK:-8192}
-HALOGEN_PREFILL_CHUNK=${HALOGEN_PREFILL_CHUNK:-8192}
+HALOGEN_MAX_TOK=${HALOGEN_MAX_TOK:-}
+HALOGEN_PREFILL_CHUNK=${HALOGEN_PREFILL_CHUNK:-}
 HALOGEN_KV_POOL_POSITIONS=${HALOGEN_KV_POOL_POSITIONS:-262144}
 HALOGEN_MAX_TOKENS_DEFAULT=${HALOGEN_MAX_TOKENS_DEFAULT:-8192}
 HALOGEN_MAX_TOKENS_CAP=${HALOGEN_MAX_TOKENS_CAP:-65536}
@@ -37,28 +42,34 @@ HALOGEN_WAIT_TIMEOUT_S=${HALOGEN_WAIT_TIMEOUT_S:-120}
 usage() {
   cat <<'EOF'
 Usage:
-  halogen start [w4b|iq4] [on|off]   Start existing image and model (prompts gum menu if interactive)
-  halogen ensure [w4b|iq4] [on|off]  Start it if needed and wait for /health to report ready
-  halogen status                     Print the server health document, variant, or container state
-  halogen stop                       Stop the container without removing it
-  halogen logs                       Show container logs (extra arguments go to podman logs)
+  halogen start [w4b|iq4|q4xl] [on|off] [8k|16k|32k]   Start existing image and model (prompts gum menu if interactive)
+  halogen ensure [w4b|iq4|q4xl] [on|off] [8k|16k|32k]  Start it if needed and wait for /health to report ready
+  halogen status                          Print the server health document, variant, or container state
+  halogen stop                            Stop the container without removing it
+  halogen logs                            Show container logs (extra arguments go to podman logs)
 
 Variants:
   w4b, native   Peonist Native W4B weights (~118 GiB .hgn, 8-bit o_proj, faster decode)
   iq4, gguf     Unsloth UD-IQ4_XS GGUF weights (~94 GB, 8-bit trunk, +2% PPL)
+  q4xl, q4_k    Unsloth UD-Q4_K_XL GGUF weights (~104 GB, 4/5-bit K-quant, max accuracy)
 
 Vision:
   off           Text-only (default)
   on            Vision sidecar (0.84 GiB /models/qwen38-flash-next-vision.hgn)
 
+Max Tokens (Arena):
+  8k, 8192      8.4 GiB arena (default/safe on 125 GiB unified RAM)
+  16k, 16384    12.5 GiB arena (+4.1 GiB RAM, +9% prefill throughput)
+  32k, 32768    21.3 GiB arena (upstream default, high OOM risk with GGUFs)
+
 Environment:
-  HALOGEN_VARIANT      Default weight variant (w4b or iq4)
+  HALOGEN_VARIANT      Default weight variant (w4b, iq4, or q4xl)
   HALOGEN_VISION       Default vision tower state: off (default) or on
+  HALOGEN_MAX_TOK      Prefill arena size: 8192 (default), 16384, or 32768
   HALOGEN_IMAGE        Image reference (default: ghcr.io/peonist-ai/halogen-flash-server:latest)
   HALOGEN_API_PORT     Loopback API port (default: 8731)
   HALOGEN_FLASH_PIN_TRUNK  Lock weights in RAM (default: 1)
-  HALOGEN_MAX_TOK      Prefill arena size (default: 8192)
-  HALOGEN_PREFILL_CHUNK  Prefill call width; must equal MAX_TOK (default: 8192)
+  HALOGEN_PREFILL_CHUNK  Prefill call width; defaults to MAX_TOK
   HALOGEN_KV_POOL_POSITIONS  Shared KV pool positions (default: 262144)
   HALOGEN_MAX_TOKENS_DEFAULT  Default request budget (default: 8192)
   HALOGEN_MAX_TOKENS_CAP  Maximum request budget (default: 65536)
@@ -209,9 +220,10 @@ if value.get("status") == "error" and "not found" not in json.dumps(value).lower
 }
 
 menu_variant() {
-  gum choose --header "halogen · select weights" --height 2 --selected "w4b    Native W4B (.hgn, faster decode)" \
-    "w4b    Native W4B (.hgn, faster decode)" \
-    "iq4    Unsloth UD-IQ4_XS (GGUF, +2% PPL)"
+  gum choose --header "halogen · select weights" --height 3 --selected "w4b    Native W4B (.hgn, faster decode)" \
+    "w4b     Native W4B (.hgn, faster decode)" \
+    "iq4     Unsloth UD-IQ4_XS (GGUF, +2% PPL)" \
+    "q4xl    Unsloth UD-Q4_K_XL (GGUF, max accuracy)"
 }
 
 resolve_variant() {
@@ -228,7 +240,8 @@ resolve_variant() {
   case "$v" in
     w4b|native|hgn|default) echo "w4b" ;;
     iq4|ud-iq4-xs|gguf) echo "iq4" ;;
-    *) die "unrecognized weight variant: $v (expected 'w4b' or 'iq4')" ;;
+    q4xl|q4|q4_k|q4k|ud-q4_k_xl|ud-q4-k-xl) echo "q4xl" ;;
+    *) die "unrecognized weight variant: $v (expected 'w4b', 'iq4', or 'q4xl')" ;;
   esac
 }
 
@@ -256,6 +269,39 @@ resolve_vision() {
   esac
 }
 
+menu_max_tok() {
+  gum choose --header "halogen · max tokens (arena)" --height 3 --selected "8k      8192 (8.4 GiB arena, default/safe)" \
+    "8k      8192 (8.4 GiB arena, default/safe)" \
+    "16k     16384 (12.5 GiB arena, +4.1 GiB RAM, +9% prefill)" \
+    "32k     32768 (21.3 GiB arena, upstream default)"
+}
+
+resolve_max_tok() {
+  local mt="${1:-${HALOGEN_MAX_TOK:-}}"
+  if [[ -z "$mt" ]]; then
+    if [[ -t 0 ]] && command -v gum >/dev/null 2>&1; then
+      local choice
+      choice=$(menu_max_tok) || exit 1
+      mt="${choice%%[ ]*}"
+    else
+      mt="8192"
+    fi
+  fi
+  case "$mt" in
+    8k|8K|8192|default) echo "8192" ;;
+    16k|16K|16384) echo "16384" ;;
+    32k|32K|32768) echo "32768" ;;
+    4k|4K|4096) echo "4096" ;;
+    *)
+      if [[ "$mt" =~ ^[0-9]+$ ]]; then
+        echo "$mt"
+      else
+        die "unrecognized MAX_TOK: $mt (expected '8k', '16k', or '32k')"
+      fi
+      ;;
+  esac
+}
+
 current_container_variant() {
   local variant
   variant=$(podman inspect --format '{{index .Config.Labels "halogen.variant"}}' "$HALOGEN_CONTAINER" 2>/dev/null || true)
@@ -265,7 +311,9 @@ current_container_variant() {
   fi
   local ckpt
   ckpt=$(podman inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$HALOGEN_CONTAINER" 2>/dev/null | grep '^HALOGEN_CHECKPOINT=' || true)
-  if [[ "$ckpt" == *UD-IQ4_XS* ]]; then
+  if [[ "$ckpt" == *UD-Q4_K_XL* ]]; then
+    printf 'q4xl\n'
+  elif [[ "$ckpt" == *UD-IQ4_XS* ]]; then
     printf 'iq4\n'
   elif [[ -n "$ckpt" ]]; then
     printf 'w4b\n'
@@ -290,22 +338,44 @@ current_container_vision() {
   fi
 }
 
+current_container_max_tok() {
+  local mt
+  mt=$(podman inspect --format '{{index .Config.Labels "halogen.max_tok"}}' "$HALOGEN_CONTAINER" 2>/dev/null || true)
+  if [[ -n "$mt" ]]; then
+    printf '%s\n' "$mt"
+    return 0
+  fi
+  local env_mt
+  env_mt=$(podman inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$HALOGEN_CONTAINER" 2>/dev/null | grep '^HALOGEN_MAX_TOK=' || true)
+  if [[ -n "$env_mt" ]]; then
+    printf '%s\n' "${env_mt#HALOGEN_MAX_TOK=}"
+    return 0
+  fi
+  printf '8192\n'
+}
+
 start_container() {
   require_podman
-  local desired_var desired_vis
+  local desired_var desired_vis desired_max_tok
   desired_var=$(resolve_variant "${1:-}") || return $?
   desired_vis=$(resolve_vision "${2:-}") || return $?
+  desired_max_tok=$(resolve_max_tok "${3:-}") || return $?
 
-  local state cur_var cur_vis
+  local state cur_var cur_vis cur_max_tok
   state=$(container_state)
   cur_var=$(current_container_variant)
   cur_vis=$(current_container_vision)
+  cur_max_tok=$(current_container_max_tok)
 
   podman image exists "$HALOGEN_IMAGE" 2>/dev/null || die "image is not present: $HALOGEN_IMAGE (pull it explicitly first)"
 
-  if [[ -n "$state" && ( ( -n "$cur_var" && "$cur_var" != "$desired_var" ) || ( -n "$cur_vis" && "$cur_vis" != "$desired_vis" ) ) ]]; then
-    printf 'halogen: config changed (variant: %s -> %s, vision: %s -> %s); recreating container\n' \
-      "${cur_var:-unknown}" "$desired_var" "${cur_vis:-unknown}" "$desired_vis" >&2
+  if [[ -n "$state" && ( \
+        ( -n "$cur_var" && "$cur_var" != "$desired_var" ) || \
+        ( -n "$cur_vis" && "$cur_vis" != "$desired_vis" ) || \
+        ( -n "$cur_max_tok" && "$cur_max_tok" != "$desired_max_tok" ) \
+      ) ]]; then
+    printf 'halogen: config changed (variant: %s -> %s, vision: %s -> %s, max_tok: %s -> %s); recreating container\n' \
+      "${cur_var:-unknown}" "$desired_var" "${cur_vis:-unknown}" "$desired_vis" "${cur_max_tok:-unknown}" "$desired_max_tok" >&2
     if [[ "$state" == running ]]; then
       podman stop --time 30 "$HALOGEN_CONTAINER" >/dev/null 2>&1 || true
     fi
@@ -315,17 +385,18 @@ start_container() {
 
   case "$state" in
     running)
-      printf 'halogen: container %s (%s, vision=%s) is already running\n' "$HALOGEN_CONTAINER" "$desired_var" "$desired_vis"
+      printf 'halogen: container %s (%s, vision=%s, max_tok=%s) is already running\n' "$HALOGEN_CONTAINER" "$desired_var" "$desired_vis" "$desired_max_tok"
       return 0
       ;;
     created|configured|exited|stopped|paused)
       evict_lemonade_models
-      printf 'halogen: starting existing container %s (%s, vision=%s)\n' "$HALOGEN_CONTAINER" "$desired_var" "$desired_vis"
+      printf 'halogen: starting existing container %s (%s, vision=%s, max_tok=%s)\n' "$HALOGEN_CONTAINER" "$desired_var" "$desired_vis" "$desired_max_tok"
       podman start "$HALOGEN_CONTAINER" >/dev/null
       return 0
       ;;
     "")
       evict_lemonade_models
+      local prefill_chunk="${HALOGEN_PREFILL_CHUNK:-$desired_max_tok}"
       local -a args=(
         run --detach
         --name "$HALOGEN_CONTAINER"
@@ -339,11 +410,12 @@ start_container() {
         --ulimit memlock=-1:-1
         --label "halogen.variant=${desired_var}"
         --label "halogen.vision=${desired_vis}"
+        --label "halogen.max_tok=${desired_max_tok}"
         --env "HALOGEN_API_PORT=${HALOGEN_API_PORT}"
         --env "HALOGEN_MODEL_ID=${HALOGEN_MODEL_ID}"
         --env "HALOGEN_FLASH_PIN_TRUNK=${HALOGEN_FLASH_PIN_TRUNK}"
-        --env "HALOGEN_MAX_TOK=${HALOGEN_MAX_TOK}"
-        --env "HALOGEN_PREFILL_CHUNK=${HALOGEN_PREFILL_CHUNK}"
+        --env "HALOGEN_MAX_TOK=${desired_max_tok}"
+        --env "HALOGEN_PREFILL_CHUNK=${prefill_chunk}"
         --env "HALOGEN_KV_POOL_POSITIONS=${HALOGEN_KV_POOL_POSITIONS}"
         --env "HALOGEN_MAX_TOKENS_DEFAULT=${HALOGEN_MAX_TOKENS_DEFAULT}"
         --env "HALOGEN_MAX_TOKENS_CAP=${HALOGEN_MAX_TOKENS_CAP}"
@@ -370,6 +442,19 @@ start_container() {
         args+=(
           --volume "${dir}:/models:ro"
           --env "HALOGEN_CHECKPOINT=/models/${HALOGEN_W4B_CHECKPOINT_FILE}"
+        )
+      elif [[ "$desired_var" == "q4xl" ]]; then
+        dir="$HALOGEN_Q4XL_MODELS"
+        [[ -d "$dir" ]] || die "models directory does not exist: $dir"
+        local ckpt_host="$dir/${HALOGEN_Q4XL_CHECKPOINT_FILE#/models/}"
+        [[ -f "$ckpt_host" ]] || die "GGUF checkpoint missing: $ckpt_host"
+        local mtp_host="$dir/${HALOGEN_Q4XL_MTP_HEAD#/models/}"
+        [[ -f "$mtp_host" ]] || die "MTP head missing: $mtp_host"
+        args+=(
+          --volume "${dir}:/models:ro"
+          --env "HALOGEN_CHECKPOINT=${HALOGEN_Q4XL_CHECKPOINT_FILE}"
+          --env "HALOGEN_MTP_HEAD=${HALOGEN_Q4XL_MTP_HEAD}"
+          --env "HALOGEN_TOKENIZER=${HALOGEN_Q4XL_TOKENIZER}"
         )
       else
         dir="$HALOGEN_IQ4_MODELS"
@@ -432,28 +517,29 @@ wait_for_health() {
 }
 
 start() {
-  start_container "${1:-}" "${2:-}"
+  start_container "${1:-}" "${2:-}" "${3:-}"
 }
 
 ensure() {
   validate_wait_timeout
-  start_container "${1:-}" "${2:-}"
+  start_container "${1:-}" "${2:-}" "${3:-}"
   wait_for_health
 }
 
 status() {
   require_podman
   require_curl
-  local health state var vis
+  local health state var vis max_tok
   state=$(container_state)
   var=$(current_container_variant)
   vis=$(current_container_vision)
+  max_tok=$(current_container_max_tok)
   if health=$(health_document 2>/dev/null); then
-    printf 'halogen: running (%s, vision=%s)\n%s\n' "${var:-unknown}" "${vis:-off}" "$health"
+    printf 'halogen: running (%s, vision=%s, max_tok=%s)\n%s\n' "${var:-unknown}" "${vis:-off}" "${max_tok:-8192}" "$health"
     return 0
   fi
   if [[ -n "$state" ]]; then
-    printf 'halogen: container %s is %s (%s, vision=%s); /health is not ready\n' "$HALOGEN_CONTAINER" "$state" "${var:-unknown}" "${vis:-off}" >&2
+    printf 'halogen: container %s is %s (%s, vision=%s, max_tok=%s); /health is not ready\n' "$HALOGEN_CONTAINER" "$state" "${var:-unknown}" "${vis:-off}" "${max_tok:-8192}" >&2
   else
     printf 'halogen: container %s does not exist; /health is not reachable\n' "$HALOGEN_CONTAINER" >&2
   fi

@@ -8,7 +8,7 @@ TurboVault's git backend may reject mutations when external processes such as Ob
 
 ## Reindex Timeouts and Live Builds
 
-A full vault reindex can take longer than the MCP client timeout. The call returns an error while the TurboVault server continues the build, so a timeout is weak evidence of failure and is not a reason to reissue.
+Routine reindexing is incremental (comparing chunk content hashes in `index.bin`) and finishes in ~4–5 seconds. A cold rebuild from scratch on a large vault, however, can take longer than the MCP client timeout. The call returns an error while the TurboVault server continues building in the background, so a timeout on a cold rebuild is weak evidence of failure and is not a reason to reissue.
 
 Mid-build state is `index.stale` present with `index.bin` absent. An aborted build leaves the same state, so `turbovault_embedding_index_status` alone cannot separate them; both report `exists: false` with `chunks: 0`. Start a second build only after confirming the first is dead.
 
@@ -18,7 +18,7 @@ Confirm the build is alive outside the MCP layer:
 - The embedding server log shows chunk tasks advancing between two samples rather than stopping.
 - The cache directory at `~/.cache/turbovault/embeddings/<vault-hash>/` is being written.
 
-A build is complete when `index.bin` exists, `stale` is false, and `built_at` is recent, with `chunks` and `dimensions` nonzero. Then validate end to end with one `turbovault_hybrid_search` and check that `dense_score` and `dense_rank` are populated rather than null.
+A build is complete when `index.bin` exists, `stale` is false, and `built_at` is recent, with `chunks` and `dimensions` nonzero. Then validate end to end with one `turbovault_semantic_search` and verify that `sparse_score`, `dense_score`, `rrf_score`, and `rerank_score` are populated.
 
 ## Discovery Execution Location
 

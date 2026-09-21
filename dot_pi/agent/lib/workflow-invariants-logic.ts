@@ -735,6 +735,99 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * TurboVault operations whose `query` string reaches Tantivy's query grammar.
+ */
+const TURBOVAULT_QUERY_OPERATIONS = new Set([
+  "search",
+  "advanced_search",
+  "semantic_search",
+]);
+
+/**
+ * Rewrites the apostrophes that Tantivy's query grammar rejects.
+ *
+ * The grammar reserves `'` as a quoted-phrase delimiter, so an intra-word
+ * apostrophe opens a phrase that never closes and the whole query is refused:
+ * `dad's birthday` becomes an unterminated `'...'`. Replacing only the
+ * apostrophe between word characters preserves deliberate phrase queries
+ * (a leading `'` is untouched) and leaves `*`, field prefixes, and operators
+ * alone. Whitespace is collapsed so multi-line queries survive as one term list.
+ */
+function repairTantivyQuery(query: string): string {
+  return query
+    .replace(/([\p{L}\p{N}])'([\p{L}\p{N}])/gu, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Silent self-healing for TurboVault search arguments. Never blocks; anything
+ * it cannot parse cleanly is returned untouched so normal tool validation
+ * reports it.
+ *
+ * This mirrors the server-side sanitizer added in the TurboVault fork, so a
+ * natural-language query behaves identically even when the running binary
+ * predates that fix (a rolled-back pin, or another MCP client on the same
+ * host). It is defence in depth, not the primary fix.
+ *
+ * Handles:
+ * - Intra-word apostrophes in `query` on search, advanced_search, and
+ *   semantic_search (see `repairTantivyQuery`).
+ * - String-serialized `args`/`arguments` objects parsed in place: the MCP
+ *   proxy requires an object and rejects a JSON string before dispatch.
+ */
+export function healTurbovaultMcpArgs(
+  toolName: unknown,
+  input: unknown
+): {
+  healedInput: Record<string, unknown>;
+  wasHealed: boolean;
+} {
+  const record: Record<string, unknown> =
+    input && typeof input === "object" ? { ...(input as Record<string, unknown>) } : {};
+  const noHeal = { healedInput: record, wasHealed: false };
+  const { server, operation, args } = parseMcpCall(toolName, record);
+  if (server !== "turbovault") return noHeal;
+
+  let wasHealed = false;
+  for (const slot of ["args", "arguments"] as const) {
+    const raw = record[slot];
+    if (typeof raw !== "string") continue;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        record[slot] = parsed;
+        wasHealed = true;
+      }
+    } catch {
+      // Leave malformed strings for normal tool validation.
+    }
+  }
+
+  const healed = { ...args };
+  if (TURBOVAULT_QUERY_OPERATIONS.has(operation) && typeof healed.query === "string") {
+    const repaired = repairTantivyQuery(healed.query);
+    if (repaired !== healed.query && repaired !== "") {
+      healed.query = repaired;
+      wasHealed = true;
+    }
+  }
+
+  if (!wasHealed) return noHeal;
+  // Write the healed args back into the same slot parseMcpCall read from.
+  if (isRecord(record.args)) {
+    record.args = healed;
+  } else if (isRecord(record.arguments)) {
+    record.arguments = healed;
+  } else if (typeof record.args === "string") {
+    record.args = JSON.stringify(healed);
+  } else {
+    Object.assign(record, healed);
+  }
+  return { healedInput: record, wasHealed: true };
+}
+
+/**
  * Checks whether a shell command executed from within an Explore subagent
  * attempts filesystem mutation or redirection.
  */
@@ -778,9 +871,14 @@ export function parseMcpCall(
   const record =
     input && typeof input === "object" ? (input as Record<string, unknown>) : {};
 
-  if (toolName === "mcp__zotero") {
+  // Namespace proxies: `mcp__<server>` carrying `{ tool, args }`. Resolved
+  // generically so a newly proxied server cannot silently bypass hook logic.
+  // `mcp__turbovault` was previously unmatched here, which made every
+  // TurboVault call made through the namespace proxy invisible to all callers.
+  if (toolName.startsWith("mcp__")) {
+    const server = toolName.slice("mcp__".length);
     const op = typeof record.tool === "string" ? record.tool : "";
-    return { server: "zotero", operation: stripServerPrefix(op, "zotero"), args: mcpArgs(record) };
+    return { server, operation: stripServerPrefix(op, server), args: mcpArgs(record) };
   }
   if (toolName === "mcp") {
     const op = typeof record.tool === "string" ? record.tool : "";

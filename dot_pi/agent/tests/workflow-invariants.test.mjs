@@ -22,6 +22,8 @@ import {
   checkZoteroCloudUpload,
   checkZoteroSemanticResult,
   healZoteroMcpArgs,
+  healTurbovaultMcpArgs,
+  parseMcpCall,
   stripAuditClaimCitationYears,
   healZoteroWorkerInput,
   checkExploreMutatingCommand,
@@ -454,6 +456,120 @@ test("healZoteroMcpArgs remaps collection alias on collection_key tools only", (
     args: { collection: "  " },
   });
   assert.equal(blank.wasHealed, false);
+});
+
+test("parseMcpCall resolves the mcp__turbovault namespace proxy", () => {
+  // Lazily-loaded MCP tools surface to extensions under the proxy name, not the
+  // underlying tool name. mcp__turbovault previously fell through to an empty
+  // server, hiding every TurboVault call from hook logic.
+  const call = parseMcpCall("mcp__turbovault", {
+    tool: "turbovault_semantic_search",
+    args: { query: "dad's birthday" },
+  });
+  assert.equal(call.server, "turbovault");
+  assert.equal(call.operation, "semantic_search");
+  assert.deepEqual(call.args, { query: "dad's birthday" });
+
+  // Zotero keeps its existing resolution through the same generic branch.
+  const zot = parseMcpCall("mcp__zotero", { tool: "zotero_semantic_search", args: {} });
+  assert.equal(zot.server, "zotero");
+  assert.equal(zot.operation, "semantic_search");
+
+  // Gateway shape and flattened shape are unchanged.
+  assert.equal(parseMcpCall("mcp", { tool: "turbovault_search", args: {} }).server, "turbovault");
+  assert.equal(parseMcpCall("turbovault_read_note", { path: "a.md" }).server, "turbovault");
+  assert.equal(parseMcpCall("bash", { command: "ls" }).server, "");
+});
+
+test("healTurbovaultMcpArgs repairs apostrophes that Tantivy's grammar rejects", () => {
+  const input = {
+    tool: "turbovault_semantic_search",
+    args: { query: "what is my dad's birthday", limit: 3 },
+  };
+  const { healedInput, wasHealed } = healTurbovaultMcpArgs("mcp__turbovault", input);
+  assert.equal(wasHealed, true);
+  assert.deepEqual(healedInput.args, {
+    query: "what is my dad s birthday",
+    limit: 3,
+  });
+  // Caller object is not mutated.
+  assert.deepEqual(input.args, { query: "what is my dad's birthday", limit: 3 });
+
+  // Every query-bearing operation is covered.
+  for (const tool of ["turbovault_search", "turbovault_advanced_search"]) {
+    const healed = healTurbovaultMcpArgs("mcp__turbovault", {
+      tool,
+      args: { query: "mom's name" },
+    });
+    assert.equal(healed.wasHealed, true);
+    assert.deepEqual(healed.healedInput.args, { query: "mom s name" });
+  }
+
+  // Digits before the apostrophe (1990's) are covered too.
+  const year = healTurbovaultMcpArgs("mcp__turbovault", {
+    tool: "turbovault_search",
+    args: { query: "the 1990's" },
+  });
+  assert.equal(year.wasHealed, true);
+  assert.deepEqual(year.healedInput.args, { query: "the 1990 s" });
+});
+
+test("healTurbovaultMcpArgs leaves clean and deliberate queries untouched", () => {
+  // No apostrophe: silent.
+  const clean = healTurbovaultMcpArgs("mcp__turbovault", {
+    tool: "turbovault_search",
+    args: { query: "dad birthday" },
+  });
+  assert.equal(clean.wasHealed, false);
+
+  // A leading apostrophe opens a deliberate phrase query: leave it alone.
+  const phrase = healTurbovaultMcpArgs("mcp__turbovault", {
+    tool: "turbovault_search",
+    args: { query: "'quoted phrase'" },
+  });
+  assert.equal(phrase.wasHealed, false);
+
+  // Match-all and field syntax must survive; only intra-word apostrophes change.
+  const mixed = healTurbovaultMcpArgs("mcp__turbovault", {
+    tool: "turbovault_search",
+    args: { query: "title:foo* dad's" },
+  });
+  assert.equal(mixed.wasHealed, true);
+  assert.deepEqual(mixed.healedInput.args, { query: "title:foo* dad s" });
+
+  // Non-query operations and non-TurboVault servers are out of scope.
+  const note = healTurbovaultMcpArgs("mcp__turbovault", {
+    tool: "turbovault_read_note",
+    args: { path: "a.md" },
+  });
+  assert.equal(note.wasHealed, false);
+  const zot = healTurbovaultMcpArgs("mcp__zotero", {
+    tool: "zotero_semantic_search",
+    args: { query: "dad's" },
+  });
+  assert.equal(zot.wasHealed, false);
+
+  // A query of only apostrophes repairs to empty: refuse rather than send "".
+  const blank = healTurbovaultMcpArgs("mcp__turbovault", {
+    tool: "turbovault_search",
+    args: { query: "''" },
+  });
+  assert.equal(blank.wasHealed, false);
+});
+
+test("healTurbovaultMcpArgs parses string-serialized proxy args", () => {
+  const { healedInput, wasHealed } = healTurbovaultMcpArgs("mcp", {
+    tool: "turbovault_semantic_search",
+    args: JSON.stringify({ query: "dad's birthday" }),
+  });
+  assert.equal(wasHealed, true);
+  assert.deepEqual(healedInput.args, { query: "dad s birthday" });
+
+  const malformed = healTurbovaultMcpArgs("mcp", {
+    tool: "turbovault_search",
+    args: "{not json",
+  });
+  assert.equal(malformed.wasHealed, false);
 });
 
 test("healZoteroMcpArgs parses pages ranges into start_page/end_page", () => {

@@ -576,6 +576,29 @@
           }
         },
         {
+          "id": "halogen-qwen3.8-flash-next-q4xl",
+          "name": "Halogen | Qwen3.8 Flash Next (UD-Q4_K_XL)",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 262144,
+          "maxTokens": 65536,
+          "samplingParams": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "min_p": 0.0,
+            "presence_penalty": 0.0
+          },
+          "thinkingLevelMap": {
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          }
+        },
+        {
           "id": "halogen-qwen3.8-flash-next",
           "name": "Halogen | Qwen3.8 Flash Next",
           "reasoning": true,

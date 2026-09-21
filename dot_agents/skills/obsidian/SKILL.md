@@ -1,6 +1,6 @@
 ---
 name: obsidian
-description: Manages notes, documents, folder organization, and TurboVault-backed lexical, dense, and hybrid retrieval in Samuel's Obsidian vault at ~/Dropbox/Sam-Obsidian-Vault/ using the Hybrid Johnny.Decimal / PARA framework. Use it when Samuel mentions Obsidian, the vault, TurboVault, a vault path, "remember" or "save", or asks to search semantically, reindex embeddings, inspect embedding status, or configure hybrid retrieval.
+description: Manages notes, documents, folder organization, and TurboVault-backed lexical and neural retrieval in Samuel's Obsidian vault at ~/Dropbox/Sam-Obsidian-Vault/ using the Hybrid Johnny.Decimal / PARA framework. Use it when Samuel mentions Obsidian, the vault, TurboVault, a vault path, "remember" or "save", or asks to search semantically, reindex embeddings, or inspect embedding status.
 ---
 
 # Obsidian Vault Management
@@ -9,20 +9,18 @@ description: Manages notes, documents, folder organization, and TurboVault-backe
 
 ```text
 REQUEST
-├─ Known path or active note? ──────→ READ: turbovault_read_note
-├─ Topic or description, no path? ─→ RESOLVE: turbovault_query_frontmatter_sql
-│                                      └─ unresolved → bounded content search
-├─ Exact words, identifiers, filenames, or citations? ─→ DISCOVERY: turbovault_search / turbovault_advanced_search
-├─ Conceptual or paraphrase-heavy question? ───────────→ HYBRID: status → turbovault_hybrid_search
-│  ├─ Dense-only requested ────────────────────────────→ DENSE: turbovault_embedding_search
-│  └─ Index missing or stale ──────────────────────────→ STATUS: turbovault_embedding_index_status → offer reindex
-├─ Embedding status, setup, or maintenance? ───────────→ MAINTENANCE: turbovault_embedding_index_status / turbovault_reindex_embeddings
-├─ Broad content discovery? ──────────────────────────→ DISCOVERY: search / advanced_search / semantic_search
-├─ Backlinks or graph traversal? ──────────────────────→ GRAPH: backlinks / forward_links / related_notes
-├─ New note? ──────────────────────────────────────────→ CREATE: choose location → format → write_note
-├─ Edit existing note? ────────────────────────────────→ EDIT: read/hash → SEARCH/REPLACE → edit_note
-├─ Move or rename? ────────────────────────────────────→ MOVE: move_note or move_file
-└─ “Remember/save this”? ──────────────────────────────→ MEMORY: append-or-create in 02_Memories/
+├─ Known path or active note? ───────────────────────→ READ: turbovault_read_note
+├─ Topic or description, no path? ───────────────────→ RESOLVE: turbovault_query_frontmatter_sql
+│                                                       └─ unresolved → bounded content search
+├─ Exact words, identifiers, filenames, citations? ──→ LEXICAL: turbovault_search / turbovault_advanced_search
+├─ Conceptual or natural-language question? ────────→ NEURAL RAG: turbovault_semantic_search
+│                                                       └─ results stale or missing → turbovault_embedding_index_status / reindex
+├─ Embedding status, setup, or maintenance? ─────────→ MAINTENANCE: turbovault_embedding_index_status / turbovault_reindex_embeddings
+├─ Backlinks or graph traversal? ────────────────────→ GRAPH: backlinks / forward_links / related_notes
+├─ New note? ────────────────────────────────────────→ CREATE: choose location → format → write_note
+├─ Edit existing note? ──────────────────────────────→ EDIT: read/hash → SEARCH/REPLACE → edit_note
+├─ Move or rename? ──────────────────────────────────→ MOVE: move_note or move_file
+└─ “Remember/save this”? ────────────────────────────→ MEMORY: append-or-create in 02_Memories/
 ```
 
 The tree is the sole intent router. Execution location follows the general delegation rules rather than the selected route.
@@ -31,8 +29,8 @@ The tree is the sole intent router. Execution location follows the general deleg
 
 - **Vault boundary:** Use only TurboVault MCP for operations inside `~/Dropbox/Sam-Obsidian-Vault/`. Never use raw filesystem or shell tools on vault notes.
 - **Mutation safety:** Read current content and hash before editing or overwriting. Every mutation requires a descriptive `commit_message`.
-- **Search preservation:** Keep `turbovault_search`, `turbovault_advanced_search`, `semantic_search`, SQL, graph, and write tools available. Dense retrieval adds a route; it does not replace exact or deterministic search.
-- **Dense lifecycle:** Treat embeddings as optional derived state. Check `turbovault_embedding_index_status` before relying on dense results, and never run a full reindex after every note read or write.
+- **Search preservation:** Keep `turbovault_search`, `turbovault_advanced_search`, `turbovault_semantic_search`, SQL, graph, and write tools available. `turbovault_semantic_search` unifies BM25 sparse search, Qwen3 dense embeddings, and BGE cross-encoder reranking; `turbovault_search` provides pure exact lexical search.
+- **Dense lifecycle:** Treat embeddings as derived state. Routine reindexing is incremental (content-hash based, ~4–5s). Call `turbovault_semantic_search` directly for queries; check `turbovault_embedding_index_status` during maintenance or if semantic results report stale/sparse fallback, and never reindex on routine note reads.
 - **Embedding privacy:** Keep API keys in the TurboVault process environment, never in notes or committed configuration. Warn that the configured endpoint receives note chunks and queries.
 - **Titles and prefixes:** The filename is the note title; never repeat it as an H1. Start the body at H1 with the first content section. Preserve existing plugin-generated heading numbers and all user-applied sorting prefixes (`00_`, `01_`, `z_`); create new headings without numbers.
 - **Vault formatting:** Never use Markdown `**bold**` in notes. Use `~={green}text=~` for active labels or terms (1–2 per paragraph) and `~={magenta}text=~` only for genuine hazards. Indent nested lists by four spaces and alternate list types between levels.
@@ -43,26 +41,28 @@ The tree is the sole intent router. Execution location follows the general deleg
 ## Retrieval Workflow
 
 1. **Known path:** Read it directly in the main session using `turbovault_read_note`.
-2. **Unknown path:** Start with a quick metadata lookup:
+2. **Unknown path (metadata lookup):** Start with `turbovault_query_frontmatter_sql({ sql: "..." })` (parameter key is `sql`, not `query`):
    ```sql
    SELECT path, description FROM files
-   WHERE path LIKE '%<term>%' OR description LIKE '%<term>%'
+   WHERE path LIKE '%<term>%' OR COALESCE(description, '') LIKE '%<term>%'
    LIMIT 5;
    ```
-   Read the resolved path directly. If metadata does not find it, use a narrow content search rather than guessing.
-3. **Choose the retrieval route:** Use `turbovault_search` or `turbovault_advanced_search` for exact terms, identifiers, filenames, equations, citations, or filters. Use `turbovault_hybrid_search` for conceptual questions and paraphrases. Use `turbovault_embedding_search` only when dense-only retrieval is requested or useful for diagnosis. Use the existing `semantic_search` when whole-note TF-IDF similarity is specifically wanted.
-4. **Check dense readiness:** Before dense or hybrid retrieval, call `turbovault_embedding_index_status`. If `exists` is false or `stale` is true, do not present dense results as available. If the endpoint is configured and the user wants semantic retrieval, offer `turbovault_reindex_embeddings`; otherwise answer with lexical search and state the limitation. Treat a reindex request that exceeds the client timeout as still running until the status check says otherwise (see Dense Index Lifecycle).
-5. **Read sources after discovery:** Dense and hybrid results identify candidate chunks. Read the returned note paths with `turbovault_read_note` before making claims that require full-note context.
+   (Wrap nullable columns in `COALESCE`—GlueSQL fails on `Null LIKE Str`). Read the resolved path directly. If metadata does not find it, proceed to content search.
+3. **Choose the retrieval route:**
+   - **Exact lexical search:** Use `turbovault_search` or `turbovault_advanced_search` for literal strings, exact identifiers, known filenames, equations, citations, or field filters.
+   - **Conceptual & natural-language queries:** Use `turbovault_semantic_search` for natural-language questions ("what is my dad's birthday?", "how is X set up?"), thematic overviews, and paraphrases. It unifies BM25 sparse search, Qwen3 dense vectors, and BGE cross-encoder reranking in a single call.
+4. **Fallback & dense readiness:** TurboVault automatically falls back to sparse BM25 if the embedding (:8082) or reranker (:8083) sidecar is offline. Call `turbovault_embedding_index_status` if results indicate stale index state; offer `turbovault_reindex_embeddings` if reindexing is needed.
+5. **Read sources after discovery:** Neural RAG returns candidate chunks with provenance (`path#chunk_id`). Read the returned note paths with `turbovault_read_note` before making claims that require full-note context.
 6. **Searching and graph lookups:** Keep small, focused searches in the main session. Use an `Explore` subagent only for a genuinely broad search that would clutter the chat context. In CPTR/headless mode, never use subagents; keep permitted discovery inline with narrow queries and bounded results.
 
 ## Dense Index Lifecycle
 
 - **Initial setup:** Configure the embedding endpoint in the TurboVault server environment, call `turbovault_embedding_index_status`, then call `turbovault_reindex_embeddings` once.
-- **Normal use:** Call `turbovault_hybrid_search` for conceptual retrieval. Do not reindex on every query.
-- **After changes:** Vault mutations mark the derived index stale. Batch note changes, then reindex when semantic retrieval is needed. Reindex after changing the endpoint, model, vector dimension, chunking settings, or after a large external vault update.
-- **Long rebuilds and timeouts:** A full reindex can outrun the MCP client timeout while the server keeps building, and the mid-build state is indistinguishable from an aborted job in the status payload. Verify before reissuing, and never start a second build over a live one. Load [TurboVault substrate guidance](references/turbovault-guide.md) to confirm a running build.
-- **Failure behavior:** If the endpoint is unavailable or the index is stale, use lexical search. Dense tools fail closed; they do not silently downgrade and should not be described as having returned dense evidence.
-- **Source boundary:** The index lives outside the vault. Read source notes after retrieval, and never place generated vectors or API keys in vault notes.
+- **Normal use:** Call `turbovault_semantic_search` for conceptual retrieval. It reports `sparse_score`, `dense_score`, `rrf_score`, and `rerank_score`. Do not reindex on every query.
+- **Incremental reindexing:** Routine updates compare note content hashes against `index.bin`. Reindexing embeds only new or modified notes and completes in ~4–5 seconds. Full rebuilds occur only after cache wipes, model changes, or chunker configuration updates.
+- **After changes:** Vault mutations mark the derived index stale. Reindex with `turbovault_reindex_embeddings` when fresh semantic retrieval is needed.
+- **Sidecar degradation:** If the embedding or reranker sidecar is offline, `turbovault_semantic_search` continues operating by falling back to sparse candidates rather than erroring out. Always report when results are sparse-only due to sidecar unavailability.
+- **Source boundary:** The index lives outside the vault in `~/.cache/turbovault/embeddings/`. Read source notes after retrieval, and never place generated vectors or API keys in vault notes.
 
 ## Editing & Creating Notes
 
