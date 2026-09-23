@@ -857,7 +857,7 @@ _strix_llama_healthy() {
 }
 
 _pi_cloud_model_scope() {
-  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-5.6*:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
+  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
   if _halogen_healthy; then
     scope+=',halogen/halogen-qwen3.8-flash-next-w4b,halogen/halogen-qwen3.8-flash-next-iq4,halogen/halogen-qwen3.8-flash-next-q4xl,halogen/halogen-qwen3.8-flash-next'
   fi
@@ -991,7 +991,7 @@ pihat() {
   # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
   # openrouter-us (US key) = everything else. Model + thinking level via /model
   # and Shift+Tab; per-model sampling via samplingParams.
-  local model_flag="${PIHAT_MODEL:-openai-codex/gpt-5.6-luna}"
+  local model_flag="${PIHAT_MODEL:-openai-codex/gpt-6-luna}"
   # Expose Halogen only while its engine-aware /health endpoint is ready.
   local model_scope="$(_pi_cloud_model_scope)"
 
@@ -1101,7 +1101,7 @@ betahat() {
   # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
   # openrouter-us (US key) = everything else. Model + thinking level via /model
   # and Shift+Tab; per-model sampling via samplingParams.
-  local model_flag="${BETAHAT_MODEL:-openai-codex/gpt-5.6-luna}"
+  local model_flag="${BETAHAT_MODEL:-openai-codex/gpt-6-luna}"
   # Expose Halogen only while its engine-aware /health endpoint is ready.
   local model_scope="$(_pi_cloud_model_scope)"
 

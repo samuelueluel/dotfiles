@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const CODEX_PROVIDER = "openai-codex";
-const FAST_MODEL_ID = "gpt-5.6-luna-fast";
-const FAST_UPSTREAM_MODEL_ID = "gpt-5.6-luna";
+const FAST_MODEL_ID = "gpt-6-luna-fast";
+const FAST_UPSTREAM_MODEL_ID = "gpt-6-luna";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

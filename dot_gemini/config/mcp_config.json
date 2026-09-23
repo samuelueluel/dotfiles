@@ -18,7 +18,6 @@
         "mcp-stata"
       ],
       "command": "uvx",
-      "disabled": true,
       "env": {
         "MCP_STATA_STRUCTURED_COMPANION_TEXT": "compact",
         "STATA_PATH": "/usr/local/stata19/stata-mp"
@@ -33,7 +32,11 @@
         "--profile",
         "production"
       ],
-      "command": "turbovault"
+      "command": "turbovault",
+      "env": {
+        "TURBOVAULT_DOCUMENT_INDEXING_ENABLED": "true",
+        "TURBOVAULT_DOCUMENT_MAX_BYTES": "52428800"
+      }
     },
     "zotero": {
       "disabled": false,

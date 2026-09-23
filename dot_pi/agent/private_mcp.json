@@ -43,6 +43,10 @@
         "--profile",
         "production"
       ],
+      "env": {
+        "TURBOVAULT_DOCUMENT_INDEXING_ENABLED": "true",
+        "TURBOVAULT_DOCUMENT_MAX_BYTES": "52428800"
+      },
       "lifecycle": "lazy",
       "directTools": false,
       "includeTools": [

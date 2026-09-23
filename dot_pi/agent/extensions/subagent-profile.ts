@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 type SubagentProfile = "local" | "cloud";
 
-const CLOUD_EXPLORE_MODEL = "openai-codex/gpt-5.6-luna";
+const CLOUD_EXPLORE_MODEL = "openai-codex/gpt-6-luna";
 
 /**
  * Select the subagent policy explicitly when a launcher sets
@@ -28,7 +28,7 @@ function getProfile(ctx: any): SubagentProfile | undefined {
  * This deliberately does not touch tools, MCP, or max_turns. max_turns remains
  * a parameter selected by the parent model (when supplied). Local Explore is
  * pinned to the parent's exact model; cloud Explore is pinned to Codex Luna.
- * The cloud policy defaults thinking to medium while allowing an explicit
+ * The cloud policy defaults thinking to high while allowing an explicit
  * per-invocation thinking request. PI_SUBAGENT_CLOUD_MODEL is intentionally
  * ignored.
  */
@@ -61,7 +61,7 @@ export default function subagentProfile(pi: ExtensionAPI) {
     // override). Explore is always pinned to the ChatGPT Plus Codex model.
     input.model = CLOUD_EXPLORE_MODEL;
     if (typeof input.thinking !== "string" || input.thinking.trim() === "") {
-      input.thinking = process.env.PI_SUBAGENT_CLOUD_THINKING?.trim() || "medium";
+      input.thinking = process.env.PI_SUBAGENT_CLOUD_THINKING?.trim() || "high";
     }
   });
 }

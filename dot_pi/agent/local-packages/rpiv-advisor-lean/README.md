@@ -97,7 +97,7 @@ write leaves your previous selection untouched and tells you so.
 | --- | --- | --- |
 | `modelKey` | The reviewer model, as `"provider/modelId"`. Written by `/advisor`. | absent — advisor off |
 | `effort` | Reasoning effort for the reviewer: `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. Written by `/advisor`; only levels supported by the selected model are offered. | absent — no reasoning sent |
-| `scribeModelKey` | Lower-cost model that refreshes the rolling checkpoint. | `openai-codex/gpt-5.6-luna` |
+| `scribeModelKey` | Lower-cost model that refreshes the rolling checkpoint. | `openai-codex/gpt-6-luna` |
 | `scribeEffort` | Reasoning effort used for checkpoint refreshes. | `high` |
 | `disabledForModels` | Executor models the advisor is stripped for. Plain strings block at any effort; `{ "model": "…", "minEffort": "…" }` blocks only at or above that effort. | `[]` |
 | `protocolMode` | How local skill protocol reaches the reviewer: `attach`, `tools`, or `both`. | `both` |

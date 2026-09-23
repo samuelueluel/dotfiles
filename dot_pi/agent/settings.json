@@ -1,6 +1,6 @@
 {
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-luna",
+  "defaultModel": "gpt-6-luna",
   "defaultThinkingLevel": "max",
   "theme": "noctalia",
   "skills": [
@@ -62,7 +62,7 @@
     "extensions/todo-reminders.ts",
     "extensions/workflow-invariants.ts"
   ],
-  "lastChangelogVersion": "0.85.1",
+  "lastChangelogVersion": "0.86.1",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "compaction": {
@@ -73,9 +73,9 @@
   "smartCompact": {
     "mode": "auto",
     "profile": "balanced",
-    "summaryModel": "openai-codex/gpt-5.6-luna",
-    "segmentationModel": "openai-codex/gpt-5.6-luna",
-    "verificationModel": "openai-codex/gpt-5.6-luna",
+    "summaryModel": "openai-codex/gpt-6-luna",
+    "segmentationModel": "openai-codex/gpt-6-luna",
+    "verificationModel": "openai-codex/gpt-6-luna",
     "summaryThinkingLevel": "high",
     "segmentationThinkingLevel": "high",
     "autoTriggerTimeoutMs": 300000,

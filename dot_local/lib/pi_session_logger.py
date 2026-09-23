@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
-LOGGER_MODEL = "openai-codex/gpt-5.6-luna"
+LOGGER_MODEL = "openai-codex/gpt-6-luna"
 LOGGER_THINKING = "high"
 LOGGER_TIMEOUT_SECONDS = 900
 LOGGER_MAX_TRANSCRIPT_CHARS = 1_500_000

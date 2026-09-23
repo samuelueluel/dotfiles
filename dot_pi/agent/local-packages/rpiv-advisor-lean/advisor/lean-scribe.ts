@@ -313,7 +313,7 @@ export async function buildLeanAdvisorMessages(opts: {
 		completeSimple,
 		signal,
 		onUpdate,
-		scribeModelKey = "openai-codex/gpt-5.6-luna",
+		scribeModelKey = "openai-codex/gpt-6-luna",
 		scribeEffort = "high",
 		scribeUsesRuntimeAuth = false,
 		previousCheckpoint,
@@ -342,8 +342,8 @@ export async function buildLeanAdvisorMessages(opts: {
 	const [provider, modelId] = splitModelKey(scribeModelKey);
 	const scribeModel =
 		(provider && modelId ? ctx.modelRegistry.find(provider, modelId) : undefined) ??
-		ctx.modelRegistry.find("openai-codex", "gpt-5.6-luna") ??
-		ctx.modelRegistry.find("openai", "gpt-5.6-luna");
+		ctx.modelRegistry.find("openai-codex", "gpt-6-luna") ??
+		ctx.modelRegistry.find("openai", "gpt-6-luna");
 	const scribeLabel = scribeModel ? `${scribeModel.provider}:${scribeModel.id}` : undefined;
 
 	let checkpoint = previousCheckpoint;

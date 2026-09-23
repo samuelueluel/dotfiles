@@ -141,7 +141,7 @@ test("preparePlanSave uses a stable title filename and generated frontmatter", (
     markdown: structuredPlan,
     title: "../../Advisor workflow / safely",
     sessionId: "abc12345-session",
-    sourceModel: "openai-codex/gpt-5.6-sol",
+    sourceModel: "openai-codex/gpt-6-sol",
     sourceEffort: "xhigh",
     now,
   });
@@ -151,7 +151,7 @@ test("preparePlanSave uses a stable title filename and generated frontmatter", (
   assert.match(prepared.content, /^---\ncreated: 2026-01-02T03:04:05\nupdated: 2026-01-02T03:04:05/);
   assert.match(prepared.content, /plan_format: 1/);
   assert.match(prepared.content, /status: canonical/);
-  assert.match(prepared.content, /source_model: "openai-codex\/gpt-5.6-sol"/);
+  assert.match(prepared.content, /source_model: "openai-codex\/gpt-6-sol"/);
   assert.match(prepared.content, /# Plan: Advisor Workflow/);
   assert.equal(prepared.commitMessage, "Save plan memory: Advisor-Workflow-Safely");
 });
@@ -248,7 +248,7 @@ test("savePlan writes the canonical plan directly and does not dispatch a model 
     const result = await commandModule.savePlan("Advisor Workflow", ctx, {
       vaultRoot: root,
       now: new Date(2026, 0, 2, 3, 4, 5),
-      sourceModel: "openai-codex/gpt-5.6-sol",
+      sourceModel: "openai-codex/gpt-6-sol",
       sourceEffort: "high",
     });
 
@@ -274,14 +274,14 @@ test("save-plan command reads model metadata from the command context", async ()
     const harness = extensionHarness();
     const notifications = [];
     const ctx = context([lintedEntry()], notifications, {
-      model: { provider: "openai-codex", id: "gpt-5.6-sol" },
+      model: { provider: "openai-codex", id: "gpt-6-sol" },
       thinkingLevel: "xhigh",
     });
 
     await harness.registrations.get("save-plan").handler("", ctx);
 
     const saved = await readFile(join(root, "02_Memories/Saved-Plans/Advisor-Workflow.md"), "utf8");
-    assert.ok(saved.includes('source_model: "openai-codex/gpt-5.6-sol"'));
+    assert.ok(saved.includes('source_model: "openai-codex/gpt-6-sol"'));
     assert.match(saved, /source_effort: "xhigh"/);
   } finally {
     if (previousVaultRoot === undefined) delete process.env.OBSIDIAN_VAULT_PATH;

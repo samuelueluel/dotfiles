@@ -14,6 +14,11 @@ vaults:
       - .obsidian
       - .trash
       - .git
+      - Personal-Info.pdf
+    excluded_subtrees:
+      - Agents
+      - Chats
+      - 90_Archive
     enable_caching: true
     cache_ttl: 300
     allowed_operations:

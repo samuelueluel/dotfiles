@@ -1,5 +1,5 @@
 {
-  "scribeModelKey": "openai-codex/gpt-5.6-luna",
+  "scribeModelKey": "openai-codex/gpt-6-luna",
   "scribeEffort": "xhigh",
   "protocolMode": "both",
   "maxSkillToolRounds": 2,
@@ -13,7 +13,5 @@
       "Call `advisor` before declaring the task complete. Make your changes durable first, and pass the `git diff` or summary output in `evidence` for a final verification check.",
       "Give the advisor's guidance serious weight. Follow the advisor's VERDICT: if `PIVOT`, immediately execute the provided alternative plan autonomously; if `CIRCUIT_BREAKER`, stop tool execution immediately and output a clear Markdown terminal debrief detailing the blocker, attempts, files on disk, and the morning decision needed."
     ]
-  },
-  "modelKey": "openai-codex/gpt-5.6-sol",
-  "effort": "xhigh"
+  }
 }

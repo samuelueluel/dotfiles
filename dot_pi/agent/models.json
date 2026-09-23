@@ -6,8 +6,8 @@
       "apiKey": "$OPENROUTER_API_KEY_US",
       "models": [
         {
-          "id": "anthropic/claude-opus-5",
-          "name": "Anthropic: Claude Opus 5",
+          "id": "anthropic/claude-opus-5.5",
+          "name": "Anthropic: Claude Opus 5.5",
           "reasoning": true,
           "contextWindow": 320000,
           "maxTokens": 128000,
@@ -21,33 +21,18 @@
             "medium": "medium",
             "high": "high",
             "xhigh": "xhigh",
-            "max": "max"
-          }
-        },
-        {
-          "id": "anthropic/claude-sonnet-5",
-          "name": "Anthropic: Claude Sonnet 5",
-          "reasoning": true,
-          "contextWindow": 320000,
-          "maxTokens": 128000,
-          "compat": {
-            "thinkingFormat": "openrouter",
-            "cacheControlFormat": "anthropic"
-          },
-          "thinkingLevelMap": {
-            "minimal": null,
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-            "xhigh": "xhigh",
-            "max": "max"
+            "max": "max",
+            "off": null
           }
         },
         {
           "id": "deepseek/deepseek-v4.1-flash",
           "name": "DeepSeek V4.1 Flash (US)",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 320000,
           "maxTokens": 262144,
           "samplingParams": {
@@ -69,46 +54,8 @@
           }
         },
         {
-          "id": "google/gemini-3.7-flash",
-          "name": "Google: Gemini 3.7 Flash",
-          "reasoning": true,
-          "contextWindow": 320000,
-          "maxTokens": 65536,
-          "compat": {
-            "thinkingFormat": "openrouter"
-          },
-          "thinkingLevelMap": {
-            "off": null,
-            "minimal": null,
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-            "xhigh": null,
-            "max": null
-          }
-        },
-        {
-          "id": "moonshotai/kimi-k3",
-          "name": "Moonshot AI: Kimi K3",
-          "reasoning": true,
-          "contextWindow": 320000,
-          "maxTokens": 128000,
-          "compat": {
-            "supportsDeveloperRole": false,
-            "thinkingFormat": "openrouter"
-          },
-          "thinkingLevelMap": {
-            "minimal": null,
-            "low": "low",
-            "medium": null,
-            "high": "high",
-            "xhigh": null,
-            "max": "max"
-          }
-        },
-        {
-          "id": "openai/gpt-5.6-luna-pro",
-          "name": "OpenAI: GPT-5.6 Luna Pro",
+          "id": "openai/gpt-6-luna-pro",
+          "name": "OpenAI: GPT-6 Luna Pro",
           "reasoning": true,
           "contextWindow": 320000,
           "maxTokens": 128000,
@@ -168,6 +115,29 @@
             "xhigh": "xhigh",
             "max": "xhigh"
           }
+        },
+        {
+          "id": "xiaomi/mimo-v2.6-pro",
+          "name": "Xiaomi: MiMo-V2.6-Pro (US)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 320000,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "together"
+          },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          }
         }
       ]
     },
@@ -180,7 +150,10 @@
           "id": "deepseek/deepseek-v4.1-flash",
           "name": "DeepSeek V4.1 Flash (CN)",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 320000,
           "maxTokens": 262144,
           "samplingParams": {
@@ -224,6 +197,29 @@
             "xhigh": null,
             "max": "max"
           }
+        },
+        {
+          "id": "xiaomi/mimo-v2.6-pro",
+          "name": "Xiaomi: MiMo-V2.6-Pro (CN)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 320000,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "together"
+          },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          }
         }
       ]
     },
@@ -233,48 +229,13 @@
       "apiKey": "$OPENROUTER_API_KEY_US",
       "models": [
         {
-          "id": "anthropic/claude-opus-5",
-          "name": "Anthropic: Claude Opus 5 (Max Context)",
-          "reasoning": true,
-          "contextWindow": 1000000,
-          "maxTokens": 128000,
-          "compat": {
-            "thinkingFormat": "openrouter",
-            "cacheControlFormat": "anthropic"
-          },
-          "thinkingLevelMap": {
-            "minimal": null,
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-            "xhigh": "xhigh",
-            "max": "max"
-          }
-        },
-        {
-          "id": "anthropic/claude-sonnet-5",
-          "name": "Anthropic: Claude Sonnet 5 (Max Context)",
-          "reasoning": true,
-          "contextWindow": 1000000,
-          "maxTokens": 128000,
-          "compat": {
-            "thinkingFormat": "openrouter",
-            "cacheControlFormat": "anthropic"
-          },
-          "thinkingLevelMap": {
-            "minimal": null,
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-            "xhigh": "xhigh",
-            "max": "max"
-          }
-        },
-        {
           "id": "deepseek/deepseek-v4.1-flash",
           "name": "DeepSeek V4.1 Flash (US / Max Context)",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 1048576,
           "maxTokens": 384000,
           "samplingParams": {
@@ -296,46 +257,8 @@
           }
         },
         {
-          "id": "google/gemini-3.7-flash",
-          "name": "Google: Gemini 3.7 Flash (Max Context)",
-          "reasoning": true,
-          "contextWindow": 1048576,
-          "maxTokens": 65536,
-          "compat": {
-            "thinkingFormat": "openrouter"
-          },
-          "thinkingLevelMap": {
-            "off": null,
-            "minimal": null,
-            "low": "low",
-            "medium": "medium",
-            "high": "high",
-            "xhigh": null,
-            "max": null
-          }
-        },
-        {
-          "id": "moonshotai/kimi-k3",
-          "name": "Moonshot AI: Kimi K3 (Max Context)",
-          "reasoning": true,
-          "contextWindow": 1000000,
-          "maxTokens": 128000,
-          "compat": {
-            "supportsDeveloperRole": false,
-            "thinkingFormat": "openrouter"
-          },
-          "thinkingLevelMap": {
-            "minimal": null,
-            "low": "low",
-            "medium": null,
-            "high": "high",
-            "xhigh": null,
-            "max": "max"
-          }
-        },
-        {
-          "id": "openai/gpt-5.6-luna-pro",
-          "name": "OpenAI: GPT-5.6 Luna Pro (Max Context)",
+          "id": "openai/gpt-6-luna-pro",
+          "name": "OpenAI: GPT-6 Luna Pro (Max Context)",
           "reasoning": true,
           "contextWindow": 1050000,
           "maxTokens": 128000,
@@ -395,6 +318,29 @@
             "xhigh": "xhigh",
             "max": "xhigh"
           }
+        },
+        {
+          "id": "xiaomi/mimo-v2.6-pro",
+          "name": "Xiaomi: MiMo-V2.6-Pro (US / Max Context)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "together"
+          },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          }
         }
       ]
     },
@@ -407,7 +353,10 @@
           "id": "deepseek/deepseek-v4.1-flash",
           "name": "DeepSeek V4.1 Flash (CN / Max Context)",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 1048576,
           "maxTokens": 384000,
           "samplingParams": {
@@ -450,6 +399,29 @@
             "high": "high",
             "xhigh": null,
             "max": "max"
+          }
+        },
+        {
+          "id": "xiaomi/mimo-v2.6-pro",
+          "name": "Xiaomi: MiMo-V2.6-Pro (CN / Max Context)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "thinkingFormat": "together"
+          },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": null,
+            "max": null
           }
         }
       ]
@@ -533,7 +505,10 @@
           "id": "halogen-qwen3.8-flash-next-w4b",
           "name": "Halogen | Qwen3.8 Flash Next (W4B Native)",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {
@@ -556,7 +531,10 @@
           "id": "halogen-qwen3.8-flash-next-iq4",
           "name": "Halogen | Qwen3.8 Flash Next (UD-IQ4_XS)",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {
@@ -579,7 +557,10 @@
           "id": "halogen-qwen3.8-flash-next-q4xl",
           "name": "Halogen | Qwen3.8 Flash Next (UD-Q4_K_XL)",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {
@@ -602,7 +583,10 @@
           "id": "halogen-qwen3.8-flash-next",
           "name": "Halogen | Qwen3.8 Flash Next",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {
@@ -636,7 +620,10 @@
           "id": "strix-qwen3.8-flash-next",
           "name": "Strix Llama | Qwen3.8 Flash Next UD-Q4_K_XL (Retained PM4)",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 262144,
           "maxTokens": 65536,
           "samplingParams": {
@@ -660,24 +647,27 @@
     "openai-codex": {
       "models": [
         {
-          "id": "gpt-5.6-luna-fast",
-          "name": "GPT-5.6 Luna (Fast)",
+          "id": "gpt-6-luna-fast",
+          "name": "GPT-6 Luna (Fast)",
           "api": "openai-codex-responses",
           "baseUrl": "https://chatgpt.com/backend-api",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "cost": {
-            "input": 0.2,
-            "output": 1.2,
-            "cacheRead": 0.02,
-            "cacheWrite": 0.25,
+            "input": 0.1,
+            "output": 0.5,
+            "cacheRead": 0.01,
+            "cacheWrite": 0.125,
             "tiers": [
               {
                 "inputTokensAbove": 272000,
-                "input": 0.4,
-                "output": 1.8,
-                "cacheRead": 0.04,
-                "cacheWrite": 0.5
+                "input": 0.2,
+                "output": 0.75,
+                "cacheRead": 0.02,
+                "cacheWrite": 0.25
               }
             ]
           },
@@ -695,24 +685,27 @@
           }
         },
         {
-          "id": "gpt-5.6-sol-max",
-          "name": "GPT-5.6 Sol (Max Context)",
+          "id": "gpt-6-luna-max",
+          "name": "GPT-6 Luna (Max Context)",
           "api": "openai-codex-responses",
           "baseUrl": "https://chatgpt.com/backend-api",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "cost": {
-            "input": 5,
-            "output": 30,
-            "cacheRead": 0.5,
-            "cacheWrite": 6.25,
+            "input": 0.1,
+            "output": 0.5,
+            "cacheRead": 0.01,
+            "cacheWrite": 0.125,
             "tiers": [
               {
                 "inputTokensAbove": 272000,
-                "input": 10,
-                "output": 45,
-                "cacheRead": 1,
-                "cacheWrite": 12.5
+                "input": 0.2,
+                "output": 0.75,
+                "cacheRead": 0.02,
+                "cacheWrite": 0.25
               }
             ]
           },
@@ -730,24 +723,27 @@
           }
         },
         {
-          "id": "gpt-5.6-luna-max",
-          "name": "GPT-5.6 Luna (Max Context)",
+          "id": "gpt-6-sol-max",
+          "name": "GPT-6 Sol (Max Context)",
           "api": "openai-codex-responses",
           "baseUrl": "https://chatgpt.com/backend-api",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "cost": {
-            "input": 0.2,
-            "output": 1.2,
-            "cacheRead": 0.02,
-            "cacheWrite": 0.25,
+            "input": 2,
+            "output": 10,
+            "cacheRead": 0.2,
+            "cacheWrite": 2.5,
             "tiers": [
               {
                 "inputTokensAbove": 272000,
-                "input": 0.4,
-                "output": 1.8,
-                "cacheRead": 0.04,
-                "cacheWrite": 0.5
+                "input": 4,
+                "output": 15,
+                "cacheRead": 0.4,
+                "cacheWrite": 5
               }
             ]
           },
@@ -770,7 +766,10 @@
           "api": "openai-codex-responses",
           "baseUrl": "https://chatgpt.com/backend-api",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "cost": {
             "input": 2,
             "output": 12,
@@ -846,6 +845,24 @@
         },
         "gpt-6-astra": {
           "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": null
+          }
+        },
+        "gpt-6-luna": {
+          "contextWindow": 320000,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": null
+          }
+        },
+        "gpt-6-sol": {
+          "contextWindow": 320000,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
             "minimal": null
           }
         }

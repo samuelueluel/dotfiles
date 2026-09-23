@@ -1,6 +1,7 @@
 {
   "workflow": "none",
-  "searxngBaseUrl": "http://localhost:8888",
+  "searxngBaseUrl": "http://127.0.0.1:8888",
+ "ssrf": { "allowRanges": ["127.0.0.0/8", "::1/128"] },
   "searchRouting": {
     "providers": [
       "searxng",

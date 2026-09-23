@@ -203,7 +203,7 @@ class SessionLoggerTests(unittest.TestCase):
         self.assertEqual(draft["outcomes"], "Added the test.")
         self.assertEqual(draft["keywords"], ["logger", "test"])
         self.assertEqual(flushed, [str(path.resolve())])
-        self.assertIn("openai-codex/gpt-5.6-luna", seen["command"])
+        self.assertIn("openai-codex/gpt-6-luna", seen["command"])
         self.assertIn("high", seen["command"])
         self.assertIn("Build the logger test.", seen["input"])
         self.assertIn("--no-tools", seen["command"])

@@ -56,7 +56,7 @@ const assistant = (content, timestamp = 1) => ({
 	content,
 	api: "openai-codex-responses",
 	provider: "openai-codex",
-	model: "gpt-5.6-luna",
+	model: "gpt-6-luna",
 	usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
 	stopReason: "toolUse",
 	timestamp,
@@ -131,7 +131,7 @@ test("long sessions refresh a checkpoint from one serialized scribe input", asyn
 		),
 	);
 
-	const model = { provider: "openai-codex", id: "gpt-5.6-luna" };
+	const model = { provider: "openai-codex", id: "gpt-6-luna" };
 	let scribeRequest;
 	const completeSimple = async (_model, request, options) => {
 		scribeRequest = { request, options };
@@ -211,7 +211,7 @@ test("checkpoint refresh merges only prior checkpoint plus new delta", async () 
 		throughEntryId: "old-boundary",
 	};
 	const delta = Array.from({ length: 13 }, (_, index) => user(`NEW-DELTA-${index}`, index + 1));
-	const model = { provider: "openai-codex", id: "gpt-5.6-luna" };
+	const model = { provider: "openai-codex", id: "gpt-6-luna" };
 	let scribeInput = "";
 	const completeSimple = async (_model, request) => {
 		scribeInput = request.messages[0].content[0].text;
@@ -241,7 +241,7 @@ test("scribe failure preserves the old checkpoint and raw delta", async () => {
 		throughEntryId: "old-boundary",
 	};
 	const delta = Array.from({ length: 13 }, (_, index) => user(`UNSUMMARIZED-${index}`, index + 1));
-	const model = { provider: "openai-codex", id: "gpt-5.6-luna" };
+	const model = { provider: "openai-codex", id: "gpt-6-luna" };
 	const completeSimple = async () => {
 		throw new Error("scribe unavailable");
 	};
@@ -549,7 +549,7 @@ test("thrown advisor authentication is returned in the normal error envelope", a
 test("evidence reaches the scribe, checkpoint, and advisor briefing, then survives one hop", async () => {
 	const evidence = "EXACT-EVIDENCE-BLOB line two";
 	const delta = Array.from({ length: 13 }, (_, index) => user(`delta-${index}`, index + 1));
-	const model = { provider: "openai-codex", id: "gpt-5.6-luna" };
+	const model = { provider: "openai-codex", id: "gpt-6-luna" };
 	let scribeInput = "";
 	const first = await buildLeanAdvisorMessages({
 		ctx: dummyContext(model),
@@ -684,7 +684,7 @@ test("skill reads are bounded before scribe serialization", async () => {
 	];
 	let scribeInput = "";
 	await buildLeanAdvisorMessages({
-		ctx: dummyContext({ provider: "openai-codex", id: "gpt-5.6-luna" }),
+		ctx: dummyContext({ provider: "openai-codex", id: "gpt-6-luna" }),
 		rawSessionMessages: raw,
 		completeSimple: async (_model, request) => {
 			scribeInput = request.messages[0].content[0].text;

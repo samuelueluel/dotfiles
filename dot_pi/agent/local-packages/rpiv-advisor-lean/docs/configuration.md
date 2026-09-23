@@ -42,7 +42,7 @@ previous selection and the active tool list are left untouched.
 | --- | --- | --- | --- |
 | `modelKey` | `string` — `"provider/modelId"` | absent (advisor off) | `/advisor` |
 | `effort` | graded thinking level (`minimal` → `max`) | absent (no `reasoning` sent) | `/advisor` effort picker |
-| `scribeModelKey` | `string` — `"provider/modelId"` | `openai-codex/gpt-5.6-luna` | hand-edited |
+| `scribeModelKey` | `string` — `"provider/modelId"` | `openai-codex/gpt-6-luna` | hand-edited |
 | `scribeEffort` | graded thinking level (`minimal` → `max`) | `high` | hand-edited |
 | `disabledForModels` | `(string \| { model, minEffort? })[]` | `[]` | hand-edited |
 | `guidance.promptSnippet` | `string` | built-in snippet | hand-edited |
@@ -84,7 +84,7 @@ These select the lower-cost model used to refresh the rolling advisor checkpoint
 A refresh occurs only when activity since the checkpoint exceeds 12 messages or
 16,000 content characters. Smaller repeated consultations reuse the checkpoint
 and bypass the scribe. If the configured model is unavailable, the extension
-tries `openai-codex/gpt-5.6-luna` and then `openai/gpt-5.6-luna`; if no scribe
+tries `openai-codex/gpt-6-luna` and then `openai/gpt-6-luna`; if no scribe
 can run, it preserves the old checkpoint and forwards the unsummarized delta.
 
 ### `protocolMode`
