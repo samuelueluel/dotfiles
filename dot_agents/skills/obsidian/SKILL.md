@@ -70,13 +70,13 @@ Vault notes are Samuel's working records, not independent proof of current laws,
 ### Attribute claims in the answer
 
 - Put a `[^oN]` footnote immediately after each material vault-grounded claim or a tightly related group from the same section. Change markers when the supporting note or section changes. Explain which note supplies which information, especially in comparisons.
-- Finish with one `### Evidence` block containing only cited entries. Give the note title, the vault-relative path, and the section actually read. When `read_note` returns a `uri`, copy that URI into a Markdown link to the note. Keep a readable path and section as a fallback. For example, if the returned URI matches the example path:
+- Finish with one `### Evidence` block containing only cited entries. Give the note title, the vault-relative path, and the section actually read. When `read_note` returns a `uri`, copy that URI into a Markdown link to the note. The deployed fork uses the vault's Obsidian folder name and `paneType=tab` so the note opens in a new tab. Keep a readable path and section as a fallback. For example, if the returned URI matches the example path:
 
   ```markdown
   The example note says to calibrate the blue widget before testing.[^o1]
 
   ### Evidence
-  [^o1]: [Example-Note](obsidian://open?vault=personal&file=20_Library%2FExample-Note), § Widget setup; `20_Library/Example-Note.md`.
+  [^o1]: [Example-Note](obsidian://open?vault=Example%20Vault&file=20_Library%2FExample-Note&paneType=tab), § Widget setup; `20_Library/Example-Note.md`.
   ```
 
 - Obsidian URIs are **note-level**, not heading links. Do not invent a `#heading` URI or a PDF/DOCX link, or promise that every chat client will open `obsidian://`. The link identifies where the claim came from; it does not establish that the claim is true or current.
