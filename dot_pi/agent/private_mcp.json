@@ -64,6 +64,7 @@
         "turbovault_inspect_frontmatter",
         "turbovault_search_by_frontmatter",
         "turbovault_semantic_search",
+        "turbovault_read_passage",
         "turbovault_embedding_index_status",
         "turbovault_reindex_embeddings",
         "turbovault_manage_tags",
