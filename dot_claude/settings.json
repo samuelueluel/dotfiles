@@ -1,41 +1,59 @@
 {
- "hooks": {
-  "PermissionRequest": [
-   {
-    "matcher": "",
-    "hooks": [
-     {
-      "type": "command",
-      "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message.oga",
-      "async": true
-     }
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/message.oga",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/dialog-information.oga",
+            "async": true
+          }
+        ]
+      }
     ]
-   }
-  ],
-  "Stop": [
-   {
-    "matcher": "",
-    "hooks": [
-     {
-      "type": "command",
-      "command": "canberra-gtk-play -f /usr/share/sounds/freedesktop/stereo/dialog-information.oga",
-      "async": true
-     }
+  },
+  "env": {
+    "ENABLE_CLAUDEAI_MCP_SERVERS": "false"
+  },
+  "permissions": {
+    "deny": [
+      "mcp__zotero__zotero_search",
+      "mcp__zotero__zotero_fetch",
+      "Skill(anthropic-skills:morning)",
+      "Skill(anthropic-skills:import-memory)",
+      "Skill(anthropic-skills:docs)",
+      "Skill(claude-in-chrome)",
+      "Skill(schedule)",
+      "Skill(fewer-permission-prompts)",
+      "Skill(claude-api)",
+      "Skill(dataviz)",
+      "Skill(artifact-design)",
+      "Skill(artifact-diagramming)",
+      "Skill(artifact-capabilities)",
+      "Artifact"
     ]
-   }
-  ]
- },
- "enabledPlugins": {
-  "mcp-stata@mcp-stata-marketplace": true
- },
- "extraKnownMarketplaces": {
-  "mcp-stata-marketplace": {
-   "source": {
-    "source": "github",
-    "repo": "tmonk/mcp-stata"
-   }
-  }
- },
- "effortLevel": "medium",
- "theme": "custom:blur-theme"
+  },
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-sonnet-5": {
+      "effortLevel": "low"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "low"
+    }
+  },
+  "theme": "custom:blur-theme"
 }

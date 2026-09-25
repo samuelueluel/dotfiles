@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRequire } from "node:module";
+import { createJiti } from "./helpers/pi-test-runtime.mjs";
 
-const require = createRequire(import.meta.url);
-const { createJiti } = require(`${process.env.HOME}/.pi/agent/npm/node_modules/.jiti-vMeKVizl/lib/jiti.cjs`);
 const jiti = createJiti(`${process.env.HOME}/.pi/agent/npm`);
 const extension = await jiti.import(`${process.env.HOME}/.pi/agent/extensions/todo-reminders.ts`);
 

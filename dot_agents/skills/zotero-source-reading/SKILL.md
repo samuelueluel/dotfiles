@@ -51,6 +51,8 @@ Use the returned evidence ID with `zotero_read_passage`. Add `neighbors=1` only 
 
 For a known phrase, table label, heading, or statistic, use `zotero_find_in_item`. Prefer a distinctive phrase over a common word. When continuing the sidecar, pass its `source_hash` as `expected_hash`.
 
+Before quoting any number from a passage or sidecar window, read its `reliability` field and the paper-level `item_warning`. For a table listed in `problem_tables` or a window with `requires_pdf_check: true`, go straight to the PDF page in step 5 instead of trying another sidecar lookup. Use the returned `pdf_pages` as the page to search, not as a verified page for citation.
+
 Inspect the deployed schema before using an unfamiliar tool. For detailed lookup and continuation examples, load [bounded source-reading syntax](../../references/zotero/deep-dive-reading.md).
 
 ### 4. Collect multiple exact routes when useful
@@ -84,7 +86,7 @@ For a decisive table value:
 2. Read the result and notes with `zotero_read_pdf_pages`.
 3. Compare with unambiguous source prose when available.
 4. If signs, digits, stars, or columns remain unclear, call `zotero_render_pdf_page` and inspect the image.
-5. Omit or label the value unverified if the image remains inconclusive.
+5. Omit or label the value unverified if the image remains inconclusive, and list it under **Check yourself** as `citation-integrity` describes. Never supply a `⟦withheld⟧` number from any other route.
 
 `zotero_read_pdf_pages` returns extracted text, not visual inspection. PDF text can also lose minus signs and alignment. Never describe it as an inspected page image.
 

@@ -23,6 +23,9 @@ path=(
 )
 export PATH
 
+# pi-claude-code-provider: don't request/replay summarized thinking text (saves context)
+export PI_CLAUDE_CODE_PROVIDER_THINKING_DISPLAY=omitted
+
 # Source local untracked variables
 if [[ -f "$HOME/.zshenv.local" ]]; then
   source "$HOME/.zshenv.local"

@@ -9,9 +9,9 @@ description: Operates Zotero OCR, MinerU sidecars, figure enrichment, embeddings
 
 ```text
 REQUEST
-├─ Parse PDFs or create sidecars? ─────────────→ PARSE: preflight → detached create
+├─ New PDF or regenerate old sidecars? ────────→ PROCESS: preflight → staged parse/enrich/check → exact-item embed
 ├─ Enrich figures? ───────────────────────────→ ENRICH: authorized VLM run → stop VLM
-├─ Embed new/changed source text? ─────────────→ INDEX: exact-item update or scoped embed
+├─ Embed new/changed source text? ─────────────→ INDEX: quality check → exact-item update or scoped embed
 ├─ Rebuild bibliography or citation graph? ────→ DERIVED INDEX: Desktop/WAL check → dedicated rebuild
 ├─ Inspect a service/index failure? ───────────→ DIAGNOSE: scoped status/probe → report cause
 ├─ Pause jobs or recover corrupted indexes? ──→ RECOVER: inspect plan → explicit approval → reviewed helper
@@ -21,7 +21,9 @@ REQUEST
 ## Safety Boundaries
 
 - Diagnose before changing state. A failed research query is not authorization to rebuild, reinstall, or start services.
-- Before stopping index processes, deleting chunks, archiving an index, or permitting a mass rebuild, inspect exact targets and obtain Samuel's explicit approval.
+- Before stopping index processes, deleting chunks, archiving an index, or permitting a mass rebuild, inspect exact targets and obtain Samuel's explicit approval. Preview and freeze the existing sidecar set before any live bulk regeneration/re-embed.
+- Never index MinerU sidecars without a current `eligible` quality report. Missing, stale, failed, or `review_required` reports must stop the operation before existing chunks are deleted or replaced; never fall back to another text route. Confirm the shared gate is installed in the package—wrapper checks alone are not sufficient.
+- Never turn an unresolved or empty collection into an unscoped parse, embed, or re-embed request. Resolve and validate the collection before starting work.
 - Use reviewed helpers under `scripts/` for preflight, process pausing, item-chunk deletion, sparse rebuild, and Chroma recovery. Never substitute raw destructive shell commands.
 - Never run a host-wide `pkill llama-server`; isolate any authorized operation to the intended service or container.
 - Ask Samuel to run `serve-embedder` or `serve-reranker` if unavailable. Never auto-start them or substitute unranked semantic results.
@@ -52,10 +54,13 @@ Load [index and parser operations](references/index-maintenance.md) for commands
 1. Resolve the intended library source and attachment; do not parse a bibliography entry as though it were a local item.
 2. Use the production capability-aware MinerU runner through `zotero-sidecar.sh`, not a copied command from another environment.
 3. After changes to the parser environment, config, or package pin, run `scripts/mineru-preflight.py` through the documented Python environment.
-4. Run one representative item before a large batch. Check that its log reports completion and its sidecar is non-empty.
-5. Run `create` detached so termination of the calling shell does not leave a partial parse. Use the documented memory watchdog for large batches.
+4. Use `zotero-sidecar.sh process --key <ITEM_KEY>` to preview a new item; use `reprocess` to preview a frozen set of existing sidecars. Pin ambiguous PDFs with `--attachment PARENT=PDF_CHILD`. Only after an explicit scope decision, use `--exclude-key RETIRED_PARENT` for a sidecar whose parent no longer exists in Zotero; this freezes/reports the exclusion without modifying that old sidecar or index. The guarded execution stages a fresh parse, runs figure enrichment when needed, checks it automatically, then publishes and re-embeds that exact item. It retains the old sidecar on a failed check and records item-level failures without stopping the batch. Stop and resume if a required service fails or index restoration cannot be verified. Never call a partial run complete.
+5. Run one representative item before an approved large batch. Run bulk processing detached with the documented memory watchdog; do not start a live batch without separate approval and the installed report-pinned gate.
+6. `create` remains a parse-only helper: it now writes a quality report for each fresh parse, but later enrichment changes that report and requires a new `check`. Do not use `create --force` as a substitute for staged `reprocess`. A fresh parse completed inside a patched `update-db` call also gets an automatic report and indexes only if eligible; PDFs requiring VLM enrichment must use `process`. Unknown legacy provenance remains ineligible until that item is freshly reparsed; never invent a version. The previously approved `VNG5RAE7` table fixes are transferred to a fresh candidate only on exact PDF/report/table-hash matches, before the fresh quality check; otherwise that item stays blocked with its corrected live sidecar unchanged.
 
 Native-text parsing and scanned-document OCR are distinct routes; text mode does not by itself imply missing formula recognition.
+
+A Surya OCR 2 replacement is under test on fork branch `surya-sidecars` (runner, per-block verify/repair, `<KEY>.blocks.json` and `<KEY>.reliability.json` beside the sidecar). It runs only against the shadow config `~/.config/zotero-mcp-shadow/config.json` and is not the production parser. Never point production config at Surya sidecars or index them into the live collection without Samuel's cutover approval. Batch order: Surya server up, run, down; assemble; Qwen VLM up, repair, enrich, down; index. See memory note `02_Memories/Zotero-Pipeline-Sidecar-Fix.md`.
 Inspect equations, tables, and failure logs when they are the reason for processing.
 Do not report a batch complete while jobs are still running or any requested items remain unresolved.
 For anomalous GPU failures, use the documented single-item CPU fallback rather than broad parser reconfiguration.
@@ -63,7 +68,7 @@ For anomalous GPU failures, use the documented single-item CPU fallback rather t
 ## 3. Figure Enrichment
 
 Enrichment is optional and separate from core text retrieval.
-Use `serve-vlm` only for an authorized enrichment run, then stop the VLM immediately after the run to release memory.
+For an approved staged `process`/`reprocess` run, use the dedicated `zotero-vlm-rocm.sh start` launcher on loopback `:18084`, then `stop` promptly afterward. The batch runner defaults to this endpoint for both preflight and its enrichment child; it does not auto-start the VLM. This ROCm route handled multiple real figure crops, whereas the shared Vulkan `serve-vlm` crashed with both BF16 and F32 projectors. Leave the shared `serve-vlm` configuration unchanged. For standalone `enrich`, `serve-vlm` still defaults to `:8084`, or set `ZOTERO_VLM_URL` explicitly for the dedicated endpoint. Never start either service without an authorized enrichment run.
 Inspect the requested mode before running: adding schemas, forcing replacement, captions-only extraction, and relocation have different effects.
 Inspect the resulting schemas/captions, then refresh the affected source text in the index.
 Do not re-enrich the collection merely because one figure query was unhelpful.
@@ -80,7 +85,7 @@ The exact-key route preserves every requested live parent key, bypasses global D
 Never substitute a DOI/title duplicate for a requested key or broaden a targeted refresh into a library rebuild.
 
 Use collection `embed` only for a genuinely collection-scoped processing request.
-A `reembed` operation deletes existing chunks first; it requires the deletion approval above.
+The shared package gate also protects direct `update-db` calls; do not assume a shell-wrapper preflight is enough. A `reembed` operation may replace existing chunks only after the current report passes the gate and requires the deletion approval above.
 Metadata, tag, native type, and collection changes alone do not justify re-embedding.
 
 Use dedicated graph/reference rebuild tools for their derived indexes, not the sidecar parser.

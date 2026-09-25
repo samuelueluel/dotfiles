@@ -1,6 +1,6 @@
 {
   "name": "pi-smart-compact",
-  "version": "9.6.2-local.2",
+  "version": "9.6.2-local.3",
   "description": "Local pi-smart-compact fork with unconstrained model reasoning and configurable execution watchdogs.",
   "type": "module",
   "main": "./dist/index.js",

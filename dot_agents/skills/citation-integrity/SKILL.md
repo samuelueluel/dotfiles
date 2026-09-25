@@ -79,7 +79,7 @@ For each estimate reported, establish:
 
 For a decisive table value, verify the targeted result and notes from its PDF page when available.
 Complete, unambiguous source prose can independently establish a number; incidental numbers may use complete positive-Rerank passages.
-A precise known-item sidecar window is permitted when page extraction fails, no page locator is available, or the window avoids a broad read. Disclose that weaker route.
+A precise known-item sidecar window is permitted when page extraction fails, no page locator is available, or the window avoids a broad read, and only if its block status permits it (Section 3). Disclose that weaker route.
 Reuse verified evidence; a second view of the same text is not independent corroboration.
 
 Read the table notes before interpreting parentheses or stars. Parentheses can contain SEs, CIs, or test statistics.
@@ -116,6 +116,17 @@ Distinguish extracted PDF-page text, MinerU sidecar text, indexed passages, and 
 `zotero_read_pdf_pages` returns text, not an image inspection. Describe the evidence as extracted PDF-page text, not the vague label “direct PDF.”
 Indexed passages and literal lookups may expose the same sidecar. Agreement does not independently verify its accuracy.
 
+Sidecar-backed tool results carry a `reliability` field (`block_status`, `requires_pdf_check`, `pdf_pages`, `check_pages`, and a paper-level `item_level`/`item_warning`). Sidecars may also show visible `[Table status: ...]` lines and `⟦withheld: ...⟧` markers. Read these before using any number:
+
+| Block status | Screening / inventory | Final answer |
+|---|---|---|
+| `verified` | Usable | A decisive number still needs a PDF-page locator |
+| `repaired` | Usable; disclose the repair | Same as `verified` |
+| `single-route`, `legacy-unverified` | Read the PDF page text first | Render the page and inspect it |
+| `unresolved` (numbers withheld) | Not usable | Render and inspect the page; if you cannot settle it, list it for Samuel under **Check yourself** |
+
+Never fill a withheld number from memory, another route's guess, or a neighboring cell. A paper-level `item_warning` applies to the whole paper even when the retrieved chunk itself is `verified`. A sidecar result with no `reliability` field is `legacy-unverified`.
+
 `zotero_find_in_pdf` is a bounded literal lookup over the authoritative PDF text layer. It returns one-based PDF page locators, verbatim extracted windows, exact total/returned match counts, and text-layer coverage. Coverage is `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage cannot establish absence. Its PDF page index is distinct from a printed label, MinerU sidecar line, or indexed offset. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key in the locator.
 
 All extracted text can lose signs, digits, stars, or column alignment, including PDF text layers.
@@ -143,17 +154,18 @@ Use a Markdown `[^cN]` footnote immediately after:
 
 Plain metadata may be listed without an evidence footnote when the claim goes no further than verified author, title, year, item key, item type, or scoped collection membership. Retain the item key or another compact identity locator in the list. Do not enumerate and cite every screened-out paper unless the user requests exclusions or an exclusion materially limits the answer. A failed search is not a source finding; report a material unresolved exclusion using the bounded wording in [extraction diagnostics](references/verification-workflow.md).
 
-### Use compact evidence locators for paper lists
+### Give readers usable evidence locations for paper lists
 
-For candidate, eligibility, or inventory lists, prefer a compact evidence column over one footnote per row:
+For candidate, eligibility, or inventory lists, use `Paper | Relevance | Evidence` rather than a footnote for each row. Relevance says why the paper qualifies; Evidence names the section, table, and verified one-based PDF page where the supporting passage appears. Link the title to that PDF page, not to a separate item link. Do not repeat the PDF link in Evidence.
 
 ```markdown
-| Paper | Why included | Evidence locator |
+| Paper | Relevance | Evidence |
 |---|---|---|
-| [Author (Year), Title](zotero://select/library/items/KEY) | Estimates treatment effects on outcome | [PDF p. 6](zotero://open-pdf/library/items/ATT_KEY?page=6); Results, Table 2 |
+| [Author (Year), Title](zotero://open-pdf/library/items/ATT_KEY?page=6) | Estimates treatment effects on outcome | Results, Table 2; PDF p. 6 |
+| [Author (Year), Title](zotero://select/library/items/KEY) | Discusses the outcome | Conclusion; PDF page not verified |
 ```
 
-Wrap the paper title in a `zotero://select/library/items/<PARENT_KEY>` link. When PDF tools return a ready-made `[PDF p. X](zotero://open-pdf/library/items/<ATT_KEY>?page=X)` locator, paste it into the locator column. If reading from a sidecar or semantic passage without a resolved PDF page, retain the plain locator (`passage abc123` or `sidecar lines 45-60`). If the list contains metadata only, the linked item key or title is sufficient and the rationale column may be omitted.
+Use the attachment key and exact URL returned by the PDF tool; never infer a page from an indexed chunk number or sidecar line. A PDF-text match must locate the supporting passage, not merely the paper title. If no PDF page is verified, link the title to the Zotero parent item and give the section or a brief supporting excerpt in Evidence. State when the page is unverified. Keep evidence IDs, chunk IDs, sidecar lines, and source hashes in the internal record, not as the only reader-facing location. For a metadata-only list, a title linked to the item is sufficient; omit Relevance and Evidence when they add nothing.
 
 ### Keep narrative citations precise and bounded
 
@@ -163,6 +175,7 @@ Wrap the paper title in a `zotero://select/library/items/<PARENT_KEY>` link. Whe
 - Each entry gives author/year, title when available, item key, and exact PDF page, passage, section, or sidecar lines. Distinguish printed pages from PDF indices when known.
 - Footnotes give source locations, not internal tool names or raw curly-brace records. Keep scores, hashes, and classification fields internal unless requested or material; never present score histories as corroboration.
 - Disclose reliance on weaker sidecar evidence in the answer; one brief note can cover several claims. Label table values needed to support the answer **table-extracted** unless source prose independently states them.
+- When a needed value stayed `unresolved`, `single-route`, or `legacy-unverified` and you did not inspect the rendered page, end the answer (before Evidence) with a short **Check yourself** list: paper, table, the `[PDF p. N](zotero://open-pdf/...)` link from the PDF tool, and the reason (e.g., "duplicated rows in the extraction"). Do not state the value as established.
 - Never claim visual inspection, page verification, exhaustive coverage, or automated auditing that did not occur.
 - Keep capability notes brief and before the Evidence block. Ordinary answers need no audit-status note.
 - If web sources also appear, combine `[^wN]` and `[^cN]` definitions in that final Evidence block.
@@ -174,7 +187,7 @@ The paper reports the stated result.[^c1]
 [^c1]: [Author — Title (Year)](zotero://select/library/items/KEY); Table 2, [PDF p. 6](zotero://open-pdf/library/items/ATT_KEY?page=6).
 ```
 
-Wrap cited titles with their `zotero://select/library/items/<PARENT_KEY>` link. When citing a verified PDF page, paste the tool-returned `[PDF p. X](zotero://open-pdf/library/items/<ATT_KEY>?page=X)` token. Do not hand-craft attachment URLs if an attachment key was not returned; use the plain text locator.
+For narrative footnotes, wrap cited titles with their `zotero://select/library/items/<PARENT_KEY>` link. When citing a verified PDF page in a footnote, paste the tool-returned `[PDF p. X](zotero://open-pdf/library/items/<ATT_KEY>?page=X)` token. In paper-list tables, instead put that verified PDF URL on the title as instructed above. Do not hand-craft attachment URLs if an attachment key was not returned; use the plain text locator.
 
 Keep structured JSON and canonical evidence records unchanged in machine-facing tasks; use footnotes or compact evidence locators for human-facing synthesis.
 For record fields or when checking where evidence came from, load [evidence record formats](references/evidence-contracts.md).

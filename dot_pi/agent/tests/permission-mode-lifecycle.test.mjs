@@ -1,22 +1,17 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import test from "node:test";
+import { piCoreUrl, piJitiPath } from "./helpers/pi-test-runtime.mjs";
 
-const require = createRequire(import.meta.url);
 const home = process.env.HOME;
 const npmRoot = resolve(home, ".pi/agent/npm");
-const jitiPath = resolve(npmRoot, "node_modules/.jiti-vMeKVizl/lib/jiti.cjs");
+const jitiPath = piJitiPath;
 const permissionPath = resolve(npmRoot, "node_modules/pi-permission-system/index.ts");
 const permissionSourcePath = resolve(npmRoot, "node_modules/pi-permission-system/src/index.ts");
 const wrapperPath = resolve(new URL("../local-packages/pi-permission-system/src/index.ts", import.meta.url).pathname);
 const modePath = resolve(new URL("../extensions/permission-mode.ts", import.meta.url).pathname);
-const corePath = resolve(
-  "/var/home/linuxbrew/.linuxbrew/Cellar/pi-coding-agent/0.85.1/libexec/lib/node_modules/@earendil-works/pi-coding-agent/dist/index.js",
-);
 
 const CHILD_SCRIPT = ({ order, coreUrl, jitiPath: childJitiPath, npmRoot: childNpmRoot, wrapperPath: childWrapperPath, modePath: childModePath }) => `
 import { createRequire } from "node:module";
@@ -262,7 +257,7 @@ function runLifecycle(order) {
         "--eval",
         CHILD_SCRIPT({
           order,
-          coreUrl: pathToFileURL(corePath).href,
+          coreUrl: piCoreUrl,
           jitiPath,
           npmRoot,
           wrapperPath,
@@ -293,7 +288,7 @@ test("installed permission package has no child-specific shutdown semantics beyo
   assert.ok(shutdownStart >= 0);
   assert.ok(beforeAgentStart > shutdownStart);
   const shutdownHandler = source.slice(shutdownStart, beforeAgentStart);
-  assert.equal((shutdownHandler.match(/event\??\.reason/g) ?? []).length, 1);
+  assert.equal((shutdownHandler.match(/event\??\.reason/g) ?? []).length, 0, "shutdown cleanup must not branch on event.reason");
   assert.equal((shutdownHandler.match(/unregisterPiPermissionSystemRuntimeApi/g) ?? []).length, 1);
   assert.equal((shutdownHandler.match(/runtimeApi = null/g) ?? []).length, 1);
 });
@@ -315,7 +310,7 @@ for (const order of ["package-first", "local-first"]) {
     assert.equal(result.autoaskAfterChildBlocked, false);
     assert.equal(result.autoaskOtherAfterChildBlocked, false);
     assert.equal(result.manualGenericBlocked, false);
-    assert.equal(result.manualPrompts, 1);
+    assert.equal(result.manualPrompts, 1, JSON.stringify(result));
     assert.equal(result.configYoloAfterManual, false);
     assert.equal(result.autoQuestionBlocked, true);
     assert.equal(result.askUserActiveAfterAuto, false);

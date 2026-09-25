@@ -1,0 +1,166 @@
+diff --git a/src/config.ts b/src/config.ts
+index 3c39203..997eae9 100644
+--- a/src/config.ts
++++ b/src/config.ts
+@@ -35,6 +35,10 @@ export interface Config {
+ 		// Model ids (e.g. "claude-future-9") whose declared 1M context Claude Code
+ 		// does not actually serve; pins them to the bare id at 200K.
+ 		forceTwoHundredK?: string[];
++		// LOCAL: cap the registered window of 1M models (Claude Code still gets [1m]).
++		contextCap?: number;
++		// LOCAL: base ids that also register an uncapped `<id>-max` variant.
++		maxVariants?: string[];
+ 	};
+ }
+ 
+@@ -48,8 +52,10 @@ export function tryParseJson(path: string): Partial<Config> {
+ 	}
+ }
+ 
+-export function claudeCodeSettings(provider: Config["provider"] = {}): { autoMemoryEnabled: boolean } {
+-	return { autoMemoryEnabled: provider.autoMemoryEnabled ?? false };
++// LOCAL: disableAllHooks keeps ~/.claude/settings.json hooks (e.g. notification
++// sounds) out of the bridged child; pi runs the tools and owns notifications.
++export function claudeCodeSettings(provider: Config["provider"] = {}): { autoMemoryEnabled: boolean; disableAllHooks: boolean } {
++	return { autoMemoryEnabled: provider.autoMemoryEnabled ?? false, disableAllHooks: true };
+ }
+ 
+ export function globalConfigPath(): string {
+diff --git a/src/index.ts b/src/index.ts
+index 434e5e9..ca2d42e 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -64,7 +64,9 @@ const CC_CHILD_ENV = {
+ // `env` and `apiKeyHelper`. Patterns are matched with picomatch against absolute
+ // paths; "**/CLAUDE.md" covers the user, ancestor, project and .claude/ copies,
+ // while rules need their own. Managed/policy memory is not excludable by design.
+-const CLAUDE_MD_EXCLUDES = ["**/CLAUDE.md", "**/.claude/rules/**"];
++// LOCAL: Claude Code's builtin agents-md module also loads AGENTS.md, which pi
++// already forwards as a context file; exclude it to avoid a duplicate copy.
++const CLAUDE_MD_EXCLUDES = ["**/CLAUDE.md", "**/.claude/rules/**", "**/AGENTS.md"];
+ 
+ // Ensure log directories exist when debug is enabled
+ if (DEBUG) {
+@@ -2075,6 +2077,10 @@ export default function (pi: ExtensionAPI) {
+ 		plan: providerSettings.plan ?? "pro",
+ 		longContextExtraUsage: providerSettings.longContextExtraUsage ?? false,
+ 		forceTwoHundredK,
++		contextCap: typeof providerSettings.contextCap === "number" ? providerSettings.contextCap : undefined,
++		maxVariants: Array.isArray(providerSettings.maxVariants)
++			? providerSettings.maxVariants.filter((id): id is string => typeof id === "string")
++			: undefined,
+ 	};
+ 	const registeredModels = applyLongContext(MODELS, longContextSettings);
+ 	if (registeredModels.length === 0) {
+diff --git a/src/models.ts b/src/models.ts
+index 789583f..e1d3e17 100644
+--- a/src/models.ts
++++ b/src/models.ts
+@@ -61,8 +61,15 @@ export type LongContextSettings = {
+ 	// Model ids whose declared 1M context Claude Code turned out not to serve;
+ 	// forces bare id at 200K without a code change.
+ 	forceTwoHundredK?: string[];
++	// LOCAL: registered window for 1M models is capped here (pi compacts at the
++	// cap); Claude Code still receives the [1m] id.
++	contextCap?: number;
++	// LOCAL: base ids that also register an uncapped `<id>-max` variant.
++	maxVariants?: string[];
+ };
+ 
++const MAX_VARIANT_SUFFIX = "-max";
++
+ export type ClaudeCodeRuntimeModel = {
+ 	cliModelId: string;
+ 	contextWindow: number;
+@@ -97,11 +104,25 @@ const PLAN_GATED_ONE_M: Record<string, (settings: LongContextSettings) => boolea
+ 	"claude-sonnet-4-6": (settings) => settings.longContextExtraUsage,
+ };
+ 
++// LOCAL: `<id>-max` maps back to its base id when the base is listed in maxVariants.
++function maxVariantBase(modelId: string, settings: LongContextSettings): string | undefined {
++	if (!modelId.endsWith(MAX_VARIANT_SUFFIX)) return undefined;
++	const base = modelId.slice(0, -MAX_VARIANT_SUFFIX.length);
++	return settings.maxVariants?.includes(base) ? base : undefined;
++}
++
+ export function resolveClaudeCodeRuntimeModel(
+ 	model: { id: string },
+ 	settings: LongContextSettings,
+ ): ClaudeCodeRuntimeModel {
+-	const modelId = model.id;
++	const base = maxVariantBase(model.id, settings);
++	if (base) return resolveUncappedRuntimeModel(base, settings);
++	const runtime = resolveUncappedRuntimeModel(model.id, settings);
++	const cap = settings.contextCap;
++	return cap && runtime.contextWindow > cap ? { ...runtime, contextWindow: cap } : runtime;
++}
++
++function resolveUncappedRuntimeModel(modelId: string, settings: LongContextSettings): ClaudeCodeRuntimeModel {
+ 	if (settings.forceTwoHundredK?.includes(modelId)) {
+ 		return { cliModelId: modelId, contextWindow: TWO_HUNDRED_K_CONTEXT };
+ 	}
+@@ -151,9 +172,13 @@ export function applyLongContext<T extends { id: string; name: string; contextWi
+ 	models: T[],
+ 	settings: LongContextSettings,
+ ): T[] {
+-	return models.map((m) => {
++	return models.flatMap((m) => {
+ 		const { contextWindow } = resolveClaudeCodeRuntimeModel(m, settings);
+-		const name = contextWindow > TWO_HUNDRED_K_CONTEXT && !/\b1M\b/i.test(m.name) ? `${m.name} 1M` : m.name;
+-		return contextWindow === m.contextWindow && name === m.name ? m : { ...m, contextWindow, name };
++		const name = contextWindow >= ONE_M_CONTEXT && !/\b1M\b/i.test(m.name) ? `${m.name} 1M` : m.name;
++		const registered = contextWindow === m.contextWindow && name === m.name ? m : { ...m, contextWindow, name };
++		if (!settings.maxVariants?.includes(m.id)) return [registered];
++		const maxId = `${m.id}${MAX_VARIANT_SUFFIX}`;
++		const max = resolveClaudeCodeRuntimeModel({ id: maxId }, settings);
++		return [registered, { ...m, id: maxId, name: `${m.name} (Max Context)`, contextWindow: max.contextWindow }];
+ 	});
+ }
+diff --git a/tests/unit-config.mjs b/tests/unit-config.mjs
+index 50a4ad9..b81690a 100644
+--- a/tests/unit-config.mjs
++++ b/tests/unit-config.mjs
+@@ -22,11 +22,11 @@ function withTempHome(fn) {
+ 
+ describe("claudeCodeSettings", () => {
+ 	it("disables auto-memory by default", () => {
+-		assert.deepEqual(claudeCodeSettings(), { autoMemoryEnabled: false });
++		assert.deepEqual(claudeCodeSettings(), { autoMemoryEnabled: false, disableAllHooks: true });
+ 	});
+ 
+ 	it("allows auto-memory to be enabled", () => {
+-		assert.deepEqual(claudeCodeSettings({ autoMemoryEnabled: true }), { autoMemoryEnabled: true });
++		assert.deepEqual(claudeCodeSettings({ autoMemoryEnabled: true }), { autoMemoryEnabled: true, disableAllHooks: true });
+ 	});
+ });
+ 
+diff --git a/tests/unit-local-variants.mjs b/tests/unit-local-variants.mjs
+new file mode 100644
+index 0000000..52b0516
+--- /dev/null
++++ b/tests/unit-local-variants.mjs
+@@ -0,0 +1,24 @@
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { applyLongContext, claudeCodeModelId } from "../src/models.ts";
++
++const settings = { plan: "pro", longContextExtraUsage: false, contextCap: 320000, maxVariants: ["claude-opus-5-5", "claude-sonnet-5"] };
++const catalog = [
++	{ id: "claude-opus-5-5", name: "Claude Opus 5.5", contextWindow: 1000000 },
++	{ id: "claude-sonnet-5", name: "Claude Sonnet 5", contextWindow: 1000000 },
++	{ id: "claude-haiku-4-5", name: "Claude Haiku 4.5", contextWindow: 200000 },
++];
++
++test("base 1M models are capped, -max variants are full 1M, both request [1m]", () => {
++	const reg = applyLongContext(catalog, settings);
++	const by = Object.fromEntries(reg.map((m) => [m.id, m]));
++	assert.deepEqual(reg.map((m) => m.id), ["claude-opus-5-5", "claude-opus-5-5-max", "claude-sonnet-5", "claude-sonnet-5-max", "claude-haiku-4-5"]);
++	assert.equal(by["claude-opus-5-5"].contextWindow, 320000);
++	assert.equal(by["claude-opus-5-5"].name, "Claude Opus 5.5");
++	assert.equal(by["claude-opus-5-5-max"].contextWindow, 1000000);
++	assert.equal(by["claude-opus-5-5-max"].name, "Claude Opus 5.5 (Max Context)");
++	assert.equal(by["claude-haiku-4-5"].contextWindow, 200000);
++	assert.equal(claudeCodeModelId({ id: "claude-opus-5-5" }, settings), "claude-opus-5-5[1m]");
++	assert.equal(claudeCodeModelId({ id: "claude-sonnet-5-max" }, settings), "claude-sonnet-5[1m]");
++	assert.equal(claudeCodeModelId({ id: "claude-haiku-4-5-max" }, settings), "claude-haiku-4-5-max");
++});

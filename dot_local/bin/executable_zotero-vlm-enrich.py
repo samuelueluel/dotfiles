@@ -33,6 +33,7 @@ Usage:
 import argparse
 import base64
 import glob
+import os
 import re
 import struct
 import sys
@@ -40,9 +41,12 @@ from pathlib import Path
 
 import requests
 
-SIDECAR_DIR = Path.home() / ".config" / "zotero-mcp" / "mineru-sidecars"
+# ZOTERO_SIDECAR_DIR selects another sidecar set (e.g. Surya sidecars, whose
+# figure crops live beside the sidecar in <KEY>.images/).
+SIDECAR_DIR = Path(os.environ.get(
+    "ZOTERO_SIDECAR_DIR", str(Path.home() / ".config" / "zotero-mcp" / "mineru-sidecars")))
 WORK_DIR = Path.home() / ".cache" / "zotero-mcp" / "mineru-work"
-VLM_URL = "http://127.0.0.1:8084/v1/chat/completions"
+VLM_URL = os.environ.get("ZOTERO_VLM_URL", "http://127.0.0.1:8084/v1/chat/completions")
 VLM_MODEL = "Qwen3-VL-30B-A3B-Instruct"  # unsloth UD-Q8_K_XL (~36 GB, MoE ~3B active)
 TIMEOUT_S = 180  # ~2-4 s/figure typical with the MoE; generous headroom for cold first call
 
@@ -52,7 +56,7 @@ IMG_RE = re.compile(r"!\[[^\]]*\]\((images/[^)\s]+)\)")
 # (number may be arabic, roman, or appendix-lettered; separator may be
 # ".", ":", em-dash, hyphen, or plain space).
 CAPTION_RE = re.compile(
-    r"^\s*(?:fig|Fig|figure|Figure|FIGURE)\.?\s*"
+    r"^\s*(?:fig|Fig|FIG|figure|Figure|FIGURE)\.?\s*"
     r"([A-Z]?[0-9IVXLCDM]+(?:\.[0-9]+)*[a-z]?)"
     r"([:.\u2014\u2013-]|\s+)(.*)$"
 )
@@ -72,35 +76,39 @@ SYSTEM_PROMPT = """You are an expert figure reader for empirical economics paper
 Given a figure image from a research paper, describe ONLY its structural taxonomy —
 what it plots and how it is constructed — with strict factual discipline.
 
-Report these fields when present:
-- Type: the figure kind (e.g. event study plot, coefficient plot, scatter plot,
-  map, histogram, time-series plot, bar chart, density plot)
+Report only these fields when directly visible:
+- Type: the figure kind
 - Y-Axis: label and units as printed on the figure
 - X-Axis: label and units as printed on the figure
-- Panels: Panel A / Panel B structure if present (name each panel)
-- Legend / Series: what series/legend entries exist, and any reference line
-  (e.g. zero baseline, 95% CI)
-- Linked Notes: any equation number or text reference visible in the image
+- Panels: panel structure and names, if printed
+- Legend / Series: visible series and reference lines
+- Linked Notes: equation numbers or text references visible in the image
 
 You MUST NOT estimate, guess, or interpret point estimates, coefficients,
 standard errors, confidence intervals, or statistical/econometric findings.
 You MUST NOT comment on significance, causality, or trends. A number visibly
 printed on the figure may be recorded as a label; never as an interpretation.
-If a field is not present, omit it rather than inventing one.
+If a field is not directly visible, omit it rather than infer or invent one.
 
-NOTE: the figure number/title/caption is stamped separately by the caller from
-the document text — never try to read or guess the figure number from the
-image itself, and do not emit a Caption field.
+The figure number/title/caption is stamped separately by the caller from the
+document text. Never read or guess it from the image and never emit a Caption
+field. Do not copy wording from the figure's caption or from these instructions.
 
-Output a concise YAML bullet block, one dash per field, exactly like:
-[Figure Schema]
-- Type: Event study plot (dynamic coefficients with 95% CI)
-- Y-Axis: Log(Assessed Property Value), 2010 USD
-- X-Axis: Years relative to policy adoption (t = -5 to +5)
-- Panels: Panel A: Residential; Panel B: Commercial
-- Legend / Series: Point estimates, 95% CI, zero baseline
-- Linked Notes: Equation (4), county-clustered SEs
+Output only a concise YAML-style block. Start with `[Figure Schema]`; follow it
+with zero or more lines in the form `- Field: value`, using only the field names
+listed above. Populate values from the image itself. Do not output placeholders,
+examples, explanations, or fields whose values are not visible.
 """
+
+
+def write_sidecar(path: Path, text: str) -> None:
+    """Replace the sidecar in one step: a stop mid-write leaves the old file, never a truncated one."""
+    tmp = path.with_name(f".{path.name}.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
 
 
 def sidecar_refs(text: str) -> list[str]:
@@ -116,12 +124,22 @@ def _images_dir(key: str) -> Path | None:
     """The MinerU images directory for an item (indexed once per key)."""
     if key in _images_dir_cache:
         return _images_dir_cache[key]
-    base = WORK_DIR / key / "out"
+    # Surya sidecars: crops rendered from the PDF beside the sidecar.
+    beside = SIDECAR_DIR / f"{key}.images"
+    if beside.is_dir():
+        _images_dir_cache[key] = beside
+        return beside
+    work = WORK_DIR / key
     result = None
+    # Bind images to the latest new-style parse, never to older run/legacy
+    # crops. Falling back could attach a different paper's figure to a new
+    # sidecar when an image is missing from its own parse.
+    manifests = sorted((work / "runs").glob("*/manifest.json"), key=lambda p: p.stat().st_mtime_ns)
+    base = manifests[-1].parent / "out" if manifests else work / "out"
     for pattern in ("*/txt/images", "*/images", "*/out/images"):
-        hits = sorted(glob.glob(str(base / pattern)))
+        hits = [Path(p) for p in glob.glob(str(base / pattern))]
         if hits:
-            result = Path(hits[0])
+            result = hits[0]
             break
     _images_dir_cache[key] = result
     return result
@@ -289,12 +307,15 @@ def insert_caption(block: str, caption: str) -> str:
     """
     if not caption or "- Caption:" in block:
         return block
+    # Keep the block's trailing newline: callers splice it back into a line
+    # list, and dropping it glues the next line onto the last schema field.
+    tail = "\n" if block.endswith("\n") else ""
     lines = block.splitlines()
     for i, ln in enumerate(lines):
         if ln.startswith("- Type:"):
             lines.insert(i + 1, f"- Caption: {caption}")
-            return "\n".join(lines)
-    return lines[0] + "\n" + f"- Caption: {caption}\n" + "\n".join(lines[1:])
+            return "\n".join(lines) + tail
+    return "\n".join([lines[0], f"- Caption: {caption}", *lines[1:]]) + tail
 
 
 def already_schema(text: str, line_no: int) -> bool:
@@ -382,7 +403,7 @@ def stamp_captions_in_file(key: str, dry_run: bool, st: dict) -> None:
         if line_no is None or span is None:
             continue
         lines[span[0]:span[1]] = [new_block]
-        sp.write_text("".join(lines), encoding="utf-8")
+        write_sidecar(sp, "".join(lines))
         st["caption"] += 1
         print(f"  {key} {img_path}: caption stamped")
 
@@ -512,7 +533,7 @@ def relocate_schemas(key: str, dry_run: bool) -> dict:
         st["caption"] += 1
     for start, end, nb in reversed(edits):
         lines2[start:end] = [nb]
-    sp.write_text("".join(lines2), encoding="utf-8")
+    write_sidecar(sp, "".join(lines2))
     print(f"  {key}: relocated {st['moved']} schemas, stamped {st['caption']} captions")
     return st
 
@@ -554,7 +575,7 @@ def process_sidecar(key: str, dry_run: bool, captions_only: bool, force: bool = 
                 # Restamp: drop the old block (caption lives in the document
                 # text, so it is re-extracted fresh on the new block).
                 del lines[span[0]:span[1]]
-                sp.write_text("".join(lines), encoding="utf-8")
+                write_sidecar(sp, "".join(lines))
                 st["restamp"] += 1
                 # fall through to the VLM path below (it re-reads the file)
             else:
@@ -565,7 +586,7 @@ def process_sidecar(key: str, dry_run: bool, captions_only: bool, force: bool = 
                     if caption is not None:
                         new_block = insert_caption(block, caption)
                         lines[span[0]:span[1]] = [new_block]
-                        sp.write_text("".join(lines), encoding="utf-8")
+                        write_sidecar(sp, "".join(lines))
                         st["caption"] += 1
                         print(f"  {key} {img_path}: caption stamped (self-heal)")
                 continue
@@ -603,7 +624,7 @@ def process_sidecar(key: str, dry_run: bool, captions_only: bool, force: bool = 
         # Write per figure (not batched): a partial run persists progress and
         # idempotency resumes where it stopped — critical for the ~6h backfill.
         lines.insert(line_no + 1, block + "\n")
-        sp.write_text("".join(lines), encoding="utf-8")
+        write_sidecar(sp, "".join(lines))
         st["schema"] += 1
         print(f"  {key} {img_path}: schema added")
     return st
@@ -629,7 +650,7 @@ def main() -> int:
 
     if not (args.captions_only or args.relocate or args.dry_run):
         try:
-            requests.get("http://127.0.0.1:8084/v1/models", timeout=5)
+            requests.get(VLM_URL.removesuffix("chat/completions") + "models", timeout=5)
         except requests.RequestException:
             print("VLM endpoint not reachable on :8084 — run `serve-vlm` first "
                   "(first serve downloads ~36 GB).", file=sys.stderr)
@@ -670,7 +691,9 @@ def main() -> int:
     if not (args.captions_only or args.relocate) and not args.dry_run and total["schema"]:
         print("\nNext: re-embed changed sidecars (embedder :8082 must be up):")
         print("  zotero-mcp-server update-db --fulltext")
-    return 0
+    # A dropped VLM request must not masquerade as a successful enrichment.
+    # Batch callers can then pause safely without publishing an incomplete sidecar.
+    return 1 if total["vlm_err"] else 0
 
 
 if __name__ == "__main__":

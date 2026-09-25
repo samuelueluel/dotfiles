@@ -73,6 +73,7 @@ primary_result_id: paper's preferred or headline result
 maximum_substantive_result_id: largest significant substantive result
 selected_result_id: result selected by the declared eligibility policy
 inventory_locators: exact tables, PDF pages, or bounded passages read
+source_reliability: block_status of each value's source and any item_warning
 close_alternative: item key and margin for the nearest competing estimate, or none
 tie_group: result IDs or item keys tied at the top-k boundary, if any
 reason: required for no_eligible_result; explain unresolved fields when unresolved
@@ -83,6 +84,8 @@ These ledger fields are internal working state. The `zotero_validate_comparison_
 `eligible` requires at least one result, all three result-role IDs, and exact inventory locators. Keep cards to the primary and maximum-substantive results plus any alternative the ranking discussion needs; extra rows cost reads without changing top-k. `no_eligible_result` requires an explicit reason and no result records. `unresolved` may contain partial results but cannot supply a selected maximum for a complete-scope comparison. Record whether primary-only and substantive-all policies would produce different top sets.
 
 Use discovery passages and existing working context first. Do not reread evidence already adequate in the current session. Do not rank, deep-verify only the apparent leader, or silently omit a frozen paper before every card is terminal.
+
+A paper cannot be dropped from contention, or ranked below the leader, on a value whose source is `single-route`, `unresolved`, or `legacy-unverified`. Read that value from the PDF page first, or keep the card `unresolved` for that field. Treat a `REQUIRES_PDF_CHECK` flag from `zotero_collect_result_evidence` as required follow-up for any value that affects selection or ranking.
 
 ### 3. Collect decisive evidence
 

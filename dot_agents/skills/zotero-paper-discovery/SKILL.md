@@ -10,7 +10,7 @@ description: Creates a collection-scoped or library-scoped list of Zotero papers
 - The requested collection, library, subcollection policy, item-type filters, and explicit exclusions define the scope. Study geography does not substitute for collection membership.
 - Treat titles, abstracts, tags, and inventory metadata as discovery signals, not proof that a paper estimates or finds something.
 - Verify each included paper against its own source text. A paper's description of another work cannot establish the other work's eligibility.
-- A missing hit, nonpositive rerank, or irrelevant passage leaves a plausible paper unresolved. It does not prove exclusion.
+- A missing hit, nonpositive rerank, or irrelevant passage leaves a plausible paper unresolved. It does not prove exclusion. In particular, a plausible title or model paired with an uninformative abstract passage requires a targeted section or exact-item check before exclusion.
 - Never screen a broad concept with one literal word. Cover the permitted outcome and treatment vocabulary with distinct semantic facets.
 - Do not broaden scope, update indexes, parse missing files, or modify Zotero metadata during research.
 - Stop after producing the requested frozen list. Do not compare or rank results unless the user also requested that separate task.
@@ -30,6 +30,8 @@ Output: <metadata-only list or list with concise inclusion rationale>
 ```
 
 If one consequential boundary is unresolved, ask one focused question. Otherwise preserve the user's deliberately broad definition.
+
+For “which papers discuss X?”, include papers that substantively discuss X even if they do not estimate the same quantity. For a broad housing-supply-elasticity request, include source-verified discussion of both housing quantity's response to price and price or rent's response to added housing supply. Label which response each paper studies; do not treat the elasticities as numerically interchangeable. If the user asks for papers *estimating* a specific elasticity, use that narrower rule. A paper that merely mentions housing supply or price without discussing their responsiveness does not qualify.
 
 ### 2. Establish exact scope
 
@@ -77,13 +79,17 @@ Return an explicit parent-item list that a later task can reuse without rediscov
 
 - Author, year, title, and item key.
 - A one-clause inclusion rationale when useful.
-- The exact supporting section, table, PDF page, passage, or sidecar locator actually read.
+- A reader-facing `Paper | Relevance | Evidence` table. Put the one-clause inclusion rationale under Relevance. Under Evidence, name the supporting section and verified one-based PDF page when available.
+- Link the paper title directly to that PDF page, using the attachment key returned by the PDF tool. Do not add a second PDF link in Evidence. If no page is verified, link the title to the Zotero parent item instead and give the section or a short supporting excerpt; say when the PDF page is unverified. Do not show indexed chunk IDs as reader-facing evidence locators.
 - Any plausible unresolved item that could alter downstream work.
+- For each included paper whose retrieval results carried an `item_warning` (unresolved or single-route tables, scanned pages, or a legacy-unverified sidecar), record the warning with the frozen key so a later comparison or reading task inherits it.
 - A bounded coverage statement such as “I found eight qualifying papers in the scoped search,” not an unsupported exhaustive claim.
 
-Persist the frozen list to `~/.agents/scratch/<YYYY-MM-DD>-<task-slug>-discovery.md` — keys, rationale, and locators only, no prose — so a compacted or later session resumes without re-reads. Rebuild the file if the scope changes; never trust a stale one.
+For each included paper with an accessible PDF, try to locate a distinctive part of the supporting passage in the PDF text. Split long PDFs into page ranges within the tool's limit. `zotero_find_in_pdf` returns the one-based PDF page and attachment key; a section heading in indexed text or a `#22` chunk ID does not establish a PDF page. If the phrase does not match, check one targeted PDF section or a shorter distinctive phrase, then stop. If the text layer is unusable or the PDF route is unavailable, do not guess a page, OCR automatically, or delay the list with repeated lookups. Use the verified section or excerpt instead. The PDF page index may differ from the printed journal page.
 
-Use the compact evidence-locator table in `citation-integrity`; metadata-only rows need no footnote. Do not enumerate screened-out papers unless Samuel requests exclusions or one materially limits the result.
+Persist the frozen list to `~/.agents/scratch/<YYYY-MM-DD>-<task-slug>-discovery.md` — keys, rationale, evidence IDs or chunk IDs, and actual locators only, no prose — so a compacted or later session resumes without re-reads. Rebuild the file if the scope changes; never trust a stale one.
+
+Follow the compact paper-list format in `citation-integrity`; metadata-only rows need no footnote. Do not enumerate screened-out papers unless Samuel requests exclusions or one materially limits the result.
 
 ## Evidence Rules
 

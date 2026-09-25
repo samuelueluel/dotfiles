@@ -7,3 +7,7 @@ zen-extensions
 .local/share/applications/swaylock.desktop
 
 **/__pycache__
+.claude/skills/synced
+
+# local Pi package deps: reinstall with npm install --omit=dev --omit=peer
+.pi/agent/local-packages/*/node_modules

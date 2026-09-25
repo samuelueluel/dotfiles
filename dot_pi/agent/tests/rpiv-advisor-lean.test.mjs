@@ -1,14 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRequire } from "node:module";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 
-const require = createRequire(import.meta.url);
-const { createJiti } = require(`${process.env.HOME}/.pi/agent/npm/node_modules/.jiti-vMeKVizl/lib/jiti.cjs`);
-const piModules = "/var/home/linuxbrew/.linuxbrew/Cellar/pi-coding-agent/0.85.1/libexec/lib/node_modules";
+import { createJiti, piModulesRoot as piModules } from "./helpers/pi-test-runtime.mjs";
 const jiti = createJiti(`${process.env.HOME}/.pi/agent/npm`, {
 	alias: {
 		"@earendil-works/pi-coding-agent": `${piModules}/@earendil-works/pi-coding-agent/dist/index.js`,

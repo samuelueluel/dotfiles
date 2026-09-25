@@ -77,7 +77,7 @@ An extraction inventory is independent of the semantic search database. If compl
 A submitted packet contains candidate evidence for the main session. Before writing conclusions:
 
 1. Verify that the packet is `processed`, the `item_key` matches, and the source hash matches disk.
-2. Re-check each verbatim quote and anchor (page, section, or table).
+2. Re-check each verbatim quote and anchor (page, section, or table). Do not accept a numeric finding whose quote sits in an `unresolved` table block or contains a `⟦withheld⟧` marker; confirm `single-route` or `legacy-unverified` numbers on the PDF page before synthesis. Prose quotes are unaffected.
 3. Check the extraction route. If a claim requires semantic search, retrieve a separate `zotero_semantic_search` passage with `Rerank > 0`. Never invent `Rerank` scores for extraction packets.
 4. Compare findings and resolve conflicts across papers in the main session.
 5. Format final findings using `citation-integrity` footnotes (`[^cN]`); never dump raw JSON packets in chat.

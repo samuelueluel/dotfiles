@@ -14,6 +14,7 @@ brew "tree"        # directory visualization
 brew "wget"        # standard downloader
 brew "yq"          # YAML/TOML processor
 brew "pi-coding-agent" # the AI agent itself
+cask "claude-code@latest" # subscription-backed Claude model provider for Pi
 brew "eza"             # ls replacement
 brew "tmux"            # terminal multiplexer for consultation workflows
 brew "uv"              # Python package installer/runner — needed for mcp-stata via uvx

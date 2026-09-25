@@ -2,12 +2,10 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import test from "node:test";
 
-const require = createRequire(import.meta.url);
-const { createJiti } = require(`${process.env.HOME}/.pi/agent/npm/node_modules/.jiti-vMeKVizl/lib/jiti.cjs`);
+import { createJiti } from "./helpers/pi-test-runtime.mjs";
 const jiti = createJiti(`${process.env.HOME}/.pi/agent/npm`);
 const logic = await jiti.import(resolve(new URL("../lib/save-plan-logic.ts", import.meta.url).pathname));
 const state = await jiti.import(resolve(new URL("../lib/plan-workflow-state.ts", import.meta.url).pathname));

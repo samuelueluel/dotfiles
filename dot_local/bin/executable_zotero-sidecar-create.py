@@ -7,11 +7,12 @@ item's PDF and writes the MinerU sidecar to
 run `zotero-sidecar.sh embed <COLLECTION_KEY>` afterward.
 
 Usage:
-  zotero-sidecar-create.py [--force] <COLLECTION_KEY>   # all items in a collection (and subcollections)
-  zotero-sidecar-create.py [--force] <KEY> [KEY ...]    # explicit item keys (any collection)
+  zotero-sidecar-create.py [--force] [--attachment-key ATTACH_KEY] <COLLECTION_KEY>
+  zotero-sidecar-create.py [--force] [--attachment-key ATTACH_KEY] <KEY> [KEY ...]
 
-  --force   Re-create: delete an existing sidecar before parsing (for a corrupt/
-            stale sidecar). Without it, items that already have a sidecar are skipped.
+  --force            Re-create an existing sidecar. The old sidecar remains in
+                     place unless the new parse succeeds.
+  --attachment-key   Pin the exact PDF attachment when the item has multiple PDFs.
 
 Skips items that already have a sidecar (unless --force). Idempotent. Logs to
 ~/.cache/zotero-mcp/logs/sidecar-create.log.
@@ -22,12 +23,11 @@ a genuinely ballooning PDF (e.g. the known Gregory case) can thrash the system â
 if a specific PDF hangs/balloons, CPU-rescue it with zotero-cpu-rescue.py instead.
 """
 import json
-import shutil
 import sys
 import time
 from pathlib import Path
 
-from zotero_mcp import mineru
+from zotero_mcp import mineru, sidecar_quality
 from zotero_mcp.local_db import LocalZoteroReader
 
 HOME = Path.home()
@@ -80,6 +80,14 @@ def main() -> None:
     args = sys.argv[1:]
     force = "--force" in args
     args = [a for a in args if a != "--force"]
+    attachment_key = None
+    if "--attachment-key" in args:
+        idx = args.index("--attachment-key")
+        if idx + 1 >= len(args):
+            print("--attachment-key requires a Zotero attachment key")
+            sys.exit(1)
+        attachment_key = args[idx + 1]
+        del args[idx:idx + 2]
     if not args:
         print("usage: zotero-sidecar-create.py [--force] <COLLECTION_KEY> | <KEY> [KEY ...]")
         sys.exit(1)
@@ -89,51 +97,67 @@ def main() -> None:
     raw = json.loads(CFG_PATH.read_text(encoding="utf-8"))
     db_path = raw.get("semantic_search", {}).get("zotero_db_path")
 
+    failures = 0
     with LocalZoteroReader(db_path=db_path) as reader:
         # A single 8-char alnum arg is a collection key IF it resolves to one;
         # otherwise it's an item key.
         if len(args) == 1 and len(args[0]) == 8 and args[0].isalnum():
             if reader.resolve_collection_keys(args[0]):
                 coll = args[0]
-                item_coll = reader.get_item_collections()
-                keys = sorted(k for k, cols in item_coll.items() if coll in cols)
+                keys = sorted(reader.resolve_collection_item_keys(coll))
+                if not keys:
+                    log(f"FAIL collection {coll}: no parent items; refusing an unscoped parse")
+                    sys.exit(2)
                 log(f"collection {coll}: {len(keys)} items")
             else:
                 keys = args
         else:
             keys = args
 
+        if attachment_key and (len(keys) != 1 or keys[0] != args[0]):
+            log("FAIL: --attachment-key is supported for one explicit item key only")
+            sys.exit(1)
         for key in keys:
             if not force and mineru.read_sidecar(cfg, key) is not None:
                 log(f"skip {key}: sidecar already exists (use --force to re-create)")
                 continue
-            pdf = None
+            pdfs = []
             for att in reader.get_attachment_paths(key):
                 rp = att.get("resolved_path")
-                if rp and str(rp).lower().endswith(".pdf") and Path(rp).exists():
-                    pdf = Path(rp)
-                    break
-            if pdf is None:
-                log(f"FAIL {key}: no resolvable PDF")
+                is_pdf = str(att.get("content_type") or "").lower() == "application/pdf" or str(rp or "").lower().endswith(".pdf")
+                if not is_pdf or not rp or not Path(rp).is_file():
+                    continue
+                if attachment_key and str(att.get("key") or "") != attachment_key:
+                    continue
+                pdfs.append((str(att.get("key") or ""), Path(rp)))
+            if len(pdfs) != 1:
+                failures += 1
+                log(f"FAIL {key}: found {len(pdfs)} resolvable matching PDFs; pin --attachment-key when ambiguous")
                 continue
-            # --force: drop the stale sidecar so the fresh parse is byte-clean.
-            if force:
-                side = mineru.sidecar_path(cfg, key)
-                if side.exists():
-                    side.unlink()
-                    log(f"force: removed existing sidecar {side}")
-            # Clear any partial output so the fresh parse is byte-clean.
-            out_dir = Path(cfg["work_dir"]) / key / "out"
-            if out_dir.exists():
-                shutil.rmtree(out_dir)
-            log(f"start {key}: {pdf.name} ({pdf.stat().st_size / 1e6:.0f} MB)")
-            ok = mineru.run_mineru(cfg, pdf, key)
+            selected_attachment, pdf = pdfs[0]
+            log(f"start {key}: {pdf.name} ({pdf.stat().st_size / 1e6:.0f} MB), attachment {selected_attachment}")
+            ok = mineru.run_mineru(cfg, pdf, key, attachment_key=selected_attachment)
             if ok:
                 side = mineru.sidecar_path(cfg, key)
-                log(f"DONE {key}: sidecar {side} ({side.stat().st_size / 1024:.0f} KB)")
+                log(f"PARSED {key}: sidecar {side} ({side.stat().st_size / 1024:.0f} KB); raw parse retained under {cfg['work_dir']}/{key}/runs")
+                try:
+                    report = sidecar_quality.build_quality_report(key, cfg, reader, attachment_key=selected_attachment)
+                    report_path = sidecar_quality.write_quality_report(report, cfg)
+                    if report["status"] != "eligible":
+                        failures += 1
+                        codes = sorted({f["code"] for f in report["findings"] if f["severity"] == "critical"})
+                        log(f"BLOCKED {key}: automated quality check {report['status']} ({', '.join(codes)}); {report_path}")
+                    else:
+                        log(f"CHECKED {key}: eligible; {report_path}")
+                except Exception as exc:
+                    failures += 1
+                    log(f"FAIL {key}: quality check raised {type(exc).__name__}: {exc}; do not embed")
             else:
-                log(f"FAIL {key}: magic-pdf failed (see {cfg['work_dir']}/{key}/run.log)")
-    log("create complete")
+                failures += 1
+                log(f"FAIL {key}: MinerU failed (see {cfg['work_dir']}/{key}/run.log)")
+    log(f"create complete: failures={failures}")
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

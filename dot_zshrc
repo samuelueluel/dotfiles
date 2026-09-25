@@ -319,6 +319,9 @@ model-check() {
 # Zed local LLM provider API key (dummy — no auth needed for Ramalama)
 export RAMALAMA_LOCAL_API_KEY=dummy
 
+# pi-claude-bridge debug log: ~/.pi/agent/claude-bridge.log + cc-cli-logs/
+export CLAUDE_BRIDGE_DEBUG=1
+
 alias pi-rebuild='podman build --no-cache -t localhost/pi-safe:latest -f "$HOME/dotfiles/dot_pi/Containerfile" "$HOME/dotfiles"'
 
 pi-safe-1() {
@@ -354,6 +357,8 @@ pi-safe-1() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e CLAUDE_BRIDGE_DEBUG \
+    -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     ${PI_CODING_AGENT_DIR:+-e PI_CODING_AGENT_DIR="$PI_CODING_AGENT_DIR"} \
     -v "$HOME":"$HOME":ro \
@@ -402,6 +407,8 @@ pi-safe-2() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e CLAUDE_BRIDGE_DEBUG \
+    -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_dir":"$abs_dir" \
     -v "$HOME/.pi":"$HOME/.pi" \
@@ -452,6 +459,8 @@ pi-safe-3() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e CLAUDE_BRIDGE_DEBUG \
+    -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
     -v "$abs_file":"$abs_file" \
     -v "$HOME/.pi":"$HOME/.pi" \
@@ -505,6 +514,8 @@ pi-safe-stata-1() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e CLAUDE_BRIDGE_DEBUG \
+    -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
@@ -560,6 +571,8 @@ pi-safe-stata-2() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e CLAUDE_BRIDGE_DEBUG \
+    -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e "PATH=/usr/local/stata19:${PATH}" \
     -e PYSTATA_HOME=/usr/local/stata19 \
     -e "LD_LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib" \
@@ -857,7 +870,7 @@ _strix_llama_healthy() {
 }
 
 _pi_cloud_model_scope() {
-  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max'
+  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max,claude-bridge/claude-opus-5-5,claude-bridge/claude-opus-5-5-max,claude-bridge/claude-sonnet-5,claude-bridge/claude-sonnet-5-max'
   if _halogen_healthy; then
     scope+=',halogen/halogen-qwen3.8-flash-next-w4b,halogen/halogen-qwen3.8-flash-next-iq4,halogen/halogen-qwen3.8-flash-next-q4xl,halogen/halogen-qwen3.8-flash-next'
   fi
@@ -1123,6 +1136,14 @@ betahat() {
   printf '\033]2;β̂ - %s\007' "${abs_target##*/}"
   { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM.md" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
+}
+
+# claudebeta = Claude Code + Stata MCP/skills + beta research prompt (unsandboxed)
+claudebeta() {
+  local beta_prompt
+  beta_prompt="$(<"$HOME/.pi/agent/APPEND_SYSTEM_BETA.md")"$'\n\n'"Override: in claudebeta (Claude Code) there is no container sandbox; you run on the host with Stata via the stata MCP server."
+  printf '\033]2;cβ - %s\007' "${PWD##*/}"
+  claude --plugin-dir "$HOME/.claude/local-plugins/stata-beta" --append-system-prompt "$beta_prompt" "$@"
 }
 
 # --- LLM CODING BENCHMARK ---

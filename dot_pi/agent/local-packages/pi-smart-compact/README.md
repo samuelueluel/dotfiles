@@ -18,5 +18,7 @@ generation prematurely:
    user configuration to use the full call budget rather than forcing deterministic
    fallbacks on large sessions.
 
+The fork also unwraps TurboVault calls made through the `mcp` gateway and `mcp__turbovault` proxy, so successful `turbovault_read_note` calls appear in the verified Files Read list and successful `turbovault_edit_note` calls appear in Files Modified.
+
 The bundled `dist/index.js` is based on upstream 9.6.2 with these deliberate patches.
 Refresh it deliberately when upgrading upstream.

@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import test from "node:test";
+import { createJiti } from "./helpers/pi-test-runtime.mjs";
 
-const require = createRequire(import.meta.url);
-const { createJiti } = require(`${process.env.HOME}/.pi/agent/npm/node_modules/.jiti-vMeKVizl/lib/jiti.cjs`);
 const jiti = createJiti(`${process.env.HOME}/.pi/agent/npm`);
 const activation = await jiti.import(
   resolve(new URL("../lib/tool-activation.ts", import.meta.url).pathname),

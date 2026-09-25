@@ -1,0 +1,13 @@
+{
+  "askClaude": {
+    "enabled": false
+  },
+  "provider": {
+    "plan": "pro",
+    "longContextExtraUsage": false,
+    "strictMcpConfig": true,
+    "autoMemoryEnabled": false,
+    "contextCap": 320000,
+    "maxVariants": ["claude-opus-5-5", "claude-sonnet-5"]
+  }
+}

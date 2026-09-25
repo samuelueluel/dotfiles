@@ -10,18 +10,13 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import test from "node:test";
+import { piCoreUrl, piJitiPath } from "./helpers/pi-test-runtime.mjs";
 
-const require = createRequire(import.meta.url);
 const home = process.env.HOME;
 const npmRoot = resolve(home, ".pi/agent/npm");
-const jitiPath = resolve(npmRoot, "node_modules/.jiti-vMeKVizl/lib/jiti.cjs");
-const corePath = resolve(
-  "/var/home/linuxbrew/.linuxbrew/Cellar/pi-coding-agent/0.85.1/libexec/lib/node_modules/@earendil-works/pi-coding-agent/dist/index.js",
-);
+const jitiPath = piJitiPath;
 const modePath = resolve(new URL("../extensions/permission-mode.ts", import.meta.url).pathname);
 const runtimePath = resolve(new URL("../lib/session-runtime.ts", import.meta.url).pathname);
 
@@ -245,7 +240,7 @@ function runProbe(label, script) {
         "--input-type=module",
         "--eval",
         script({
-          coreUrl: pathToFileURL(corePath).href,
+          coreUrl: piCoreUrl,
           jitiPath,
           npmRoot,
           runtimePath,
@@ -290,13 +285,13 @@ function runOwnershipProbe() {
         "--input-type=module",
         "--eval",
         OWNER_SCRIPT({
-          coreUrl: pathToFileURL(corePath).href,
+          coreUrl: piCoreUrl,
           jitiPath,
           npmRoot,
           modePath,
           runtimePath,
           childScript: CHILD_SCRIPT({
-            coreUrl: pathToFileURL(corePath).href,
+            coreUrl: piCoreUrl,
             jitiPath,
             npmRoot,
             modePath,

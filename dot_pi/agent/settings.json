@@ -50,7 +50,8 @@
     "local-packages/pi-smart-compact",
     "local-packages/pi-compact-transcript",
     "local-packages/pi-math",
-    "npm:pi-vim"
+    "npm:pi-vim",
+    "local-packages/pi-claude-bridge"
   ],
   "extensions": [
     "extensions/agent-title.ts",
@@ -62,7 +63,7 @@
     "extensions/todo-reminders.ts",
     "extensions/workflow-invariants.ts"
   ],
-  "lastChangelogVersion": "0.86.1",
+  "lastChangelogVersion": "0.87.1",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "compaction": {
@@ -76,8 +77,8 @@
     "summaryModel": "openai-codex/gpt-6-luna",
     "segmentationModel": "openai-codex/gpt-6-luna",
     "verificationModel": "openai-codex/gpt-6-luna",
-    "summaryThinkingLevel": "high",
-    "segmentationThinkingLevel": "high",
+    "summaryThinkingLevel": "xhigh",
+    "segmentationThinkingLevel": "xhigh",
     "autoTriggerTimeoutMs": 300000,
     "codexMaxCallMs": 300000,
     "maxLatencyMs": 0,

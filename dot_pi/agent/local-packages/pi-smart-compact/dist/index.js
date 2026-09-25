@@ -1593,9 +1593,36 @@ var COMMAND_KEYS = ["command", "cmd", "script"];
 function hasPresent(args, keys) {
   return keys.some((k) => args[k] != null);
 }
-function extractToolPath(args) {
+function unwrapMcpToolCall(toolName, args) {
+  const wrapperName = normalizeToolName(toolName);
+  if (wrapperName !== "mcp" && wrapperName !== "mcp_turbovault")
+    return { name: toolName, arguments: args };
+  const outer = args && typeof args === "object" && !Array.isArray(args) ? args : {};
+  if (wrapperName === "mcp" && typeof outer.server === "string" && outer.server.trim().toLowerCase() !== "turbovault")
+    return { name: toolName, arguments: args };
+  const nestedName = typeof outer.tool === "string" ? outer.tool : "";
+  if (!nestedName.toLowerCase().startsWith("turbovault_"))
+    return { name: toolName, arguments: args };
+  let nestedArgs = outer.args ?? outer.arguments;
+  if (typeof nestedArgs === "string") {
+    try {
+      nestedArgs = JSON.parse(nestedArgs);
+    } catch {
+      return { name: toolName, arguments: args };
+    }
+  }
+  if (!nestedArgs || typeof nestedArgs !== "object" || Array.isArray(nestedArgs))
+    return { name: toolName, arguments: args };
+  return { name: nestedName, arguments: nestedArgs };
+}
+function extractToolPath(args, toolName) {
   if (!args || typeof args !== "object")
     return;
+  if (typeof toolName === "string") {
+    const unwrapped = unwrapMcpToolCall(toolName, args);
+    if (unwrapped.arguments !== args)
+      return extractToolPath(unwrapped.arguments, unwrapped.name);
+  }
   const a = args;
   for (const k of PATH_KEYS) {
     const v = a[k];
@@ -1760,8 +1787,9 @@ function nameHas(name, hints) {
   return hints.some((hint) => words.includes(hint));
 }
 function classifyToolOperation(args, toolName) {
-  const a = args && typeof args === "object" ? args : {};
-  const name = normalizeToolName(toolName);
+  const unwrapped = unwrapMcpToolCall(toolName, args);
+  const a = unwrapped.arguments && typeof unwrapped.arguments === "object" ? unwrapped.arguments : {};
+  const name = normalizeToolName(unwrapped.name);
   const hasPath = extractToolPath(a) !== undefined;
   if (hasPath && hasPresent(a, PAYLOAD_KEYS))
     return "mutate";
@@ -1795,18 +1823,20 @@ function commandIdentity(args) {
   return raw.trim().replace(/\s+/g, " ").split(" ").filter((token) => token !== "--" && !/^--?(?:retry|force|runInBand|no-cache|verbose|silent)(?:=|$)/i.test(token)).join(" ");
 }
 function toolOperationSignature(toolName, args) {
+  const unwrapped = unwrapMcpToolCall(toolName, args);
+  const callArgs = unwrapped.arguments && typeof unwrapped.arguments === "object" ? unwrapped.arguments : {};
   const operation = classifyToolOperation(args, toolName);
-  const name = normalizeToolName(toolName);
+  const name = normalizeToolName(unwrapped.name);
   if (operation === "execute")
-    return operation + "\x00" + name + "\x00" + commandIdentity(args);
-  const target = extractToolPath(args);
+    return operation + "\x00" + name + "\x00" + commandIdentity(callArgs);
+  const target = extractToolPath(callArgs, unwrapped.name);
   if (target)
     return operation + "\x00" + name + "\x00" + target.replace(/\\/g, "/");
   if (operation === "search") {
-    const query = ["pattern", "query", "glob"].map((key) => args[key]).find((value) => typeof value === "string") ?? "";
+    const query = ["pattern", "query", "glob"].map((key) => callArgs[key]).find((value) => typeof value === "string") ?? "";
     return operation + "\x00" + name + "\x00" + query;
   }
-  return operation + "\x00" + name + "\x00" + JSON.stringify(stableValue(args));
+  return operation + "\x00" + name + "\x00" + JSON.stringify(stableValue(callArgs));
 }
 function sameToolOperation(left, right) {
   return toolOperationSignature(left.name, left.arguments) === toolOperationSignature(right.name, right.arguments);
@@ -1881,7 +1911,7 @@ function smartKeepBoundaryCandidates(msgs, keepFromIndex, branchEntries) {
     const files = new Set;
     for (const b of blocks) {
       for (const tc of flattenToolCallBlock(b)) {
-        const fp = extractToolPath(tc.arguments);
+        const fp = extractToolPath(tc.arguments, tc.name);
         if (fp)
           files.add(fp.split("/").pop() ?? fp);
       }
@@ -2612,7 +2642,7 @@ function trackFileOps(msgs, _tcIdx) {
       }
       continue;
     }
-    const filePath = extractToolPath(tc.arguments);
+    const filePath = extractToolPath(tc.arguments, tc.name);
     if (!filePath)
       continue;
     if (operation === "mutate") {
@@ -2866,7 +2896,7 @@ function segmentTopicsHeuristic(msgs, pc, maxSegs = 20, _tcIdx) {
     const text = extractText(message.content);
     const messageTokens = estimateTokens(text);
     const tools = message.role === "assistant" ? (Array.isArray(message.content) ? message.content : []).flatMap(flattenToolCallBlock) : [];
-    const nextFile = tools.map((tool) => extractToolPath(tool.arguments)).find((value) => Boolean(value));
+    const nextFile = tools.map((tool) => extractToolPath(tool.arguments, tool.name)).find((value) => Boolean(value));
     const nextBasename = shiftBasename(nextFile);
     const closesActiveTool = message.role === "toolResult" && (tcIdx.get(message.toolCallId ?? "")?.msgIndex ?? -1) >= startIdx;
     const fileShift = Boolean(lastFile && nextBasename && nextBasename !== lastFile);
@@ -2890,7 +2920,7 @@ function segmentTopicsHeuristic(msgs, pc, maxSegs = 20, _tcIdx) {
     }
     tokenAcc += messageTokens;
     for (const tool of tools) {
-      const filePath = extractToolPath(tool.arguments);
+      const filePath = extractToolPath(tool.arguments, tool.name);
       if (filePath) {
         lastFile = shiftBasename(filePath) ?? lastFile;
         currentPrimaryFile = filePath;
@@ -5042,7 +5072,7 @@ function detectDamage(postMessages, details) {
       for (const b of blocks) {
         if (isToolCallBlock(b)) {
           const operation = classifyToolOperation(b.arguments, b.name);
-          const fp = operation === "read" || operation === "search" || operation === "list" ? extractToolPath(b.arguments) : undefined;
+          const fp = operation === "read" || operation === "search" || operation === "list" ? extractToolPath(b.arguments, b.name) : undefined;
           if (fp) {
             const fpLower = fp.toLowerCase();
             if (compactedFiles.has(fpLower) || compactedReadFiles.has(fpLower)) {
@@ -9000,7 +9030,7 @@ function successfulToolEvidence(messages) {
       name: normalizeToolName(call.name),
       operation: classifyToolOperation(call.arguments, call.name),
       command,
-      path: extractToolPath(call.arguments),
+      path: extractToolPath(call.arguments, call.name),
       result
     });
   }

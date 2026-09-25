@@ -1,7 +1,6 @@
 ---
 name: skill-update
-description: Updates and cleans up existing agent skills using skill-creation standards. Use when the user asks to "check", "review", "update", or "refine" an existing skill.
-disable-model-invocation: true
+description: Updates and cleans up existing agent skills using skill-creation standards. Use when the user asks to "check", "review", "update", or "refine" an existing skill, including "update the skill" after discussing a gap or failure.
 ---
 
 # Skill Update & Maintenance
@@ -12,19 +11,25 @@ disable-model-invocation: true
 REQUEST INTENT
 │
 ├─ "check <skill>" / "does <skill> need work?" ──→ READ-ONLY HEALTH CHECK
-│                                                  ├─ List and read the complete skill directory
+│                                                  ├─ List and read the target skill's complete directory
 │                                                  ├─ Audit every shipped file against skill-creation rules
 │                                                  ├─ Report line count, status, or obsolete rules
 │                                                  └─ INVARIANT: Never mutate files during a check
 │
-├─ Tier 1: Procedural or tool fix (90% of updates)
+├─ "update <named skill(s)>" ──→ NAMED UPDATE: only named skill(s) → choose tier
+├─ "update the skill" after a discussed gap ──→ CONTEXTUAL UPDATE: only implicated skill(s)
+│                                              └─ Inspect each target's directory → choose tier
+├─ Explicit "check/audit all skills" ──→ READ-ONLY HEALTH CHECK for each skill
+├─ Explicit "update all skills" ──→ ALL-SKILLS UPDATE: inspect all skill directories → choose tier
+│
+├─ Tier 1: Procedural or tool fix (default)
 │  Does an existing step or rule already touch this concept?
 │  ├─ YES ──→ IN-PLACE ANCHOR EDIT (update sentence; freeze surrounding prose)
 │  └─ NO  ──→ WORKFLOW POSITIONING (slot chronologically; NEVER append at file tail)
 │
 ├─ Tier 2: New capability / failure mode
 │  ├─ SKILL.md has room (<180 lines) ──→ Add plain-language workflow step
-│  └─ Near line budget (180–220 lines) ──→ Offload to references/<theme>.md
+│  └─ Near line budget (180–220 lines) ──→ Keep rule in SKILL.md; offload only supporting detail
 │
 └─ Tier 3: Structural overhaul / deep reorganization ──→ PRE-FLIGHT RFC GATE
                                                          ├─ STOP: Present Phase 1 plan in chat (Why, What, Scope)
@@ -50,24 +55,31 @@ REQUEST INTENT
 
 ## The Execution Workflow
 
+### Choosing the Update Scope
+- If Samuel names a skill or skills, update only those. Otherwise, use the preceding conversation to identify the skill(s) whose instructions are implicated by the gap; do not update every skill that happened to be used.
+- Inspect or update all skills only when Samuel explicitly requests an all-skills audit or update. "Complete skill directory" means every shipped file within each target skill's folder, not every skill under `~/.agents/skills/`.
+- Do not require Samuel to restate an established case. Ask one focused question only if the target or desired behavior remains unclear. Then follow the appropriate update tier below.
+- Turn the observed case into a generally useful rule or workflow step in the relevant location. Avoid a one-off patch that only mentions the example.
+- Inspect each target skill's complete directory before editing. After editing, check the revised instructions against `skill-creation` and all related files; verify that the rule is discoverable and does not contradict existing guidance.
+
 ### Read-Only Health Check ("check <skill>" / "does <skill> need work?")
 - Triggered by casual questions ("Check the music skill", "How is session-log looking?", "Does X need maintenance?").
-- List the complete skill directory, including hidden and nested files.
+- List the target skill's complete directory, including hidden and nested files.
 - Read `SKILL.md`, every Markdown reference, and every shipped script, example, schema, or other documentation file.
 - Check both directions: every documented link resolves, and every shipped reference is reachable through an explained loading route.
 - Check all files against `skill-creation` standards, including plain language, line guidelines, rule/reference separation, cross-file consistency, and hook alignment.
 - Report what you found in chat. Never modify files during a health check.
 
 ### Tier 1: Small In-Place Edit (Default)
-- Read the target `SKILL.md` (or the affected reference file).
+- List and inspect the complete target skill directory, including `SKILL.md`, references, scripts, and examples.
 - Find the exact line or rule governing the behavior.
 - Edit it directly in place. Do not rewrite unaffected surrounding sentences.
 - Verify that `SKILL.md` remains clear, plain-spoken, and within the ~150–200 line guideline.
 - Apply the edit directly, stage with `chezmoi add`, and report a short 2–3 bullet summary. Show a terminal `git diff` only on explicit request.
 
 ### Tier 2: Moving Detail to References
-- When adding a large schema, table, or deep troubleshooting run that would push `SKILL.md` past ~200 lines:
-- Keep a short 1–2 line pointer with trigger phrasing in `SKILL.md` under `## Progressive Disclosure & Reference Routing`.
+- When adding a large schema, table, or deep troubleshooting run that would push `SKILL.md` past ~200 lines, keep governing rules and workflow steps in `SKILL.md`.
+- Put only supporting detail in a reference; add a short pointer with trigger phrasing in `SKILL.md` under `## Progressive Disclosure & Reference Routing`.
 - Create or update a single-purpose file in `references/<theme>.md`.
 - Add the trigger line on line 3: `**Load this file when** [triggers]`.
 - Apply the changes, stage with `chezmoi add`, and report a short summary.

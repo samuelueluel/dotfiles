@@ -198,6 +198,8 @@ export default async function processPermissionSystem(pi: ExtensionAPI): Promise
   const releaseToken = () => {
     registry.activeTokens.delete(token);
   };
+  const preserveExistingRuntimeApi = childSession || registry.activeTokens.size > 1;
+  const runtimeApiBeforeInstall = preserveExistingRuntimeApi ? permissionRuntime() : undefined;
   const planYolo = createPlanYoloLeaseController();
 
   try {
@@ -257,22 +259,19 @@ export default async function processPermissionSystem(pi: ExtensionAPI): Promise
           }
 
           return target.on(event as never, async (lifecycleEvent: SessionShutdownEvent, ctx: unknown) => {
+            const preserveRuntimeApi = childSession || registry.activeTokens.size > 1;
+            const runtimeApiBeforeShutdown = preserveRuntimeApi ? permissionRuntime() : undefined;
             try {
-              if (lifecycleEvent?.reason !== "quit") {
-                return await handler(lifecycleEvent, ctx);
-              }
-
-              // A child runner's `quit` is a session teardown, not process
-              // shutdown. An overlapping live runner also means this runner
-              // cannot be the last owner of the process-global API. Preserve
-              // the package's ordinary cleanup while changing only the reason
-              // that controls its global unregister branch.
-              const preserveRuntimeApi = childSession || registry.activeTokens.size > 1;
-              if (preserveRuntimeApi) {
-                return await handler({ ...lifecycleEvent, reason: "new" }, ctx);
-              }
+              // The installed package performs process-wide cleanup
+              // unconditionally, so allow its session cleanup but restore the
+              // runtime API while a child or overlapping session remains alive.
               return await handler(lifecycleEvent, ctx);
             } finally {
+              if (runtimeApiBeforeShutdown) {
+                (globalThis as typeof globalThis & {
+                  __piPermissionSystem?: PermissionSystemRuntime;
+                }).__piPermissionSystem = runtimeApiBeforeShutdown;
+              }
               releaseToken();
             }
           });
@@ -293,7 +292,17 @@ export default async function processPermissionSystem(pi: ExtensionAPI): Promise
     });
 
     await packageModule.default(wrappedPi);
+    if (runtimeApiBeforeInstall) {
+      (globalThis as typeof globalThis & {
+        __piPermissionSystem?: PermissionSystemRuntime;
+      }).__piPermissionSystem = runtimeApiBeforeInstall;
+    }
   } catch (error) {
+    if (runtimeApiBeforeInstall) {
+      (globalThis as typeof globalThis & {
+        __piPermissionSystem?: PermissionSystemRuntime;
+      }).__piPermissionSystem = runtimeApiBeforeInstall;
+    }
     releaseToken();
     throw error;
   }
