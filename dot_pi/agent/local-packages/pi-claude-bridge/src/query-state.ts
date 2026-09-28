@@ -48,6 +48,21 @@ export class QueryContext {
 	/** turnBlocks length at that message_start: where an abandoned attempt's blocks begin. */
 	turnStreamBlockStart = 0;
 
+	/** Pi-side history was rewritten (mid-turn compaction, tree nav) while this
+	 *  query was live, so the CC session no longer matches pi's context and
+	 *  cannot be rebuilt until the turn ends. CC-reported usage during this
+	 *  window reflects the stale pre-rewrite session; feeding it to pi's meter
+	 *  re-triggers compaction forever (compaction-loop bug). While set,
+	 *  updateUsage rewrites usage with the pi-side estimate instead. Cleared on
+	 *  the next top-level fresh query, where syncSharedSession rebuilds. */
+	// LOCAL: compaction-loop fix — divergence-window flag; see updateUsage in index.ts.
+	staleUsageUntilRebuild = false;
+	/** chars/4 estimate of pi's current message list (pi's own estimateTokens
+	 *  heuristic), refreshed on every provider call for this context. The
+	 *  honest context size while staleUsageUntilRebuild is set. */
+	// LOCAL: compaction-loop fix — see updateUsage in index.ts.
+	piContextEstimate = 0;
+
 	get turnBlocks(): Array<any> {
 		if (!this.turnOutput) throw new Error("turnBlocks accessed before resetTurnState");
 		return this.turnOutput.content;

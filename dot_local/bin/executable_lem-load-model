@@ -149,7 +149,11 @@ case "$id" in
       on)
         mtp_model="$QWEN38_FLASH_MTP_FULL"
         [[ "$halo_backend" == "halo-rocm" ]] && mtp_model="$QWEN38_FLASH_MTP_SHARED"
-        args+=" --spec-type draft-mtp --spec-draft-model $mtp_model --spec-draft-n-max 3 --spec-draft-p-min 0.75"
+        mtp_p_min=0.75
+        # ROCm benchmarks found 0.75 slows decode despite higher acceptance;
+        # use p-min 0 on both Halo launchers, leaving canonical Vulkan unchanged.
+        [[ "$halo_backend" == "halo-vulkan" || "$halo_backend" == "halo-rocm" ]] && mtp_p_min=0
+        args+=" --spec-type draft-mtp --spec-draft-model $mtp_model --spec-draft-n-max 3 --spec-draft-p-min $mtp_p_min"
         ;;
       off)
         args+=" --spec-type none"

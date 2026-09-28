@@ -58,6 +58,7 @@ tags:
 
 - **Description placement:** Required in `10_Projects/`, `20_Library/`, and `02_Memories/`; omit it in `00_Inbox/`, `01_Todo/`, and `30_Personal/`. Use 1–2 plain-text sentences in double quotes, without wikilinks or Markdown.
 - **Timestamp format:** Local time, zero-padded, without timezone or milliseconds.
+- **Spacing:** The body starts immediately after the frontmatter — no blank line between the closing `---` and the first heading.
 - **Canonical flat tags:**
 
 | Category | Tag | Scope |

@@ -3,6 +3,8 @@
 import type { ExtensionAPI, ExtensionContext, ReadonlyFooterDataProvider } from "@mariozechner/pi-coding-agent";
 import { type Component, type Theme, type TUI, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import * as child_process from "child_process";
+import * as fs from "node:fs";
+import { trimBlackholeStatus, isObservationMemoryEnabled } from "../lib/blackhole-status.js";
 
 class PowerlineFooter implements Component {
 	private tui: TUI;
@@ -19,6 +21,7 @@ class PowerlineFooter implements Component {
 	private lastContextInfo = "";
 	private lastCostInfo = "";
 	private gitStatusExtras: string = "";
+	private blackholeMemoryEnabled = true;
 
 	constructor(tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider, ctx: ExtensionContext) {
 		this.tui = tui;
@@ -46,6 +49,14 @@ class PowerlineFooter implements Component {
 
 	private fetchAsyncData() {
 		if (this.disposed) return;
+		// blackhole's OM gauges are dead meters when memory:false (O pegs full,
+		// P stays empty). Re-read the config on every fetch cycle so /blackhole
+		// om-on revives the gauges within the render interval.
+		try {
+			const configPath = `${process.env.HOME || ""}/.pi/agent/pi-blackhole/pi-blackhole-config.json`;
+			const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+			this.blackholeMemoryEnabled = isObservationMemoryEnabled(config.memory);
+		} catch {}
 		const cwd = this.cwd;
 		const branch = this.footerData.getGitBranch();
 		if (branch) {
@@ -213,7 +224,13 @@ class PowerlineFooter implements Component {
 			const parts: string[] = [];
 			for (const [key, text] of statuses) {
 				if (key === "advisor-nudge" || key === "pi-permission-system") continue;
-				if (text) parts.push(text);
+				if (text) {
+					parts.push(
+						key === "blackhole"
+							? trimBlackholeStatus(text, { dropObservationGauges: !this.blackholeMemoryEnabled })
+							: text,
+					);
+				}
 			}
 			if (parts.length > 0) left += ` ${GRAY}|${RESET} ${parts.join(" ")}`;
 		}

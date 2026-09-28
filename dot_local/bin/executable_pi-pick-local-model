@@ -91,7 +91,7 @@ _quants=(W4B UD-IQ4_XS UD-Q4_K_XL \
          AP-Q4_K_XL \
          UD-Q8_K_XL UD-Q8_K_XL)
 _backends=(halogen halogen halogen \
-           nathan-vulkan halo-vulkan halo-rocm strix-llama nathan-vulkan halo-vulkan halo-rocm \
+           nathan-vulkan halo-vulkan halo-rocm halo-rocm-kyuz0 nathan-vulkan halo-vulkan halo-rocm \
            nathan-vulkan halo-vulkan halo-rocm nathan-vulkan halo-vulkan halo-rocm \
            halo-vulkan \
            nathan-vulkan nathan-vulkan)

@@ -400,7 +400,7 @@ start_container() {
       local -a args=(
         run --detach
         --name "$HALOGEN_CONTAINER"
-        --restart unless-stopped
+        --restart on-failure:3
         --publish "127.0.0.1:${HALOGEN_API_PORT}:${HALOGEN_API_PORT}"
         --device /dev/kfd
         --device /dev/dri

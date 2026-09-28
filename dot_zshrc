@@ -357,6 +357,8 @@ pi-safe-1() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
+    -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
     -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
@@ -407,6 +409,8 @@ pi-safe-2() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
+    -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
     -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
@@ -459,6 +463,8 @@ pi-safe-3() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
+    -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
     -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e PULSE_SERVER="unix:/run/user/1000/pulse/native" \
@@ -514,6 +520,8 @@ pi-safe-stata-1() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
+    -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
     -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e "PATH=/usr/local/stata19:${PATH}" \
@@ -571,6 +579,8 @@ pi-safe-stata-2() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
+    -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
     -e CLAUDE_CONFIG_DIR="$HOME/.pi/agent/claude-code-sandbox-auth" \
     -e "PATH=/usr/local/stata19:${PATH}" \
@@ -880,6 +890,14 @@ _pi_cloud_model_scope() {
   print -r -- "$scope"
 }
 
+_pi_non_bridge_model_scope() {
+  # Positive provider allowlist: Pi's model matcher also tests bare model IDs,
+  # so a negative claude-bridge glob would not reliably exclude this provider.
+  # Add new provider families here when they should be available in local launchers.
+  local scope='anthropic/**,halogen/**,local/**,openai-codex/**,openrouter-ds/**,openrouter-ds-max/**,openrouter-us/**,openrouter-us-max/**,strix/**'
+  print -r -- "$scope"
+}
+
 # Keep the historical helper name for pi/beta callers while sharing the
 # exact same loader implementation.
 _lem_preload() {
@@ -919,9 +937,12 @@ _pi_subagent_concurrency() {
 }
 
 pi() {
+  local -x PI_BLACKHOLE_COMPACT_AFTER_TOKENS=230000  # local absolute compaction trigger; cloud sessions (pihat/betahat) set 350000 instead
+  local -x PI_BLACKHOLE_MID_RUN_COMPACTION=resume    # transparent mid-run compaction at turn seams; cloud stays off
   _pi_subagent_concurrency 1
   _pi_nonstata_skills
   _pi_theme_args
+  local model_scope="$(_pi_non_bridge_model_scope)"
 
   local model_id pi_model_id model_flag
   model_id=$(_pi_pick_local_model) || return 1
@@ -969,7 +990,7 @@ pi() {
     no)
       printf 'type=pi\nmodel=%s\nthinking=%s\ncwd=%s\nsandbox=unsandboxed\n' "$model_flag" "${PI_LOCAL_THINKING_LEVEL:-unknown}" "${PWD##*/}" > "$_state_file"
       printf '\033]2;π - %s\007' "${PWD##*/}"
-      { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "$@" } \
+      { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "$@" } \
         always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
     yes)
@@ -990,13 +1011,14 @@ pi() {
 
       printf 'type=pi\nmodel=%s\nthinking=%s\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${PI_LOCAL_THINKING_LEVEL:-unknown}" "${abs_target##*/}" "$level" > "$_state_file"
       printf '\033]2;π - %s\007' "${abs_target##*/}"
-      { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" "${@:2}" } \
+      { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "${@:2}" } \
         always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
   esac
 }
 
 pihat() {
+  local -x PI_BLACKHOLE_COMPACT_AFTER_TOKENS=350000  # cloud absolute compaction trigger; local sessions (pi/beta) set 230000 instead
   _pi_subagent_concurrency 4
   _pi_nonstata_skills
   _pi_theme_args
@@ -1050,9 +1072,12 @@ pihat() {
 }
 
 beta() {
+  local -x PI_BLACKHOLE_COMPACT_AFTER_TOKENS=230000  # local absolute compaction trigger; cloud sessions (pihat/betahat) set 350000 instead
+  local -x PI_BLACKHOLE_MID_RUN_COMPACTION=resume    # transparent mid-run compaction at turn seams; cloud stays off
   _pi_subagent_concurrency 1
   _pi_stata_skills
   _pi_theme_args
+  local model_scope="$(_pi_non_bridge_model_scope)"
   local target="${1:-$PWD}" abs_target
   abs_target="$(realpath "$target" 2>/dev/null)" || { echo "Error: cannot resolve '$target'"; return 1; }
   [[ -d "$abs_target" ]] || { echo "Error: '$target' is not a directory."; return 1; }
@@ -1102,11 +1127,12 @@ beta() {
   printf 'type=beta\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
 
   printf '\033]2;β - %s\007' "${abs_target##*/}"
-  { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM.md" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
+  { pi-safe-stata-${level} "${abs_target}" --tui-mode fullscreen "${_PI_STATA_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-beta.json" --model "$model_flag" --models "$model_scope" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM.md" --append-system-prompt "$HOME/.pi/agent/APPEND_SYSTEM_BETA.md" "${@:2}" } \
     always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
 }
 
 betahat() {
+  local -x PI_BLACKHOLE_COMPACT_AFTER_TOKENS=350000  # cloud absolute compaction trigger; local sessions (pi/beta) set 230000 instead
   _pi_subagent_concurrency 4
   _pi_stata_skills
   _pi_theme_args

@@ -43,7 +43,7 @@ LEDGER_RE = re.compile(
     r"(?P<decode_s>[\d.]+)s\s+=\s+(?P<rate>n/a|[\d.]+)(?:\s+t/s)?"
     r"(?:\s+\|\s+(?P<rounds>\d+)\s+rounds,\s+"
     r"commit\s+(?P<commit>[\d.]+)/round)?\s+\|\s+prompt\s+"
-    r"(?P<prompt>\d+)(?:\s+\((?P<cached>\d+)\s+cached\))?,\s+"
+    r"(?P<prompt>\d+)(?:\s+\((?P<cached>\d+)\s+cached(?:,\s+[\d.]+%)?\))?,\s+"
     r"prefill\s+(?P<prefill>[\d.]+)s"
 )
 

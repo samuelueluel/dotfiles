@@ -47,11 +47,11 @@
       "extensions": []
     },
     "local-packages/rpiv-advisor-lean",
-    "local-packages/pi-smart-compact",
     "local-packages/pi-compact-transcript",
     "local-packages/pi-math",
     "npm:pi-vim",
-    "local-packages/pi-claude-bridge"
+    "local-packages/pi-claude-bridge",
+    "npm:pi-blackhole"
   ],
   "extensions": [
     "extensions/agent-title.ts",
@@ -61,7 +61,8 @@
     "extensions/save-plan.ts",
     "extensions/powerline-footer.ts",
     "extensions/todo-reminders.ts",
-    "extensions/workflow-invariants.ts"
+    "extensions/workflow-invariants.ts",
+    "extensions/working-state-reminders.ts"
   ],
   "lastChangelogVersion": "0.87.1",
   "hideThinkingBlock": true,

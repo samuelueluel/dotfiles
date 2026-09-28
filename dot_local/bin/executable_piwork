@@ -262,6 +262,7 @@ def _log_summary_with_dedicated_model(args):
             transcript_path,
             existing_summary=existing,
             thinking=getattr(args, "thinking", "high"),
+            state_file=getattr(args, "state_file", None),
         )
     fields = _logger_draft_to_storage_fields(draft)
     fields["transcript_path"] = transcript_path
@@ -479,6 +480,10 @@ def cmd_summary(argv):
     )
     log_parser.add_argument("session_id", nargs="?")
     log_parser.add_argument("--transcript-path")
+    log_parser.add_argument(
+        "--state-file",
+        help="explicit legacy state-file override (default: autodetect ~/.pi/agent/working-state/<session UUID>.md)",
+    )
     log_parser.add_argument("--thinking", choices=("high", "max"), default="high")
     log_parser.add_argument("--fallback-json", help="validated parent draft; requires explicit approval")
     log_parser.add_argument("--parent-fallback-approved", action="store_true")

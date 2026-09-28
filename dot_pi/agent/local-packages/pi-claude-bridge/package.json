@@ -1,6 +1,6 @@
 {
   "name": "pi-claude-bridge",
-  "version": "0.8.0-local.1",
+  "version": "0.8.0-local.2",
   "private": true,
   "description": "Local pi-claude-bridge fork: 320K-capped Claude models plus -max 1M variants; hooks and duplicate AGENTS.md disabled in the bridged Claude Code child.",
   "keywords": [

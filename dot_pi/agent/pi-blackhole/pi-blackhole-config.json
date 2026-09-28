@@ -1,0 +1,28 @@
+{
+  "memory": false,
+  "compaction": "auto",
+  "compactionEngine": "blackhole",
+  "skipForProviders": [
+    "claude-bridge"
+  ],
+  "compactAfterPreset": "samuel",
+  "compactAfterPresets": {
+    "samuel": [
+      {
+        "window": 262144,
+        "ratio": 0.8774
+      },
+      {
+        "window": 400000,
+        "ratio": 0.875
+      },
+      {
+        "window": 1048576,
+        "ratio": 0.3337
+      }
+    ]
+  },
+  "debugLog": false,
+  "_comment": "memory:false disables the Observer/Reflector/Dropper LLM workers (no background bookkeeping; re-enable with /blackhole om-on). compactionEngine: blackhole = deterministic structural summaries. skipForProviders: on claude-bridge models the bridge's own compaction takeover handles summaries; blackhole owns compaction on every other provider. TRIGGER POLICY (2026-09-28): per-session-type ABSOLUTE thresholds via launcher env PI_BLACKHOLE_COMPACT_AFTER_TOKENS \u2014 local (pi/beta) 240000, cloud (pihat/betahat) 350000. The samuel preset mirrors that policy for env-less launches: 262144 cap -> 240k, 400000 cap -> 350k, 1M -> 350k. tailBehavior pi-default: keep pi's ~20k verbatim tail at the compaction cut instead of only the last user message (LangWatch preserved-tail recommendation). debugLog: set true to write ~/.pi/agent/pi-blackhole/debug.ndjson.",
+  "tailBehavior": "pi-default"
+}

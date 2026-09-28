@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -18,6 +19,9 @@ LOGGER_MAX_TRANSCRIPT_CHARS = 1_500_000
 _TOOL_RESULT_EXCERPT_CHARS = 2_500
 _TOOL_ARGUMENT_EXCERPT_CHARS = 8_000
 _THINKING_EXCERPT_CHARS = 1_200
+_WORKING_STATE_DIRECTORY = Path.home() / ".pi" / "agent" / "working-state"
+_SESSION_ID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
+_WORKING_STATE_MAX_CHARS = 24_000
 _ALLOWED_THINKING = frozenset({"high", "max"})
 _TEXT_FIELDS = ("title", "summary", "outcomes", "artifacts", "open_items")
 _OMISSION_MARKER_PREFIX = "[[PI_SESSION_LOGGER_OMITTED"
@@ -32,6 +36,22 @@ payloads; explicit omission markers are not evidence. Return exactly one JSON
 object and no prose, Markdown fence, or explanation. Use only evidence in the
 transcript and the existing summary context, if supplied. Do not invent
 decisions, files, commands, outcomes, or next steps.
+
+A trailing "working_state" entry, when present, is the session's curated
+UUID-scoped working-state file captured verbatim from the dedicated state directory. It is
+high-trust evidence and is authoritative for exact numbers, commands, error
+strings, decisions, and open items; the transcript projection supplies
+narrative and coverage. If the file appears stale relative to late-session
+transcript activity, follow the transcript for those events.
+
+When distilling outcomes, preserve the file's status qualifiers (ok, wrong,
+suspect, failed): a result marked wrong or suspect must never be reported as
+a clean finding, and its stated reason must travel with it. Include
+approaches the session explicitly ruled out, with the reason, so the summary
+prevents future re-exploration. State each fact once: where the state file
+and the transcript agree, distill a single statement rather than restating
+both, and prefer the file's exact numbers. Harvest keywords from exact
+identifiers in the file (dataset names, endpoints, versions, thread tags).
 
 The JSON object must have exactly these useful fields:
 - title: concise title for this completed session
@@ -202,6 +222,59 @@ def _project_transcript_entry(
     return projected
 
 
+def _session_id(raw_transcript: str) -> str:
+    """Read the immutable session UUID from the transcript header; never infer from cwd."""
+    for line in raw_transcript.splitlines():
+        if '"type":"session"' not in line and '"type": "session"' not in line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(entry, dict) and entry.get("type") == "session":
+            session_id = entry.get("id")
+            return session_id if isinstance(session_id, str) and _SESSION_ID_RE.fullmatch(session_id) else ""
+    return ""
+
+
+def read_working_state(
+    session_id: str, override: str | None = None
+) -> dict[str, Any] | None:
+    """Locate the session's UUID-scoped file and bound its content.
+
+    Explicit overrides are opt-in for legacy files. An invalid/missing UUID
+    must not fall back to a shared cwd file: that would leak another window's state.
+    """
+    if override:
+        path = os.path.realpath(os.path.expanduser(str(override)))
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"state file not found: {path}")
+    else:
+        if not isinstance(session_id, str) or not _SESSION_ID_RE.fullmatch(session_id):
+            return None
+        path = str(_WORKING_STATE_DIRECTORY / f"{session_id}.md")
+        if not os.path.isfile(path):
+            return None
+    try:
+        content = Path(path).read_text(encoding="utf-8", errors="replace").strip()
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return None
+    if not content:
+        return None
+    truncated = False
+    if len(content) > _WORKING_STATE_MAX_CHARS:
+        content = content[:_WORKING_STATE_MAX_CHARS]
+        truncated = True
+    return {
+        "type": "working_state",
+        "source": path,
+        "mtime": datetime.fromtimestamp(mtime).astimezone().isoformat(timespec="seconds"),
+        "truncated": truncated,
+        "content": content,
+    }
+
+
 def prepare_transcript(transcript: str) -> str:
     """Build a bounded evidence-preserving transcript for the logger model.
 
@@ -347,6 +420,7 @@ def run_logger(
     *,
     existing_summary: dict[str, Any] | None = None,
     thinking: str = LOGGER_THINKING,
+    state_file: str | None = None,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     pi_path: str | None = None,
     flusher: Callable[[str], None] = flush_transcript,
@@ -360,12 +434,16 @@ def run_logger(
     if not raw_transcript.strip():
         raise ValueError("cannot log an empty transcript")
     transcript = prepare_transcript(raw_transcript)
+    payload = transcript
+    working_state = read_working_state(_session_id(raw_transcript), state_file)
+    if working_state:
+        payload += json.dumps(working_state, ensure_ascii=False, separators=(",", ":")) + "\n"
     command = _pi_command(thinking=thinking, pi_path=pi_path)
     command[-1] = _user_prompt(existing_summary)
     try:
         result = runner(
             command,
-            input=transcript,
+            input=payload,
             text=True,
             capture_output=True,
             cwd=os.path.expanduser("~"),

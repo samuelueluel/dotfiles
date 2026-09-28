@@ -33,6 +33,8 @@ Usage:
 import argparse
 import base64
 import glob
+import hashlib
+import json
 import os
 import re
 import struct
@@ -56,7 +58,7 @@ IMG_RE = re.compile(r"!\[[^\]]*\]\((images/[^)\s]+)\)")
 # (number may be arabic, roman, or appendix-lettered; separator may be
 # ".", ":", em-dash, hyphen, or plain space).
 CAPTION_RE = re.compile(
-    r"^\s*(?:fig|Fig|FIG|figure|Figure|FIGURE)\.?\s*"
+    r"^\s*(?:fig|Fig|FIG|figure|Figure|FIGURE|Exhibit|EXHIBIT)\.?\s*"
     r"([A-Z]?[0-9IVXLCDM]+(?:\.[0-9]+)*[a-z]?)"
     r"([:.\u2014\u2013-]|\s+)(.*)$"
 )
@@ -240,9 +242,16 @@ def find_schema_block(lines: list[str], line_no: int) -> tuple[int, int] | None:
     return None
 
 
+def _plain_caption(line: str) -> str:
+    """Drop Markdown emphasis and heading/quote markers: Surya writes captions
+    as ``**Figure 1.** Title``, ``**Fig. A3.**`` or ``## Figure 2``."""
+    return re.sub(r"\*\*|__", "", line).strip().lstrip("#>*_ ").strip()
+
+
 def looks_like_caption(line: str) -> str | None:
     """Return the trimmed caption line when ``line`` is a figure caption line,
     else None. Rejects in-text references like "Figure 4 shows that ..."."""
+    line = _plain_caption(line)
     m = CAPTION_RE.match(line)
     if not m:
         return None
@@ -250,7 +259,7 @@ def looks_like_caption(line: str) -> str | None:
     first_word = rest.split()[0].strip(".,;:") if rest else ""
     if first_word.lower() in _CAPTION_PROSE_VERBS:
         return None
-    return line.strip()
+    return line
 
 
 def _is_barrier(lines: list[str], j: int) -> bool:
@@ -259,26 +268,161 @@ def _is_barrier(lines: list[str], j: int) -> bool:
         return False
     if IMG_RE.search(lines[j]):
         return True
-    if s.startswith("#"):
+    if s.startswith("#") or s.startswith("<!-- pdf-page:"):
         return True
     return False
 
 
-def extract_caption(lines: list[str], line_no: int) -> str | None:
+_blocks_cache: dict = {}
+_BLOCK_IMG_RE = re.compile(r"p(\d+)_b(\d+)\.png$")
+
+
+def _surya_blocks(key: str) -> list | None:
+    """The Surya sidecar's block records (``<KEY>.blocks.json``), or None for MinerU."""
+    if key not in _blocks_cache:
+        bp = SIDECAR_DIR / f"{key}.blocks.json"
+        try:
+            _blocks_cache[key] = json.loads(bp.read_text(encoding="utf-8"))["blocks"] if bp.exists() else None
+        except (OSError, ValueError, KeyError):
+            _blocks_cache[key] = None
+    return _blocks_cache[key]
+
+
+def _overlap(a, b, lo: int) -> float:
+    return min(a[lo + 2], b[lo + 2]) - max(a[lo], b[lo])
+
+
+def _caption_gap(f, c) -> float | None:
+    """Distance from a figure box to a caption box: vertical when they share
+    columns, horizontal when they share rows (a caption set sideways beside a
+    landscape figure); None when they share neither."""
+    if _overlap(f, c, 0) > 0:
+        return max(c[1] - f[3], f[1] - c[3], 0.0)
+    if _overlap(f, c, 1) > 0:
+        return max(c[0] - f[2], f[0] - c[2], 0.0)
+    return None
+
+
+def _match(caps: list, figs: dict) -> dict:
+    """Caption index -> figure id: the most captions matched one to one, then
+    the smallest total gap. Nearest-first fails when a caption sits between
+    two figures (Fig. 3 below its plot and just above Fig. 4's)."""
+    cand = [sorted((g, i) for i, f in figs.items() if (g := _caption_gap(f, c)) is not None) for c, _t in caps]
+    best: list = [(-1, 0.0), {}]
+
+    def walk(k: int, used: set, cost: float, got: dict) -> None:
+        if k == len(caps):
+            if (len(got), -cost) > (best[0][0], -best[0][1]):
+                best[0], best[1] = (len(got), cost), dict(got)
+            return
+        if len(got) + len(caps) - k < best[0][0]:
+            return
+        for g, i in cand[k]:
+            if i not in used:
+                got[k] = i
+                walk(k + 1, used | {i}, cost + g, got)
+                del got[k]
+        walk(k + 1, used, cost, got)
+
+    if len(caps) <= 8 and len(figs) <= 12:
+        walk(0, set(), 0.0, {})
+        return best[1]
+    got, used = {}, set()  # too many to search: nearest first
+    for g, k, i in sorted((g, k, i) for k, cs in enumerate(cand) for g, i in cs):
+        if k not in got and i not in used:
+            got[k] = i
+            used.add(i)
+    return got
+
+
+_page_captions: dict = {}
+
+
+def _captions_on_page(key: str, page: int) -> dict:
+    """Figure id -> caption for one Surya page (see :func:`caption_from_geometry`)."""
+    ck = (key, page)
+    if ck in _page_captions:
+        return _page_captions[ck]
+    here = [b for b in _surya_blocks(key) or [] if int(b["page"]) == page and b.get("pdf_bbox")]
+    figs = {}
+    for b in here:
+        box = [float(v) for v in b["pdf_bbox"]]
+        # Icons and logos (tiny pictures) never carry a figure caption.
+        if b["label"] in ("Figure", "Picture", "Diagram") and box[2] - box[0] >= 50 and box[3] - box[1] >= 50:
+            figs[b["id"]] = box
+    caps = []
+    for b in here:
+        if b["label"] in ("Caption", "Text"):
+            text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", b.get("html") or "")).strip()
+            cap = looks_like_caption(text)
+            if cap:
+                caps.append(([float(v) for v in b["pdf_bbox"]], cap))
+    out = {figs_id: caps[k][1] for k, figs_id in _match(caps, figs).items()}
+    # Panels of a multi-panel figure: a figure without a caption of its own
+    # takes its neighbour's (same columns or same rows) when no other
+    # numbered caption lies between them; repeated so a 2x2 grid fills in.
+    changed = True
+    while changed:
+        changed = False
+        for i, box in figs.items():
+            if i in out:
+                continue
+            near = []
+            for j, cap in out.items():
+                ob = figs[j]
+                if (g := _caption_gap(ob, box)) is None:
+                    continue
+                span = [min(box[0], ob[0]), min(box[1], ob[1]), max(box[2], ob[2]), max(box[3], ob[3])]
+                between = [c for c, _t in caps if _overlap(span, c, 0) > 0 and _overlap(span, c, 1) > 0
+                           and _caption_gap(box, c) is not None and _caption_gap(ob, c) is not None
+                           and (_overlap(box, c, 0) > 0) == (_overlap(ob, c, 0) > 0)]
+                if not between:
+                    near.append((g, cap))
+            if near:
+                out[i] = min(near)[1]
+                changed = True
+    _page_captions[ck] = out
+    return out
+
+
+def caption_from_geometry(key: str, img_path: str) -> str | None:
+    """The caption printed with the figure on its page (Surya sidecars only).
+
+    Numbered captions on the page are matched one to one with figures by the
+    gap between them (vertical when they share columns, horizontal when they
+    share rows), most matches first, then the smallest total gap. So captions
+    above figures (Greene, many journals), below (Hastie) and beside
+    (landscape pages) all work, and a caption never crosses a page. Panels
+    without a caption of their own inherit a neighbouring panel's. None when
+    the sidecar has no block geometry or no caption belongs to the figure.
+    """
+    m = _BLOCK_IMG_RE.search(img_path)
+    if not _surya_blocks(key) or not m:
+        return None
+    page = int(m.group(1))
+    return _captions_on_page(key, page).get(f"{key}:p{page}:b{int(m.group(2))}")
+
+
+def extract_caption(lines: list[str], line_no: int, key: str | None = None) -> str | None:
     """Find the caption line for the figure at ``line_no``.
 
-    Scans forward (image -> schema block -> caption) up to 18 lines, stopping
-    at the next image or a heading; falls back to a short backward scan. A
-    caption whose lead is bare ("Figure 1:") has its title joined from the
-    next line.
+    Surya sidecars (``key`` given, block geometry on disk): the caption
+    printed nearest the figure (:func:`caption_from_geometry`). Otherwise
+    scans forward (image -> schema block -> caption) up to 18 lines, stopping
+    at the next image, a heading or a page break; falls back to a short
+    backward scan. A caption whose lead is bare ("Figure 1:") has its title
+    joined from the next line.
     """
+    if key is not None and _surya_blocks(key):
+        m = IMG_RE.search(lines[line_no])
+        return caption_from_geometry(key, m.group(1)) if m else None
     n = len(lines)
     for j in range(line_no + 1, min(line_no + 18, n)):
         if _is_barrier(lines, j):
             break
         cap = looks_like_caption(lines[j])
         if cap:
-            m = CAPTION_RE.match(lines[j])
+            m = CAPTION_RE.match(cap)
             if m and not m.group(3).strip():
                 for k in range(j + 1, min(j + 3, n)):
                     nxt = lines[k].strip()
@@ -321,6 +465,32 @@ def insert_caption(block: str, caption: str) -> str:
 def already_schema(text: str, line_no: int) -> bool:
     """True when a [Figure Schema] block already sits below the image line."""
     return find_schema_block(text.splitlines(), line_no) is not None
+
+
+CACHE_DIR = Path.home() / ".cache" / "zotero-mcp" / "vlm-enrich-cache"
+
+
+def cache_key(img_bytes: bytes) -> str:
+    """Schemas depend only on the model, the prompt and the image bytes."""
+    h = hashlib.sha256()
+    for part in (VLM_MODEL.encode(), SYSTEM_PROMPT.encode(), img_bytes):
+        h.update(hashlib.sha256(part).digest())
+    return h.hexdigest()
+
+
+def cache_get(key: str) -> str | None:
+    p = CACHE_DIR / f"{key}.txt"
+    return p.read_text(encoding="utf-8") if p.exists() else None
+
+
+def cache_put(key: str, block: str) -> None:
+    """Store a schema block without its Caption line (captions come from the
+    document text and are stamped fresh on every use)."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    block = "\n".join(ln for ln in block.splitlines() if not ln.startswith("- Caption:"))
+    tmp = CACHE_DIR / f".{key}.tmp"
+    tmp.write_text(block, encoding="utf-8")
+    os.replace(tmp, CACHE_DIR / f"{key}.txt")
 
 
 def ask_vlm(img_b64: str, mime: str) -> str | None:
@@ -386,7 +556,7 @@ def stamp_captions_in_file(key: str, dry_run: bool, st: dict) -> None:
         if "- Caption:" in block:
             st["caption_skip"] += 1
             continue
-        caption = extract_caption(lines, line_no)
+        caption = extract_caption(lines, line_no, key)
         if caption is None:
             st["caption_none"] += 1
             continue
@@ -404,6 +574,10 @@ def stamp_captions_in_file(key: str, dry_run: bool, st: dict) -> None:
             continue
         lines[span[0]:span[1]] = [new_block]
         write_sidecar(sp, "".join(lines))
+        # The block went in as one multi-line element: re-split so later
+        # images' line numbers match the file again.
+        lines = "".join(lines).splitlines(keepends=True)
+        idx = image_line_index(lines)
         st["caption"] += 1
         print(f"  {key} {img_path}: caption stamped")
 
@@ -489,7 +663,7 @@ def relocate_schemas(key: str, dry_run: bool) -> dict:
         st["moved"] = st["schemas"]
         for img in expected:
             ln = idx[img]
-            if extract_caption(lines, ln) is not None:
+            if extract_caption(lines, ln, key) is not None:
                 st["caption"] += 1
             else:
                 st["caption_none"] += 1
@@ -525,7 +699,7 @@ def relocate_schemas(key: str, dry_run: bool) -> dict:
         block = "".join(lines2[span[0]:span[1]])
         if "- Caption:" in block:
             continue
-        cap = extract_caption(lines2, ln)
+        cap = extract_caption(lines2, ln, key)
         if cap is None:
             st["caption_none"] += 1
             continue
@@ -545,7 +719,7 @@ def process_sidecar(key: str, dry_run: bool, captions_only: bool, force: bool = 
     ``force`` re-stamps: removes an existing [Figure Schema] block before
     re-running the VLM (used after a model upgrade to refresh all schemas).
     """
-    st = {"figures": 0, "schema": 0, "dim_filter": 0, "missing_img": 0,
+    st = {"figures": 0, "schema": 0, "cached": 0, "dim_filter": 0, "missing_img": 0,
           "already": 0, "restamp": 0, "vlm_err": 0, "caption": 0,
           "caption_skip": 0, "caption_none": 0}
     sp = SIDECAR_DIR / f"{key}.md"
@@ -582,7 +756,7 @@ def process_sidecar(key: str, dry_run: bool, captions_only: bool, force: bool = 
                 st["already"] += 1
                 block = "".join(lines[span[0]:span[1]])
                 if "- Caption:" not in block:
-                    caption = extract_caption(lines, line_no)
+                    caption = extract_caption(lines, line_no, key)
                     if caption is not None:
                         new_block = insert_caption(block, caption)
                         lines[span[0]:span[1]] = [new_block]
@@ -599,18 +773,24 @@ def process_sidecar(key: str, dry_run: bool, captions_only: bool, force: bool = 
             st["dim_filter"] += 1
             continue
         mime = "image/png" if img.suffix.lower() in (".png",) else "image/jpeg"
-        try:
-            b64 = base64.b64encode(img.read_bytes()).decode()
-            raw = ask_vlm(b64, mime)
-        except requests.RequestException as e:
-            print(f"  {key} {img_path}: VLM error ({e})", file=sys.stderr)
-            st["vlm_err"] += 1
-            continue
-        block = clean_schema(raw)
-        if not block:
-            print(f"  {key} {img_path}: empty VLM response", file=sys.stderr)
-            st["vlm_err"] += 1
-            continue
+        img_bytes = img.read_bytes()
+        ck = cache_key(img_bytes)
+        block = None if force else cache_get(ck)
+        if block is not None:
+            st["cached"] += 1
+        else:
+            try:
+                raw = ask_vlm(base64.b64encode(img_bytes).decode(), mime)
+            except requests.RequestException as e:
+                print(f"  {key} {img_path}: VLM error ({e})", file=sys.stderr)
+                st["vlm_err"] += 1
+                continue
+            block = clean_schema(raw)
+            if not block:
+                print(f"  {key} {img_path}: empty VLM response", file=sys.stderr)
+                st["vlm_err"] += 1
+                continue
+            cache_put(ck, block)
         # Stamp the locally-extracted caption before writing, so VLM-produced
         # and backfilled blocks carry the identical Caption field.
         text = sp.read_text(encoding="utf-8")
@@ -619,7 +799,7 @@ def process_sidecar(key: str, dry_run: bool, captions_only: bool, force: bool = 
         line_no = idx.get(img_path)
         if line_no is None:
             continue
-        caption = extract_caption(lines, line_no)
+        caption = extract_caption(lines, line_no, key)
         block = insert_caption(block, caption)
         # Write per figure (not batched): a partial run persists progress and
         # idempotency resumes where it stopped — critical for the ~6h backfill.
@@ -679,7 +859,7 @@ def main() -> int:
         if args.relocate and st.get("verdict") and st["verdict"] != "RELOCATE":
             print(f"[{key}] {st['verdict']}")
         elif not args.relocate:
-            print(f"[{key}] figures={st['figures']} schema={st['schema']} "
+            print(f"[{key}] figures={st['figures']} schema={st['schema']} cached={st.get('cached', 0)} "
                   f"already={st['already']} restamp={st['restamp']} "
                   f"dim_filter={st['dim_filter']} missing={st['missing_img']} "
                   f"vlm_err={st['vlm_err']} caption={st['caption']} "

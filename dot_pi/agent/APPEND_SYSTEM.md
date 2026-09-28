@@ -37,6 +37,7 @@ For Chezmoi-managed configuration:
 
 ## Working Rules
 
+- For complex multi-step work (roughly 3+ steps), create a todo list before starting and maintain it throughout: mark each task in_progress when beginning it and completed immediately when finished; skip the list for trivial or purely conversational requests. Keep todo subjects terse — the list is the glanceable pointer; substantive results and decisions belong in the current session's UUID-scoped working-state file (see the working-state skill), not in todo items.
 - Preserve unrelated content and avoid unnecessary rewrites.
 - Ask one focused question when a consequential decision is unresolved; otherwise proceed with the requested work.
 - When Samuel asks only for a proposal or review, do not modify files.

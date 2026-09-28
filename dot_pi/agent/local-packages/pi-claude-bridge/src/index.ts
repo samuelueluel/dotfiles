@@ -1,6 +1,6 @@
 import { calculateCost, createAssistantMessageEventStream, type AssistantMessage, type AssistantMessageEventStream, type Context, type ImageContent, type Model, type SimpleStreamOptions, type TextContent, type Tool, type UserMessage } from "@earendil-works/pi-ai";
 import { getModels } from "@earendil-works/pi-ai/compat";
-import { buildSessionContext, compact, generateBranchSummary, keyHint, type BranchSummaryResult, type CompactionEntry, type ExtensionAPI, type ExtensionContext, type ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import { buildSessionContext, compact, estimateTokens, generateBranchSummary, keyHint, type BranchSummaryResult, type CompactionEntry, type ExtensionAPI, type ExtensionContext, type ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { query, type EffortLevel, type SDKMessage, type SettingSource } from "@anthropic-ai/claude-agent-sdk";
 import type { Base64ImageSource, ContentBlockParam } from "@anthropic-ai/sdk/resources";
 import { Text } from "@earendil-works/pi-tui";
@@ -766,6 +766,8 @@ export const __test = {
 	CC_CHILD_ENV,
 	buildMcpServers,
 	branchSummaryOutcome,
+	updateUsage,
+	estimatePiContext,
 	get promptCaptures() {
 		return promptCaptures;
 	},
@@ -978,7 +980,21 @@ function buildMcpServers(tools: Tool[], queryCtx: QueryContext): Record<string, 
 
 // --- Usage helpers ---
 
-function updateUsage(output: AssistantMessage, usage: Record<string, number | undefined>, model: Model<any>): void {
+// LOCAL: compaction-loop fix — pi-side context estimate. See updateUsage below.
+/** chars/4 estimate of pi's current context size, using pi's own per-message
+ *  estimator — the same heuristic pi's estimateContextTokens falls back to
+ *  when no usage is available. This is what a freshly rebuilt CC session
+ *  (pi's current history re-imported) would actually cost, so it is the
+ *  honest meter value while the live session is stale. */
+function estimatePiContext(context: Context): number {
+	let total = 0;
+	for (const message of context.messages) {
+		total += estimateTokens(message as Parameters<typeof estimateTokens>[0]);
+	}
+	return total;
+}
+
+function updateUsage(output: AssistantMessage, usage: Record<string, number | undefined>, model: Model<any>, c?: QueryContext): void {
 	if (usage.input_tokens != null) output.usage.input = usage.input_tokens;
 	if (usage.output_tokens != null) output.usage.output = usage.output_tokens;
 	if (usage.cache_read_input_tokens != null) output.usage.cacheRead = usage.cache_read_input_tokens;
@@ -988,10 +1004,29 @@ function updateUsage(output: AssistantMessage, usage: Record<string, number | un
 	if (reasoning != null) output.usage.reasoning = reasoning;
 	output.usage.totalTokens = output.usage.input + output.usage.output + output.usage.cacheRead + output.usage.cacheWrite;
 	calculateCost(model, output.usage);
+	// Divergence window (compaction-loop fix): pi's history was rewritten while
+	// this query was live, so CC's session still holds the full pre-rewrite
+	// context and its reported usage (~300k cacheRead) is stale — it would keep
+	// pi's meter over the compaction threshold forever. Report what the next
+	// rebuilt request will actually cost instead: the pi-side estimate of the
+	// current list. Cost stays on the real CC-reported numbers.
+	// LOCAL: compaction-loop fix — stale-usage suppression in the divergence window.
+	let staleRewrite = 0;
+	if (c?.staleUsageUntilRebuild && c.piContextEstimate > 0) {
+		const realCost = output.usage.cost;
+		const estimate = Math.max(c.piContextEstimate, output.usage.output);
+		output.usage.input = Math.max(0, estimate - output.usage.output);
+		output.usage.cacheRead = 0;
+		output.usage.cacheWrite = 0;
+		output.usage.totalTokens = estimate;
+		output.usage.cost = realCost;
+		staleRewrite = c.piContextEstimate;
+	}
 	const promptTokens = output.usage.input + output.usage.cacheRead + output.usage.cacheWrite;
 	const cachePct = promptTokens > 0 ? Math.round(output.usage.cacheRead / promptTokens * 100) : 0;
 	const reasoningText = reasoning != null ? ` reasoning=${reasoning}` : "";
-	debug(`usage: in=${output.usage.input} out=${output.usage.output} cacheRead=${output.usage.cacheRead} cacheWrite=${output.usage.cacheWrite} total=${output.usage.totalTokens}${reasoningText} cachePct=${cachePct}% model=${model.id}`);
+	const staleText = staleRewrite > 0 ? ` STALE-SESSION → estimate=${staleRewrite}` : "";
+	debug(`usage: in=${output.usage.input} out=${output.usage.output} cacheRead=${output.usage.cacheRead} cacheWrite=${output.usage.cacheWrite} total=${output.usage.totalTokens}${reasoningText} cachePct=${cachePct}% model=${model.id}${staleText}`);
 }
 
 // Log the *served* context window reported by an SDK result message
@@ -1104,7 +1139,7 @@ function processStreamEvent(
 		c.turnStreamMessageId = event.message?.id;
 		c.turnStreamOpen = true;
 		c.turnStreamBlockStart = c.turnBlocks.length;
-		if (event.message?.usage) updateUsage(c.turnOutput, event.message.usage, model);
+		if (event.message?.usage) updateUsage(c.turnOutput, event.message.usage, model, c);
 		return;
 	}
 
@@ -1181,7 +1216,7 @@ function processStreamEvent(
 
 	if (event?.type === "message_delta") {
 		c.turnOutput.stopReason = mapStopReason(event.delta?.stop_reason);
-		if (event.usage) updateUsage(c.turnOutput, event.usage, model);
+		if (event.usage) updateUsage(c.turnOutput, event.usage, model, c);
 		return;
 	}
 
@@ -1288,7 +1323,7 @@ function processAssistantMessage(message: SDKMessage, model: Model<any>, customT
 			debug("processAssistantMessage: unhandled block type", block.type);
 		}
 	}
-	if (assistantMsg.usage && c.turnOutput) updateUsage(c.turnOutput, assistantMsg.usage, model);
+	if (assistantMsg.usage && c.turnOutput) updateUsage(c.turnOutput, assistantMsg.usage, model, c);
 
 	// End the stream on tool_use, same as processStreamEvent's message_stop handler.
 	if (c.turnSawToolCall && c.currentPiStream && c.turnOutput) {
@@ -1561,6 +1596,7 @@ function streamClaudeAgentSdk(model: Model<any>, context: Context, options?: Sim
 	if (resultCtx) {
 		claimCurrentPiStream(stream, "tool-result", resultCtx);
 		resultCtx.resetTurnState(model);
+		resultCtx.piContextEstimate = estimatePiContext(context);
 		// User messages (steer/followUp) pi injected into context during the
 		// active query: a steer sent while a tool was executing, drained by pi at
 		// the turn boundary and appended alongside the tool result.
@@ -1606,6 +1642,14 @@ function streamClaudeAgentSdk(model: Model<any>, context: Context, options?: Sim
 	const isReentrant = activeQuery;
 	const queryCtx = isReentrant ? new QueryContext() : ctx();
 	debug(`provider: fresh query setup, isReentrant=${isReentrant}, activeContexts=${activeQueryContexts.size}`);
+	if (!isReentrant) {
+		// Top-level fresh query: syncSharedSession below rebuilds (or honestly
+		// resumes) the CC session, so its reported usage reflects pi's current
+		// history again. End any divergence-window suppression set by a mid-turn
+		// compaction on the previous turn.
+		// LOCAL: compaction-loop fix — end stale-usage suppression on rebuild.
+		queryCtx.staleUsageUntilRebuild = false;
+	}
 
 	// Resolved first: an unaccountable system prompt throws, and doing that before
 	// anything is claimed or reset leaves no half-built query behind — in particular
@@ -1636,6 +1680,7 @@ function streamClaudeAgentSdk(model: Model<any>, context: Context, options?: Sim
 	queryCtx.turnToolCallIds = [];
 	queryCtx.resetTurnState(model);
 	queryCtx.latestCursor = 0;
+	queryCtx.piContextEstimate = estimatePiContext(context);
 
 	const cwd = process.cwd();
 	// cliModel is the actual id sent to Claude Code (may carry [1m]); model.id is the
@@ -2217,6 +2262,17 @@ export default function (pi: ExtensionAPI) {
 		if (sharedSession) {
 			debug(`${event}: marking needsRebuild on session ${sharedSession.sessionId.slice(0, 8)}`);
 			sharedSession = { ...sharedSession, needsRebuild: true };
+		}
+		// Compaction-loop fix: if a bridge query is live, pi just rewrote history
+		// out from under a CC session that cannot be rebuilt until the turn ends.
+		// CC's reported usage now reflects the stale pre-rewrite session (~full
+		// cacheRead) and would keep pi's meter over the compaction threshold,
+		// firing compaction again and again. Suppress it in updateUsage until the
+		// next top-level fresh query rebuilds the session.
+		// LOCAL: compaction-loop fix — open the divergence window on mid-turn rewrites.
+		if (ctx().activeQuery !== null) {
+			ctx().staleUsageUntilRebuild = true;
+			debug(`${event}: live query detected; suppressing stale CC usage until rebuild (estimate=${ctx().piContextEstimate})`);
 		}
 	};
 	pi.on("session_compact", (event) => markRebuild(`session_compact:${event.reason}:willRetry=${event.willRetry}`));
