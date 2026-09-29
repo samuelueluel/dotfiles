@@ -1,8 +1,8 @@
 {
   "name": "pi-claude-bridge",
-  "version": "0.8.0-local.2",
+  "version": "0.8.0-local.3",
   "private": true,
-  "description": "Local pi-claude-bridge fork: 320K-capped Claude models plus -max 1M variants; hooks and duplicate AGENTS.md disabled in the bridged Claude Code child.",
+  "description": "Local pi-claude-bridge fork: conservative context caps, optional -max variants, and Claude Sonnet 5.5; hooks and duplicate AGENTS.md are disabled in the bridged Claude Code child.",
   "keywords": [
     "pi-package",
     "pi",

@@ -1,0 +1,25 @@
+vaults:
+  - name: family
+    path: /var/home/samuel/Family-Vault
+    is_default: true
+    write_backend: direct
+    watch_for_changes: true
+    allowed_extensions:
+      - .md
+      - .markdown
+    excluded_paths:
+      - .obsidian
+      - .trash
+      - .git
+    enable_caching: true
+    cache_ttl: 300
+    allowed_operations:
+      - all
+
+observability:
+  log_level: info
+  security_auditing: true
+  performance_monitoring: true
+
+batch:
+  conflict_strategy: strict

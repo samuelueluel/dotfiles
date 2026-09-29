@@ -81,6 +81,54 @@
         "turbovault_quick_health_check"
       ]
     },
+    "turbovault_family": {
+      "command": "/var/home/samuel/.local/bin/turbovault",
+      "args": [
+        "--config",
+        "/var/home/samuel/.config/turbovault/family.yaml",
+        "--profile",
+        "production"
+      ],
+      "env": {
+        "TURBOVAULT_DOCUMENT_INDEXING_ENABLED": "true",
+        "TURBOVAULT_DOCUMENT_MAX_BYTES": "52428800",
+        "XDG_CACHE_HOME": "/var/home/samuel/.cache/turbovault-family"
+      },
+      "lifecycle": "lazy",
+      "directTools": false,
+      "includeTools": [
+        "read_note",
+        "write_note",
+        "edit_note",
+        "delete_note",
+        "move_note",
+        "get_notes_info",
+        "search",
+        "advanced_search",
+        "get_backlinks",
+        "get_forward_links",
+        "get_broken_links",
+        "get_related_notes",
+        "get_hub_notes",
+        "suggest_links",
+        "query_frontmatter_sql",
+        "inspect_frontmatter",
+        "search_by_frontmatter",
+        "semantic_search",
+        "read_passage",
+        "embedding_index_status",
+        "reindex_embeddings",
+        "manage_tags",
+        "update_frontmatter",
+        "list_templates",
+        "create_from_template",
+        "generate_index",
+        "batch_execute",
+        "get_vault_context",
+        "quick_health_check"
+      ],
+      "disabled": true
+    },
     "lastfm": {
       "command": "mcp-lastfm",
       "lifecycle": "lazy",

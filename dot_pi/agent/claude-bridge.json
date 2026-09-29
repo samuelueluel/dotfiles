@@ -10,7 +10,8 @@
     "contextCap": 400000,
     "maxVariants": [
       "claude-opus-5-5",
-      "claude-sonnet-5"
+      "claude-sonnet-5",
+      "claude-sonnet-5-5"
     ]
   }
 }

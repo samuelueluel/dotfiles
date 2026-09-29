@@ -7,7 +7,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { applyLongContext, buildModels, claudeCodeModelId, resolveClaudeCodeRuntimeModel, resolveModel } from "../src/models.js";
+import { applyLongContext, buildModels, claudeCodeModelId, resolveClaudeCodeRuntimeModel, resolveModel, withLocalModelFallbacks } from "../src/models.js";
 import { getModels } from "@earendil-works/pi-ai/compat";
 
 const PRO = { plan: "pro", longContextExtraUsage: false };
@@ -44,6 +44,32 @@ describe("MODELS projection", () => {
 		assert.ok(find(models, "claude-opus-5"), "opus-5 present");
 		assert.ok(find(models, "claude-fable-5-1"), "fable-5-1 present");
 		assert.ok(find(models, "claude-haiku-4-5"), "haiku present");
+	});
+
+	it("adds Sonnet 5.5 as a 400K base model with a verified 1M twin", () => {
+		const models = buildModels(withLocalModelFallbacks([mockPiAiModel("claude-sonnet-5")]));
+		const sonnet55 = find(models, "claude-sonnet-5-5");
+		assert.ok(sonnet55);
+		assert.equal(sonnet55.name, "Claude Sonnet 5.5");
+		assert.equal(sonnet55.contextWindow, 1000000);
+		assert.equal(sonnet55.maxTokens, 128000);
+		assert.deepEqual(sonnet55.thinkingLevelMap, {
+			off: null, minimal: null, low: "low", medium: "medium", high: "high", xhigh: null, max: null,
+		});
+		assert.equal(resolveModel(models, "sonnet")?.id, "claude-sonnet-5-5");
+
+		const settings = { ...PRO, contextCap: 400000, maxVariants: ["claude-sonnet-5-5"] };
+		const registered = applyLongContext(models, settings);
+		const base = find(registered, "claude-sonnet-5-5");
+		const max = find(registered, "claude-sonnet-5-5-max");
+		assert.equal(base?.contextWindow, 400000);
+		assert.equal(max?.contextWindow, 1000000);
+		assert.deepEqual(resolveClaudeCodeRuntimeModel(base, settings), {
+			cliModelId: "claude-sonnet-5-5[1m]", contextWindow: 400000,
+		});
+		assert.deepEqual(resolveClaudeCodeRuntimeModel(max, settings), {
+			cliModelId: "claude-sonnet-5-5[1m]", contextWindow: 1000000,
+		});
 	});
 
 	it("sorts newest generation first within each family", () => {

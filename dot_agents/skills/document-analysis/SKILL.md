@@ -1,9 +1,11 @@
 ---
 name: document-analysis
-description: Enables analysis of private PDFs, DOCX files, images, text, and Markdown through the isolated document-analysis pipeline, with local OCR and visual enrichment. Use when the user asks to analyze, inspect, read, OCR, summarize, or discuss a personal document, places a file in the document-analysis inbox, mentions a document-analysis job ID, or invokes this skill.
+description: This skill is deprecated and no longer provides a supported document-analysis workflow. Do not load it for document-related requests; ask Samuel which replacement workflow to use.
 ---
 
-# Private Document Analysis
+# Private Document Analysis (Deprecated)
+
+> **Deprecated:** Do not use this skill or run the procedures below. If Samuel asks for document analysis, ask which replacement workflow he wants before proceeding.
 
 ## Request-Routing Playbook
 

@@ -27,7 +27,7 @@ index 3c39203..997eae9 100644
  
  export function globalConfigPath(): string {
 diff --git a/src/index.ts b/src/index.ts
-index 434e5e9..5c3bb78 100644
+index 434e5e9..42223df 100644
 --- a/src/index.ts
 +++ b/src/index.ts
 @@ -1,6 +1,6 @@
@@ -38,6 +38,15 @@ index 434e5e9..5c3bb78 100644
  import { query, type EffortLevel, type SDKMessage, type SettingSource } from "@anthropic-ai/claude-agent-sdk";
  import type { Base64ImageSource, ContentBlockParam } from "@anthropic-ai/sdk/resources";
  import { Text } from "@earendil-works/pi-tui";
+@@ -9,7 +9,7 @@ import { appendFileSync, mkdirSync, realpathSync, statSync } from "fs";
+ import { homedir } from "os";
+ import { dirname, join } from "path";
+ import { PROVIDER_ID, messageContentToText, convertPiMessages } from "./convert.js";
+-import { applyLongContext, buildModels, claudeCodeModelId, type LongContextSettings, resolveModel as _resolveModel } from "./models.js";
++import { applyLongContext, buildModels, claudeCodeModelId, type LongContextSettings, resolveModel as _resolveModel, withLocalModelFallbacks } from "./models.js";
+ import { MCP_SERVER_NAME, MCP_TOOL_PREFIX, renderSkillsBlock } from "./skills.js";
+ import { verifyWrittenSession as _verifyWrittenSession } from "./session-verify.js";
+ import { extractAllToolResults as _extractAllToolResults, type McpResult } from "./extract-tool-results.js";
 @@ -64,7 +64,9 @@ const CC_CHILD_ENV = {
  // `env` and `apiKeyHelper`. Patterns are matched with picomatch against absolute
  // paths; "**/CLAUDE.md" covers the user, ancestor, project and .claude/ copies,
@@ -49,6 +58,17 @@ index 434e5e9..5c3bb78 100644
  
  // Ensure log directories exist when debug is enabled
  if (DEBUG) {
+@@ -138,8 +140,8 @@ const SDK_TO_PI_TOOL_NAME: Record<string, string> = {
+ 	read: "read", write: "write", edit: "edit", bash: "bash",
+ };
+ 
+-// MODELS is buildModels(getModels("anthropic")) — projection kept in models.js.
+-const MODELS = buildModels(getModels("anthropic"));
++// LOCAL: supplement a newly released model when the pi-ai catalog lags.
++const MODELS = buildModels(withLocalModelFallbacks(getModels("anthropic")));
+ let providerSettings: NonNullable<Config["provider"]> = {};
+ let longContextSettings: LongContextSettings = { plan: "pro", longContextExtraUsage: false };
+ 
 @@ -764,6 +766,8 @@ export const __test = {
  	CC_CHILD_ENV,
  	buildMcpServers,
@@ -200,10 +220,55 @@ index 434e5e9..5c3bb78 100644
  	pi.on("session_compact", (event) => markRebuild(`session_compact:${event.reason}:willRetry=${event.willRetry}`));
  	pi.on("session_tree", () => markRebuild("session_tree"));
 diff --git a/src/models.ts b/src/models.ts
-index 789583f..e1d3e17 100644
+index 789583f..1e43e83 100644
 --- a/src/models.ts
 +++ b/src/models.ts
-@@ -61,8 +61,15 @@ export type LongContextSettings = {
+@@ -1,13 +1,41 @@
+ // Model selection + display-order policy for the model picker. The picker is
+-// driven by pi-ai's anthropic catalog: models appear (and disappear) with it,
+-// no per-model code here. Extracted from index.ts so tests can import without
+-// activating the extension.
++// normally driven by pi-ai's anthropic catalog. LOCAL: add a metadata fallback
++// for newly released Sonnet 5.5 until pi-ai's catalog catches up. Extracted from
++// index.ts so tests can import without activating the extension.
+ // `resolveModel` resolves family shortcuts (opus/sonnet/fable) to the newest
+ // matching id regardless of sort order; sort order only drives picker display.
+ 
+ const TWO_HUNDRED_K_CONTEXT = 200_000;
+ const ONE_M_CONTEXT = 1_000_000;
+ 
++// LOCAL: Anthropic lists Sonnet 5.5 before the installed pi-ai catalog does.
++// Its published limits are 1M context / 128K output. The bridge measured the
++// [1m] route on Pro; contextCap keeps the standard picker entry at 400K.
++export function withLocalModelFallbacks<T extends { id: string; [key: string]: any }>(piAiModels: T[]): T[] {
++	const id = "claude-sonnet-5-5";
++	if (piAiModels.some((model) => model.id === id)) return piAiModels;
++
++	const sonnet5 = piAiModels.find((model) => model.id === "claude-sonnet-5");
++	if (!sonnet5) return piAiModels;
++
++	return [...piAiModels, {
++		...sonnet5,
++		id,
++		name: "Claude Sonnet 5.5",
++		contextWindow: ONE_M_CONTEXT,
++		maxTokens: 128_000,
++		thinkingLevelMap: {
++			off: null,
++			minimal: null,
++			low: "low",
++			medium: "medium",
++			high: "high",
++			xhigh: null,
++			max: null,
++		},
++	} as T];
++}
++
+ // pi-ai ships dated snapshot ids (claude-opus-4-5-20251101, ...) alongside the
+ // bare ids. They are never exposed - and must not steal first-partial-match
+ // shortcuts like "opus-4-5" from the bare id.
+@@ -61,8 +89,15 @@ export type LongContextSettings = {
  	// Model ids whose declared 1M context Claude Code turned out not to serve;
  	// forces bare id at 200K without a code change.
  	forceTwoHundredK?: string[];
@@ -219,7 +284,16 @@ index 789583f..e1d3e17 100644
  export type ClaudeCodeRuntimeModel = {
  	cliModelId: string;
  	contextWindow: number;
-@@ -97,11 +104,25 @@ const PLAN_GATED_ONE_M: Record<string, (settings: LongContextSettings) => boolea
+@@ -86,6 +121,8 @@ const MEASURED_ONE_M = new Set([
+ 	"claude-opus-4-8",
+ 	"claude-opus-4-7",
+ 	"claude-sonnet-5",
++	// LOCAL: Pro SDK probe on 2026-09-28 served 1M for claude-sonnet-5-5[1m].
++	"claude-sonnet-5-5",
+ ]);
+ 
+ // Measured exceptions: pi-ai declares 1M and the [1m] id works, but only when
+@@ -97,11 +134,25 @@ const PLAN_GATED_ONE_M: Record<string, (settings: LongContextSettings) => boolea
  	"claude-sonnet-4-6": (settings) => settings.longContextExtraUsage,
  };
  
@@ -246,7 +320,7 @@ index 789583f..e1d3e17 100644
  	if (settings.forceTwoHundredK?.includes(modelId)) {
  		return { cliModelId: modelId, contextWindow: TWO_HUNDRED_K_CONTEXT };
  	}
-@@ -151,9 +172,13 @@ export function applyLongContext<T extends { id: string; name: string; contextWi
+@@ -151,9 +202,13 @@ export function applyLongContext<T extends { id: string; name: string; contextWi
  	models: T[],
  	settings: LongContextSettings,
  ): T[] {
@@ -337,6 +411,52 @@ index 0000000..52b0516
 +	assert.equal(claudeCodeModelId({ id: "claude-sonnet-5-max" }, settings), "claude-sonnet-5[1m]");
 +	assert.equal(claudeCodeModelId({ id: "claude-haiku-4-5-max" }, settings), "claude-haiku-4-5-max");
 +});
+diff --git a/tests/unit-models.mjs b/tests/unit-models.mjs
+index 995bdca..5c119bd 100644
+--- a/tests/unit-models.mjs
++++ b/tests/unit-models.mjs
+@@ -7,7 +7,7 @@
+  */
+ import { describe, it } from "node:test";
+ import assert from "node:assert/strict";
+-import { applyLongContext, buildModels, claudeCodeModelId, resolveClaudeCodeRuntimeModel, resolveModel } from "../src/models.js";
++import { applyLongContext, buildModels, claudeCodeModelId, resolveClaudeCodeRuntimeModel, resolveModel, withLocalModelFallbacks } from "../src/models.js";
+ import { getModels } from "@earendil-works/pi-ai/compat";
+ 
+ const PRO = { plan: "pro", longContextExtraUsage: false };
+@@ -46,6 +46,32 @@ describe("MODELS projection", () => {
+ 		assert.ok(find(models, "claude-haiku-4-5"), "haiku present");
+ 	});
+ 
++	it("adds Sonnet 5.5 as a 400K base model with a verified 1M twin", () => {
++		const models = buildModels(withLocalModelFallbacks([mockPiAiModel("claude-sonnet-5")]));
++		const sonnet55 = find(models, "claude-sonnet-5-5");
++		assert.ok(sonnet55);
++		assert.equal(sonnet55.name, "Claude Sonnet 5.5");
++		assert.equal(sonnet55.contextWindow, 1000000);
++		assert.equal(sonnet55.maxTokens, 128000);
++		assert.deepEqual(sonnet55.thinkingLevelMap, {
++			off: null, minimal: null, low: "low", medium: "medium", high: "high", xhigh: null, max: null,
++		});
++		assert.equal(resolveModel(models, "sonnet")?.id, "claude-sonnet-5-5");
++
++		const settings = { ...PRO, contextCap: 400000, maxVariants: ["claude-sonnet-5-5"] };
++		const registered = applyLongContext(models, settings);
++		const base = find(registered, "claude-sonnet-5-5");
++		const max = find(registered, "claude-sonnet-5-5-max");
++		assert.equal(base?.contextWindow, 400000);
++		assert.equal(max?.contextWindow, 1000000);
++		assert.deepEqual(resolveClaudeCodeRuntimeModel(base, settings), {
++			cliModelId: "claude-sonnet-5-5[1m]", contextWindow: 400000,
++		});
++		assert.deepEqual(resolveClaudeCodeRuntimeModel(max, settings), {
++			cliModelId: "claude-sonnet-5-5[1m]", contextWindow: 1000000,
++		});
++	});
++
+ 	it("sorts newest generation first within each family", () => {
+ 		const models = buildModels([
+ 			oneM("claude-opus-4-7"), oneM("claude-opus-5"),
 diff --git a/tests/unit-stale-usage.mjs b/tests/unit-stale-usage.mjs
 new file mode 100644
 index 0000000..efd6414

@@ -1,12 +1,40 @@
 // Model selection + display-order policy for the model picker. The picker is
-// driven by pi-ai's anthropic catalog: models appear (and disappear) with it,
-// no per-model code here. Extracted from index.ts so tests can import without
-// activating the extension.
+// normally driven by pi-ai's anthropic catalog. LOCAL: add a metadata fallback
+// for newly released Sonnet 5.5 until pi-ai's catalog catches up. Extracted from
+// index.ts so tests can import without activating the extension.
 // `resolveModel` resolves family shortcuts (opus/sonnet/fable) to the newest
 // matching id regardless of sort order; sort order only drives picker display.
 
 const TWO_HUNDRED_K_CONTEXT = 200_000;
 const ONE_M_CONTEXT = 1_000_000;
+
+// LOCAL: Anthropic lists Sonnet 5.5 before the installed pi-ai catalog does.
+// Its published limits are 1M context / 128K output. The bridge measured the
+// [1m] route on Pro; contextCap keeps the standard picker entry at 400K.
+export function withLocalModelFallbacks<T extends { id: string; [key: string]: any }>(piAiModels: T[]): T[] {
+	const id = "claude-sonnet-5-5";
+	if (piAiModels.some((model) => model.id === id)) return piAiModels;
+
+	const sonnet5 = piAiModels.find((model) => model.id === "claude-sonnet-5");
+	if (!sonnet5) return piAiModels;
+
+	return [...piAiModels, {
+		...sonnet5,
+		id,
+		name: "Claude Sonnet 5.5",
+		contextWindow: ONE_M_CONTEXT,
+		maxTokens: 128_000,
+		thinkingLevelMap: {
+			off: null,
+			minimal: null,
+			low: "low",
+			medium: "medium",
+			high: "high",
+			xhigh: null,
+			max: null,
+		},
+	} as T];
+}
 
 // pi-ai ships dated snapshot ids (claude-opus-4-5-20251101, ...) alongside the
 // bare ids. They are never exposed - and must not steal first-partial-match
@@ -93,6 +121,8 @@ const MEASURED_ONE_M = new Set([
 	"claude-opus-4-8",
 	"claude-opus-4-7",
 	"claude-sonnet-5",
+	// LOCAL: Pro SDK probe on 2026-09-28 served 1M for claude-sonnet-5-5[1m].
+	"claude-sonnet-5-5",
 ]);
 
 // Measured exceptions: pi-ai declares 1M and the [1m] id works, but only when
