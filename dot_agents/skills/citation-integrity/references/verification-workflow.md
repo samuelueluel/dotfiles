@@ -1,8 +1,31 @@
 # Extraction Diagnostics and Failure Wording
 
-**Load this file when** a table has broken signs or columns, inferential statistics conflict, or it is unclear whether a retrieved passage can support a claim.
+**Load this file when** a sidecar status line or `reliability` field names a finding, a table has broken signs or columns, inferential statistics conflict, or it is unclear whether a retrieved passage can support a claim.
 
 The [citation integrity skill](../SKILL.md) owns the governing checks. This reference illustrates failure cases; it is not a second audit workflow.
+
+## What Each Status Line Means
+
+Surya sidecars mark every table that is not `verified` with a `[Table status: ...]` line, every contradicted equation with an `[Equation status: ...]` line, and every paragraph whose inline math disagrees with the page with a `[Math status: ...]` line. The reason in parentheses is either a plain sentence or an internal code. A MinerU sidecar, or a result with no `reliability` field, is `legacy-unverified`: nothing was checked.
+
+| What you see | Numbers | What remains unchecked |
+|---|---|---|
+| No status line on a table (`verified`) | Every number matches the PDF text layer one to one | Placement is checked for values unique in the table, but not label rows shifted against their numbers, swaps between identical values, group headers spanning the wrong columns, or stars the text layer does not print. A table without numbers is checked word by word and row order only |
+| `REPAIRED (... corrected or filled from the PDF text layer)`, sign or star fixes | Misread cells, signs, or stars were replaced from the text layer and re-checked in full | Same as `verified` |
+| `SINGLE-ROUTE (column headers do not line up with the page)` | Match the text layer | Which column a number belongs to |
+| `SINGLE-ROUTE (significance stars on some values are not in the PDF text layer)` | Match the text layer | Significance; the sidecar shows stars the page may not print |
+| `SINGLE-ROUTE (printed labels missing: ...)` | Match the text layer | The listed labels or headers are missing from the table |
+| `SINGLE-ROUTE (re-read by a second model)` | A vision-model re-read whose numbers match the text layer | Labels can sit on the wrong rows |
+| `SINGLE-ROUTE (no PDF text layer; Surya and a second model agree on every number ...)` | Scanned page: two independent image readings agree | No text layer; fine for screening, render for decisive numbers |
+| `SINGLE-ROUTE (ocr_layer_agreement)` | Scanned page: the sidecar agrees with the page's own OCR text | Two OCR reads agreeing, not an independent check |
+| `SINGLE-ROUTE (no_text_layer)` | Nothing: the table is a picture on a born-digital page | Everything; treat like a scanned table |
+| `SINGLE-ROUTE (math_table)`, `(mark_cells)`, `(no_numbers)`, or `(no independent check)` | Formulas, symbols, or check marks the text layer cannot place, or nothing to compare | Everything; render the page |
+| `UNRESOLVED (...)` on a table, with `⟦withheld⟧` markers | Withheld | Not applicable; render the page |
+| No status line on an equation | Symbols match the text layer, or could not be checked | Fractions, sub- and superscripts, term order; render before quoting |
+| `[Equation status: UNRESOLVED (symbols differ ...)]` or an equation-number mismatch | The listed symbols or number contradict the text layer | Render the page; never quote the sidecar version |
+| `[Math status: SINGLE-ROUTE (inline math or text differs ...)]` | The paragraph's inline math or wording differs from the page by the listed symbols | Render before quoting a formula or a word it names |
+
+Long numbers in software output (Stata logs with many-digit coefficients) are often misread by OCR. On born-digital pages the checks catch and repair these; on a scan of such output nothing can, so treat those numbers as unconfirmed.
 
 ## Table and Numerical Symptoms
 
@@ -10,7 +33,9 @@ The [citation integrity skill](../SKILL.md) owns the governing checks. This refe
 |---|---|---|
 | Coefficient sign disagrees with the IRR's position relative to 1 | Outcome row, transformation note, source prose, or actual table image | “The extracted columns disagree; the estimate remains unverified.” |
 | Stars appear below the table, detached from cells | Actual cell alignment and star legend | “The estimate and SE are available; the significance marker could not be assigned reliably.” |
-| Minus signs disappear in PDF text | Prose describing direction or actual page image | “The extracted sign is unclear.” |
+| Minus signs disappear in PDF text, or a number starts with a stray `2` or `)` | Prose describing direction or actual page image | “The extracted sign is unclear.” |
+| Sidecar value looks right but the page prints something odd (such as `6.144` for a count) | The rendered page | Report the printed value and flag a likely source typo |
+| Equation symbols, sub- or superscripts, or a fraction look doubtful | The rendered equation | “The extracted equation could not be confirmed against the page.” |
 | CI excludes the null but p-value is nonsignificant | Methods for both interval and test; clustering, resampling, or alternative procedures | “The reported CI and p-value disagree; I could not establish whether the interval and test used different methods.” |
 | Large percentage is normalized from counts | Baseline denominator, treatment dose, and whether it is a cumulative program effect | “The dose or denominator is unverified, so this cannot support a per-building comparison.” |
 | Number is visible but uncertainty is outside the read window | Table continuation and notes | “The estimate was retrieved, but its uncertainty was not.” |

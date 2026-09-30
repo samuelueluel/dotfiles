@@ -73,7 +73,7 @@ primary_result_id: paper's preferred or headline result
 maximum_substantive_result_id: largest significant substantive result
 selected_result_id: result selected by the declared eligibility policy
 inventory_locators: exact tables, PDF pages, or bounded passages read
-source_reliability: block_status of each value's source and any item_warning
+source_reliability: block_status and finding of each value's source, and any item_warning
 close_alternative: item key and margin for the nearest competing estimate, or none
 tie_group: result IDs or item keys tied at the top-k boundary, if any
 reason: required for no_eligible_result; explain unresolved fields when unresolved
@@ -115,7 +115,7 @@ For every estimate that will appear in the answer, establish:
 - Whether parentheses are SEs, CIs, or another statistic.
 - Exact reported p-value, CI, SE, or significance threshold when available.
 
-A decisive table read must include row and column labels plus notes. When complete source prose already reports the estimate with its uncertainty and significance, that prose establishes the paper-level maximum without a redundant table read; read the table only when prose lacks a decision-relevant field or the ranking margin is close. Treat `REFERENCED_TABLE_NOT_READ` as required follow-up only in those cases. PDF text can lose signs and alignment just as sidecars can.
+A decisive table read must include row and column labels plus notes, confirmed on the PDF page even when the block is `verified`; verification does not check which label row or group header a number sits under, and sidecar tables often drop notes. When complete source prose already reports the estimate with its uncertainty and significance, that prose establishes the paper-level maximum without a redundant table read; read the table only when prose lacks a decision-relevant field or the ranking margin is close. Treat `REFERENCED_TABLE_NOT_READ` as required follow-up only in those cases. PDF text can lose signs and alignment just as sidecars can.
 
 Use unambiguous source prose only when it directly describes the same result. If text routes disagree or remain ambiguous, inspect the actual rendered page image. If image inspection is unavailable or inconclusive, omit the value or mark it unverified.
 

@@ -96,7 +96,7 @@ Follow the compact paper-list format in `citation-integrity`; metadata-only rows
 Load `citation-integrity` whenever the output attributes a substantive estimand or finding to a paper.
 
 - Only positive-Rerank semantic text or verified direct source reading can support substantive inclusion.
-- Keep indexed passages, MinerU sidecars, extracted PDF text, and inspected images distinct.
+- Keep indexed passages, sidecars, extracted PDF text, and inspected images distinct.
 - Retain exact item keys, evidence IDs, source hashes, and actual locators internally.
 - Never claim PDF-page verification or image inspection from an indexed passage or sidecar line.
 

@@ -29,7 +29,7 @@ Reuse adequate evidence rather than retrieving another representation for reassu
 - Never use one paper's evidence as proof of another paper's findings. A paper's description of prior work establishes what it says about that work, not independent verification of the cited result.
 - Metadata abstracts, titles, membership, bibliography entries, and graph relationships do not establish empirical findings.
 - Passages marked `REF` or consisting of reference lists establish citations only.
-- Generated `[Figure Schema]` descriptions are discovery aids, not observed results. Verify findings against source prose, captions, tables, or an actually inspected image.
+- Generated `[Figure Schema]` descriptions are discovery aids, not observed results. Verify findings against source prose, captions, tables, or an actually inspected image. The stamped `- Caption:` line can belong to a neighboring figure; confirm a figure's number and title on the rendered page before citing it.
 - Never invent scores, quotes, provenance, or missing statistics. Mark unresolved claims `UNVERIFIED`, qualify them, or omit them.
 
 ## 1. Decide Whether the Evidence Supports the Claim
@@ -83,6 +83,7 @@ A precise known-item sidecar window is permitted when page extraction fails, no 
 Reuse verified evidence; a second view of the same text is not independent corroboration.
 
 Read the table notes before interpreting parentheses or stars. Parentheses can contain SEs, CIs, or test statistics.
+Take notes, panel titles, sub-headers, units, and sample restrictions from the PDF page. Sidecar tables often drop them, so a sidecar table without notes says nothing about whether the page has them.
 Preserve the reported scale: coefficient, semielasticity, marginal effect, IRR, or percentage change.
 Do not exponentiate an already transformed estimate or assume a log-link coefficient and a reported semielasticity are interchangeable.
 
@@ -112,26 +113,28 @@ A numerical maximum among unlike results must be labeled that way, not called th
 
 ## 3. Check Extracted Text and Record Its Source
 
-Distinguish extracted PDF-page text, MinerU sidecar text, indexed passages, and visual inspection.
+Distinguish extracted PDF-page text, sidecar text (MinerU or Surya), indexed passages, and visual inspection.
 `zotero_read_pdf_pages` returns text, not an image inspection. Describe the evidence as extracted PDF-page text, not the vague label “direct PDF.”
 Indexed passages and literal lookups may expose the same sidecar. Agreement does not independently verify its accuracy.
 
-Sidecar-backed tool results carry a `reliability` field (`block_status`, `requires_pdf_check`, `pdf_pages`, `check_pages`, and a paper-level `item_level`/`item_warning`). Sidecars may also show visible `[Table status: ...]` lines and `⟦withheld: ...⟧` markers. Read these before using any number:
+Sidecar-backed tool results carry a `reliability` field (`block_status`, `requires_pdf_check`, `pdf_pages`, `check_pages`, and a paper-level `item_level`/`item_warning`). Sidecars may also show visible `[Table status: ...]`, `[Equation status: ...]`, and `[Math status: ...]` lines and `⟦withheld: ...⟧` markers. Read these before using any number or formula. Read the reason in a status line's parentheses, not only the status: `single-route` has several meanings, and some confirm the numbers but not their labels. For what each status line means, load [extraction diagnostics](references/verification-workflow.md).
 
 | Block status | Screening / inventory | Final answer |
 |---|---|---|
-| `verified` | Usable | A decisive number still needs a PDF-page locator |
+| `verified` | Usable | A decisive number still needs a PDF-page locator. Confirm its row label, column header, panel, and sample restriction on the page: verification checks the numbers and most of their placement, not which label row or group header they sit under |
 | `repaired` | Usable; disclose the repair | Same as `verified` |
 | `single-route`, `legacy-unverified` | Read the PDF page text first | Render the page and inspect it |
 | `unresolved` (numbers withheld) | Not usable | Render and inspect the page; if you cannot settle it, list it for Samuel under **Check yourself** |
 
-Never fill a withheld number from memory, another route's guess, or a neighboring cell. A paper-level `item_warning` applies to the whole paper even when the retrieved chunk itself is `verified`. A sidecar result with no `reliability` field is `legacy-unverified`.
+Never fill a withheld number from memory, another route's guess, or a neighboring cell. A paper-level `item_warning` directs checks to the tables and pages it lists (`problem_tables`, `check_pages`): render those pages before using their values. A `verified` block elsewhere in the paper keeps its own status. A warning that lists no tables or pages, such as a legacy-unverified sidecar, applies to the whole paper. A sidecar result with no `reliability` field is `legacy-unverified`.
 
-`zotero_find_in_pdf` is a bounded literal lookup over the authoritative PDF text layer. It returns one-based PDF page locators, verbatim extracted windows, exact total/returned match counts, and text-layer coverage. Coverage is `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage cannot establish absence. Its PDF page index is distinct from a printed label, MinerU sidecar line, or indexed offset. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key in the locator.
+`zotero_find_in_pdf` is a bounded literal lookup over the PDF text layer. It returns one-based PDF page locators, verbatim extracted windows, exact total/returned match counts, and text-layer coverage. Coverage is `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage cannot establish absence. Its PDF page index is distinct from a printed label, MinerU sidecar line, or indexed offset. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key in the locator.
 
-All extracted text can lose signs, digits, stars, or column alignment, including PDF text layers.
+All extracted text can lose signs, digits, stars, or column alignment, including PDF text layers. The PDF text layer is not the authority: when a sidecar and PDF text disagree, neither wins, so render the page. In PDF text, a leading `2`, `)`, or odd character before a number can be a mis-encoded minus sign. On scanned pages, PDF text is a second OCR, not an independent check. A literal no-match for a number does not show that the number is absent, because mis-encoded signs break the match; search by the row label instead.
 If a value needed to support the answer is ambiguous, use unambiguous source prose or inspect the actual page/table image with an available tool.
 Never silently repair a table, reattach detached stars by guesswork, or choose the coefficient/IRR column that fits expectations.
+If the rendered page shows an apparent typo, report the value as printed and flag it as a likely source typo. OCR sometimes silently "corrects" a typo, so a plausible sidecar value can differ from what the page prints.
+Never rely on sidecar LaTeX for a sign, exponent, index, fraction, or which symbol appears (ν or v, x or X). Before quoting or reasoning from an equation or inline formula, render its page and read it there. An `[Equation status: UNRESOLVED ...]` line means the equation's symbols contradict the PDF text layer and names them; a `[Math status: SINGLE-ROUTE ...]` line means a paragraph's inline math or wording differs from the page. An equation without a status line has at most the same symbols as the page: fractions, sub- and superscripts, and term order are never checked, and scanned math is not checked at all.
 If the ambiguity cannot be resolved from text, render the targeted PDF page or normalized region with `zotero_render_pdf_page` and inspect the actual image. If visual inspection is unavailable or still inconclusive, omit the value or mark it unverified.
 For specific symptoms and failure wording, load [extraction diagnostics](references/verification-workflow.md).
 

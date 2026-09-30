@@ -42,6 +42,9 @@
 
 - Writing: Ghostty writing terminal (Monaspace Xenon) | ghostty-write
 
+- Website: Publish Canadian citizenship snapshot | ~/canadian-citizenship-site/update.sh
+- Website: Preview Canadian citizenship snapshot (no upload) | ~/canadian-citizenship-site/update.sh --check
+
 - Niri: Toggle debug view | niri msg action toggle-debug-view
 - Niri: IPC msg | niri msg
 

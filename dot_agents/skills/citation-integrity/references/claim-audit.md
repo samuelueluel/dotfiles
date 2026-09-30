@@ -14,7 +14,7 @@ Submit no more than eight atomic claims in one call with `escalation="none"`. Fo
 | `pdf_page` | Exact parent `item_key`, one-based `page`, literal `quote` | `end_page`, `attachment_key`, `content_hash` |
 | `mineru_sidecar` | Exact parent `item_key`, literal `quote` | `locator`, `start_line`, `end_line`, `content_hash`, `index_generation` |
 
-Item keys are eight-character parent keys, not titles, DOIs, paths, or collections. The tool rejects caller-supplied source bodies and reranker scores.
+`mineru_sidecar` is the route name for any sidecar, including Surya sidecars. Item keys are eight-character parent keys, not titles, DOIs, paths, or collections. The tool rejects caller-supplied source bodies and reranker scores.
 
 Numeric claims require evidence from a PDF-page read, or the supported weaker MinerU-sidecar fallback after a PDF-page route fails. Accepted quotes must contain the values and any explicitly asserted units; a unit-less expected value matches any source unit for that number, so an SE printed as `(10.66%)` satisfies a unit-less `se` entry. Supply `expected_values` for the empirical values to audit so structural numbers such as `Table 6`, `Figure 2`, publication years, and PDF pages are not treated as findings.
 
@@ -60,6 +60,7 @@ None of these statuses decides whether the source substantively entails the clai
 |---|---|
 | `QUOTE_NOT_FOUND` | Compare the literal quote with the source, including layout breaks; correct a genuine transcription or locator error rather than rewriting source text. |
 | `NUMBER_MISMATCH` / `UNIT_MISMATCH` | Read the `gate_failures` message first — it lists the missing and quoted tokens — then inspect signs, ranges, thresholds, and whether the accepted excerpt contains the stated value and unit. |
+| `SIDECAR_BLOCK_UNRESOLVED` | The sidecar window holds an unresolved table or a `⟦withheld⟧` number. This is not a payload error: switch that claim to a `pdf_page` route after rendering the page, or drop the claim. |
 | `CHUNK_NOT_FOUND` | Check the returned chunk identifier and whether the indexed evidence changed. |
 | `check_mode`, `CHECKER_UNAVAILABLE`, `CHECKER_SKIPPED` | Treat as an outdated schema or unavailable capability, not a finding about the source. |
 | Retained preview omits its quote or diagnostics conflict | Treat as a response-contract failure, not evidence that the author or agent fabricated a result. |

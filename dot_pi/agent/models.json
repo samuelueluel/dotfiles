@@ -865,6 +865,13 @@
             "max": "max",
             "minimal": null
           }
+        },
+        "gpt-6.1-sol": {
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": null
+          }
         }
       }
     }

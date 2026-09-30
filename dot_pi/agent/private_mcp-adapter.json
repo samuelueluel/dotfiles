@@ -1,6 +1,7 @@
 {
   "settings": {
-    "toolResultRendering": "boxed"
+    "toolResultRendering": "boxed",
+    "deferWithMissingMetadata": true
   },
   "mcpServers": {
     "searxng": {
@@ -146,6 +147,36 @@
         "zotero_search",
         "zotero_fetch"
       ]
+    },
+    "cloudflare-docs": {
+      "url": "https://docs.mcp.cloudflare.com/mcp",
+      "lifecycle": "lazy",
+      "directTools": false,
+      "disabled": true
+    },
+    "cloudflare": {
+      "url": "https://mcp.cloudflare.com/mcp",
+      "lifecycle": "lazy",
+      "directTools": false,
+      "disabled": true
+    },
+    "cloudflare-bindings": {
+      "url": "https://bindings.mcp.cloudflare.com/mcp",
+      "lifecycle": "lazy",
+      "directTools": false,
+      "disabled": true
+    },
+    "cloudflare-builds": {
+      "url": "https://builds.mcp.cloudflare.com/mcp",
+      "lifecycle": "lazy",
+      "directTools": false,
+      "disabled": true
+    },
+    "cloudflare-observability": {
+      "url": "https://observability.mcp.cloudflare.com/mcp",
+      "lifecycle": "lazy",
+      "directTools": false,
+      "disabled": true
     }
   }
 }

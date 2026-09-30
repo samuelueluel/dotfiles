@@ -13,6 +13,7 @@ description: Resolves and reads named or exact Zotero papers to answer bounded q
 - Use the smallest source window that supplies the requested fact and necessary context.
 - Reuse adequate evidence already read in the current session. Do not retrieve another representation for reassurance.
 - Never repair extracted tables by intuition. Render the actual page when a decisive sign, digit, star, or column remains ambiguous.
+- Never quote or reason from sidecar LaTeX without rendering the equation's page. Sidecar equations can swap symbols, drop sub- and superscripts, or turn a vector into a fraction.
 - After two uninformative attempts to locate the same missing fact, change the reading method once or report it unresolved.
 - Do not modify metadata, process attachments, rebuild indexes, or download cited papers during source reading.
 
@@ -51,7 +52,7 @@ Use the returned evidence ID with `zotero_read_passage`. Add `neighbors=1` only 
 
 For a known phrase, table label, heading, or statistic, use `zotero_find_in_item`. Prefer a distinctive phrase over a common word. When continuing the sidecar, pass its `source_hash` as `expected_hash`.
 
-Before quoting any number from a passage or sidecar window, read its `reliability` field and the paper-level `item_warning`. For a table listed in `problem_tables` or a window with `requires_pdf_check: true`, go straight to the PDF page in step 5 instead of trying another sidecar lookup. Use the returned `pdf_pages` as the page to search, not as a verified page for citation.
+Before quoting any number or formula from a passage or sidecar window, read its `reliability` field, any `[Table status]`, `[Equation status]`, or `[Math status]` line, and the paper-level `item_warning`. For a table listed in `problem_tables`, a window with `requires_pdf_check: true`, or a flagged equation, go straight to the PDF page in step 5 instead of trying another sidecar lookup. Use the returned `pdf_pages` as the page to search, not as a verified page for citation.
 
 Inspect the deployed schema before using an unfamiliar tool. For detailed lookup and continuation examples, load [bounded source-reading syntax](../../references/zotero/deep-dive-reading.md).
 
@@ -65,7 +66,7 @@ The composite tool:
 - Chains sidecar hashes.
 - Preserves indexed, sidecar, and PDF routes separately.
 - Reports PDF text-layer coverage and one-based pages.
-- Flags numeric or significance-marker disagreements.
+- Flags numeric or significance-marker disagreements, and raises `REQUIRES_PDF_CHECK` with `pdf_check_pages_not_read` when flagged sidecar pages still need a PDF read.
 
 Its output contains candidate evidence, not verified substantive fields. Inspect the returned text and resolve any flag before using a value.
 
@@ -79,13 +80,14 @@ For every estimate reported, establish:
 - Sample, population, geography, and horizon.
 - Specification and whether the result is main, subgroup, dynamic, robustness, or model-based.
 - Meaning of parentheses and significance marks.
+- Row label, column header, panel, and sample restriction, confirmed on the PDF page even when the block is `verified`. Take table notes and units from the page, since sidecar tables often drop them.
 
 For a decisive table value:
 
 1. Locate its actual PDF page with `zotero_find_in_pdf` or a verified outline. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key with the locator.
 2. Read the result and notes with `zotero_read_pdf_pages`.
 3. Compare with unambiguous source prose when available.
-4. If signs, digits, stars, or columns remain unclear, call `zotero_render_pdf_page` and inspect the image.
+4. If signs, digits, stars, or columns remain unclear, call `zotero_render_pdf_page` and inspect the image. If the page shows an apparent typo, report the printed value and flag it as a likely source typo.
 5. Omit or label the value unverified if the image remains inconclusive, and list it under **Check yourself** as `citation-integrity` describes. Never supply a `⟦withheld⟧` number from any other route.
 
 `zotero_read_pdf_pages` returns extracted text, not visual inspection. PDF text can also lose minus signs and alignment. Never describe it as an inspected page image.
