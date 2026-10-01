@@ -23,6 +23,7 @@ Surya sidecars mark every table that is not `verified` with a `[Table status: ..
 | `UNRESOLVED (...)` on a table, with `⟦withheld⟧` markers | Withheld | Not applicable; render the page |
 | No status line on an equation | Symbols match the text layer, or could not be checked | Fractions, sub- and superscripts, term order; render before quoting |
 | `[Equation status: UNRESOLVED (symbols differ ...)]` or an equation-number mismatch | The listed symbols or number contradict the text layer | Render the page; never quote the sidecar version |
+| `[Equation status: REPAIRED (...)]` or `[Math status: REPAIRED (...)]` | Look-alike symbols (ν read as v, ι read as t) were restored from the text layer, and the symbols now match it | Fractions, sub- and superscripts, term order; render before quoting |
 | `[Math status: SINGLE-ROUTE (inline math or text differs ...)]` | The paragraph's inline math or wording differs from the page by the listed symbols | Render before quoting a formula or a word it names |
 
 Long numbers in software output (Stata logs with many-digit coefficients) are often misread by OCR. On born-digital pages the checks catch and repair these; on a scan of such output nothing can, so treat those numbers as unconfirmed.

@@ -880,7 +880,7 @@ _strix_llama_healthy() {
 }
 
 _pi_cloud_model_scope() {
-  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-6*:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max,claude-bridge/claude-opus-5-5,claude-bridge/claude-opus-5-5-max,claude-bridge/claude-sonnet-5-5,claude-bridge/claude-sonnet-5-5-max,claude-bridge/claude-sonnet-5,claude-bridge/claude-sonnet-5-max'
+  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-6-!(sol*):max,openai-codex/gpt-6.1-sol:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max,claude-bridge/claude-opus-5-5,claude-bridge/claude-opus-5-5-max,claude-bridge/claude-sonnet-5-5,claude-bridge/claude-sonnet-5-5-max,claude-bridge/claude-sonnet-5,claude-bridge/claude-sonnet-5-max'
   if _halogen_healthy; then
     scope+=',halogen/halogen-qwen3.8-flash-next-w4b,halogen/halogen-qwen3.8-flash-next-iq4,halogen/halogen-qwen3.8-flash-next-q4xl,halogen/halogen-qwen3.8-flash-next'
   fi
