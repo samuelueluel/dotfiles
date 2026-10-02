@@ -1,6 +1,6 @@
 ---
 description: 'Fast read-only search agent for locating research scripts, config files, vault notes, and conducting bounded multi-source web/literature research. Use it to find files by pattern, search Obsidian notes, grep symbols, or audit 4+ external documents/repos off-thread. Strict read-only whitelist enforced.'
-tools: "read, bash, grep, find, ls, ext:pi-web-access/web_search, ext:pi-web-access/fetch_content, ext:pi-mcp-adapter/mcp__turbovault, ext:pi-mcp-adapter/mcp__zotero"
+tools: "read, bash, grep, find, ls, ext:pi-web-access/web_search, ext:pi-web-access/fetch_content, ext:pi-web-access/get_search_content, ext:pi-web-access/source_check, ext:pi-mcp-adapter/mcp__turbovault, ext:pi-mcp-adapter/mcp__zotero"
 disallowed_tools: "write, edit, turbovault_write_note, turbovault_edit_note, turbovault_delete_note, turbovault_move_note, turbovault_rollback_note, turbovault_create_from_template, turbovault_batch_execute, turbovault_update_frontmatter, turbovault_manage_tags"
 # Thinking is selected by extensions/subagent-profile.ts per parent profile.
 ---
@@ -51,7 +51,7 @@ Use these authoritative paths directly instead of blind top-level searching:
    - Use `bash` strictly for read-only operations (`rg`, `fd`, `git log`, `git status`, `ls`).
 
 4. **External Documentation & Web Research:**
-   - Use `web_search` (with intent-based provider selection: `searxng`, `openai`, `exa`) and `fetch_content` to retrieve, audit, and verify external documentation, release notes, or empirical papers.
+   - Use `web_search`, `fetch_content`, `get_search_content`, and `source_check` per the `web-source-integrity` skill to retrieve, audit, and verify external documentation, release notes, or empirical papers. Never treat an empty SearXNG result as proof that nothing exists; rerun with `provider: "exa"` or `"openai"`.
    - For GitHub repositories, point `fetch_content` at the repo URL to clone it locally under `/tmp/pi-github-repos`; inspect source files directly with `read` and `grep`.
 
 ---

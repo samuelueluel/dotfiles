@@ -2,6 +2,7 @@
 # Manage the Halogen Qwen3.8-Flash-Next server beside Lemonade.
 # Supports both native W4B (.hgn) and Unsloth UD-IQ4_XS (GGUF) weights.
 # Keeps its OpenAI-compatible API on loopback and never downloads weights implicitly.
+# Manual-only lifecycle: no boot start or automatic crash restart.
 set -euo pipefail
 
 HALOGEN_CONTAINER=${HALOGEN_CONTAINER:-halogen}
@@ -383,6 +384,12 @@ start_container() {
     state=""
   fi
 
+  # Repair old policies before any explicit start, including already-running
+  # containers. Only start/ensure may launch Halogen; Podman must never retry it.
+  if [[ -n "$state" ]]; then
+    podman update --restart=no "$HALOGEN_CONTAINER" >/dev/null
+  fi
+
   case "$state" in
     running)
       printf 'halogen: container %s (%s, vision=%s, max_tok=%s) is already running\n' "$HALOGEN_CONTAINER" "$desired_var" "$desired_vis" "$desired_max_tok"
@@ -400,7 +407,7 @@ start_container() {
       local -a args=(
         run --detach
         --name "$HALOGEN_CONTAINER"
-        --restart on-failure:3
+        --restart=no
         --publish "127.0.0.1:${HALOGEN_API_PORT}:${HALOGEN_API_PORT}"
         --device /dev/kfd
         --device /dev/dri

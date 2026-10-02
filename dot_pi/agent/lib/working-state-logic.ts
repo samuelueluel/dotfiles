@@ -252,6 +252,7 @@ export class WorkingStateTracker {
 			this.actionsSinceWrite = 0;
 			this.actionsSinceNudge = 0;
 			this.lastMtimeMs = undefined;
+			this.stalenessDue = false;
 			return;
 		}
 
@@ -267,6 +268,7 @@ export class WorkingStateTracker {
 			this.lastMtimeMs = mtimeMs;
 			this.actionsSinceWrite = 0;
 			this.actionsSinceNudge = 0;
+			this.stalenessDue = false;
 			return;
 		}
 
@@ -288,11 +290,19 @@ export class WorkingStateTracker {
 		this.stalenessDue = false;
 		if (this.nudgesThisCycle >= this.config.maxNudgesPerCycle) return undefined;
 
+		// A queued nudge may outlive a write or deletion before the next call.
+		// Recheck at delivery so a freshly updated/missing file stays silent.
+		const file = this.getStateFilePath();
+		if (!file || !this.fsAdapter.existsSync(file)) return undefined;
+		try {
+			if (this.fsAdapter.statSync(file).mtimeMs !== this.lastMtimeMs) return undefined;
+		} catch {
+			return undefined;
+		}
 		const payload = this.actionsSinceWrite;
 		this.nudgesThisCycle += 1;
 		this.actionsSinceNudge = 0;
-		const file = this.getStateFilePath();
-		return file ? stalenessNudgeText(payload, file) : undefined;
+		return stalenessNudgeText(payload, file);
 	}
 
 	public resetRequestCycle(): void {

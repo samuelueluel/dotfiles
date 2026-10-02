@@ -19,6 +19,7 @@ const intakeState = await jiti.import(
 
 const PLAN_TOOL_SURFACE = [
   "read",
+  "working_state_path",
   "ask_user",
   "bash",
   "edit",
@@ -254,6 +255,11 @@ test("plan disables YOLO, keeps ask_user, and drops mutating tools from the surf
     assert.equal(harness.runtime.getYoloMode(), false);
     assert.ok(harness.activeTools().includes("ask_user"));
     assert.ok(harness.activeTools().includes("read"));
+    assert.ok(harness.activeTools().includes("working_state_path"), "session identity stays available without writes");
+    const pathLookup = await harness.handlers.get("tool_call")(
+      { toolName: "working_state_path", toolCallId: "plan-path", input: {} }, harness.context,
+    );
+    assert.notEqual(pathLookup?.block, true);
     assert.ok(harness.activeTools().includes("bash"));
     assert.ok(harness.activeTools().includes("todo"));
     assert.ok(harness.activeTools().includes("smart_compact"), "compaction stays available in plan mode");

@@ -39,23 +39,33 @@ REQUEST
 Use `web_search` for open-ended questions, current events, or discovering candidate links. For complex questions, batch 2–3 distinct queries in parallel using `queries: [...]` rather than repeating single keywords. Note the returned `responseId` and candidate URLs.
 
 Select the `provider` argument based on query intent:
-- **Exact strings, compiler/runtime errors, CLI flags, Stata syntax, dotfiles**: Set `provider: "searxng"`. This uses the local Google CSE / DuckDuckGo index with exact token matching, zero latency, and zero token cost.
-- **Explanatory "how-to", feature comparisons, multi-page doc synthesis, architectural trade-offs**: Set `provider: "openai"`. This routes to OpenAI search (Codex-backed) for grounded narrative answers.
-- **Academic literature discovery, working papers, conceptual essays, "find similar"**: Set `provider: "exa"`. This uses neural semantic embeddings to surface conceptually linked sources.
+- **Default — exact strings, errors, CLI flags, Stata syntax, docs, routine lookups**: Omit `provider`. The configured route tries local SearXNG first (Google CSE, Google, and Bing; about one second, no token cost), then `openai`, then `exa`. Quoted phrases and `site:` work as in Google.
+- **Explanatory "how-to", feature comparisons, multi-page doc synthesis, architectural trade-offs**: Set `provider: "openai"`. This runs OpenAI hosted search (Codex login) and returns a written answer with sources. It is slower (about 15–20 seconds).
+- **Conceptual or "find similar" searches, essays, literature discovery**: Set `provider: "exa"`. This uses neural semantic search. It runs without an API key, so heavy use can hit a shared rate limit (HTTP 429); switch providers when that happens.
+- **Scholarly papers by keyword**: Use `provider: "searxng"` with a bang prefix in the query: `!oa` (OpenAlex), `!cr` (Crossref), `!se` (Semantic Scholar), or `!arx` (arXiv). Example: `query: "!oa housing supply elasticity"`. Pair with `exa` for conceptual coverage.
 - **High-stakes corroboration**: Pass `provider: ["searxng", "exa"]` for simultaneous keyword and neural coverage.
-- **Routine or unclassified lookups**: Omit `provider` to use the configured fallback cascade (`searxng` → `openai` → `exa`).
 
-The search tool returns a synthesized summary. Use it to find promising links, but remember it does not replace reading the actual page.
+Narrow the search before reading more pages:
+- Use `domainFilter` to keep results on the right sources, such as `["stata.com", "scorreia.com"]` for official documentation or `["-pinterest.com"]` to exclude a site.
+- Use `recencyFilter` (`day`, `week`, `month`, `year`) for current events, recent releases, or anything where an old page would mislead.
+
+Read the result for what it is. SearXNG and Exa return search snippets with URLs. Only `openai` returns a written summary. Both are leads for which pages to read; neither replaces reading the actual page.
+
+An empty SearXNG result is not evidence that nothing exists. SearXNG reports zero hits as a success, so the configured route does not fall back on its own. Rerun the query with `provider: "exa"` or `provider: "openai"` before concluding that nothing was found.
 
 ### Mode 2: Search Then Read
 
-Use `web_search` with `includeContent: true` when likely source pages should be fetched along with discovery. This does not automatically place every fetched page in context. Use `get_search_content` with the prior `responseId` and a URL/query selector; prefer `findText` plus a bounded `limit` to retrieve only the relevant passage.
+Use `web_search` with `includeContent: true` when likely source pages should be fetched along with discovery. This does not automatically place every fetched page in context. Use `get_search_content` with the prior `responseId` and a URL/query selector; prefer `findText` to retrieve only the relevant passages (it returns bounded matches with nearby context and ignores `offset`/`limit`). Use `offset` and `limit` only when you need to page through a section in order.
 
 Use this route when the best source is not known in advance but the search response identifies a small set of promising pages. If a known URL is already available, use `fetch_content` instead.
 
 ### Mode 3: Known-URL Reading
 
 Use `fetch_content` for a specified URL or a short list of selected URLs. For GitHub repository URLs, `fetch_content` automatically clones the repository locally under `/tmp/pi-github-repos`; inspect source files directly with `read` and `grep` rather than scraping web views. Use `readable` for normal evidence extraction, `raw` when exact HTTP text matters, and `answer` only when a page-local question is the requested task. Inspect the returned content; do not treat the fetch operation itself as proof that the page supports the claim.
+
+PDF fetches use local text extraction. Tables, columns, and equations come out flattened, so check any number taken from a PDF table against its row and column labels before citing it. When a paper matters for Samuel's research rather than a quick lookup, suggest adding it to Zotero, where the MinerU pipeline preserves tables and figures.
+
+Pages that require JavaScript or sit behind bot checks can come back empty or as a challenge page. Report the page as inaccessible and look for another source; do not cite what the search snippet said the page contains.
 
 ### Mode 4: Atomic Claim Verification
 
@@ -65,8 +75,7 @@ Do not automatically run every route. Choose the shortest route that reaches ade
 
 ### Execution Topology (Inline vs. Subagent Delegation)
 
-- **Default to INLINE:** Run all modes directly in the main session for routine lookups, syntax/error checks, conceptual how-to synthesis, and all local `pi`/`beta` sessions (avoiding local slot contention).
-- **Subagent Delegation (`pihat`/`betahat` only):** For deep multi-source audits where reading 4+ full papers, repositories, or extensive doc sites would bloat the parent context window, dispatch parallel `Explore` subagents (up to 4-fanout). Each child agent must follow Mode 2/3 and return a structured evidence packet with direct findings, verified URLs, and verbatim quotes.
+Run web work inline; the playbook above and the `Agent` tool's routing rules decide when delegation is allowed. When you do delegate to `Explore`, require each child to follow Mode 2/3 and return an evidence packet with direct findings, verified URLs, and verbatim quotes.
 
 ## Evidence and Citation Contract
 

@@ -6,7 +6,7 @@ The [citation integrity skill](../SKILL.md) owns the governing checks. This refe
 
 ## What Each Status Line Means
 
-Surya sidecars mark every table that is not `verified` with a `[Table status: ...]` line, every contradicted equation with an `[Equation status: ...]` line, and every paragraph whose inline math disagrees with the page with a `[Math status: ...]` line. The reason in parentheses is either a plain sentence or an internal code. A MinerU sidecar, or a result with no `reliability` field, is `legacy-unverified`: nothing was checked.
+Surya sidecars mark every table that is not `verified` with a `[Table status: ...]` line, every contradicted equation with an `[Equation status: ...]` line, every paragraph whose inline math disagrees with the page with a `[Math status: ...]` line, and content OCR returned for a blank scanned page with a `[Page status: ...]` line. The reason in parentheses is either a plain sentence or an internal code. A MinerU sidecar, or a result with no `reliability` field, is `legacy-unverified`: nothing was checked.
 
 | What you see | Numbers | What remains unchecked |
 |---|---|---|
@@ -24,6 +24,7 @@ Surya sidecars mark every table that is not `verified` with a `[Table status: ..
 | No status line on an equation | Symbols match the text layer, or could not be checked | Fractions, sub- and superscripts, term order; render before quoting |
 | `[Equation status: UNRESOLVED (symbols differ ...)]` or an equation-number mismatch | The listed symbols or number contradict the text layer | Render the page; never quote the sidecar version |
 | `[Equation status: REPAIRED (...)]` or `[Math status: REPAIRED (...)]` | Look-alike symbols (ν read as v, ι read as t) were restored from the text layer, and the symbols now match it | Fractions, sub- and superscripts, term order; render before quoting |
+| `[Page status: UNRESOLVED (the scanned page is blank ...)]` | Withheld: OCR returned text for a page with no ink, so it is invented | Render the page; never cite the withheld content |
 | `[Math status: SINGLE-ROUTE (inline math or text differs ...)]` | The paragraph's inline math or wording differs from the page by the listed symbols | Render before quoting a formula or a word it names |
 
 Long numbers in software output (Stata logs with many-digit coefficients) are often misread by OCR. On born-digital pages the checks catch and repair these; on a scan of such output nothing can, so treat those numbers as unconfirmed.

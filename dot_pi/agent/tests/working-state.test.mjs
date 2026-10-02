@@ -4,9 +4,11 @@ import { randomUUID } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
 import test from "node:test";
-import { createJiti } from "./helpers/pi-test-runtime.mjs";
+import { createJiti, piCoreUrl, piPackageRoot } from "./helpers/pi-test-runtime.mjs";
 
-const jiti = createJiti(`${process.env.HOME}/.pi/agent/npm`);
+const jiti = createJiti(`${process.env.HOME}/.pi/agent/npm`, {
+	alias: { "@earendil-works/pi-ai": path.join(piPackageRoot, "node_modules/@earendil-works/pi-ai/dist/compat.js") },
+});
 const extension = await jiti.import(
 	`${process.env.HOME}/.pi/agent/extensions/working-state-reminders.ts`,
 );
@@ -46,7 +48,9 @@ function makeHarness({ cwd, threshold = 15, maxNudges = 2, trigger, margin } = {
 	if (margin === undefined) delete process.env.PI_WORKING_STATE_PRE_COMPACT_MARGIN;
 	else process.env.PI_WORKING_STATE_PRE_COMPACT_MARGIN = String(margin);
 	const handlers = new Map();
+	const tools = new Map();
 	const pi = {
+		registerTool(tool) { tools.set(tool.name, tool); },
 		on(name, handler) {
 			const list = handlers.get(name) ?? [];
 			list.push(handler);
@@ -58,6 +62,7 @@ function makeHarness({ cwd, threshold = 15, maxNudges = 2, trigger, margin } = {
 	const ctx = { cwd, sessionManager: { getSessionId: () => idsByDir.get(cwd) } };
 	return {
 		handlers,
+		tools,
 		ctx,
 		async emit(name, event = {}) {
 			let result;
@@ -80,6 +85,128 @@ async function reminderText(harness) {
 async function actions(harness, count) {
 	for (let i = 0; i < count; i += 1) {
 		await harness.emit("tool_execution_end", { toolName: "read", isError: false, result: {} });
+	}
+}
+
+test("real SDK resolves paths through direct and nested execution with contextless Bash", async (t) => {
+	const { createAgentSession, createBashTool, DefaultResourceLoader, SessionManager, SettingsManager } = await import(piCoreUrl);
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "working-state-sdk-"));
+	t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+	const settingsManager = SettingsManager.inMemory({});
+	const resourceLoader = new DefaultResourceLoader({
+		cwd: dir, agentDir: dir, settingsManager,
+		noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true,
+		extensionFactories: [extension.default],
+	});
+	await resourceLoader.reload();
+	const { session } = await createAgentSession({
+		cwd: dir, agentDir: dir, resourceLoader, settingsManager,
+		sessionManager: SessionManager.inMemory(dir),
+	});
+	t.after(() => session.dispose());
+	await session.bindExtensions({});
+	// A pre-wrapped shell tool without a session context cannot expose the UUID.
+	const bash = createBashTool(dir);
+	const shell = await bash.execute("shell-test", { command: 'printf "%s" "$PI_SESSION_ID"' });
+	assert.equal(shell.structuredContent.output, "", "reproduces the missing shell UUID");
+	const tool = session.agent.state.tools.find((tool) => tool.name === "working_state_path");
+	assert.ok(tool, "resolver is active without a discovery step");
+	const direct = await tool.execute("path-direct", {});
+	// Nested execution must be owned by an assistant-issued parent tool call.
+	session.agent.state.messages.push({ role: "assistant", content: [
+		{ type: "toolCall", id: "path-parent", name: "codemode", arguments: {} },
+	] });
+	const nested = await session.extensionRunner.createToolContext("path-parent", undefined)
+		.executeTool("working_state_path", {});
+	assert.equal(nested.isError, false, JSON.stringify(nested.result));
+	assert.deepEqual(direct.structuredContent, nested.result.structuredContent);
+	assert.equal(direct.structuredContent.session_id, session.sessionManager.getSessionId());
+	assert.equal(direct.structuredContent.state_file,
+		path.join(stateDirectory, `${session.sessionManager.getSessionId()}.md`));
+	assert.equal(direct.structuredContent.exists, false);
+	assert.equal(fs.existsSync(direct.structuredContent.state_file), false);
+});
+
+test("path resolver uses the live UUID without shell env or filesystem creation", async (t) => {
+	const dir = makeStateDir(false);
+	t.after(() => removeStateDir(dir));
+	const harness = makeHarness({ cwd: dir });
+	const tool = harness.tools.get("working_state_path");
+	assert.equal(tool.annotations.readOnlyHint, true);
+	const priorId = process.env.PI_SESSION_ID;
+	process.env.PI_SESSION_ID = "wrong-inherited-session";
+	t.after(() => {
+		if (priorId === undefined) delete process.env.PI_SESSION_ID;
+		else process.env.PI_SESSION_ID = priorId;
+	});
+	const result = await tool.execute("test", {}, undefined, undefined, harness.ctx);
+	assert.deepEqual(result.structuredContent, {
+		session_id: idsByDir.get(dir), state_file: statePath(dir), exists: false,
+	});
+	assert.equal(fs.existsSync(statePath(dir)), false);
+	fs.mkdirSync(stateDirectory, { recursive: true });
+	fs.writeFileSync(statePath(dir), "# SESSION-STATE\n");
+	assert.equal((await tool.execute("test", {}, undefined, undefined, harness.ctx)).structuredContent.exists, true);
+});
+
+test("path resolver rebinds per call and isolates sessions sharing a cwd", async (t) => {
+	const dir = makeStateDir(false);
+	t.after(() => removeStateDir(dir));
+	const harness = makeHarness({ cwd: dir });
+	const tool = harness.tools.get("working_state_path");
+	const first = await tool.execute("test", {}, undefined, undefined, harness.ctx);
+	const replacementId = randomUUID();
+	harness.ctx.sessionManager.getSessionId = () => replacementId;
+	const next = await tool.execute("test", {}, undefined, undefined, harness.ctx);
+	assert.equal(next.structuredContent.session_id, replacementId);
+	assert.notEqual(next.structuredContent.state_file, first.structuredContent.state_file);
+	assert.equal(next.structuredContent.state_file, path.join(stateDirectory, `${replacementId}.md`));
+});
+
+test("path resolver fails closed for invalid IDs and missing tool context", async (t) => {
+	const dir = makeStateDir(false);
+	t.after(() => removeStateDir(dir));
+	const harness = makeHarness({ cwd: dir });
+	const tool = harness.tools.get("working_state_path");
+	for (const id of ["", "../other-window", `${process.pid}-${randomUUID()}`, undefined]) {
+		harness.ctx.sessionManager.getSessionId = () => id;
+		await assert.rejects(tool.execute("test", {}, undefined, undefined, harness.ctx), /UUID unavailable/);
+	}
+	await assert.rejects(tool.execute("test", {}, undefined, undefined, undefined), /UUID unavailable/);
+});
+
+test("path lookups do not advance the staleness counter", async (t) => {
+	const dir = makeStateDir(true);
+	t.after(() => removeStateDir(dir));
+	const harness = makeHarness({ cwd: dir, threshold: 2 });
+	await harness.emit("session_start");
+	await reminderText(harness);
+	for (let i = 0; i < 5; i += 1) {
+		await harness.emit("tool_execution_end", { toolName: "working_state_path", isError: false });
+	}
+	assert.equal(await reminderText(harness), undefined);
+	await actions(harness, 2);
+	assert.match(await reminderText(harness), /successful actions/);
+});
+
+for (const action of ["write", "delete"]) {
+	for (const observeBeforeDelivery of [false, true]) {
+		test(`queued staleness nudge is cleared after ${action} (observed=${observeBeforeDelivery})`, async (t) => {
+			const dir = makeStateDir(true);
+			t.after(() => removeStateDir(dir));
+			const harness = makeHarness({ cwd: dir, threshold: 2 });
+			await harness.emit("session_start");
+			await reminderText(harness);
+			await actions(harness, 2);
+			if (action === "delete") fs.rmSync(statePath(dir));
+			else {
+				fs.appendFileSync(statePath(dir), "- [ok] recorded\n");
+				const later = new Date(Date.now() + 2000);
+				fs.utimesSync(statePath(dir), later, later);
+			}
+			if (observeBeforeDelivery) await actions(harness, 1);
+			assert.equal(await reminderText(harness), undefined);
+		});
 	}
 }
 

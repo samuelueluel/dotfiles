@@ -9,3 +9,24 @@ search:
   formats:
     - html
     - json
+
+# Engine overrides, tested 2026-09-30 from this host.
+# Working general engines: google cse (default), google, bing.
+# Disabled: duckduckgo/qwant return CAPTCHA, brave returns "too many requests",
+# google scholar returns zero results. mojeek/startpage are inactive upstream (PoW CAPTCHA).
+engines:
+  - name: google
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: duckduckgo
+    disabled: true
+  - name: brave
+    disabled: true
+  - name: google scholar
+    disabled: true
+  # Scholarly APIs; reachable from agents via !oa / !cr bangs.
+  - name: openalex
+    disabled: false
+  - name: crossref
+    disabled: false

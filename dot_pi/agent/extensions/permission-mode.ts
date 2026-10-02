@@ -89,6 +89,7 @@ const HEADLESS_ALLOWED_TOOLS = new Set([
   "grep",
   "find",
   "ls",
+  "working_state_path",
   "web_search",
   "fetch_content",
   "get_search_content",
@@ -389,11 +390,12 @@ function isPlanIntakeReadCall(toolName: string, input: unknown, planPath: string
  * not a change to any of Samuel's own files, config, or repositories.
  */
 export const PLAN_ALLOWED_TOOLS = new Set([
-  // Built-in read-only inspection.
+  // Read-only inspection, including session identity (no state-file creation).
   "read",
   "grep",
   "find",
   "ls",
+  "working_state_path",
   // Web research and retrieval.
   "web_search",
   "fetch_content",

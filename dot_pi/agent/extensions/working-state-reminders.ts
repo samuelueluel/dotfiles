@@ -1,10 +1,12 @@
 import { registerReminder } from "@kennyfrc/pi-system-reminders";
+import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";
 import {
 	estimateTokens,
 	readWorkingStateConfig,
 	WorkingStateTracker,
+	stateFilePath,
 } from "../lib/working-state-logic.js";
 
 export const WORKING_STATE_RESTORE_REMINDER_ID = "working-state-restore";
@@ -12,6 +14,32 @@ export const WORKING_STATE_STALENESS_REMINDER_ID = "working-state-staleness";
 export const WORKING_STATE_PRE_COMPACT_REMINDER_ID = "working-state-pre-compact";
 
 export default function workingStateRemindersExtension(pi: ExtensionAPI): void {
+	// Resolve from the live tool context, not process.env or a cached session ID.
+	// Shell backends and nested tool wrappers do not always expose PI_SESSION_ID.
+	pi.registerTool({
+		name: "working_state_path",
+		label: "Working State Path",
+		description: "Resolve this Pi session's exact UUID-scoped working-state path before reading or writing it. Read-only; does not create a directory or file. Independent of shell environment variables.",
+		parameters: Type.Object({}),
+		outputSchema: Type.Object({
+			session_id: Type.String(),
+			state_file: Type.String(),
+			exists: Type.Boolean(),
+		}),
+		annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+			const sessionId = ctx?.sessionManager?.getSessionId();
+			const file = typeof sessionId === "string" ? stateFilePath(sessionId) : undefined;
+			if (!file) throw new Error("Current Pi session UUID unavailable; refusing to resolve shared or guessed working state.");
+			const result = { session_id: sessionId!, state_file: file, exists: fs.existsSync(file) };
+			return {
+				content: [{ type: "text", text: JSON.stringify(result) }],
+				details: result,
+				structuredContent: result,
+			};
+		},
+	});
+
 	const tracker = new WorkingStateTracker(readWorkingStateConfig(), {
 		existsSync: fs.existsSync,
 		statSync: (target: string) => fs.statSync(target),
@@ -101,7 +129,7 @@ export default function workingStateRemindersExtension(pi: ExtensionAPI): void {
 	// the todo list is not the state file, so they are skipped here.
 	pi.on("tool_execution_end", (event: any) => {
 		if (event?.isError === true) return;
-		if (event?.toolName === "todo") return;
+		if (event?.toolName === "todo" || event?.toolName === "working_state_path") return;
 		tracker.observeSuccessfulAction();
 	});
 

@@ -62,11 +62,15 @@
     "extensions/powerline-footer.ts",
     "extensions/todo-reminders.ts",
     "extensions/workflow-invariants.ts",
-    "extensions/working-state-reminders.ts"
+    "extensions/working-state-reminders.ts",
+    "-builtin:mcp"
   ],
-  "lastChangelogVersion": "0.87.1",
+  "lastChangelogVersion": "0.99.1",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
+  "codemode": {
+    "mode": "only"
+  },
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,
