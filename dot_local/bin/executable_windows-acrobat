@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Start the persistent Windows VM and attach its local SPICE console.
+set -euo pipefail
+export LC_ALL=C
+uri=qemu:///system
+vm=windows-acrobat
+share="$HOME/Windows-PDFs"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/windows-acrobat"
+mkdir -p "$share" "$state_dir"
+chmod 700 "$share" "$state_dir"
+
+fail() {
+    printf '%s\n' "$*" >&2
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send --urgency=critical 'Windows' "$*" || true
+    fi
+    exit 1
+}
+# One launcher at a time; keep the lock while its console is open.
+exec 9>"$state_dir/operation.lock"
+if ! flock -n 9; then
+    fail 'A Windows VM console or maintenance operation is already open.'
+fi
+if ! state=$(virsh --connect "$uri" domstate "$vm"); then
+    fail 'Cannot find the Windows VM or connect to libvirt.'
+fi
+case "$state" in
+    'shut off')
+        virsh --connect "$uri" start "$vm" || fail 'Windows failed to start.'
+        ;;
+    paused)
+        virsh --connect "$uri" resume "$vm" || fail 'Windows failed to resume.'
+        ;;
+    running) ;;
+    *) fail "Windows is in state: $state. Check Virtual Machine Manager." ;;
+esac
+# No TCP display listener. Windows-PDFs is shared through virtiofs (domain
+# <filesystem>, guest VirtioFsSvc + WinFsp) and appears in Windows as Z:,
+# independent of the viewer.
+exec virt-viewer --connect "$uri" --attach --domain-name --wait --reconnect \
+    --auto-resize=always "$vm"

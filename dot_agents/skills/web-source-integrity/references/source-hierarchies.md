@@ -6,7 +6,7 @@
 
 Source quality is relational: judge the page's purpose, authorship, evidence, incentives, freshness, and fit for the claim. A domain reputation is a useful prior, not a conclusion. An official page is usually strongest for the organization's own rules or product behavior, but it is not automatically independent evidence for performance, safety, or comparative claims.
 
-Prefer the highest-signal source that can answer the specific question. Use secondary and community sources to discover primary material, explain implementation experience, or document disagreement when they are the relevant evidence type.
+The source-eligibility and verification rules live in `SKILL.md`. This reference supplies the request-type hierarchy, evaluation factors, and role distinctions. Secondary and community material can help locate primary evidence, explain implementation experience, or document disagreement.
 
 ## Request-Type Hierarchy
 
@@ -27,7 +27,7 @@ Prefer the highest-signal source that can answer the specific question. Use seco
 
 ## Page-Level Evaluation
 
-For each candidate page, assess:
+These factors help compare candidate pages under the rules in `SKILL.md`:
 
 1. **Fit:** Does the page answer this claim, or merely discuss the topic?
 2. **Role:** Is it primary evidence, an official self-description, independent analysis, reporting, commentary, or user experience?
@@ -57,7 +57,7 @@ Deprioritize SEO listicles, anonymous aggregators, AI-generated summaries, scrap
 
 ### Hard-deny category
 
-Maintain a small local denylist for confirmed phishing, malware, impersonation, fabricated-citation services, and sources that violate the user's access or safety constraints. A denylist entry should have a reason and review date; avoid treating a transient broken page or unpopular viewpoint as a security denylist entry.
+This category covers confirmed phishing, malware, impersonation, fabricated-citation services, and sources excluded by the user's access or safety constraints. It describes a source class, not a requirement to create or maintain a new denylist.
 
 ## Exceptions
 
@@ -69,4 +69,4 @@ Maintain a small local denylist for confirmed phishing, malware, impersonation, 
 
 ## Corroboration
 
-Count corroboration by independent evidence chains, not URL totals. Multiple pages that copy one announcement form one chain. For a comparison, seek evidence for each side. For a contested claim, search explicitly for credible counterevidence before calling it settled.
+Independent evidence chains, rather than URL totals, explain the corroboration rule in `SKILL.md`. Multiple copies of one announcement form one chain; separately sourced evidence about each side of a comparison can establish different facts. Counterevidence can reveal a dispute that a list of agreeing URLs conceals.

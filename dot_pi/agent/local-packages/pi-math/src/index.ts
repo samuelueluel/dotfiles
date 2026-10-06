@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getCapabilities } from "@earendil-works/pi-tui";
 import { loadSvgMathRendererOptions } from "./config.js";
-import { installMarkdownMathPatch } from "./markdown-patch.js";
+import { installMarkdownMathPatch, type MathPatchController } from "./markdown-patch.js";
 import { createTerminalMathRenderer, type TerminalMathRenderer } from "./renderer.js";
 
 function errorMessage(error: unknown): string {
@@ -23,27 +23,36 @@ export default async function piMathExtension(pi: ExtensionAPI): Promise<void> {
     loadFailure = errorMessage(error);
   }
 
-  const patch = renderer ? installMarkdownMathPatch(renderer) : undefined;
+  let patch: MathPatchController | undefined;
+  let rearm: ReturnType<typeof setImmediate> | undefined;
 
   pi.on("session_start", (_event, ctx) => {
-    // Defer until every session_start handler has run. rearm() only restores
-    // pi-math when the prototype still exposes this patch's known delegate;
-    // it deliberately leaves an unknown wholesale renderer in control rather
-    // than adopting a wrapper that may already delegate into pi-math.
-    if (patch) setImmediate(() => patch.rearm());
+    // pi-streaming-guard replaces Markdown.render wholesale on session_start,
+    // which would leave pi-math bypassed. Defer one macrotask so every
+    // session_start handler has run, then re-layer pi-math on top and delegate
+    // into whatever render won.
+    if (ctx.mode === "tui" && renderer) {
+      patch ??= installMarkdownMathPatch(renderer);
+      if (rearm) clearImmediate(rearm);
+      rearm = setImmediate(() => { rearm = undefined; patch?.rearm(); });
+    }
     if (loadFailure && ctx.mode === "tui") {
       ctx.ui.notify(`pi-math failed to load: ${loadFailure}`, "error");
     }
   });
 
-  // Check each turn for a renderer that safely yielded the original delegate.
-  // Unknown replacements are left untouched to avoid forming a render cycle.
+  // Re-assert the wrapper each turn: a mid-session "/streaming-guard on" (or
+  // any wholesale re-patch) replaces Markdown.render between turns.
   pi.on("turn_start", () => {
     patch?.rearm();
   });
 
   pi.on("session_shutdown", () => {
+    if (rearm) clearImmediate(rearm);
+    rearm = undefined;
     patch?.uninstall();
+    patch = undefined;
+    renderer?.clear();
   });
 
   pi.registerCommand("math-render", {

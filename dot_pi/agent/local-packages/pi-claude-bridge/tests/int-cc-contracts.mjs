@@ -11,7 +11,9 @@
 // as soon as the message they care about arrives. Run the whole file on every
 // @anthropic-ai/claude-agent-sdk or Claude Code bump.
 //
-// Verified against: SDK 0.3.280 / Claude Code 2.1.280.
+// Verified against: SDK 0.3.284 / Claude Code 2.1.284. package.json declares
+// ^0.3.284 and package-lock.json resolves 0.3.285 (Claude Code 2.1.285), which
+// has not been run through this file.
 //
 // Assumptions that are NOT covered here, and why:
 //   - DISABLE_AUTO_COMPACT=1 stops CC-side autocompaction. Provoking it needs a
@@ -251,6 +253,35 @@ test("includePartialMessages yields the stream_event shapes processStreamEvent d
 	}
 });
 
+test("message_delta usage carries thinking tokens nested under output_tokens_details", { timeout: 120_000 }, async () => {
+	// The bridge maps this onto pi's `usage.reasoning`. The nesting is the whole
+	// contract: updateUsage previously read a flat `usage.thinking_tokens` plus a
+	// `usage.reasoning_tokens` that exists in no SDK version, so it silently reported
+	// nothing on every thinking turn. If CC ever flattens or renames the field, this
+	// fails here instead of going quiet again.
+	const deltaUsages = [];
+	for await (const message of query({
+		prompt: "Think briefly about what 17 * 23 is, then state just the number.",
+		options: providerOptions({ includePartialMessages: true, effort: "medium", maxTurns: 1, persistSession: false }),
+	})) {
+		if (message.type === "stream_event" && message.event?.type === "message_delta" && message.event.usage) {
+			deltaUsages.push(message.event.usage);
+		}
+	}
+
+	assert.ok(deltaUsages.length > 0, "no message_delta carried usage");
+	const withThinking = deltaUsages.filter((u) => typeof u.output_tokens_details?.thinking_tokens === "number");
+	assert.ok(withThinking.length > 0,
+		`no message_delta reported output_tokens_details.thinking_tokens — got ${JSON.stringify(deltaUsages)}`);
+	for (const usage of withThinking) {
+		assert.ok(usage.output_tokens_details.thinking_tokens > 0, "a thinking turn must report a positive count");
+		assert.ok(usage.output_tokens_details.thinking_tokens <= usage.output_tokens,
+			`thinking_tokens must stay a subset of output_tokens: ${JSON.stringify(usage)}`);
+		assert.equal(usage.thinking_tokens, undefined, "a flat thinking_tokens would mean the shape changed");
+		assert.equal(usage.reasoning_tokens, undefined, "reasoning_tokens has never existed; a value means the shape changed");
+	}
+});
+
 test("a streamed prompt keeps the query open past result until the input generator ends", { timeout: 120_000 }, async () => {
 	// Passing an AsyncIterable makes isSingleUserTurn false, so the SDK no longer
 	// closes the CLI's stdin on the first result. That parked generator is what
@@ -480,7 +511,7 @@ test("--thinking-display summarized is still an accepted flag value", { timeout:
 	assert.equal(result?.subtype, "success", `CC rejected --thinking-display summarized: ${JSON.stringify(result)}`);
 });
 
-// --- The gitStatus cache pinning ---
+// --- Captured request contracts ---
 
 /** One-turn stub API: records every /v1/messages body, answers a canned "OK" SSE.
  *  Lets a contract assert on the exact request CC builds, at zero API cost. */
@@ -516,6 +547,42 @@ function stubApi(requests) {
 /** cache_control markers are breakpoint directives, not cache-keyed content — CC 2.1.280
  *  moves them (and a 1h ttl) between turns, so payload comparisons strip them. */
 const sansCacheControl = (m) => JSON.parse(JSON.stringify(m, (_k, v) => (v === null || v === undefined) ? v : (typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([key]) => key !== "cache_control")) : v)));
+
+// --- Native instruction exclusions ---
+
+test("claudeMdExcludes prevents native AGENTS.md from duplicating forwarded instructions", { timeout: 120_000 }, async () => {
+	const requests = [];
+	const api = await stubApi(requests);
+	const cwd = mkdtempSync(join(tmpdir(), "cc-agents-exclude-"));
+	const marker = `project-instructions-${randomUUID()}`;
+	writeFileSync(join(cwd, "AGENTS.md"), marker);
+	try {
+		for (const excluded of [false, true]) {
+			const { result } = await collect(query({
+				prompt: "Reply OK.",
+				options: providerOptions({
+					cwd, maxTurns: 1, persistSession: false,
+					env: { ...process.env, ANTHROPIC_BASE_URL: api.url, ENABLE_CLAUDEAI_MCP_SERVERS: "0", DISABLE_AUTO_COMPACT: "1" },
+					settings: { claudeMdExcludes: ["**/CLAUDE.md", "**/.claude/rules/**", ...(excluded ? ["**/AGENTS.md"] : [])] },
+					systemPrompt: { type: "preset", preset: "claude_code", append: marker },
+				}),
+			}));
+			assert.equal(result?.subtype, "success");
+			const request = requests.at(-1);
+			assert.ok(request, "CC sent no request");
+			const system = JSON.stringify(request.system);
+			const messages = JSON.stringify(request.messages);
+			assert.equal(system.split(marker).length - 1, 1, "forwarded instructions must remain");
+			assert.equal(messages.split(marker).length - 1, excluded ? 0 : 1,
+				excluded ? "native AGENTS.md survived the exclusion" : "CC did not load AGENTS.md — check ambient exclusions or native loading changes");
+		}
+	} finally {
+		api.close();
+		rmSync(cwd, { recursive: true, force: true });
+	}
+});
+
+// --- The gitStatus cache pinning ---
 
 test("includeGitInstructions:false strips gitStatus and keeps the preset static across git transitions", { timeout: 180_000 }, async () => {
 	// The claude_code preset embeds a gitStatus snapshot (git status --short +

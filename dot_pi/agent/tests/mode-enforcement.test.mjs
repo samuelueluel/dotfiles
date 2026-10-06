@@ -114,6 +114,30 @@ function createHarness(initialTools = ["read", "ask_user", "bash"]) {
   };
 }
 
+test("startup defaults to autoask and respects explicit mode overrides", async () => {
+  const previousDefault = process.env.PI_DEFAULT_MODE;
+  try {
+    for (const requested of [undefined, "manual", "plan", "autoask", "auto"]) {
+      if (requested === undefined) delete process.env.PI_DEFAULT_MODE;
+      else process.env.PI_DEFAULT_MODE = requested;
+      const harness = createHarness();
+      try {
+        await harness.handlers.get("session_start")({}, harness.context);
+        const expected = requested ?? "autoask";
+        assert.equal(globalThis[modeModule.PERMISSION_MODE_STATE_KEY].mode, expected);
+        assert.equal(harness.runtime.getYoloMode(), expected === "autoask" || expected === "auto");
+        assert.equal(harness.activeTools().includes("ask_user"), expected !== "auto");
+      } finally {
+        await harness.settle();
+        harness.cleanup();
+      }
+    }
+  } finally {
+    if (previousDefault === undefined) delete process.env.PI_DEFAULT_MODE;
+    else process.env.PI_DEFAULT_MODE = previousDefault;
+  }
+});
+
 test("auto hides and runtime-blocks ask_user while injecting fallback guidance", async () => {
   const harness = createHarness();
   try {

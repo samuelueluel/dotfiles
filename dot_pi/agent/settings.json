@@ -1,7 +1,7 @@
 {
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-6-luna",
-  "defaultThinkingLevel": "max",
+  "defaultModel": "gpt-6.1-sol",
+  "defaultThinkingLevel": "medium",
   "theme": "noctalia",
   "skills": [
     "/var/home/samuel/.agents/skills",
@@ -65,12 +65,13 @@
     "extensions/working-state-reminders.ts",
     "-builtin:mcp"
   ],
-  "lastChangelogVersion": "0.99.1",
+  "defaultTools": ["+codemode"],
+  "codemode": {
+    "mode": "on"
+  },
+  "lastChangelogVersion": "1.0.1",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
-  "codemode": {
-    "mode": "only"
-  },
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,

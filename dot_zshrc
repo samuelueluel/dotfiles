@@ -357,6 +357,7 @@ pi-safe-1() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_MCP_CONFIG_MODE \
     -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
     -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
@@ -409,6 +410,7 @@ pi-safe-2() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_MCP_CONFIG_MODE \
     -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
     -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
@@ -463,6 +465,7 @@ pi-safe-3() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_MCP_CONFIG_MODE \
     -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
     -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
@@ -520,6 +523,7 @@ pi-safe-stata-1() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_MCP_CONFIG_MODE \
     -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
     -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
@@ -579,6 +583,7 @@ pi-safe-stata-2() {
     -e OPENROUTER_API_KEY_DS \
     -e PI_SUBAGENTS_MAX_CONCURRENT \
     -e PI_STATE_FILE \
+    -e PI_MCP_CONFIG_MODE \
     -e PI_BLACKHOLE_COMPACT_AFTER_TOKENS \
     -e PI_BLACKHOLE_MID_RUN_COMPACTION \
     -e CLAUDE_BRIDGE_DEBUG \
@@ -618,7 +623,15 @@ pi-safe-stata-2() {
 #
 # pihat / betahat write a state file to ~/.pi/running/ for status monitoring.
 
-# Helper: populate global _PI_SKILL_ARGS with --no-skills + --skill for all skills except stata* and music.
+# Cloudflare ecosystem skills are visible only in the dedicated cf profile.
+_pi_is_cloudflare_skill() {
+  case "$1" in
+    cloudflare*|agents-sdk|durable-objects|nextjs-on-cloudflare|sandbox-*|turnstile-spin|web-perf|workers-best-practices|wrangler) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Helper: explicit non-Stata skills; Cloudflare skills require the cf profile.
 # Also skips agy-only skills (auto, mode, manual) so they never load into pi/pihat.
 _pi_nonstata_skills() {
   typeset -ga _PI_SKILL_ARGS
@@ -627,19 +640,21 @@ _pi_nonstata_skills() {
   local s
   for s in ~/.agents/skills/*; do
     [[ -d "$s" ]] || continue
+    if [[ "${_PI_CLOUDFLARE_PROFILE:-0}" != 1 ]] && _pi_is_cloudflare_skill "${s:t}"; then continue; fi
     [[ "${s:t}" == stata* ]] && continue
     (( ${_pi_skip[(Ie)${s:t}]} )) && continue
     _PI_SKILL_ARGS+=("--skill" "$s")
   done
   for s in ~/.pi/agent/skills/*(N); do
     [[ -d "$s" ]] || continue
+    if [[ "${_PI_CLOUDFLARE_PROFILE:-0}" != 1 ]] && _pi_is_cloudflare_skill "${s:t}"; then continue; fi
     (( ${_pi_skip[(Ie)${s:t}]} )) && continue
     _PI_SKILL_ARGS+=("--skill" "$s")
   done
 }
 
 # Helper: populate global _PI_STATA_SKILL_ARGS with --no-skills + --skill for Stata research skills.
-# Skips agy-only skills (auto, mode, manual) and non-research skills (music).
+# Skips agy-only skills, music, and Cloudflare ecosystem skills.
 _pi_stata_skills() {
   typeset -ga _PI_STATA_SKILL_ARGS
   _PI_STATA_SKILL_ARGS=("--no-skills")
@@ -647,11 +662,13 @@ _pi_stata_skills() {
   local s
   for s in ~/.agents/skills/*; do
     [[ -d "$s" ]] || continue
+    if [[ "${_PI_CLOUDFLARE_PROFILE:-0}" != 1 ]] && _pi_is_cloudflare_skill "${s:t}"; then continue; fi
     (( ${_beta_skip[(Ie)${s:t}]} )) && continue
     _PI_STATA_SKILL_ARGS+=("--skill" "$s")
   done
   for s in ~/.pi/agent/skills/*(N); do
     [[ -d "$s" ]] || continue
+    if [[ "${_PI_CLOUDFLARE_PROFILE:-0}" != 1 ]] && _pi_is_cloudflare_skill "${s:t}"; then continue; fi
     (( ${_beta_skip[(Ie)${s:t}]} )) && continue
     _PI_STATA_SKILL_ARGS+=("--skill" "$s")
   done
@@ -880,7 +897,7 @@ _strix_llama_healthy() {
 }
 
 _pi_cloud_model_scope() {
-  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-6-!(sol*):max,openai-codex/gpt-6.1-sol:max,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max,claude-bridge/claude-opus-5-5,claude-bridge/claude-opus-5-5-max,claude-bridge/claude-sonnet-5-5,claude-bridge/claude-sonnet-5-5-max,claude-bridge/claude-sonnet-5,claude-bridge/claude-sonnet-5-max'
+  local scope='openrouter-us/**:max,openrouter-ds/**:max,openai-codex/gpt-6-!(sol*):max,openai-codex/gpt-6.1-sol:medium,openrouter-us-max/!(anthropic)/**:max,openrouter-ds-max/**:max,antigravity/gemini-3.8-flash:max,claude-bridge/claude-opus-5-5,claude-bridge/claude-opus-5-5-max,claude-bridge/claude-sonnet-5-5,claude-bridge/claude-sonnet-5-5-max,claude-bridge/claude-sonnet-5,claude-bridge/claude-sonnet-5-max'
   if _halogen_healthy; then
     scope+=',halogen/halogen-qwen3.8-flash-next-w4b,halogen/halogen-qwen3.8-flash-next-iq4,halogen/halogen-qwen3.8-flash-next-q4xl,halogen/halogen-qwen3.8-flash-next'
   fi
@@ -990,7 +1007,7 @@ pi() {
     no)
       printf 'type=pi\nmodel=%s\nthinking=%s\ncwd=%s\nsandbox=unsandboxed\n' "$model_flag" "${PI_LOCAL_THINKING_LEVEL:-unknown}" "${PWD##*/}" > "$_state_file"
       printf '\033]2;π - %s\007' "${PWD##*/}"
-      { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "$@" } \
+      { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-adapter.json" --model "$model_flag" --models "$model_scope" "$@" } \
         always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
     yes)
@@ -1011,7 +1028,7 @@ pi() {
 
       printf 'type=pi\nmodel=%s\nthinking=%s\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${PI_LOCAL_THINKING_LEVEL:-unknown}" "${abs_target##*/}" "$level" > "$_state_file"
       printf '\033]2;π - %s\007' "${abs_target##*/}"
-      { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "${@:2}" } \
+      { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$HOME/.pi/agent/mcp-adapter.json" --model "$model_flag" --models "$model_scope" "${@:2}" } \
         always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
   esac
@@ -1019,6 +1036,12 @@ pi() {
 
 pihat() {
   local -x PI_BLACKHOLE_COMPACT_AFTER_TOKENS=350000  # cloud absolute compaction trigger; local sessions (pi/beta) set 230000 instead
+  local launcher=pihat
+  local mcp_config="$HOME/.pi/agent/mcp-adapter.json"
+  if [[ "${_PI_CLOUDFLARE_PROFILE:-0}" == 1 ]]; then
+    launcher=cf
+    mcp_config="$HOME/.pi/agent/mcp-cloudflare.json"
+  fi
   _pi_subagent_concurrency 4
   _pi_nonstata_skills
   _pi_theme_args
@@ -1026,12 +1049,12 @@ pihat() {
   # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
   # openrouter-us (US key) = everything else. Model + thinking level via /model
   # and Shift+Tab; per-model sampling via samplingParams.
-  local model_flag="${PIHAT_MODEL:-openai-codex/gpt-6-luna}"
+  local model_flag="${PIHAT_MODEL:-openai-codex/gpt-6.1-sol}"
   # Expose Halogen only while its engine-aware /health endpoint is ready.
   local model_scope="$(_pi_cloud_model_scope)"
 
   local go
-  go=$(gum choose --header "pihat · run in container?" \
+  go=$(gum choose --header "$launcher · run in container?" \
     "no   unsandboxed" \
     "yes  sandboxed") || return 1
 
@@ -1042,9 +1065,9 @@ pihat() {
 
   case "${go%%[ ]*}" in
     no)
-      printf 'type=pihat\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=unsandboxed\n' "$model_flag" "${PWD##*/}" > "$_state_file"
+      printf 'type=%s\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=unsandboxed\n' "$launcher" "$model_flag" "${PWD##*/}" > "$_state_file"
       printf '\033]2;π̂ - %s\007' "${PWD##*/}"
-      { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "$@" } \
+      { command pi --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$mcp_config" --model "$model_flag" --models "$model_scope" "$@" } \
         always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
     yes)
@@ -1053,7 +1076,7 @@ pihat() {
       [[ -f "$abs_target" ]] && is_file=1
 
       local level
-      level=$(gum choose --header "pihat · isolation level" \
+      level=$(gum choose --header "$launcher · isolation level" \
         "1   write to dir  +  read all of \$HOME" \
         "2   write to dir  +  no read elsewhere" \
         "3   write to single file only") || return 1
@@ -1063,12 +1086,21 @@ pihat() {
         echo "Error: level 3 requires a file path, not a directory."; return 1
       fi
 
-      printf 'type=pihat\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
+      printf 'type=%s\nmodel=%s\nthinking=max\ncwd=%s\nsandbox=sandboxed %s\n' "$launcher" "$model_flag" "${abs_target##*/}" "$level" > "$_state_file"
       printf '\033]2;π̂ - %s\007' "${abs_target##*/}"
-      { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --model "$model_flag" --models "$model_scope" "${@:2}" } \
+      { pi-safe-${level} "${abs_target}" --tui-mode fullscreen "${_PI_SKILL_ARGS[@]}" "${_PI_THEME_ARGS[@]}" --mcp-config "$mcp_config" --model "$model_flag" --models "$model_scope" "${@:2}" } \
         always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
       ;;
   esac
+}
+
+# Cloudflare-only skill visibility and an independent, initially dormant MCP profile.
+# Enable desired servers manually in /mcp's panel, editing the selected cf source.
+cf() {
+  local -x PI_MCP_CONFIG_MODE=exclusive  # cf never merges project/shared MCP overrides
+  local _PI_CLOUDFLARE_PROFILE=1
+  local PIHAT_MODEL="${CF_MODEL:-${PIHAT_MODEL:-openai-codex/gpt-6.1-sol}}"
+  pihat "$@"
 }
 
 beta() {
@@ -1140,7 +1172,7 @@ betahat() {
   # Routing baked into models.json: openrouter-ds (CN key) = DeepSeek only,
   # openrouter-us (US key) = everything else. Model + thinking level via /model
   # and Shift+Tab; per-model sampling via samplingParams.
-  local model_flag="${BETAHAT_MODEL:-openai-codex/gpt-6-luna}"
+  local model_flag="${BETAHAT_MODEL:-openai-codex/gpt-6.1-sol}"
   # Expose Halogen only while its engine-aware /health endpoint is ready.
   local model_scope="$(_pi_cloud_model_scope)"
 

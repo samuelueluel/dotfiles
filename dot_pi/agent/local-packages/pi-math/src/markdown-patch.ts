@@ -4,6 +4,7 @@ import {
   getCapabilities,
   getCellDimensions,
   type DefaultTextStyle,
+  type MarkdownOptions,
 } from "@earendil-works/pi-tui";
 import { insertFormulaImages, type FormulaImagePlacement } from "./image-layout.js";
 import type { TerminalMathRenderer } from "./renderer.js";
@@ -20,6 +21,7 @@ type MarkdownInternals = {
   text: string;
   paddingX?: number;
   defaultTextStyle?: DefaultTextStyle;
+  options?: MarkdownOptions;
 };
 
 type MarkdownRender = (this: Markdown, width: number) => string[];
@@ -41,35 +43,16 @@ interface TransformLineage {
 }
 
 const MAX_TRANSFORM_LINEAGES = 32;
-const PATCH_STATE_KEY = Symbol.for("pi-math.markdown.patch");
-
-type MarkdownPrototype = {
-  render: MarkdownRender;
-  [key: symbol]: unknown;
-};
-
-interface SharedPatchState {
-  wrapper: MarkdownRender;
-  baseRender: MarkdownRender;
-  delegate: MarkdownRender;
-  renderer: TerminalMathRenderer;
-  enabled: boolean;
-  installed: boolean;
-  owner: symbol;
-  transformCache: WeakMap<Markdown, CachedTransform>;
-  transformLineages: TransformLineage[];
-  lineageUsage: number;
-}
 
 export interface MathPatchController {
   isEnabled(): boolean;
   setEnabled(enabled: boolean): void;
   clearTransformCache(): void;
   /**
-   * Re-assert the wrapper only when the prototype still exposes the delegate
-   * captured by this patch. Never adopt an arbitrary current wrapper: another
-   * extension may already delegate to pi-math, and adopting it would create a
-   * render cycle during reloads or mid-session patches.
+   * Re-assert the wrapper as the outermost Markdown.render. Other extensions
+   * may replace the prototype method wholesale instead of chaining (notably
+   * pi-streaming-guard, which activates on session_start and can be toggled
+   * mid-session); rearm() adopts the current render as the delegation target.
    */
   rearm(): void;
   uninstall(): void;
@@ -116,79 +99,19 @@ function matchingLineage(
 }
 
 /**
- * Build a controller for the shared patch state. The owner token makes old
- * extension instances harmless after `/reload`: a stale shutdown or turn hook
- * cannot tear down the wrapper adopted by a newer instance.
- */
-function createPatchController(
-  prototype: MarkdownPrototype,
-  state: SharedPatchState,
-  owner: symbol,
-): MathPatchController {
-  const ownsState = () => state.installed && state.owner === owner;
-
-  return {
-    isEnabled: () => ownsState() && state.enabled,
-    setEnabled(value: boolean) {
-      if (ownsState()) state.enabled = value;
-    },
-    clearTransformCache() {
-      if (!ownsState()) return;
-      state.transformCache = new WeakMap();
-      state.transformLineages = [];
-      state.lineageUsage = 0;
-    },
-    rearm() {
-      if (!ownsState()) return;
-      const current = prototype.render;
-      if (current === state.wrapper) return;
-
-      // Do not adopt an arbitrary current renderer. A wholesale patch may have
-      // captured pi-math before replacing the prototype; adopting that wrapper
-      // here would create an A -> B -> A cycle. Leave the other renderer in
-      // control until it yields the delegate we originally captured.
-      if (current !== state.baseRender && current !== state.delegate) return;
-
-      state.delegate = current;
-      prototype.render = state.wrapper;
-    },
-    uninstall() {
-      if (!ownsState()) return;
-      state.enabled = false;
-      state.transformCache = new WeakMap();
-      state.transformLineages = [];
-      state.lineageUsage = 0;
-      if (prototype.render === state.wrapper) prototype.render = state.delegate;
-      state.installed = false;
-      if (prototype[PATCH_STATE_KEY] === state) delete prototype[PATCH_STATE_KEY];
-    },
-  };
-}
-
-/**
  * Install a reversible display-only wrapper around Pi's Markdown renderer.
  * The source Markdown is restored before render() returns, so session history
  * and provider context always retain the original LaTeX.
- *
- * The state is stored with Symbol.for() on Markdown.prototype so duplicate
- * package instances share one wrapper instead of building a cross-instance
- * delegation cycle during reloads.
  */
 export function installMarkdownMathPatch(renderer: TerminalMathRenderer): MathPatchController {
-  const prototype = Markdown.prototype as unknown as MarkdownPrototype;
-  const existing = prototype[PATCH_STATE_KEY] as SharedPatchState | undefined;
-  const owner = Symbol("pi-math-owner");
+  const baseRender = Markdown.prototype.render;
+  let enabled = true;
+  let installed = true;
+  let transformCache = new WeakMap<Markdown, CachedTransform>();
+  let transformLineages: TransformLineage[] = [];
+  let lineageUsage = 0;
 
-  if (existing?.installed) {
-    existing.renderer = renderer;
-    existing.enabled = true;
-    existing.owner = owner;
-    return createPatchController(prototype, existing, owner);
-  }
-
-  const baseRender = prototype.render;
-  let state: SharedPatchState;
-  const patchedRender: MarkdownRender = function (width: number): string[] {
+  const renderMath = function (this: Markdown, width: number, delegate: MarkdownRender): string[] {
     const markdown = this as unknown as MarkdownInternals;
     const source = markdown.text;
     const protocol = getCapabilities().images;
@@ -196,13 +119,13 @@ export function installMarkdownMathPatch(renderer: TerminalMathRenderer): MathPa
     // Rasterizing it on every token floods Kitty and leaves no durable output to preserve.
     const isTransientReasoning = markdown.defaultTextStyle?.italic === true;
     if (
-      !state.enabled ||
+      !enabled ||
       !protocol ||
       typeof source !== "string" ||
       isTransientReasoning ||
       !containsPotentialMath(source)
     ) {
-      return state.delegate.call(this, width);
+      return delegate.call(this, width);
     }
 
     const paddingX =
@@ -217,18 +140,18 @@ export function installMarkdownMathPatch(renderer: TerminalMathRenderer): MathPa
 
     let transformed: string;
     let placements: FormulaImagePlacement[];
-    const cached = state.transformCache.get(this);
+    const cached = transformCache.get(this);
     if (cached?.source === source && cached.layoutKey === layoutKey) {
       ({ transformed, placements } = cached);
     } else {
       placements = [];
-      const lineage = matchingLineage(state.transformLineages, source, layoutKey);
+      const lineage = matchingLineage(transformLineages, source, layoutKey);
       const imageIds = new Map<string, number>();
       transformed = expandMathInMarkdown(source, (latex, display, context) => {
         const inline = !display && !context.standalone;
         if (inline) return undefined;
 
-        const raster = state.renderer.render(latex, display, color, {
+        const raster = renderer.render(latex, display, color, {
           maxWidthCells: contentWidth,
           maxHeightCells: inline ? 1 : maxBlockRows,
           cellWidthPx: cells.widthPx,
@@ -251,48 +174,93 @@ export function installMarkdownMathPatch(renderer: TerminalMathRenderer): MathPa
         return { text: marker, forceBlock: !inline, rawInline: inline };
       });
       if (imageIds.size > 0) {
-        const nextUsage = ++state.lineageUsage;
+        const nextUsage = ++lineageUsage;
         if (lineage) {
           lineage.imageIds = imageIds;
           lineage.lastUsed = nextUsage;
           lineage.source = source;
         } else {
-          state.transformLineages.push({ imageIds, layoutKey, lastUsed: nextUsage, source });
+          transformLineages.push({ imageIds, layoutKey, lastUsed: nextUsage, source });
         }
-        if (state.transformLineages.length > MAX_TRANSFORM_LINEAGES) {
-          state.transformLineages.sort((left, right) => right.lastUsed - left.lastUsed);
-          state.transformLineages = state.transformLineages.slice(0, MAX_TRANSFORM_LINEAGES);
+        if (transformLineages.length > MAX_TRANSFORM_LINEAGES) {
+          transformLineages.sort((left, right) => right.lastUsed - left.lastUsed);
+          transformLineages = transformLineages.slice(0, MAX_TRANSFORM_LINEAGES);
         }
       }
-      state.transformCache.set(this, { source, layoutKey, transformed, placements });
+      transformCache.set(this, { source, layoutKey, transformed, placements });
     }
 
     if (transformed === source || placements.length === 0) {
-      return state.delegate.call(this, width);
+      return delegate.call(this, width);
     }
 
     markdown.text = transformed;
     try {
-      const textLines = stripGeneratedMathFenceLines(state.delegate.call(this, width));
+      const textLines = stripGeneratedMathFenceLines(delegate.call(this, width));
       return insertFormulaImages(textLines, placements, { renderWidth: width, paddingX });
     } finally {
       markdown.text = source;
     }
   };
 
-  state = {
-    wrapper: patchedRender,
-    baseRender,
-    delegate: baseRender,
-    renderer,
-    enabled: true,
-    installed: true,
-    owner,
-    transformCache: new WeakMap(),
-    transformLineages: [],
-    lineageUsage: 0,
+  // Pi 0.99 applies native Markdown transformers inside render(). Run that
+  // text-only stage before rasterization, once, then insert images after layout.
+  // It cannot replace this hook: it has no access to final terminal rows.
+  const rendering = new WeakSet<Markdown>();
+  const delegates = new WeakMap<MarkdownRender, MarkdownRender>();
+  const wrap = (delegate: MarkdownRender): MarkdownRender => {
+    const wrapped: MarkdownRender = function (width) {
+      // Each generation keeps its own delegate. A cooperative wrapper can retain
+      // an older generation without cycles or bypassing the renderer beneath it.
+      if (rendering.has(this)) return delegate.call(this, width);
+      rendering.add(this);
+      const markdown = this as unknown as MarkdownInternals;
+      const source = markdown.text;
+      const options = markdown.options;
+      try {
+        if (enabled && getCapabilities().images &&
+            markdown.defaultTextStyle?.italic !== true && options?.transform) {
+          const contentWidth = Math.max(1, width - (markdown.paddingX ?? 0) * 2);
+          markdown.text = options.transform(source, contentWidth);
+          markdown.options = { ...options, transform: undefined };
+        }
+        return renderMath.call(this, width, delegate);
+      } finally {
+        markdown.text = source;
+        markdown.options = options;
+        rendering.delete(this);
+      }
+    };
+    delegates.set(wrapped, delegate);
+    return wrapped;
   };
-  prototype[PATCH_STATE_KEY] = state;
-  prototype.render = patchedRender;
-  return createPatchController(prototype, state, owner);
+  let patchedRender = wrap(baseRender);
+  Markdown.prototype.render = patchedRender;
+  return {
+    isEnabled: () => enabled,
+    setEnabled(value: boolean) {
+      enabled = value;
+    },
+    clearTransformCache() {
+      transformCache = new WeakMap();
+      transformLineages = [];
+      lineageUsage = 0;
+    },
+    rearm() {
+      if (!installed || delegates.has(Markdown.prototype.render)) return;
+      patchedRender = wrap(Markdown.prototype.render);
+      Markdown.prototype.render = patchedRender;
+    },
+    uninstall() {
+      enabled = false;
+      transformCache = new WeakMap();
+      transformLineages = [];
+      lineageUsage = 0;
+      const delegate = delegates.get(Markdown.prototype.render);
+      if (installed && delegate) Markdown.prototype.render = delegate;
+      // Older generations retained by other extensions now pass through to
+      // their own delegates; never overwrite a renderer owned by someone else.
+      installed = false;
+    },
+  };
 }

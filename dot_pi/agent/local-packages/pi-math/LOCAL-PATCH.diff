@@ -1,0 +1,13 @@
+diff --git a/src/markdown-patch.ts b/src/markdown-patch.ts
+index f7f05d8..24db8cb 100644
+--- a/src/markdown-patch.ts
++++ b/src/markdown-patch.ts
+@@ -149,7 +149,7 @@ export function installMarkdownMathPatch(renderer: TerminalMathRenderer): MathPa
+       const imageIds = new Map<string, number>();
+       transformed = expandMathInMarkdown(source, (latex, display, context) => {
+         const inline = !display && !context.standalone;
+-        if (inline && protocol !== "kitty") return undefined;
++        if (inline) return undefined;
+ 
+         const raster = renderer.render(latex, display, color, {
+           maxWidthCells: contentWidth,

@@ -1,40 +1,12 @@
 // Model selection + display-order policy for the model picker. The picker is
-// normally driven by pi-ai's anthropic catalog. LOCAL: add a metadata fallback
-// for newly released Sonnet 5.5 until pi-ai's catalog catches up. Extracted from
-// index.ts so tests can import without activating the extension.
+// driven by pi-ai's anthropic catalog: models appear (and disappear) with it,
+// no per-model code here. Extracted from index.ts so tests can import without
+// activating the extension.
 // `resolveModel` resolves family shortcuts (opus/sonnet/fable) to the newest
 // matching id regardless of sort order; sort order only drives picker display.
 
 const TWO_HUNDRED_K_CONTEXT = 200_000;
 const ONE_M_CONTEXT = 1_000_000;
-
-// LOCAL: Anthropic lists Sonnet 5.5 before the installed pi-ai catalog does.
-// Its published limits are 1M context / 128K output. The bridge measured the
-// [1m] route on Pro; contextCap keeps the standard picker entry at 400K.
-export function withLocalModelFallbacks<T extends { id: string; [key: string]: any }>(piAiModels: T[]): T[] {
-	const id = "claude-sonnet-5-5";
-	if (piAiModels.some((model) => model.id === id)) return piAiModels;
-
-	const sonnet5 = piAiModels.find((model) => model.id === "claude-sonnet-5");
-	if (!sonnet5) return piAiModels;
-
-	return [...piAiModels, {
-		...sonnet5,
-		id,
-		name: "Claude Sonnet 5.5",
-		contextWindow: ONE_M_CONTEXT,
-		maxTokens: 128_000,
-		thinkingLevelMap: {
-			off: null,
-			minimal: null,
-			low: "low",
-			medium: "medium",
-			high: "high",
-			xhigh: null,
-			max: null,
-		},
-	} as T];
-}
 
 // pi-ai ships dated snapshot ids (claude-opus-4-5-20251101, ...) alongside the
 // bare ids. They are never exposed - and must not steal first-partial-match
@@ -111,8 +83,11 @@ export type ClaudeCodeRuntimeModel = {
 //   measured-good ids get `[1m]`.
 // - The registered contextWindow must match the window the bridge actually
 //   requests, or pi's status bar and compaction threshold misreport.
-// [1m] ids verified to serve 1M on every plan. A new model serves 200K until
-// someone measures it (diag/context-size.mjs) and adds it here.
+// [1m] ids verified to serve 1M on every plan (sonnet-5-5 measured on Pro with
+// and without Extra Usage; opus-5-5 on Max per its run notes). A new model
+// serves 200K until someone measures it (diag/context-size.mjs) and adds it
+// here. Known exception unrelated to long context: fable-5 is not included
+// with Pro account without Extra Usage.
 const MEASURED_ONE_M = new Set([
 	"claude-fable-5",
 	"claude-fable-5-1",
@@ -120,8 +95,7 @@ const MEASURED_ONE_M = new Set([
 	"claude-opus-5",
 	"claude-opus-4-8",
 	"claude-opus-4-7",
-	"claude-sonnet-5",
-	// LOCAL: Pro SDK probe on 2026-09-28 served 1M for claude-sonnet-5-5[1m].
+  "claude-sonnet-5",
 	"claude-sonnet-5-5",
 ]);
 
@@ -202,6 +176,7 @@ export function applyLongContext<T extends { id: string; name: string; contextWi
 	models: T[],
 	settings: LongContextSettings,
 ): T[] {
+	// LOCAL: flatMap so a maxVariants base also registers its `<id>-max` twin.
 	return models.flatMap((m) => {
 		const { contextWindow } = resolveClaudeCodeRuntimeModel(m, settings);
 		const name = contextWindow >= ONE_M_CONTEXT && !/\b1M\b/i.test(m.name) ? `${m.name} 1M` : m.name;

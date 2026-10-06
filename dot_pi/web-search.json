@@ -1,5 +1,12 @@
 {
   "workflow": "none",
+  "maxInlineContentChars": 12000,
+  "webSearch": {
+    "allowedProviders": ["searxng", "openai", "exa"]
+  },
+  "fetchRouting": {
+    "allowRemoteHostedProviders": false
+  },
   "searxngBaseUrl": "http://127.0.0.1:8888",
   "openaiSearchProviders": ["openai-codex"],
   "openaiSearchModel": "gpt-6-luna",

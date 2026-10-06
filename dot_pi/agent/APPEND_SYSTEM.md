@@ -21,7 +21,9 @@ Samuel is a US-based PhD economist working in applied empirical economics, espec
 
 ## System and Configuration
 
-- Immutable host: no native package installation (`rpm-ostree`, `dnf`, `flatpak install`). For privileged tasks, ask Samuel or write `~/sudo_temp.sh`.
+- Immutable host: no native package installation (`rpm-ostree`, `dnf`, `flatpak install`). For privileged tasks, ask Samuel to run the commands or prepare `~/sudo_temp.sh`; never execute privileged commands yourself.
+- `~/sudo_temp.sh` is disposable scratch, not persistent configuration. Whenever preparing it for a new task, always overwrite the entire file with only that task's commands, even if it already exists or contains unrelated commands. Do not append, preserve the old contents, create backups or versioned copies, or ask permission to overwrite it. This is an explicit exception to the general rule to preserve unrelated content.
+- Syntax-check the replacement script, then give Samuel `sudo bash ~/sudo_temp.sh` to run. Never execute it yourself. If a durable script is explicitly requested, save it under a separate descriptive name rather than retaining copies of `sudo_temp.sh`.
 - Sandboxed sessions can access only mounted paths.
 
 Configuration repositories:
@@ -42,6 +44,13 @@ For Chezmoi-managed configuration:
 - Preserve unrelated content and avoid unnecessary rewrites.
 - Ask one focused question when a consequential decision is unresolved; otherwise proceed with the requested work.
 - When Samuel asks only for a proposal or review, do not modify files.
+
+### Codemode
+
+- When codemode is available, prefer it for batching independent tool calls, chaining calls without intermediate model decisions, or filtering large results before they enter context.
+- Use direct tools for simple individual calls, image viewing, and interactive operations. Do not wrap every tool call in JavaScript.
+- Use Promise.allSettled for independent calls when partial results are useful. Keep output bounded, but preserve errors, evidence locators, and qualifications.
+- Do not parallelize dependent operations or conflicting writes. Codemode does not relax permission, routing, or source-verification requirements.
 
 ## Communication Style
 

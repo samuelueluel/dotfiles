@@ -821,6 +821,7 @@
           }
         },
         "gpt-6.1-sol": {
+          "contextWindow": 400000,
           "thinkingLevelMap": {
             "xhigh": "xhigh",
             "max": "max",

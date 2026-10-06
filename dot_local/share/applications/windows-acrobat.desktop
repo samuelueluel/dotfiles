@@ -1,0 +1,21 @@
+[Desktop Entry]
+Type=Application
+Name=Windows
+Comment=Start the saved Windows 11 VM
+Exec=/var/home/samuel/.local/bin/windows
+Icon=computer
+Terminal=false
+Categories=Office;
+Keywords=Windows;Acrobat;Adobe;PDF;VM;
+StartupNotify=false
+Actions=PDFs;Manage;
+
+[Desktop Action PDFs]
+Name=Open PDF exchange folder
+Exec=xdg-open /var/home/samuel/Windows-PDFs
+Icon=folder-documents
+
+[Desktop Action Manage]
+Name=Manage Windows VM
+Exec=virt-manager --connect qemu:///system --show-domain-console windows-acrobat
+Icon=virt-manager

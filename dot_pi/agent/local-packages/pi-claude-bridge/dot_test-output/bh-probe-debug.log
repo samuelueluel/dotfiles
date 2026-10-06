@@ -1,0 +1,3 @@
+[2026-09-26T05:02:17.704Z] [6m29pq] loadConfig: {"askClaude":{"enabled":false},"provider":{"plan":"pro","longContextExtraUsage":false,"strictMcpConfig":true,"autoMemoryEnabled":false,"contextCap":320000,"maxVariants":["claude-opus-5-5","claude-sonnet-5"]}}
+[2026-09-26T05:02:22.352Z] [6m29pq] session_shutdown: clearing session none
+[2026-09-26T05:02:22.352Z] [6m29pq] session_shutdown: clearing ACTIVE_STREAM_SIMPLE_KEY

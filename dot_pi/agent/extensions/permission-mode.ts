@@ -669,8 +669,10 @@ export default function permissionModeExtension(pi: ExtensionAPI): void {
     // changes only through an explicit mode command or a new OS process.
     if (!processState.initialized) {
       const requested = requestedStartupMode();
+      // With no explicit startup mode, automate approvals but keep questions
+      // available. Preserve an upstream YOLO default as fully automatic.
       processState.mode = requested
-        ?? (permissionRuntime()?.getYoloMode?.() === true ? "auto" : "manual");
+        ?? (permissionRuntime()?.getYoloMode?.() === true ? "auto" : "autoask");
       processState.initialized = true;
     }
     currentMode = processState.mode ?? "manual";

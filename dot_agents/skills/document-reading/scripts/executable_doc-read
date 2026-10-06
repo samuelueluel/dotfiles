@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Runs doc_read.py with the Surya venv's Python (it has PyMuPDF and requests).
+set -euo pipefail
+py="${DOC_READ_PYTHON:-$HOME/surya-spike-venv/bin/python}"
+[[ -x "$py" ]] || { echo "doc-read: Python not found at $py (set DOC_READ_PYTHON)" >&2; exit 2; }
+exec "$py" "$(dirname "$(readlink -f "$0")")/doc_read.py" "$@"
