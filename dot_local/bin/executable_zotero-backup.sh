@@ -7,6 +7,10 @@
 #                         off-machine via Dropbox)
 #   Layer 2 (crops):     ~/.config/zotero-mcp/surya-sidecars/*.images -> ~/zotero-mcp-backups/
 #                        (~222 MB; page crops rendered from the PDFs, VLM enrichment inputs)
+#   Layer 1b (OCR seeds): ~/.cache/zotero-mcp/surya-work/runs/ JSON -> ~/Dropbox/zotero-mcp-backups/
+#                        (state.json, manifest.json, results.json; ~160 MB raw; the inputs
+#                         seeded reruns reassemble from — losing them means days of fresh OCR.
+#                         Page PNGs are skipped: they re-render from the PDFs)
 #   Surya sidecars replaced MinerU on 2026-10-08; MinerU sidecars are no longer backed up.
 #   Layer 3 (chroma):    ~/.config/zotero-mcp/chroma_db/            -> ~/zotero-mcp-backups/
 #                        (fast-restore: unpack instead of re-embedding ~19k chunks)
@@ -20,6 +24,7 @@
 set -u
 STAMP=$(date '+%Y%m%d-%H%M%S')
 SIDECAR_SRC="$HOME/.config/zotero-mcp/surya-sidecars"
+RUNS_SRC="$HOME/.cache/zotero-mcp/surya-work/runs"
 CHROMA_SRC="$HOME/.config/zotero-mcp/chroma_db"
 LOCAL_DST="$HOME/zotero-mcp-backups"
 DROPBOX_DST="$HOME/Dropbox/zotero-mcp-backups"
@@ -39,6 +44,14 @@ if [ -d "$SIDECAR_SRC" ]; then
   tar -czf "$DROPBOX_DST/zotero-sidecars-$STAMP.tar.gz" -C "$SIDECAR_SRC" --exclude="*.images" . \
     && log "layer1 sidecars -> $DROPBOX_DST/zotero-sidecars-$STAMP.tar.gz ($(du -h "$DROPBOX_DST/zotero-sidecars-$STAMP.tar.gz" | cut -f1))"
   prune "$DROPBOX_DST" "zotero-sidecars-*.tar.gz" "$((KEEP + 1))"
+fi
+
+# Layer 1b: OCR seed JSON -> Dropbox
+if [ -d "$RUNS_SRC" ]; then
+  ( cd "$RUNS_SRC" && find . -type f \( -name state.json -o -name manifest.json -o -name results.json \) -print0 \
+      | tar -czf "$DROPBOX_DST/zotero-ocr-seeds-$STAMP.tar.gz" --null -T - ) \
+    && log "layer1b ocr seeds -> $DROPBOX_DST/zotero-ocr-seeds-$STAMP.tar.gz ($(du -h "$DROPBOX_DST/zotero-ocr-seeds-$STAMP.tar.gz" | cut -f1))"
+  prune "$DROPBOX_DST" "zotero-ocr-seeds-*.tar.gz" "$((KEEP + 1))"
 fi
 
 # Layer 2: crops -> local

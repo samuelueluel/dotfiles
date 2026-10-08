@@ -43,12 +43,12 @@ Copy the user's original file into `inbox/`. The intake command claims that copy
 
 The bridge connects Pi to the local document pipeline. It works on both local and cloud routes, but blocks unknown endpoints. While cloud models (`pihat`) can read the resulting artifacts through the bridge, direct filesystem access to the workspace remains blocked.
 
-Enrichment always runs locally. `document_analysis_enrich` only ever calls local MinerU and the local VLM at `127.0.0.1:8084`. The cloud model reads the returned output, but never does the preprocessing itself.
+Enrichment always runs locally. `document_analysis_enrich` only ever called local MinerU (now retired) and the local VLM at `127.0.0.1:8084`. The cloud model reads the returned output, but never does the preprocessing itself.
 
 ## Service Roles
 
 - `pi` or `pihat` is the conversation model. The document helper does not load it and does not use it for OCR.
-- MinerU is the local OCR/layout tool. It is installed at `~/mineru-upgrade-venv/bin/mineru` and runs with offline flags.
+- MinerU was the local OCR/layout tool. It is retired and its environment was removed on 2026-10-08.
 - The vision service is the local endpoint at `http://127.0.0.1:8084/v1/chat/completions`. Running `serve-vlm` starts this model on the host. (Other services like `serve-embedder` are unrelated).
 - Enrichment returns its output to the conversation model, but no cloud service ever preprocesses the document.
 
