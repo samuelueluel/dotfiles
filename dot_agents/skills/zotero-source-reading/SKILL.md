@@ -52,7 +52,7 @@ Use the returned evidence ID with `zotero_read_passage`. Add `neighbors=1` only 
 
 For a known phrase, table label, heading, or statistic, use `zotero_find_in_item`. Prefer a distinctive phrase over a common word. When continuing the sidecar, pass its `source_hash` as `expected_hash`.
 
-Before quoting any number or formula from a passage or sidecar window, read its `reliability` field, any `[Table status]`, `[Equation status]`, `[Math status]`, or `[Page status]` line, and the paper-level `item_warning`. For a table listed in `problem_tables`, a window with `requires_pdf_check: true`, or a flagged equation, go straight to the PDF page in step 5 instead of trying another sidecar lookup. Use the returned `pdf_pages` as the page to search, not as a verified page for citation.
+Before quoting any number or formula from a passage or sidecar window, read its `reliability` field, any `[Table status]`, `[Equation status]`, `[Math status]`, or `[Page status]` line, and the paper-level `item_warning`. For a table listed in `problem_tables`, a window with `requires_pdf_check: true`, or a flagged equation, go straight to the PDF page in step 5 instead of trying another sidecar lookup. Use the returned `pdf_pages` as the page to search, not as a verified page for citation. Those pages belong to the reliability `attachment_key`; pass it to the PDF tools when the item has more than one PDF.
 
 Inspect the deployed schema before using an unfamiliar tool. For detailed lookup and continuation examples, load [bounded source-reading syntax](../../references/zotero/deep-dive-reading.md).
 

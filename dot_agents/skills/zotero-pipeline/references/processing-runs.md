@@ -72,7 +72,7 @@ systemd-run --user --unit zotero-surya-<name> --collect --same-dir \
 
 ## Deploying a Fork Tag
 
-The live server runs the fork from `~/.Uvfile`'s pinned tag through `uv tool`. After a tested change on branch `surya-sidecars`:
+The live server runs the fork from `~/.Uvfile`'s pinned tag through `uv tool`. After a tested change on branch `samuel`:
 
 1. Commit and push the branch; create and push an annotated tag `samuel-v0.11.0.<N>`.
 2. Update the tag in `~/.Uvfile`, then `chezmoi add ~/.Uvfile`.
