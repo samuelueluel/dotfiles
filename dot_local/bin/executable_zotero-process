@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+"""zotero-process — process new Zotero papers into the live Surya index.
+
+  zotero-process start  --run NAME --item KEY [--item KEY ...] [--dry-run]
+  zotero-process status --run NAME
+  zotero-process finish --run NAME
+
+start   Checks the scope and services, saves a rolling backup of the live
+        index (chroma_db + bm25_index.json + config.json -> *.pre-run), then
+        launches zotero_mcp.surya_batch on the live config as the detached
+        user unit zotero-surya-NAME (OCR, table repair, figure enrichment,
+        indexing). The batch starts and stops its own Surya and Qwen servers.
+        Rerunning start with the same NAME resumes from per-item checkpoints
+        and does not overwrite the backup.
+status  Unit state, the run log tail and per-item stage completion.
+finish  After the unit has exited: verifies each item (sidecar, reliability
+        record, chunks in the live index), rebuilds the citation graph and
+        reference index, and restarts zotero-mcp.service.
+
+MinerU is retired; this is the only supported route for new papers.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+import urllib.request
+from pathlib import Path
+
+HOME = Path.home()
+LIVE = HOME / ".config/zotero-mcp"
+CONFIG = LIVE / "config.json"
+FORK = HOME / ".local/src/zotero-mcp"
+FORK_PY = FORK / ".venv/bin/python"
+LIVE_PY = HOME / ".local/share/uv/tools/zotero-mcp-server/bin/python"
+RUNS = HOME / ".cache/zotero-mcp/surya-work/runs"
+BACKUP_FILES = ("chroma_db", "bm25_index.json", "config.json")
+KEY_RE = re.compile(r"^[A-Z0-9]{8}$")
+
+
+def die(msg: str) -> None:
+    sys.exit(f"zotero-process: {msg}")
+
+
+def unit(run: str) -> str:
+    return f"zotero-surya-{run}"
+
+
+def active_surya_units() -> list[str]:
+    out = subprocess.run(["systemctl", "--user", "list-units", "zotero-surya-*", "--no-legend", "--plain"],
+                         capture_output=True, text=True).stdout
+    return [line.split()[0] for line in out.splitlines() if line.strip() and " active " in f" {line} "]
+
+
+def reachable(url: str) -> bool:
+    try:
+        urllib.request.urlopen(url, timeout=5)
+        return True
+    except Exception as exc:  # any HTTP answer means the service is up
+        return hasattr(exc, "code")
+
+
+def sidecar_dir() -> Path:
+    raw = json.loads(CONFIG.read_text())
+    return Path(raw["semantic_search"]["mineru"]["sidecar_dir"]).expanduser()
+
+
+def chunk_counts(keys: list[str]) -> dict[str, int]:
+    db = LIVE / "chroma_db/chroma.sqlite3"
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    marks = ",".join("?" * len(keys))
+    rows = con.execute(
+        f"select string_value, count(*) from embedding_metadata where key='item_key' "
+        f"and string_value in ({marks}) group by 1", keys).fetchall()
+    con.close()
+    return {k: 0 for k in keys} | dict(rows)
+
+
+def cmd_start(args) -> None:
+    keys = list(dict.fromkeys(args.item))
+    if bad := [k for k in keys if not KEY_RE.match(k)]:
+        die(f"not Zotero item keys: {bad}")
+    if not re.match(r"^[a-z0-9][a-z0-9-]{0,40}$", args.run):
+        die("run name: lowercase letters, digits and dashes")
+    run_dir = RUNS / args.run
+    resuming = (run_dir / "state.json").is_file()
+    if resuming:
+        state = json.loads((run_dir / "state.json").read_text())
+        if sorted(state.get("scope") or []) != sorted(keys):
+            die(f"run {args.run} exists with scope {state.get('scope')}; resume it with the same keys or pick a new name")
+    if running := active_surya_units():
+        die(f"another Surya run is active: {running}")
+    if not reachable("http://127.0.0.1:8082/v1/models"):
+        die("embedder :8082 is not answering; ask Samuel to start it (the index stage needs it)")
+    if not reachable("http://127.0.0.1:23119/api/"):
+        print("warning: Zotero desktop local API (:23119) is not answering; item resolution may fail")
+    known = chunk_counts(keys)
+    if already := [k for k, n in known.items() if n]:
+        print(f"note: already indexed, will be reprocessed: {already}")
+    cmd = [str(FORK_PY), "-m", "zotero_mcp.surya_batch", "--config", str(CONFIG), "--allow-live",
+           "--run", args.run] + [a for k in keys for a in ("--item", k)]
+    print("command:", " ".join(cmd))
+    if args.dry_run:
+        return
+    if not resuming:
+        for name in BACKUP_FILES:
+            src, dst = LIVE / name, LIVE / f"{name}.pre-run"
+            if dst.is_dir():
+                shutil.rmtree(dst)
+            elif dst.exists():
+                dst.unlink()
+            (shutil.copytree if src.is_dir() else shutil.copy2)(src, dst)
+        con = sqlite3.connect(f"file:{LIVE / 'chroma_db.pre-run/chroma.sqlite3'}?mode=ro", uri=True)
+        check = con.execute("pragma quick_check").fetchone()[0]
+        con.close()
+        if check != "ok":
+            die(f"backup quick_check: {check}")
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "live-backup.txt").write_text(f"{LIVE}/*.pre-run taken before run {args.run}\n")
+        print(f"backup: {LIVE}/{{chroma_db,bm25_index.json,config.json}}.pre-run")
+    subprocess.run(["systemctl", "--user", "reset-failed", unit(args.run)], capture_output=True)
+    subprocess.run(["systemd-run", "--user", "--unit", unit(args.run), "--collect", "--same-dir", *cmd],
+                   cwd=FORK, check=True)
+    print(f"started {unit(args.run)}; check with: zotero-process status --run {args.run}")
+
+
+def cmd_status(args) -> None:
+    run_dir = RUNS / args.run
+    state_file = run_dir / "state.json"
+    if not state_file.is_file():
+        die(f"no run {args.run}")
+    active = subprocess.run(["systemctl", "--user", "is-active", unit(args.run)],
+                            capture_output=True, text=True).stdout.strip()
+    print(f"unit {unit(args.run)}: {active}")
+    log = run_dir / "run.log"
+    if log.is_file():
+        print("".join(log.read_text().splitlines(keepends=True)[-8:]), end="")
+    state = json.loads(state_file.read_text())
+    for key, item in sorted(state.get("items", {}).items()):
+        print(f"{key}: done={item.get('done', [])} level={item.get('level', '-')} errors={len(item.get('errors') or [])}")
+
+
+def cmd_finish(args) -> None:
+    run_dir = RUNS / args.run
+    state_file = run_dir / "state.json"
+    if not state_file.is_file():
+        die(f"no run {args.run}")
+    active = subprocess.run(["systemctl", "--user", "is-active", unit(args.run)],
+                            capture_output=True, text=True).stdout.strip()
+    if active in ("active", "activating"):
+        die(f"{unit(args.run)} is still {active}")
+    state = json.loads(state_file.read_text())
+    keys = sorted(state.get("items", {}))
+    if not keys:
+        die("run has no items")
+    sc = sidecar_dir()
+    counts = chunk_counts(keys)
+    problems = []
+    for k in keys:
+        item = state["items"][k]
+        missing = [s for s in ("ocr", "repair", "enrich", "index") if s not in item.get("done", [])]
+        files = [f"{k}{s}" for s in (".md", ".reliability.json", ".blocks.json") if not (sc / f"{k}{s}").is_file()]
+        if missing or files or not counts[k] or item.get("errors"):
+            problems.append(f"{k}: stages missing {missing}, files missing {files}, chunks {counts[k]}, errors {item.get('errors')}")
+        print(f"{k}: level={item.get('level', '-')} chunks={counts[k]}")
+    if problems:
+        print("\n".join(problems))
+        die("run incomplete; diagnose, then rerun start with the same --run and keys to resume")
+    # The graph and reference index read zotero.sqlite immutably; pending WAL
+    # writes (Zotero Desktop open after edits) would be silently missed.
+    wal = HOME / "Zotero/zotero.sqlite-wal"
+    if wal.is_file() and wal.stat().st_size:
+        die("Zotero's WAL has pending writes; close Zotero Desktop fully, then rerun finish")
+    rebuild = (
+        "from zotero_mcp.citation_graph import CitationGraph\n"
+        "from zotero_mcp.reference_index import build_reference_index\n"
+        "g = CitationGraph().build(); r = build_reference_index()\n"
+        "print(f\"graph: {g['reference_entries']} entries, {g['resolved_citations']} resolved citations; \"\n"
+        "      f\"reference index: {r['entries']} entries from {r['source_sidecars']} sidecars\")\n"
+    )
+    subprocess.run([str(LIVE_PY), "-I", "-c", rebuild], cwd="/", check=True)
+    subprocess.run(["systemctl", "--user", "restart", "zotero-mcp.service"], check=True)
+    print("zotero-mcp.service restarted; run complete and verified")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(prog="zotero-process", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    s = sub.add_parser("start")
+    s.add_argument("--run", required=True)
+    s.add_argument("--item", action="append", required=True)
+    s.add_argument("--dry-run", action="store_true")
+    for name in ("status", "finish"):
+        sub.add_parser(name).add_argument("--run", required=True)
+    args = ap.parse_args()
+    {"start": cmd_start, "status": cmd_status, "finish": cmd_finish}[args.cmd](args)
+
+
+if __name__ == "__main__":
+    main()

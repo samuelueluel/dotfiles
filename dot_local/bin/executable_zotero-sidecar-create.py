@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Retired with MinerU; kept for history only.
+raise SystemExit("zotero-sidecar-create.py: MinerU is retired (2026-10-08); production uses Surya sidecars via zotero_mcp.surya_batch.")
 """zotero-sidecar-create.py — GPU MinerU sidecar creation (parse ONLY, no embed).
 
 Separates "create sidecar" from "embed". Runs magic-pdf (ROCm GPU path) on each

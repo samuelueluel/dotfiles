@@ -258,6 +258,12 @@ def mineru_config() -> dict[str, Any]:
     override wins; otherwise the already-installed generic venvs are tried in
     the known order. Offline Hugging Face flags are added to every invocation.
     """
+    # MinerU is retired (2026-10-08): never run it, whatever is installed.
+    return {
+        "status": "unavailable",
+        "binary": None,
+        "reason": "MinerU is retired and disabled",
+    }
     explicit = os.environ.get("DOCUMENT_ANALYSIS_MINERU_BIN")
     if explicit:
         candidates = [Path(explicit).expanduser()]

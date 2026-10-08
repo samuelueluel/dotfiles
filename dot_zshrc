@@ -1197,12 +1197,15 @@ betahat() {
 }
 
 # claude = Claude Code with a fixed niri-minimap title (ĉ = cloud Claude) and
-# the working-state plugin (~/.claude/local-plugins/working-state).
+# the working-state plugin (~/.claude/local-plugins/working-state), plus the
+# figures plugin (~/.claude/local-plugins/figures: math, diagrams, and images
+# drawn inline in Ghostty; needs resvg from the Brewfile).
 # Claude Code normally retitles the window with the conversation topic, which
-# niri-minimap cannot classify, so that is disabled here.
+# niri-minimap cannot classify, so that is disabled here. CLAUDE_TTY lets the
+# claude-alert hook ring this terminal's bell (hooks have no /dev/tty).
 claude() {
   printf '\033]2;ĉ - %s\007' "${PWD##*/}"
-  CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 command claude --plugin-dir "$HOME/.claude/local-plugins/working-state" "$@"
+  CLAUDE_TTY="$(tty)" CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 command claude --plugin-dir "$HOME/.claude/local-plugins/working-state" --plugin-dir "$HOME/.claude/local-plugins/figures" "$@"
 }
 
 # claudefam = claude + the turbovault_family MCP server (~/Family-Vault/).
@@ -1219,7 +1222,7 @@ claudebeta() {
   local beta_prompt
   beta_prompt="$(<"$HOME/.claude/claudebeta-prompt.md")"
   printf '\033]2;ĉβ - %s\007' "${PWD##*/}"
-  CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 command claude --plugin-dir "$HOME/.claude/local-plugins/stata-beta" --plugin-dir "$HOME/.claude/local-plugins/working-state" --append-system-prompt "$beta_prompt" "$@"
+  CLAUDE_TTY="$(tty)" CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 command claude --plugin-dir "$HOME/.claude/local-plugins/stata-beta" --plugin-dir "$HOME/.claude/local-plugins/working-state" --plugin-dir "$HOME/.claude/local-plugins/figures" --append-system-prompt "$beta_prompt" "$@"
 }
 
 # --- LLM CODING BENCHMARK ---

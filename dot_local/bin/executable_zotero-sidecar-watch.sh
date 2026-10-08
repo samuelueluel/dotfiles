@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Retired with MinerU; kept for history only.
+echo "zotero-sidecar-watch.sh: MinerU is retired (2026-10-08); production uses Surya sidecars via zotero_mcp.surya_batch." >&2; exit 3
 # zotero-sidecar-watch.sh — GTT balloon + hang watchdog for sidecar-create runs.
 #
 # Reuses the calibrated GTT detection from zotero-backfill-watchdog.sh

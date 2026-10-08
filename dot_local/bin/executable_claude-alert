@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Claude Code hook: play a sound and ring the terminal bell, so Ghostty marks
+# the window urgent and niri-minimap shows the red alert badge (as Pi's
+# alert-on-finish extension does). Hooks have no controlling terminal, so the
+# bell goes to the pty the claude wrapper recorded in CLAUDE_TTY.
+# Usage: claude-alert <sound-name>   (freedesktop stereo theme, e.g. complete)
+sound="/usr/share/sounds/freedesktop/stereo/${1:-complete}.oga"
+cat >/dev/null  # drain the hook's JSON input
+[[ -n "${CLAUDE_TTY:-}" && -w "$CLAUDE_TTY" ]] && printf '\a' > "$CLAUDE_TTY"
+[[ -f "$sound" ]] && { canberra-gtk-play -f "$sound" >/dev/null 2>&1 & }
+exit 0

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Retired with MinerU; kept for history only.
+echo "zotero-backfill-watchdog.sh: MinerU is retired (2026-10-08); production uses Surya sidecars via zotero_mcp.surya_batch." >&2; exit 3
 # zotero-backfill-watchdog.sh — self-healing runner for the MinerU library backfill.
 #
 # WHY: on this APU (133 GB unified memory), magic-pdf on the ROCm GPU path can

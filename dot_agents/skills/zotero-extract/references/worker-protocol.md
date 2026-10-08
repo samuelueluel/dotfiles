@@ -6,7 +6,7 @@
 
 ```
 You are an extraction worker for item <KEY> (<title>). The full source text is
-at <source_path> (route: <mineru_sidecar|pdf_text_layer>, fidelity: <high|low>) —
+at <source_path> (route: <mineru_sidecar|pdf_text_layer>, fidelity: <high|low>; mineru_sidecar names any sidecar, now Surya) —
 read all of it there; the orchestrator does not inline large sources.
 
 ZOTERO_EXTRACT_WORKER: FULL_DOCUMENT

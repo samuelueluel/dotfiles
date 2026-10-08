@@ -8,6 +8,8 @@ an item from another job's log, and never kills a parser outside the pinned
 runner's process tree. MinerU's own timeout remains the last-resort guard.
 """
 from __future__ import annotations
+# Retired with MinerU; kept for history only.
+raise SystemExit("zotero-sidecar-batch-watch.py: MinerU is retired (2026-10-08); production uses Surya sidecars via zotero_mcp.surya_batch.")
 
 import argparse
 import json

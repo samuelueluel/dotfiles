@@ -14,6 +14,8 @@ then indexed through an exact-key update. Indexing failures are recorded and
 retried on resume; they are NEVER counted as successes. Do not run a global reset.
 """
 from __future__ import annotations
+# Retired with MinerU; kept for history only.
+raise SystemExit("zotero-sidecar-reprocess.py: MinerU is retired (2026-10-08); production uses Surya sidecars via zotero_mcp.surya_batch.")
 
 import argparse
 from collections import Counter

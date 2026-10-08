@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Retired with MinerU; kept for history only.
+raise SystemExit("zotero-cpu-rescue.py: MinerU is retired (2026-10-08); production uses Surya sidecars via zotero_mcp.surya_batch.")
 """CPU-venv rescue for MinerU poison items.
 
 The GPU (ROCm) magic-pdf path deterministically balloons amdgpu GTT on a

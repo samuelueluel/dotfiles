@@ -33,6 +33,10 @@ if [ -z "$cmd" ] || { [ "$#" -eq 0 ] && [ "$cmd" != reprocess ]; }; then
   exit 1
 fi
 
+# Retired with MinerU on 2026-10-08; kept for history only.
+echo "zotero-sidecar.sh: MinerU is retired (2026-10-08); production uses Surya sidecars via zotero_mcp.surya_batch." >&2
+exit 3
+
 # Resolve a collection key to its item keys; pass explicit item keys through.
 resolve_keys() {
   local arg="$1"

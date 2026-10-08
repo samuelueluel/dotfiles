@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """CLI shim for the managed Zotero sidecar-quality checker."""
 from __future__ import annotations
+# Retired with MinerU; kept for history only.
+raise SystemExit("zotero-sidecar-quality.py: MinerU is retired (2026-10-08); Surya sidecars carry reliability.json instead.")
 
 import importlib.util
 from pathlib import Path

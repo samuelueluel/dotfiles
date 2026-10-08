@@ -16,7 +16,7 @@ from agent_transcripts import read_transcript_text
 
 # Primary: Haiku 5.5 through Claude Code (`claude -p`, Claude subscription).
 # Fallback: DeepSeek V4.1 Flash through Pi on the US OpenRouter key, 1M-context
-# provider variant. Never route through Pi's claude-bridge provider.
+# provider variant.
 LOGGER_MODEL = "claude-haiku-5-5"
 FALLBACK_LOGGER_MODEL = "openrouter-us-max/deepseek/deepseek-v4.1-flash"
 LOGGER_THINKING = "max"

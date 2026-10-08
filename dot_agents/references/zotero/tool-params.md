@@ -2,7 +2,7 @@
 
 **Load this file on the first retrieval call of a session**, before guessing
 parameter names. The deployed schema is authoritative; these bounds were
-verified against fork release `samuel-v0.11.0.22` — recheck them after any
+verified against fork release `samuel-v0.11.0.22` and unchanged through `samuel-v0.11.0.25` — recheck them after any
 release upgrade.
 
 ## Lookup budgets (all text budgets are 256–16000 chars)

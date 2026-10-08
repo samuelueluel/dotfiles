@@ -43,10 +43,10 @@ from pathlib import Path
 
 import requests
 
-# ZOTERO_SIDECAR_DIR selects another sidecar set (e.g. Surya sidecars, whose
-# figure crops live beside the sidecar in <KEY>.images/).
+# Default: the live Surya sidecars (MinerU retired 2026-10-08), whose
+# figure crops live beside the sidecar in <KEY>.images/; ZOTERO_SIDECAR_DIR overrides.
 SIDECAR_DIR = Path(os.environ.get(
-    "ZOTERO_SIDECAR_DIR", str(Path.home() / ".config" / "zotero-mcp" / "mineru-sidecars")))
+    "ZOTERO_SIDECAR_DIR", str(Path.home() / ".config" / "zotero-mcp" / "surya-sidecars")))
 WORK_DIR = Path.home() / ".cache" / "zotero-mcp" / "mineru-work"
 VLM_URL = os.environ.get("ZOTERO_VLM_URL", "http://127.0.0.1:8084/v1/chat/completions")
 VLM_MODEL = "Qwen3-VL-30B-A3B-Instruct"  # unsloth UD-Q8_K_XL (~36 GB, MoE ~3B active)

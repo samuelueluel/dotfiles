@@ -16,7 +16,7 @@ Submit no more than eight atomic claims in one call with `escalation="none"`. Fo
 
 `mineru_sidecar` is the route name for any sidecar, including Surya sidecars. Item keys are eight-character parent keys, not titles, DOIs, paths, or collections. The tool rejects caller-supplied source bodies and reranker scores.
 
-Numeric claims require evidence from a PDF-page read, or the supported weaker MinerU-sidecar fallback after a PDF-page route fails. Accepted quotes must contain the values and any explicitly asserted units; a unit-less expected value matches any source unit for that number, so an SE printed as `(10.66%)` satisfies a unit-less `se` entry. Supply `expected_values` for the empirical values to audit so structural numbers such as `Table 6`, `Figure 2`, publication years, and PDF pages are not treated as findings.
+Numeric claims require evidence from a PDF-page read, or the supported weaker sidecar fallback after a PDF-page route fails. Accepted quotes must contain the values and any explicitly asserted units; a unit-less expected value matches any source unit for that number, so an SE printed as `(10.66%)` satisfies a unit-less `se` entry. Supply `expected_values` for the empirical values to audit so structural numbers such as `Table 6`, `Figure 2`, publication years, and PDF pages are not treated as findings.
 
 ```json
 {

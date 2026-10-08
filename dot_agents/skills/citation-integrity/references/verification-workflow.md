@@ -6,7 +6,7 @@ The [citation integrity skill](../SKILL.md) owns the governing checks. This refe
 
 ## What Each Status Line Means
 
-Surya sidecars mark every table that is not `verified` with a `[Table status: ...]` line, every contradicted equation with an `[Equation status: ...]` line, every paragraph whose inline math disagrees with the page with a `[Math status: ...]` line, and content OCR returned for a blank scanned page with a `[Page status: ...]` line. The reason in parentheses is either a plain sentence or an internal code. A MinerU sidecar, or a result with no `reliability` field, is `legacy-unverified`: nothing was checked.
+Surya sidecars mark every table that is not `verified` with a `[Table status: ...]` line, every contradicted equation with an `[Equation status: ...]` line, every paragraph whose inline math disagrees with the page with a `[Math status: ...]` line, and content OCR returned for a blank scanned page with a `[Page status: ...]` line. The reason in parentheses is either a plain sentence or an internal code. A result with no `reliability` field (legacy MinerU text) is `legacy-unverified`: nothing was checked.
 
 | What you see | Numbers | What remains unchecked |
 |---|---|---|

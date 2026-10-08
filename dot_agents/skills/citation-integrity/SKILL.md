@@ -113,11 +113,11 @@ A numerical maximum among unlike results must be labeled that way, not called th
 
 ## 3. Check Extracted Text and Record Its Source
 
-Distinguish extracted PDF-page text, sidecar text (MinerU or Surya), indexed passages, and visual inspection.
+Distinguish extracted PDF-page text, Surya sidecar text, indexed passages, and visual inspection.
 `zotero_read_pdf_pages` returns text, not an image inspection. Describe the evidence as extracted PDF-page text, not the vague label “direct PDF.”
 Indexed passages and literal lookups may expose the same sidecar. Agreement does not independently verify its accuracy.
 
-Sidecar-backed tool results carry a `reliability` field (`block_status`, `requires_pdf_check`, `pdf_pages`, `check_pages`, and a paper-level `item_level`/`item_warning`). Sidecars may also show visible `[Table status: ...]`, `[Equation status: ...]`, and `[Math status: ...]` lines and `⟦withheld: ...⟧` markers. Read these before using any number or formula. Read the reason in a status line's parentheses, not only the status: `single-route` has several meanings, and some confirm the numbers but not their labels. For what each status line means, load [extraction diagnostics](references/verification-workflow.md).
+Sidecar-backed tool results carry a `reliability` field (`block_status`, `requires_pdf_check`, `pdf_pages`, `check_pages`, and a paper-level `item_level`/`item_warning`); `zotero_semantic_search` shows it as `Reliability` and `Item warning` lines on each hit. Sidecars may also show visible `[Table status: ...]`, `[Equation status: ...]`, and `[Math status: ...]` lines and `⟦withheld: ...⟧` markers. Read these before using any number or formula. Read the reason in a status line's parentheses, not only the status: `single-route` has several meanings, and some confirm the numbers but not their labels. For what each status line means, load [extraction diagnostics](references/verification-workflow.md).
 
 | Block status | Screening / inventory | Final answer |
 |---|---|---|
@@ -128,7 +128,7 @@ Sidecar-backed tool results carry a `reliability` field (`block_status`, `requir
 
 Never fill a withheld number from memory, another route's guess, or a neighboring cell. A paper-level `item_warning` directs checks to the tables and pages it lists (`problem_tables`, `check_pages`): render those pages before using their values. A `verified` block elsewhere in the paper keeps its own status. A warning that lists no tables or pages, such as a legacy-unverified sidecar, applies to the whole paper. A sidecar result with no `reliability` field is `legacy-unverified`.
 
-`zotero_find_in_pdf` is a bounded literal lookup over the PDF text layer. It returns one-based PDF page locators, verbatim extracted windows, exact total/returned match counts, and text-layer coverage. Coverage is `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage cannot establish absence. Its PDF page index is distinct from a printed label, MinerU sidecar line, or indexed offset. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key in the locator.
+`zotero_find_in_pdf` is a bounded literal lookup over the PDF text layer. It returns one-based PDF page locators, verbatim extracted windows, exact total/returned match counts, and text-layer coverage. Coverage is `complete`, `partial_text_coverage`, or `no_usable_text`; a no-match on incomplete coverage cannot establish absence. Its PDF page index is distinct from a printed label, sidecar line, or indexed offset. On multi-PDF items, pass `attachment_key` and keep the echoed resolved attachment key in the locator.
 
 All extracted text can lose signs, digits, stars, or column alignment, including PDF text layers. The PDF text layer is not the authority: when a sidecar and PDF text disagree, neither wins, so render the page. In PDF text, a leading `2`, `)`, or odd character before a number can be a mis-encoded minus sign. On scanned pages, PDF text is a second OCR, not an independent check. A literal no-match for a number does not show that the number is absent, because mis-encoded signs break the match; search by the row label instead.
 If a value needed to support the answer is ambiguous, use unambiguous source prose or inspect the actual page/table image with an available tool.

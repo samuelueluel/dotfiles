@@ -23,7 +23,7 @@ REQUEST
 - An empty packet means the paper was read completely and contained no matching evidence under the rule (`examined_in_full: true`, `qualifying_evidence: false`). An empty packet is a valid negative finding.
 - Never call `zotero_audit_claims` inside an extraction run. That tool is for ordinary Zotero search only and cannot replace full-document extraction checks.
 - Never quote from memory or paraphrase. If a quote fails validation, copy the exact characters from the source text. Never edit the source file or weaken checks to force a pass.
-- Never create sidecars during a run. Papers that need sidecars are recorded on the `worklist` for Samuel to process locally with `zotero-sidecar.sh create`.
+- Never create sidecars during a run. Papers that need sidecars are recorded on the `worklist`; Samuel processes them separately through the [paper-processing pipeline](../zotero-pipeline/SKILL.md) (`zotero-process`). MinerU is retired.
 - No cloud OCR, no cloud embeddings, and no web downloads. Preprocessing stays completely local.
 - Sources with unresolvable issues (multiple conflicting PDFs, scanned pages without text, oversized files) fail closed and are marked `escalated`. Never force them through.
 - Never reprocess a finished paper; if a run is interrupted, resume from `pending`.
@@ -39,7 +39,7 @@ Workflow boundary: `zotero` handles ordinary search, identity, metadata, and cit
 
 Every run freezes an exact list of Zotero item keys at `init`. A collection expands and deduplicates all papers within it; `--item KEY`, `--items KEY1,KEY2`, or `--items-file FILE` selects explicit papers without requiring a shared collection. Downstream extraction operates on this frozen inventory, not on live collection membership.
 
-An extraction inventory is independent of the semantic search database. If completed sidecars need to be embedded later, pass those exact keys to `zotero_update_semantic_index(item_keys=[...])`.
+An extraction inventory is independent of the semantic search database. Papers processed from the worklist through `zotero-process` are indexed as part of that run; never re-embed during an extraction.
 
 `--items-file` accepts a JSON list of keys or objects with `item_key`, `title`, and `date`. Attachments, notes, and annotations are rejected.
 

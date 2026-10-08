@@ -5,6 +5,19 @@ description: Examines citation neighbors, resolved inbound-edge rankings, and bi
 
 # Zotero Citation Analysis
 
+## Choose the Graph Operation
+
+```text
+REQUEST
+├─ What a paper cites, or what cites it? ─────→ NEIGHBORS: zotero_get_citation_neighbors (depth=1)
+├─ Which papers share references? ────────────→ COUPLING: zotero_find_bibliographically_coupled_papers
+├─ Which work is most cited in a scope? ──────→ RANKING: zotero_rank_works_by_inbound_citations
+├─ How often a work appears in bibliographies? → STOP: use zotero-bibliography-search
+└─ Papers on a topic, not a seed paper? ──────→ STOP: use zotero-paper-discovery first
+```
+
+For detailed node and scope semantics, load [citation graph details](../../references/zotero/bibliography-graphs.md).
+
 ## Non-Negotiable Rules
 
 - State the graph scope and measure before calling a citation tool.
@@ -14,15 +27,6 @@ description: Examines citation neighbors, resolved inbound-edge rankings, and bi
 - External nodes establish incoming relationships and metadata only; they do not establish the external work's findings or outgoing bibliography.
 - Never call inbound degree a raw citation total, HITS score, hub score, or general centrality.
 - Read source passages separately before reporting substantive findings from any paper found through the graph.
-
-## Choose the Graph Operation
-
-- Direct cited or citing neighbors: `zotero_get_citation_neighbors`, `depth=1`.
-- Works sharing resolved references: `zotero_find_bibliographically_coupled_papers`.
-- Ranking by resolved inbound edges: `zotero_rank_works_by_inbound_citations`.
-- True bibliography occurrences: stop and use `zotero-bibliography-search` instead.
-
-For detailed node and scope semantics, load [citation graph details](../../references/zotero/bibliography-graphs.md).
 
 ## Scope Rules
 

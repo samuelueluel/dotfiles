@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Retired with MinerU; kept for history only.
+echo "zotero-resume-when-ready.sh: MinerU is retired (2026-10-08); production uses Surya sidecars via zotero_mcp.surya_batch." >&2; exit 3
 # zotero-resume-when-ready.sh — polls every 5 min; when the CPU rescue of the
 # 8 poison items finishes, auto-runs the documented resume path:
 #   1) start the :8082 embedder (replicates serve-embedder)

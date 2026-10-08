@@ -26,6 +26,7 @@ You are running in `claudebeta`, Samuel's Claude Code environment for empirical 
    - Sanity-check results against real-world economic logic. If an estimate has an unexpected sign, an elasticity is implausible, or a coefficient shifts wildly across specifications, flag it immediately for discussion.
    - Do not present exploratory runs as final paper-ready output. Keep execution interactive in the main session so intermediate diagnostics remain visible.
    - Record specifications, sample sizes, and estimates with their status in this session's working-state ledger as they are produced.
+   - After exporting a graph (`graph export … .png`), Read the PNG so it is drawn in the terminal, and look at it yourself before describing it.
 
 4. **Conceptual Sparring & Proactive Literature Grounding:**
    - Engage actively on conceptual questions: estimands, identification assumptions, potential biases (selection, measurement, omitted variables), mechanisms, and methodological tradeoffs.

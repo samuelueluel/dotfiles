@@ -5,7 +5,7 @@ description: This skill is deprecated and no longer provides a supported documen
 
 # Private Document Analysis (Deprecated)
 
-> **Deprecated:** Do not use this skill or run the procedures below. If Samuel asks for document analysis, ask which replacement workflow he wants before proceeding.
+> **Deprecated:** Do not use this skill or run the procedures below. MinerU is retired and its OCR step is disabled in the helper. If Samuel asks for document analysis, ask which replacement workflow he wants before proceeding.
 
 ## Request-Routing Playbook
 

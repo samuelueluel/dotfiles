@@ -149,7 +149,7 @@ def main() -> int:
 
     # coverage: pool items with a full sidecar must have chunks
     if args.pool:
-        sidecar_dir = Path.home() / ".config" / "zotero-mcp" / "mineru-sidecars"
+        sidecar_dir = Path.home() / ".config" / "zotero-mcp" / "surya-sidecars"
         db = sqlite3.connect(f"file:{os.path.expanduser('~/Zotero/zotero.sqlite')}?immutable=1", uri=True)
         missing: list[str] = []
         for coll in args.pool.split(","):

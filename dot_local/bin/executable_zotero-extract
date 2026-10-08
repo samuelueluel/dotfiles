@@ -6,7 +6,7 @@ This is the deterministic-code tier of the exhaustive extraction workflow
 
   1. freezes an explicit item scope, populated from a Zotero collection
      subtree or a caller-supplied list of Zotero parent items,
-  2. resolves each item's text source (MinerU sidecar preferred, PDF text
+  2. resolves each item's text source (Surya sidecar preferred, PDF text
      layer as the lower-fidelity fallback; ambiguous or oversized sources
      fail closed),
   3. validates worker evidence packets (schema + verbatim-quote-at-source
@@ -38,7 +38,7 @@ Usage:
 
 Environment:
   ZOTERO_LOCAL_API             default http://127.0.0.1:23119/api/users/0
-  ZOTERO_MINERU_SIDECAR_DIR    default ~/.config/zotero-mcp/mineru-sidecars
+  ZOTERO_MINERU_SIDECAR_DIR    default ~/.config/zotero-mcp/surya-sidecars (Surya; name kept)
   ZOTERO_STORAGE_DIR           default ~/Zotero/storage
   ZOTERO_EXTRACT_MAX_SOURCE_CHARS  default 400000; sources above this are
                                escalated (unit processing not yet implemented)
@@ -96,7 +96,7 @@ def api_base():
 def sidecar_dir():
     return Path(os.environ.get(
         "ZOTERO_MINERU_SIDECAR_DIR",
-        str(Path.home() / ".config" / "zotero-mcp" / "mineru-sidecars")))
+        str(Path.home() / ".config" / "zotero-mcp" / "surya-sidecars")))
 
 
 def storage_dir():

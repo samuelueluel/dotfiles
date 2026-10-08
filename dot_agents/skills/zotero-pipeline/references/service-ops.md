@@ -8,7 +8,7 @@
 - **Reranker (`127.0.0.1:8083`):** Mandatory for semantic evidence and fail-closed. If down, ask Samuel to run `serve-reranker`, then retry. Never substitute unranked results or remote models.
 - **Zotero Desktop (`127.0.0.1:23119`):** Required for metadata writes, CSL exports, and live full-text extraction. Read-only vector search works without Desktop (omitting live title/creator metadata).
 - **Live semantic tag filters:** Require readable local SQLite. After Zotero writes or sync, close Desktop and allow WAL checkpointing before relying on changed tags or item types; never retry without the supplied filter.
-- **VLM (`127.0.0.1:8084`):** Offline figure enrichment. Run `serve-vlm` for processing and `stop-vlm` immediately after to release RAM.
+- **Pipeline Surya OCR (`127.0.0.1:18090`, container `zotero-surya`) and Qwen VLM (`127.0.0.1:18084`, `zotero-vlm-rocm.sh`):** Started and stopped by the processing batch itself, one at a time. Neither should be running outside a processing run; if one is left over after a crash, stop only that container. The shared `serve-vlm` on `:8084` is not part of the pipeline.
 
 ## Error Diagnostic Map
 

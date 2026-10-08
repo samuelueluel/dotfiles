@@ -65,7 +65,8 @@ eligible_results:
   treatment, dose, denominator, population, geography, horizon
   result_class: main | subgroup | dosage | dynamic | supplemental | robustness | model_based
   specification status and evidence IDs (retained `zr1:...` IDs or
-  route-prefixed locators: `pdf:KEY:p12:label`, `mineru:KEY:line7`)
+  route-prefixed locators: `pdf:KEY:p12:label`, `mineru:KEY:line7`; the
+  `mineru:` prefix names any sidecar, now Surya)
   source_reported: whether the value is source-reported or agent-calculated
   calculation_method: for agent-calculated values — source inputs, formula,
   calculated result, and unit/scale

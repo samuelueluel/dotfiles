@@ -65,39 +65,19 @@
     "extensions/working-state-reminders.ts",
     "-builtin:mcp"
   ],
-  "defaultTools": ["+codemode"],
+  "defaultTools": [
+    "+codemode"
+  ],
   "codemode": {
     "mode": "on"
   },
-  "lastChangelogVersion": "1.0.1",
+  "lastChangelogVersion": "1.0.4",
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,
     "keepRecentTokens": 20000
-  },
-  "smartCompact": {
-    "mode": "auto",
-    "profile": "balanced",
-    "summaryModel": "openai-codex/gpt-6-luna",
-    "segmentationModel": "openai-codex/gpt-6-luna",
-    "verificationModel": "openai-codex/gpt-6-luna",
-    "summaryThinkingLevel": "xhigh",
-    "segmentationThinkingLevel": "xhigh",
-    "autoTriggerTimeoutMs": 300000,
-    "codexMaxCallMs": 300000,
-    "maxLatencyMs": 0,
-    "autoTrigger": true,
-    "autoTriggerStrategy": "settled",
-    "minContextPercent": 80,
-    "requireApproval": false,
-    "zeroCallEnabled": true,
-    "backupEnabled": true,
-    "scrubSecrets": true,
-    "agentToolAccess": "disabled",
-    "contextGraphEnabled": false,
-    "showStatus": false
   },
   "outputPad": 0,
   "retry": {

@@ -22,7 +22,7 @@ Pi uses its native readable terminal renderer for inline LaTeX. Display formulas
 2. **Use MathJax-Compatible LaTeX:** The renderer supports much more than a short command allowlist, but not every package or macro. If a formula is unsupported, pi-math preserves the original delimited source; it does not approximate the formula with Unicode.
 3. **No Math Inside Code Fences:** Code blocks (```) keep text raw on purpose. Never put math inside code fences unless you are explicitly showing raw `.tex` source code or Stata `esttab` output.
 4. **Keep Inline Delimiters Tight:** Write `$\beta_1$`, not `$ \beta_1 $`. Do not put whitespace immediately inside `$...$`, and always make sure opening and closing delimiters are paired.
-5. **Clean Up Extracted Formulas:** Text from web pages or MinerU sidecars often mixes messy OCR symbols with raw LaTeX. Always re-type formulas using clean LaTeX commands.
+5. **Clean Up Extracted Formulas:** Text from web pages or OCR sidecars often mixes messy OCR symbols with raw LaTeX. Always re-type formulas using clean LaTeX commands.
 
 ## Renderer Behavior and Common Constructs
 
