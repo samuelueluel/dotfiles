@@ -12,14 +12,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-LOGGER_MODEL = "openai-codex/gpt-6-luna"
-LOGGER_THINKING = "high"
-LOGGER_TIMEOUT_SECONDS = 900
+from agent_transcripts import read_transcript_text
+
+# Primary: Haiku 5.5 through Claude Code (`claude -p`, Claude subscription).
+# Fallback: DeepSeek V4.1 Flash through Pi on the US OpenRouter key, 1M-context
+# provider variant. Never route through Pi's claude-bridge provider.
+LOGGER_MODEL = "claude-haiku-5-5"
+FALLBACK_LOGGER_MODEL = "openrouter-us-max/deepseek/deepseek-v4.1-flash"
+LOGGER_THINKING = "max"
+LOGGER_TIMEOUT_SECONDS = 1500
 LOGGER_MAX_TRANSCRIPT_CHARS = 1_500_000
 _TOOL_RESULT_EXCERPT_CHARS = 2_500
 _TOOL_ARGUMENT_EXCERPT_CHARS = 8_000
 _THINKING_EXCERPT_CHARS = 1_200
 _WORKING_STATE_DIRECTORY = Path.home() / ".pi" / "agent" / "working-state"
+# Claude Code sessions keep theirs here (working-state plugin); UUIDs never collide.
+_CLAUDE_WORKING_STATE_DIRECTORY = Path.home() / ".claude" / "working-state"
 _SESSION_ID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 _WORKING_STATE_MAX_CHARS = 24_000
 _ALLOWED_THINKING = frozenset({"high", "max"})
@@ -43,6 +51,12 @@ high-trust evidence and is authoritative for exact numbers, commands, error
 strings, decisions, and open items; the transcript projection supplies
 narrative and coverage. If the file appears stale relative to late-session
 transcript activity, follow the transcript for those events.
+
+A trailing "files_changed" entry, when present, is the exact list of files a
+Claude Code session edited with its Edit, Write, or NotebookEdit tools,
+recorded mechanically by the working-state plugin (most recent first, with
+edit counts). Use it for artifacts. It omits files changed by shell commands
+or other tools, so the transcript may name more.
 
 When distilling outcomes, preserve the file's status qualifiers (ok, wrong,
 suspect, failed): a result marked wrong or suspect must never be reported as
@@ -254,6 +268,8 @@ def read_working_state(
             return None
         path = str(_WORKING_STATE_DIRECTORY / f"{session_id}.md")
         if not os.path.isfile(path):
+            path = str(_CLAUDE_WORKING_STATE_DIRECTORY / f"{session_id}.md")
+        if not os.path.isfile(path):
             return None
     try:
         content = Path(path).read_text(encoding="utf-8", errors="replace").strip()
@@ -272,6 +288,41 @@ def read_working_state(
         "mtime": datetime.fromtimestamp(mtime).astimezone().isoformat(timespec="seconds"),
         "truncated": truncated,
         "content": content,
+    }
+
+
+_FILES_CHANGED_MAX = 200
+
+
+def read_files_changed(session_id: str) -> dict[str, Any] | None:
+    """Read the working-state plugin's changed-files sidecar for a Claude Code session."""
+    if not isinstance(session_id, str) or not _SESSION_ID_RE.fullmatch(session_id):
+        return None
+    path = _CLAUDE_WORKING_STATE_DIRECTORY / f"{session_id}.files.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    rows = [
+        (file_path, entry)
+        for file_path, entry in data.items()
+        if isinstance(entry, dict)
+        and isinstance(entry.get("count"), int)
+        and isinstance(entry.get("last"), (int, float))
+    ]
+    if not rows:
+        return None
+    rows.sort(key=lambda row: row[1]["last"], reverse=True)
+    return {
+        "type": "files_changed",
+        "source": str(path),
+        "files": [
+            {"path": file_path, "edits": entry["count"]}
+            for file_path, entry in rows[:_FILES_CHANGED_MAX]
+        ],
+        "truncated": len(rows) > _FILES_CHANGED_MAX,
     }
 
 
@@ -388,6 +439,35 @@ def normalize_draft(value: dict[str, Any]) -> dict[str, Any]:
     return draft
 
 
+def _claude_command(thinking: str = LOGGER_THINKING, claude_path: str | None = None) -> list[str]:
+    thinking = str(thinking).strip().lower()
+    if thinking not in _ALLOWED_THINKING:
+        raise ValueError("session logger thinking must be high or max")
+    executable = claude_path or shutil.which("claude")
+    if not executable:
+        raise RuntimeError("cannot run session logger: claude executable not found")
+    # No tools, MCP servers, skills, settings, or saved session; the custom
+    # system prompt replaces Claude Code's default one.
+    return [
+        executable,
+        "--print",
+        "--model",
+        LOGGER_MODEL,
+        "--effort",
+        thinking,
+        "--tools",
+        "",
+        "--strict-mcp-config",
+        "--disable-slash-commands",
+        "--no-session-persistence",
+        "--setting-sources",
+        "",
+        "--system-prompt",
+        _SYSTEM_PROMPT,
+        _user_prompt(),
+    ]
+
+
 def _pi_command(thinking: str = LOGGER_THINKING, pi_path: str | None = None) -> list[str]:
     thinking = str(thinking).strip().lower()
     if thinking not in _ALLOWED_THINKING:
@@ -405,7 +485,7 @@ def _pi_command(thinking: str = LOGGER_THINKING, pi_path: str | None = None) -> 
         "--no-context-files",
         "--no-approve",
         "--model",
-        LOGGER_MODEL,
+        FALLBACK_LOGGER_MODEL,
         "--thinking",
         thinking,
         "--system-prompt",
@@ -415,31 +495,7 @@ def _pi_command(thinking: str = LOGGER_THINKING, pi_path: str | None = None) -> 
     ]
 
 
-def run_logger(
-    transcript_path: str,
-    *,
-    existing_summary: dict[str, Any] | None = None,
-    thinking: str = LOGGER_THINKING,
-    state_file: str | None = None,
-    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
-    pi_path: str | None = None,
-    flusher: Callable[[str], None] = flush_transcript,
-) -> dict[str, Any]:
-    """Return a validated draft without writing any summary or index files."""
-    path = os.path.realpath(os.path.expanduser(str(transcript_path)))
-    if not os.path.isfile(path):
-        raise FileNotFoundError(f"transcript not found: {path}")
-    flusher(path)
-    raw_transcript = Path(path).read_text(encoding="utf-8", errors="replace")
-    if not raw_transcript.strip():
-        raise ValueError("cannot log an empty transcript")
-    transcript = prepare_transcript(raw_transcript)
-    payload = transcript
-    working_state = read_working_state(_session_id(raw_transcript), state_file)
-    if working_state:
-        payload += json.dumps(working_state, ensure_ascii=False, separators=(",", ":")) + "\n"
-    command = _pi_command(thinking=thinking, pi_path=pi_path)
-    command[-1] = _user_prompt(existing_summary)
+def _run_model(command: list[str], payload: str, runner: Callable[..., subprocess.CompletedProcess[str]], label: str) -> dict[str, Any]:
     try:
         result = runner(
             command,
@@ -451,10 +507,57 @@ def run_logger(
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError("session logger timed out; no summary was written") from exc
+        raise RuntimeError(f"session logger ({label}) timed out") from exc
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
         if len(detail) > 1200:
             detail = detail[-1200:]
-        raise RuntimeError(f"session logger failed; no summary was written: {detail}")
+        raise RuntimeError(f"session logger ({label}) failed: {detail}")
     return normalize_draft(_extract_json(result.stdout))
+
+
+def run_logger(
+    transcript_path: str,
+    *,
+    existing_summary: dict[str, Any] | None = None,
+    thinking: str = LOGGER_THINKING,
+    state_file: str | None = None,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    pi_path: str | None = None,
+    claude_path: str | None = None,
+    flusher: Callable[[str], None] = flush_transcript,
+) -> dict[str, Any]:
+    """Return a validated draft without writing any summary or index files."""
+    path = os.path.realpath(os.path.expanduser(str(transcript_path)))
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"transcript not found: {path}")
+    flusher(path)
+    raw_transcript = read_transcript_text(path)
+    if not raw_transcript.strip():
+        raise ValueError("cannot log an empty transcript")
+    transcript = prepare_transcript(raw_transcript)
+    payload = transcript
+    session_id = _session_id(raw_transcript)
+    working_state = read_working_state(session_id, state_file)
+    if working_state:
+        payload += json.dumps(working_state, ensure_ascii=False, separators=(",", ":")) + "\n"
+    files_changed = read_files_changed(session_id)
+    if files_changed:
+        payload += json.dumps(files_changed, ensure_ascii=False, separators=(",", ":")) + "\n"
+    # Haiku first; any failure (missing CLI, usage limit, timeout, bad JSON)
+    # retries once on the OpenRouter fallback before giving up.
+    prompt = _user_prompt(existing_summary)
+    try:
+        primary = _claude_command(thinking=thinking, claude_path=claude_path)
+        primary[-1] = prompt
+        return _run_model(primary, payload, runner, LOGGER_MODEL)
+    except (RuntimeError, ValueError) as primary_error:
+        fallback = _pi_command(thinking=thinking, pi_path=pi_path)
+        fallback[-1] = prompt
+        try:
+            return _run_model(fallback, payload, runner, FALLBACK_LOGGER_MODEL)
+        except (RuntimeError, ValueError) as fallback_error:
+            raise RuntimeError(
+                f"session logger failed on both models; no summary was written. "
+                f"{primary_error} | {fallback_error}"
+            ) from fallback_error

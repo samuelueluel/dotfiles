@@ -15,6 +15,8 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Iterator
 
+from agent_transcripts import CLAUDE_PROJECTS_ROOT, claude_session_id, iter_claude_transcript_paths, open_transcript
+
 import pi_session_sqlite as session_db
 
 SUMMARY_INDEX_PATH = os.path.expanduser("~/.pi/agent/session-summaries.json")
@@ -254,6 +256,13 @@ def iter_session_paths() -> Iterator[str]:
             if real_path not in seen and os.path.isfile(real_path):
                 seen.add(real_path)
                 yield real_path
+    # Claude Code sessions; filed ones are symlinks into FOLDERS_ROOT and
+    # were already yielded above.
+    for path in iter_claude_transcript_paths():
+        real_path = os.path.realpath(path)
+        if real_path not in seen and os.path.isfile(real_path):
+            seen.add(real_path)
+            yield real_path
 
 
 def _message_text(content: Any) -> str:
@@ -278,7 +287,7 @@ def read_session_metadata(file_path: str) -> dict[str, Any]:
         "message_count": 0,
     }
     try:
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as handle:
+        with open_transcript(file_path) as handle:
             for line in handle:
                 if not line.strip():
                     continue
@@ -400,7 +409,7 @@ def session_path_index() -> dict[str, str]:
         stem = os.path.basename(path)
         if stem.endswith(".jsonl"):
             stem = stem[:-6]
-        candidate = stem.rsplit("_", 1)[-1] if "_" in stem else ""
+        candidate = stem.rsplit("_", 1)[-1] if "_" in stem else claude_session_id(path)
         if candidate:
             index.setdefault(candidate, path)
         else:
@@ -450,6 +459,8 @@ def workspace_for_path(file_path: str) -> str:
     except ValueError:
         pass
     if path == unfiled_dir or path.startswith(unfiled_dir + os.sep):
+        return "Unfiled"
+    if path.startswith(os.path.realpath(CLAUDE_PROJECTS_ROOT) + os.sep):
         return "Unfiled"
     try:
         relative = os.path.relpath(path, sessions_root)

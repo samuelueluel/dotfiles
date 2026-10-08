@@ -19,6 +19,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Iterable
 
+from agent_transcripts import CLAUDE_PROJECTS_ROOT, iter_claude_transcript_paths, open_transcript
+
 DB_PATH = os.path.expanduser("~/.pi/agent/session-log.sqlite")
 FOLDERS_ROOT = os.path.expanduser("~/.pi/agent/folders")
 SESSIONS_ROOT = os.path.expanduser("~/.pi/agent/sessions")
@@ -56,6 +58,8 @@ def _workspace_for_path(file_path: str) -> str:
         pass
     if path == unfiled_dir or path.startswith(unfiled_dir + os.sep):
         return "Unfiled"
+    if path.startswith(os.path.realpath(CLAUDE_PROJECTS_ROOT) + os.sep):
+        return "Unfiled"
     try:
         relative = os.path.relpath(path, sessions_root)
         if relative != os.pardir and not relative.startswith(os.pardir + os.sep):
@@ -75,6 +79,13 @@ def iter_session_paths() -> Iterable[str]:
             if real_path not in seen and os.path.isfile(real_path):
                 seen.add(real_path)
                 yield real_path
+    # Claude Code sessions; filed ones are symlinks into FOLDERS_ROOT and
+    # were already yielded above.
+    for path in iter_claude_transcript_paths():
+        real_path = os.path.realpath(path)
+        if real_path not in seen and os.path.isfile(real_path):
+            seen.add(real_path)
+            yield real_path
 
 
 def _message_text(content: Any) -> str:
@@ -125,7 +136,7 @@ def _parse_transcript(path: str) -> dict[str, Any]:
         stat = os.stat(path)
         metadata["size"] = int(stat.st_size)
         metadata["mtime_ns"] = int(stat.st_mtime_ns)
-        with open(path, "rb") as raw:
+        with open_transcript(path, binary=True) as raw:
             for line_number, raw_line in enumerate(raw, 1):
                 hasher.update(raw_line)
                 try:

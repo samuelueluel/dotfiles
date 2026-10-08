@@ -17,6 +17,13 @@ if LOCAL_LIB not in sys.path:
     sys.path.insert(0, LOCAL_LIB)
 
 from pi_session_summary import find_session_path, load_store, summary_search_text  # noqa: E402
+from agent_transcripts import (  # noqa: E402
+    claude_resume_command,
+    is_claude_transcript,
+    is_unfiled_claude_path,
+    iter_unfiled_claude_transcripts,
+    open_transcript,
+)
 
 from datetime import datetime
 
@@ -49,7 +56,7 @@ def parse_session_meta(file_path):
         "turn_count": 0,
     }
     try:
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+        with open_transcript(file_path) as f:
             for line in f:
                 if not line.strip():
                     continue
@@ -98,14 +105,29 @@ def parse_session_meta(file_path):
 
     display_title = meta["name"] if meta["name"] else (meta["first_prompt"] if meta["first_prompt"] else "Untitled conversation")
     meta["title"] = display_title
+    meta["agent"] = "claude" if is_claude_transcript(file_path) else "pi"
     return meta
+
+
+def unfiled_session_files():
+    """Unfiled Pi transcripts plus Claude Code transcripts not yet filed."""
+    files = glob.glob(os.path.join(UNFILED_DIR, "*.jsonl"))
+    files += list(iter_unfiled_claude_transcripts())
+    return files
+
+
+def claude_launch(session_path, expect_key=None):
+    """(command, cwd) resuming a Claude Code session; Stata keys use claudebeta."""
+    launcher = "claudebeta" if expect_key in ("ctrl-b", "ctrl-h", "beta", "betahat") else "claude"
+    cwd, command = claude_resume_command(session_path, launcher)
+    return command, (cwd if os.path.isdir(cwd) else None)
 
 def get_session_title(file_path):
     """Extract authoritative session name (session_info name prioritized over prompt)."""
     name = None
     first_msg = None
     try:
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as fp:
+        with open_transcript(file_path) as fp:
             for line in fp:
                 if not line.strip():
                     continue
@@ -156,6 +178,8 @@ def effective_session_title(meta, summary):
 def session_display(meta, folder, rel_time, summary_store):
     summary = get_summary(meta, summary_store)
     title = effective_session_title(meta, summary)
+    if meta.get("agent") == "claude":
+        title = "ĉ " + title
     display = f"  [{folder}] {rel_time:<8} {title}"
     snippet = summary_search_text(summary, limit=None)
     if snippet:
@@ -209,7 +233,7 @@ def cmd_source():
         print(f"{display}\tfolder:{folder}")
 
     # Top-level entry for unfiled
-    unfiled_files = glob.glob(os.path.join(UNFILED_DIR, "*.jsonl"))
+    unfiled_files = unfiled_session_files()
     unfiled_count = len(unfiled_files)
     latest_unfiled_mtime = max([os.path.getmtime(f) for f in unfiled_files]) if unfiled_files else time.time()
     rel_unfiled_time = format_relative_time(latest_unfiled_mtime)
@@ -267,7 +291,7 @@ def cmd_list_folder(folder):
     summary_store = load_picker_store()
 
     if folder == "Unfiled":
-        files = glob.glob(os.path.join(UNFILED_DIR, "*.jsonl"))
+        files = unfiled_session_files()
         files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
         print("➕ [New] Start fresh conversation (Unfiled)\tnew:Unfiled")
         for f in files:
@@ -295,7 +319,7 @@ def cmd_preview(target):
         else:
             fdir = os.path.join(FOLDERS_DIR, folder)
 
-        files = glob.glob(os.path.join(fdir, "*.jsonl"))
+        files = unfiled_session_files() if folder == "Unfiled" else glob.glob(os.path.join(fdir, "*.jsonl"))
         files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
         summary_store = load_picker_store()
 
@@ -323,6 +347,7 @@ def cmd_preview(target):
         print("  Ctrl+N → Start a fresh conversation in this folder")
         print("  Ctrl+R → Rename this workspace folder")
         print("  Session picker: Enter=pihat  Ctrl+B=betahat  Ctrl+L=pi  Ctrl+H=beta")
+        print("  Claude sessions (ĉ): Enter/Ctrl+L=claude  Ctrl+B/Ctrl+H=claudebeta")
         return
 
     if target.startswith("new:"):
@@ -387,6 +412,8 @@ def cmd_preview(target):
         # Determine folder name from path
         parent = os.path.dirname(session_path)
         folder = os.path.basename(parent) if parent != UNFILED_DIR else "Unfiled"
+        if is_unfiled_claude_path(session_path):
+            folder = "Unfiled"
 
         print(f"\033[1;36m{title}\033[0m")
         print(f"\033[2mFolder: {folder}  │  Updated: {dt} ({rel_time})  │  Turns: {meta['turn_count']}\033[0m")
@@ -405,6 +432,12 @@ def cmd_preview(target):
 
         print("─" * 50)
         print("\033[1;33mActions:\033[0m")
+        if meta.get("agent") == "claude":
+            print("  Claude Code session (ĉ)")
+            print("  Enter/Ctrl+L → Resume with claude")
+            print("  Ctrl+B/Ctrl+H → Resume with claudebeta (Stata)")
+            print("  Ctrl+M → Move/stash this chat into another folder")
+            return
         print("  Enter  → Resume with pihat (cloud)")
         print("  Ctrl+B → Resume with betahat (Stata + cloud)")
         print("  Ctrl+L → Resume with pi (local)")
@@ -444,6 +477,10 @@ def resolve_picker_launch(target_out, expect_key, home=None):
     if target_out.startswith("session:"):
         session_path = target_out[8:]
         meta = parse_session_meta(session_path)
+        if meta.get("agent") == "claude":
+            if expect_key == "ctrl-m":
+                return f"piwork stash '{session_path}'", None
+            return claude_launch(session_path, expect_key)
         cwd = meta["cwd"] if meta["cwd"] and os.path.isdir(meta["cwd"]) else ""
         project_cwd = cwd if cwd and os.path.realpath(cwd) != home else ""
 
@@ -529,9 +566,11 @@ def cmd_action(action_type, target):
         if action_type == "open":
             run_folder_session_picker(folder)
         elif action_type == "resume":
-            files = glob.glob(os.path.join(fdir, "*.jsonl"))
+            files = unfiled_session_files() if folder == "Unfiled" else glob.glob(os.path.join(fdir, "*.jsonl"))
             if files:
                 latest = max(files, key=os.path.getmtime)
+                if is_claude_transcript(latest):
+                    spawn_terminal(*claude_launch(latest))
                 spawn_terminal(f"pi --session '{latest}'")
             else:
                 spawn_terminal(f"piwork new '{folder}'")
@@ -577,6 +616,13 @@ def cmd_action(action_type, target):
         session_path = target[8:]
         meta = parse_session_meta(session_path)
         cwd = meta["cwd"] if meta["cwd"] and os.path.isdir(meta["cwd"]) else ""
+
+        if meta.get("agent") == "claude":
+            if action_type == "move":
+                spawn_terminal(f"piwork stash '{session_path}'")
+            else:
+                spawn_terminal(*claude_launch(session_path, action_type))
+            return
 
         if action_type in ("open", "pihat"):
             spawn_terminal(f"pihat --session '{session_path}'", cwd=cwd or home)

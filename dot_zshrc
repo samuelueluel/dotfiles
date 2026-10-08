@@ -1196,12 +1196,30 @@ betahat() {
     always { rm -f "$_state_file"; unset PI_STATE_FILE; printf '\a' > /dev/tty }
 }
 
-# claudebeta = Claude Code + Stata MCP/skills + beta research prompt (unsandboxed)
+# claude = Claude Code with a fixed niri-minimap title (ĉ = cloud Claude) and
+# the working-state plugin (~/.claude/local-plugins/working-state).
+# Claude Code normally retitles the window with the conversation topic, which
+# niri-minimap cannot classify, so that is disabled here.
+claude() {
+  printf '\033]2;ĉ - %s\007' "${PWD##*/}"
+  CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 command claude --plugin-dir "$HOME/.claude/local-plugins/working-state" "$@"
+}
+
+# claudefam = claude + the turbovault_family MCP server (~/Family-Vault/).
+# The server is defined only in ~/.claude/mcp-family.json, so plain claude and
+# claudebeta never connect to it or list its tools. To bring it into a running
+# session, quit and run: claudefam --resume <session-id>
+claudefam() {
+  claude --mcp-config "$HOME/.claude/mcp-family.json" "$@"
+}
+
+# claudebeta = Claude Code + Stata MCP/skills + research prompt
+# (~/.claude/claudebeta-prompt.md; separate from Pi's APPEND_SYSTEM_BETA.md)
 claudebeta() {
   local beta_prompt
-  beta_prompt="$(<"$HOME/.pi/agent/APPEND_SYSTEM_BETA.md")"$'\n\n'"Override: in claudebeta (Claude Code) there is no container sandbox; you run on the host with Stata via the stata MCP server."
-  printf '\033]2;cβ - %s\007' "${PWD##*/}"
-  claude --plugin-dir "$HOME/.claude/local-plugins/stata-beta" --append-system-prompt "$beta_prompt" "$@"
+  beta_prompt="$(<"$HOME/.claude/claudebeta-prompt.md")"
+  printf '\033]2;ĉβ - %s\007' "${PWD##*/}"
+  CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 command claude --plugin-dir "$HOME/.claude/local-plugins/stata-beta" --plugin-dir "$HOME/.claude/local-plugins/working-state" --append-system-prompt "$beta_prompt" "$@"
 }
 
 # --- LLM CODING BENCHMARK ---

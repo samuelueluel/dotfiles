@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "turbovault_family": {
+      "command": "/var/home/samuel/.local/bin/turbovault",
+      "args": ["--config", "/var/home/samuel/.config/turbovault/family.yaml", "--profile", "production"],
+      "env": {
+        "TURBOVAULT_DOCUMENT_INDEXING_ENABLED": "true",
+        "TURBOVAULT_DOCUMENT_MAX_BYTES": "52428800",
+        "XDG_CACHE_HOME": "/var/home/samuel/.cache/turbovault-family"
+      }
+    }
+  }
+}

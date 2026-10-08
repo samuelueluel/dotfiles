@@ -157,9 +157,78 @@ def test_explicit_override_reaches_payload() -> None:
         assert draft["title"] == "t"
 
 
+def test_files_changed_sidecar_reaches_payload() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        sidecar = psl._CLAUDE_WORKING_STATE_DIRECTORY / f"{SESSION_ID}.files.json"
+        sidecar.write_text(json.dumps({"/a.do": {"count": 2, "last": 5}, "/b.py": {"count": 1, "last": 9}}), encoding="utf-8")
+        try:
+            entry = psl.read_files_changed(SESSION_ID)
+            assert entry is not None and entry["type"] == "files_changed"
+            assert [f["path"] for f in entry["files"]] == ["/b.py", "/a.do"]
+            assert psl.read_files_changed(OTHER_ID) is None
+            transcript = os.path.join(tmp, "session.jsonl")
+            Path(transcript).write_text(make_transcript(tmp), encoding="utf-8")
+            draft = psl.run_logger(
+                transcript,
+                runner=_stub_runner_expected_payload('"type":"files_changed"'),
+                flusher=lambda _p: None,
+            )
+            assert draft["title"] == "t"
+        finally:
+            sidecar.unlink()
+
+
+def _logger_runner(fail_models: set[str], calls: list[str]):
+    def runner(command, input=None, **kwargs):  # noqa: A002
+        model = command[command.index("--model") + 1]
+        calls.append(model)
+        if model in fail_models:
+            return subprocess.CompletedProcess(command, 1, stdout="", stderr="usage limit reached")
+        draft = {
+            "title": model, "summary": "s", "outcomes": "o", "artifacts": "a",
+            "open_items": "", "keywords": [],
+        }
+        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(draft), stderr="")
+
+    return runner
+
+
+def test_haiku_first_then_openrouter_fallback() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        transcript = os.path.join(tmp, "session.jsonl")
+        Path(transcript).write_text(make_transcript(tmp), encoding="utf-8")
+        kwargs = dict(flusher=lambda _p: None, claude_path="/x/claude", pi_path="/x/pi")
+        calls: list[str] = []
+        draft = psl.run_logger(transcript, runner=_logger_runner(set(), calls), **kwargs)
+        assert calls == [psl.LOGGER_MODEL] and draft["title"] == "claude-haiku-5-5"
+        calls = []
+        draft = psl.run_logger(transcript, runner=_logger_runner({psl.LOGGER_MODEL}, calls), **kwargs)
+        assert calls == [psl.LOGGER_MODEL, psl.FALLBACK_LOGGER_MODEL]
+        assert draft["title"] == "openrouter-us-max/deepseek/deepseek-v4.1-flash"
+        try:
+            psl.run_logger(
+                transcript,
+                runner=_logger_runner({psl.LOGGER_MODEL, psl.FALLBACK_LOGGER_MODEL}, []),
+                **kwargs,
+            )
+        except RuntimeError as exc:
+            assert "both models" in str(exc)
+        else:
+            raise AssertionError("expected failure on both models")
+
+
+def test_claude_command_is_isolated_and_max_effort() -> None:
+    command = psl._claude_command(claude_path="/x/claude")
+    assert command[command.index("--effort") + 1] == "max"
+    assert command[command.index("--tools") + 1] == ""
+    for flag in ("--no-session-persistence", "--strict-mcp-config", "--disable-slash-commands"):
+        assert flag in command
+
+
 if __name__ == "__main__":
-    with tempfile.TemporaryDirectory() as state_dir:
+    with tempfile.TemporaryDirectory() as state_dir, tempfile.TemporaryDirectory() as claude_dir:
         psl._WORKING_STATE_DIRECTORY = Path(state_dir)
+        psl._CLAUDE_WORKING_STATE_DIRECTORY = Path(claude_dir)
         check("session id extracted", test_session_id_extracted)
         check("autodetect finds only own state file", test_autodetect_finds_only_own_state_file)
         check("autodetect silent when absent or empty", test_autodetect_silent_when_absent_or_empty)
@@ -168,6 +237,9 @@ if __name__ == "__main__":
         check("run logger appends only matching working state", test_run_logger_appends_only_matching_state_entry)
         check("run logger without matching state stays transcript only", test_run_logger_without_state_file_stays_transcript_only)
         check("explicit override reaches payload", test_explicit_override_reaches_payload)
+        check("files-changed sidecar reaches payload", test_files_changed_sidecar_reaches_payload)
+        check("haiku first then openrouter fallback", test_haiku_first_then_openrouter_fallback)
+        check("claude command is isolated and max effort", test_claude_command_is_isolated_and_max_effort)
     if FAILURES:
         print(f"\n{len(FAILURES)} failing: {', '.join(FAILURES)}")
         sys.exit(1)

@@ -1,0 +1,34 @@
+{
+  "name": "working-state",
+  "version": "0.2.0",
+  "description": "Per-session working-state file for Claude Code: path and rules in the system prompt, restore after compaction and resume, staleness and pre-compaction nudges.",
+  "userConfig": {
+    "staleThreshold": {
+      "type": "number",
+      "title": "Stale threshold",
+      "description": "Successful tool calls without a state-file change before a staleness nudge.",
+      "default": 15
+    },
+    "maxNudgesPerPrompt": {
+      "type": "number",
+      "title": "Max staleness nudges per prompt",
+      "description": "Cap on staleness nudges between two user prompts.",
+      "default": 2
+    },
+    "compactAtTokens": {
+      "type": "number",
+      "title": "Compaction point (tokens)",
+      "description": "Context size where compaction is expected; 0 reads Claude Code's own threshold (autoCompactWindow).",
+      "default": 0
+    },
+    "preCompactMargin": {
+      "type": "number",
+      "title": "Pre-compaction warning margin (tokens)",
+      "description": "Warn this many tokens before the compaction point.",
+      "default": 40000
+    }
+  },
+  "author": {
+    "name": "Samuel"
+  }
+}

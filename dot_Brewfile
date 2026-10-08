@@ -29,6 +29,9 @@ brew "tealdeer"    # simplified man pages (fast Rust tldr client)
 brew "yq"          # jq-style processor for YAML/TOML/XML
 brew "ouch"        # archive tool (zip, tar, gz, zst, etc.)
 brew "pandoc"       # universal document converter (used by pi-markdown-preview)
+brew "resvg"        # SVG rasterizer — used by the Claude Code figures plugin for math and SVG
+brew "graphviz"     # dot diagrams — drawn inline by the Claude Code figures plugin
+brew "d2"           # d2 diagrams — drawn inline by the Claude Code figures plugin
 brew "vdirsyncer"  # sync CalDAV/CardDAV calendars/contacts to local storage
 brew "yt-dlp"      # video downloader
 brew "starship"    # cross-shell prompt

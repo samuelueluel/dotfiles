@@ -1,0 +1,11 @@
+# Third-party Claude Code plugins, pinned to a reviewed commit. To update:
+# review the new commit's source, then change the SHA in the URL.
+
+# figures: math, diagrams, and tool images drawn inline in Ghostty.
+# Reviewed 2026-10-07 at eb233df (no network; runs only resvg/magick/dot/d2/mmdr;
+# writes only $TMPDIR/claude-figures). Needs resvg (~/.Brewfile).
+[".claude/local-plugins/figures"]
+    type = "archive"
+    url = "https://github.com/natsukium/claude-code-figures-plugin/archive/eb233df665778b6c9e17edac8355189eed94cd0e.tar.gz"
+    stripComponents = 1
+    exact = false

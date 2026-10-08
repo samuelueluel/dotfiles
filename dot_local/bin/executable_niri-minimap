@@ -301,7 +301,7 @@ def lookup_icon_name(app_id, icon_theme):
 def detect_agent_info(
     app_id, title, is_urgent=False, is_focused=False, is_acknowledged=False
 ):
-    """Detect if a terminal window is running a CLI agent (agy, pi, pihat, beta, betahat).
+    """Detect if a terminal window is running a CLI agent (agy, claude, claudebeta, pi, pihat, beta, betahat).
     Returns (label_text, badge_color_hex, is_urgent_alert, has_widehat) or None.
     """
     if not app_id or "ghostty" not in app_id.lower():
@@ -322,6 +322,18 @@ def detect_agent_info(
     if re.search(r"\b(agy|antigravity)\b", t_lower):
         agent_type = "agy"
         default_label = "a"
+    # Claude Code launchers title windows "ĉ - dir" / "ĉβ - dir"; check before
+    # the beta/pi branches because "ĉβ" also contains β.
+    elif "ĉβ" in t_clean or "c\u0302β" in t_clean:
+        agent_type = "claudebeta"
+        default_label = "β"
+        default_color = "#D97757"  # Claude orange
+        has_hat = True
+    elif t_clean.startswith(("ĉ", "c\u0302")):
+        agent_type = "claude"
+        default_label = "c"
+        default_color = "#D97757"  # Claude orange
+        has_hat = True
     elif "betahat" in t_lower or "β̂" in t or "\u03b2\u0302" in t or "β^" in t:
         agent_type = "betahat"
         default_label = "β"
