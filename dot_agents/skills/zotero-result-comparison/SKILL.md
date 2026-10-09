@@ -150,7 +150,19 @@ Lead with the winner and the qualification needed to interpret it. Normally give
 - Material differences in dose, denominator, population, area, or horizon.
 - One bounded uncertainty statement if the conclusion is limited to verified estimates.
 
-Respect the requested output boundary. If both the numerical and substantive winner are clear, analyze one paper. When estimands differ materially and Samuel permits alternatives, report the top three even if one paper is the numerical leader, and say so directly. Analyze no unselected paper; name the remaining papers without statistics or summary. Follow `citation-integrity` for claim-level footnotes; one tightly bounded table or passage may use one marker for several values.
+Respect the requested output boundary. If both the numerical and substantive winner are clear, analyze one paper. When estimands differ materially and Samuel permits alternatives, report the top three even if one paper is the numerical leader, and say so directly. Analyze no unselected paper; name the remaining papers without statistics or summary. Follow `citation-integrity` for claim-level footnotes; one tightly bounded table or passage may use one marker for several values. Shape the answer like this:
+
+```markdown
+<Verdict: the winner under the stated basis, or "No clean winner" and the reason (outcome, timing, or design differ).>[^c1]
+
+| Paper | Outcome and scale | Estimate (inference) | Dose, population, horizon |
+<decisive papers only>
+
+<Agent calculations, labeled as calculations, after the source-reported values.>
+<Caveats: only the design and timing differences that change the reading.>
+
+### Evidence
+```
 
 ## Evidence Invariants
 

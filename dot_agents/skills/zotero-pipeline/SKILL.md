@@ -26,7 +26,7 @@ REQUEST
 - Use exact parent item keys. Never turn an unresolved or empty collection into an unscoped run, embed or re-embed.
 - Only one pipeline GPU server runs at a time. The batch starts and stops its own Surya (`:18090`) and Qwen (`:18084`) servers; never start them by hand for a live run, and never run a host-wide `pkill llama-server`.
 - Ask Samuel to run `serve-embedder` or `serve-reranker` when they are down. Never start or stop them yourself.
-- Do not stop a run during its `index` stage unless it is hung: indexing deletes an item's chunks before writing the new ones, so the item has no chunks until the run is resumed.
+- Since `samuel-v0.11.0.27`, indexing keeps an item's old chunks until its new ones are written, and `zotero-process` indexes one item per call with a 90-minute timeout. A stopped or hung index stage leaves interrupted items on their old chunks; resume the run to finish them.
 - Before deleting chunks, archiving an index, or approving a mass rebuild, show the exact targets and get Samuel's explicit approval. Use the reviewed helpers under `scripts/`; never substitute raw destructive shell commands.
 - Never upload PDFs to Zotero Cloud. Adding and linking items belongs to [library management](../zotero-library/SKILL.md).
 - Never download, parse or embed a paper merely because it appears in a bibliography.

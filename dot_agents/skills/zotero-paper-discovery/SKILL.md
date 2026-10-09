@@ -89,7 +89,17 @@ For each included paper with an accessible PDF, try to locate a distinctive part
 
 Persist the frozen list to `~/.agents/scratch/<YYYY-MM-DD>-<task-slug>-discovery.md` — keys, rationale, evidence IDs or chunk IDs, and actual locators only, no prose — so a compacted or later session resumes without re-reads. Rebuild the file if the scope changes; never trust a stale one.
 
-Follow the compact paper-list format in `citation-integrity`; metadata-only rows need no footnote. Do not enumerate screened-out papers unless Samuel requests exclusions or one materially limits the result.
+Follow the compact paper-list format in `citation-integrity`; metadata-only rows need no footnote. Shape the answer like this:
+
+```markdown
+<Lead: how many papers qualify in which scope, and how the list is grouped if the rule has natural groups.>
+
+| Paper | Relevance | Evidence |
+<one row per included paper; title linked to the verified PDF page>
+
+<Close calls excluded: one line each, only when the exclusion is consequential.>
+<Coverage statement, plus any item warnings a later task inherits.>
+``` Do not enumerate screened-out papers unless Samuel requests exclusions or one materially limits the result.
 
 ## Evidence Rules
 

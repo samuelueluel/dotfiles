@@ -37,7 +37,7 @@ Most time is OCR; scanned pages and dense tables are slowest. A seeded rerun ski
 
 ## Stopping and Resuming
 
-- Stop a run with `systemctl --user stop zotero-surya-<name>`. Avoid stopping during `index`, which leaves the item being indexed without chunks until resumed.
+- Stop a run with `systemctl --user stop zotero-surya-<name>`. Stopping during `index` is safe: the item being indexed keeps its old chunks (or has none if it is new) until the run is resumed.
 - Resume by rerunning `zotero-process start` with the same `--run` name and the same keys. Completed stages are skipped. If an item's PDF hash changed, its stages restart.
 - A run name with a different scope is refused; choose a new name instead of editing `state.json`.
 - After a crash, check `podman ps` for a leftover `zotero-surya` or Qwen container before resuming, and stop only that container.

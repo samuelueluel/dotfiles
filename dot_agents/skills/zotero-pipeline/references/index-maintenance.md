@@ -26,7 +26,7 @@ ZOTERO_LOCAL=true "$HOME/.local/share/uv/tools/zotero-mcp-server/bin/zotero-mcp-
   --item-key <ITEM_KEY> [--item-key <ANOTHER_ITEM_KEY>]
 ```
 
-`--item-key` is repeatable and accepts live parent keys only. `--limit`, `--force-rebuild` and Batch API mode are rejected, so the request cannot broaden into a partial or destructive library update. The route bypasses DOI/title deduplication, skips the library deletion pass and leaves the sync watermark alone. Back up `chroma_db` and `bm25_index.json` first, as `zotero-process start` does.
+Re-embed many items with one call per item (a loop over keys), not one call over the whole set: a call that hangs costs only its item, and since `samuel-v0.11.0.27` an interrupted item keeps its old chunks. `--item-key` is repeatable and accepts live parent keys only. `--limit`, `--force-rebuild` and Batch API mode are rejected, so the request cannot broaden into a partial or destructive library update. The route bypasses DOI/title deduplication, skips the library deletion pass and leaves the sync watermark alone. Back up `chroma_db` and `bm25_index.json` first, as `zotero-process start` does.
 
 ## Sparse (BM25) Index
 

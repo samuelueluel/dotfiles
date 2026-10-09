@@ -105,7 +105,20 @@ For a decisive table value:
 
 Lead with the requested finding. Keep the source's scale and qualifications attached to the claim. Follow `citation-integrity` for material claims, exact statistics, and source locations.
 
-Use one citation marker for several values from the same tightly bounded result context. Do not add an unrelated literature review, retrieval diary, or audit-status section.
+Use one citation marker for several values from the same tightly bounded result context. Do not add an unrelated literature review, retrieval diary, or audit-status section. Shape the answer like this:
+
+```markdown
+<Lead: the requested finding with its scale, sample, and inference.>[^c1]
+
+<Table only when several values were asked for: one row per estimate, columns as printed (estimate, SE or CI, p), in the source's notation.>
+
+<A few bullets only for context the reader needs: specification, sample, and any verified discrepancy, such as prose and table disagreeing, reported as printed.>
+
+**Check yourself** <only for unverified flagged values; see citation-integrity>
+
+### Evidence
+[^c1]: [Author — Title (Year)](zotero://select/library/items/KEY); Table 2, [PDF p. 6](zotero://open-pdf/library/items/ATT_KEY?page=6).
+```
 
 ## Failure Boundaries
 

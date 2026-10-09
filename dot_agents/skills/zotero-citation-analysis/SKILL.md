@@ -67,7 +67,7 @@ An empty result can reflect low reference-resolution coverage rather than substa
 
 Call `zotero_rank_works_by_inbound_citations` with an explicit scope, collection key when needed, and bounded `top_n`.
 
-Report the measure as `resolved inbound edges`. Attach the returned resolution-coverage limitation. Do not compare it directly with publisher, Google Scholar, or raw bibliography citation counts.
+Report the measure as `resolved inbound edges`. Attach the returned resolution-coverage limitation. Every result carries `tied_beyond_top_n`, the number of works tied with the last returned rank but cut off. In every list you show, including secondary lists such as a collection-only tail, end at a complete tie: when the count is above zero, rerun with a larger `top_n` and name the tied works, or state "N more works tied at K edges". Do not compare it directly with publisher, Google Scholar, or raw bibliography citation counts.
 
 ## Identity and External Nodes
 
@@ -79,7 +79,16 @@ Report the measure as `resolved inbound edges`. Attach the returned resolution-c
 
 ## Answer
 
-Name the exact graph measure, scope, direction, and node type in the result. Use `citation-integrity` for graph claims and evidence locators.
+Name the exact graph measure, scope, direction, and node type in the result. Use `citation-integrity` for graph claims and evidence locators. Shape the answer like this:
+
+```text
+<Lead sentence: the answer, its measure ("16 resolved inbound edges"), and the scope used>
+
+| # | Work (linked title; "not in your library" for external nodes) | Resolved inbound edges |
+  (one row per work; tied works share a rank such as "4–9 (tied)"; the list ends at a complete tie)
+
+<Coverage: resolved and unresolved entry counts from resolution_coverage; the counts are a lower bound, not publisher citation counts>
+```
 
 If Samuel then asks what a discovered paper finds, switch to `zotero-source-reading`; graph evidence cannot support findings.
 

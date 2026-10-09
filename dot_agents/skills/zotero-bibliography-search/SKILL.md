@@ -70,7 +70,15 @@ Return a compact citing-paper list with:
 - Resolution status and target key/node when available.
 - Exact occurrence and distinct-paper counts, or a clear capped/lower-bound statement.
 
-Use `citation-integrity` for evidence wording. Do not infer substantive findings from the bibliography.
+Use `citation-integrity` for evidence wording. Do not infer substantive findings from the bibliography. Shape the answer like this:
+
+```markdown
+<Lead: N occurrences in M distinct citing papers within the scope, or a stated lower bound.>
+
+| Citing paper (linked title, key) | Bibliography entry (excerpt) | Resolution |
+
+<Cap or unresolved-entry caveat.>
+```
 
 ## Stop Condition
 
